@@ -407,7 +407,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         <div className="mb-10 border-b border-zinc-700 pb-8">
                             <h1 className="text-3xl font-medium text-white mb-4">Help</h1>
                             <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
-                                Here's how to navigate the spiderweb and master the tools for deep musical exploration.
+                                Here's how to navigate the connections map and master the tools for deep musical exploration.
                             </p>
                         </div>
 
@@ -415,7 +415,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                             <div className="space-y-8">
                                 <p className="text-zinc-400 text-base leading-relaxed">
-                                    The artists you choose (your "seeds") determine the musical DNA of your spiderweb.
+                                    The artists you choose (your "roots") determine the musical DNA of your connections map.
                                 </p>
                                 <ul className="space-y-6">
                                     <li className="flex gap-5">
@@ -442,7 +442,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
 
                     <HelpSection id="getting-around" title="Getting around the map">
                         <p className="text-zinc-400 max-w-3xl mb-12 text-base leading-relaxed">
-                            The Spiderweb is meant to be explored organically. Pan and zoom to find interesting clusters.
+                            The Connections map is meant to be explored organically. Pan and zoom to find interesting clusters.
                         </p>
                         
                         <InteractionVisual />
@@ -620,7 +620,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 </div>
                                 <h4 className="text-base font-medium text-white">5 Tokens (~£0.50)</h4>
                                 <p className="text-sm text-zinc-400 leading-relaxed">
-                                    Curate a full relational spiderweb from a single artist seed, mapping labels, genres, origins, and eras.
+                                    Curate a full relational connections map from a single artist seed, mapping labels, genres, origins, and eras.
                                 </p>
                             </div>
 

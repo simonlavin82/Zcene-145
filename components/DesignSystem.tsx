@@ -551,8 +551,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'color-palette', title: 'Color Palette' },
         { id: 'layout-spacing', title: 'Layout & Spacing' },
         { id: 'iconography', title: 'Iconography' },
-        { id: 'spiderweb-legends', title: 'Spiderweb Legends' },
-        { id: 'spiderweb-controls', title: 'Spiderweb Controls' },
+        { id: 'spiderweb-legends', title: 'Connections Legends' },
+        { id: 'spiderweb-controls', title: 'Connections Controls' },
         { id: 'mobile-navigation', title: 'Mobile Navigation Bar' },
         { id: 'buttons', title: 'Buttons' },
         { id: 'toggles', title: 'Toggles' },
@@ -780,7 +780,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     <section id="typography">
                         <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Typography Scale</h2>
                         <p className="text-sm text-zinc-400 mb-12 max-w-2xl leading-relaxed">
-                            Our typography system balances 1990s aesthetic impact with modern legibility. We use heavy weights (Bold) for large headlines while employing medium weights (Medium 500) and wide tracking (tracking-widest) for all-caps section markers and panel headers ("YOUR ZCENES", "ARTISTS", "SPIDERWEB", "DEEP CUTS") to ensure category labels act as understated structural markers without competing with main project titles or brand logos.
+                            Our typography system balances 1990s aesthetic impact with modern legibility. We use heavy weights (Bold) for large headlines while employing medium weights (Medium 500) and wide tracking (tracking-widest) for all-caps section markers and panel headers ("YOUR ZCENES", "ROOTS", "CONNECTIONS", "DEEP CUTS") to ensure category labels act as understated structural markers without competing with main project titles or brand logos.
                         </p>
                         <div className="space-y-16">
                             {/* Font Families */}
@@ -1332,7 +1332,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                     {/* 6. SPIDERWEB LEGENDS */}
                     <section id="spiderweb-legends">
-                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Spiderweb Legends</h2>
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Connections Legends</h2>
                         
                         <div className="space-y-12">
                             <div>
@@ -1527,7 +1527,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                     {/* SPIDERWEB CONTROLS */}
                     <section id="spiderweb-controls">
-                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Spiderweb Controls</h2>
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Connections Controls</h2>
                         <p className="text-base text-zinc-300 leading-relaxed max-w-3xl mb-12">
                             The Spiderweb canvas employs a dedicated set of floating controls utilizing the <code>CanvasControlStyles</code> primitive. These controls ensure consistent interaction models for zoom, centering, filtering, and search logic overlaying the D3 canvas.
                         </p>

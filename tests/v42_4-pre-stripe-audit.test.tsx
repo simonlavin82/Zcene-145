@@ -137,5 +137,47 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     // index.html meta description
     expect(htmlSrc).toContain('<meta name="description" content="Independent, ad-free visual music discovery engine.');
   });
+
+  it('6. Verifies Landing Page Lexicon Modernization (Roots & Connections) & Get Up Kids / Jimmy Eat World UI parity', () => {
+    const homeSrc = fs.readFileSync(path.resolve(__dirname, '../components/HomePage.tsx'), 'utf-8');
+    const exampleGraphSrc = fs.readFileSync(path.resolve(__dirname, '../components/ExampleMusicGraph.tsx'), 'utf-8');
+    const deepCutsSrc = fs.readFileSync(path.resolve(__dirname, '../components/CollectionIntelligenceVisual.tsx'), 'utf-8');
+    const engineSrc = fs.readFileSync(path.resolve(__dirname, '../components/EnginePage.tsx'), 'utf-8');
+    const archSrc = fs.readFileSync(path.resolve(__dirname, '../architecture_truth.md'), 'utf-8');
+
+    // HomePage Lexicon
+    expect(homeSrc).toContain('visual connections map');
+    expect(homeSrc).not.toContain('visual spiderweb');
+    expect(homeSrc).toContain('>Roots</h2>');
+    expect(homeSrc).not.toContain('>Artists</h2>');
+    expect(homeSrc).toContain('>Connections</h2>');
+    expect(homeSrc).not.toContain('>Spiderweb</h2>');
+
+    // ExampleMusicGraph UI Parity (Get Up Kids + Jimmy Eat World)
+    expect(exampleGraphSrc).toContain("['The Get Up Kids', 'Jimmy Eat World']");
+    expect(exampleGraphSrc).toContain("id: 'The Get Up Kids'");
+    expect(exampleGraphSrc).toContain("id: 'Jimmy Eat World'");
+    expect(exampleGraphSrc).toContain("id: 'Vagrant'");
+    expect(exampleGraphSrc).toContain("id: 'Doghouse'");
+    expect(exampleGraphSrc).toContain("id: 'Midwest Emo'");
+
+    // CollectionIntelligenceVisual UI Parity
+    expect(deepCutsSrc).toContain('The Get Up Kids');
+    expect(deepCutsSrc).toContain('Jimmy Eat World');
+    expect(deepCutsSrc).toContain('5/5 Hits');
+    expect(deepCutsSrc).toContain('2/5 Hits');
+    expect(deepCutsSrc).toContain('https://is1-ssl.mzstatic.com/image/thumb/Music/54/81/df/mzi.hvbwtrse.jpg/600x600bb.jpg');
+    expect(deepCutsSrc).toContain('Matt Pryor');
+    expect(deepCutsSrc).toContain('Vagrant, Doghouse');
+    expect(deepCutsSrc).not.toContain('Sunami');
+    expect(deepCutsSrc).not.toContain('Concrete Cowboy');
+
+    // Engine & Architecture Parity
+    expect(engineSrc).toContain('Sync: Render Connections');
+    expect(engineSrc).toContain('topological connections graph');
+    expect(archSrc).toContain('rich connections graph density');
+    expect(archSrc).toContain('Connections graph node tooltips must prioritize');
+    expect(archSrc).toContain('hasUniqueSpiderweb: true'); // Immutable contract preserved
+  });
 });
 

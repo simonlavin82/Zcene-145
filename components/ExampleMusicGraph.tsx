@@ -5,44 +5,104 @@ import { GraphData, Node, Link } from '../types';
 import { LegendSymbol } from './Icons';
 import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
 
-// A static, predefined graph for the example animation that mirrors real app data structure
+// A static, predefined graph for the example animation that mirrors real app data structure (The Get Up Kids + Jimmy Eat World)
 const exampleGraphData: GraphData = {
   nodes: [
-    { id: 'Jimmy Eat World', type: 'artist', group: 1 },
-    { id: '1993', type: 'founded', group: 1 },
-    { id: 'Emo', type: 'genre', group: 2 },
-    { id: 'Alternative Rock', type: 'genre', group: 2 },
-    { id: 'Vagrant Records', type: 'label', group: 3 },
+    // Root Artists (Seeds)
+    { id: 'The Get Up Kids', type: 'artist', group: 1, isSeed: true },
+    { id: 'Jimmy Eat World', type: 'artist', group: 1, isSeed: true },
+
+    // Record Labels
+    { id: 'Vagrant', type: 'label', group: 2 },
+    { id: 'Doghouse', type: 'label', group: 2 },
+    { id: 'Jade Tree', type: 'label', group: 2 },
+    { id: 'Polyvinyl Record Co.', type: 'label', group: 2 },
+    { id: 'Crank! A Record Company', type: 'label', group: 2 },
+
+    // Genres & Scenes
+    { id: 'Midwest Emo', type: 'genre', group: 3 },
+    { id: 'Emo', type: 'genre', group: 3 },
+    { id: 'Alternative Rock', type: 'genre', group: 3 },
+    { id: 'Post Hardcore', type: 'genre', group: 3 },
+
+    // Origins
     { id: 'United States', type: 'country', group: 4 },
-    // AI Suggested Artists (Simulating recommendations)
-    { id: 'The Get Up Kids', type: 'artist', group: 5 },
-    { id: 'Weezer', type: 'artist', group: 5 },
-    { id: 'blink-182', type: 'artist', group: 6 },
-    { id: '1992', type: 'founded', group: 6 },
-    { id: 'Pop Punk', type: 'genre', group: 2 },
-    { id: 'MCA Records', type: 'label', group: 7 },
-    { id: 'Alkaline Trio', type: 'artist', group: 9 },
-    { id: 'Punk Rock', type: 'genre', group: 10 },
+
+    // Eras / Founded
+    { id: '1995', type: 'founded', group: 5 },
+    { id: '1993', type: 'founded', group: 5 },
+    { id: '1997', type: 'founded', group: 5 },
+    { id: '1998', type: 'founded', group: 5 },
+    { id: '1991', type: 'founded', group: 5 },
+
+    // Discovered Artists (Deep Cuts)
+    { id: 'The Promise Ring', type: 'artist', group: 6 },
+    { id: 'Braid', type: 'artist', group: 6 },
+    { id: 'Texas Is the Reason', type: 'artist', group: 6 },
+    { id: 'The Casket Lottery', type: 'artist', group: 6 },
+    { id: 'The Anniversary', type: 'artist', group: 6 },
+    { id: 'Reggie and the Full Effect', type: 'artist', group: 6 },
+    { id: 'Christie Front Drive', type: 'artist', group: 6 },
+    { id: 'Sense Field', type: 'artist', group: 6 },
+    { id: 'Saves The Day', type: 'artist', group: 6 },
+    { id: 'The Appleseed Cast', type: 'artist', group: 6 },
+    { id: 'Jejune', type: 'artist', group: 6 },
   ],
   links: [
+    // Cross-Anchor & Direct Seed Links
+    { source: 'The Get Up Kids', target: 'Jimmy Eat World', value: 1 },
+    { source: 'The Get Up Kids', target: 'Vagrant', value: 1 },
+    { source: 'Jimmy Eat World', target: 'Vagrant', value: 1 },
+    { source: 'The Get Up Kids', target: 'Doghouse', value: 1 },
+    { source: 'The Get Up Kids', target: '1995', value: 1 },
     { source: 'Jimmy Eat World', target: '1993', value: 1 },
+    { source: 'The Get Up Kids', target: 'Midwest Emo', value: 1 },
     { source: 'Jimmy Eat World', target: 'Emo', value: 1 },
-    { source: 'Jimmy Eat World', target: 'Alternative Rock', value: 1 },
-    { source: 'Jimmy Eat World', target: 'Vagrant Records', value: 1 },
-    { source: 'Jimmy Eat World', target: 'United States', value: 1 },
-    { source: 'Jimmy Eat World', target: 'The Get Up Kids', value: 1 },
     { source: 'The Get Up Kids', target: 'Emo', value: 1 },
-    { source: 'Jimmy Eat World', target: 'Weezer', value: 1 },
-    { source: 'Weezer', target: 'Alternative Rock', value: 1 },
-    { source: 'blink-182', target: '1992', value: 1 },
-    { source: 'blink-182', target: 'Pop Punk', value: 1 },
-    { source: 'blink-182', target: 'MCA Records', value: 1 },
-    { source: 'blink-182', target: 'United States', value: 1 },
-    { source: 'blink-182', target: 'Jimmy Eat World', value: 1 },
-    { source: 'Alkaline Trio', target: 'Punk Rock', value: 1 },
-    { source: 'Alkaline Trio', target: 'Vagrant Records', value: 1 },
-    { source: 'Alkaline Trio', target: 'United States', value: 1 },
-    { source: 'Alkaline Trio', target: 'blink-182', value: 1 },
+    { source: 'Jimmy Eat World', target: 'Alternative Rock', value: 1 },
+    { source: 'The Get Up Kids', target: 'United States', value: 1 },
+    { source: 'Jimmy Eat World', target: 'United States', value: 1 },
+
+    // Label Ecosystems
+    { source: 'The Promise Ring', target: 'Jade Tree', value: 1 },
+    { source: 'The Promise Ring', target: 'Midwest Emo', value: 1 },
+    { source: 'The Promise Ring', target: 'The Get Up Kids', value: 1 },
+    { source: 'Braid', target: 'Polyvinyl Record Co.', value: 1 },
+    { source: 'Braid', target: 'Midwest Emo', value: 1 },
+    { source: 'Braid', target: 'The Get Up Kids', value: 1 },
+    { source: 'The Anniversary', target: 'Vagrant', value: 1 },
+    { source: 'The Anniversary', target: '1997', value: 1 },
+    { source: 'The Anniversary', target: 'The Get Up Kids', value: 1 },
+    { source: 'Reggie and the Full Effect', target: 'Vagrant', value: 1 },
+    { source: 'Reggie and the Full Effect', target: '1998', value: 1 },
+    { source: 'Reggie and the Full Effect', target: 'The Get Up Kids', value: 1 },
+    { source: 'The Casket Lottery', target: 'Vagrant', value: 1 },
+    { source: 'The Casket Lottery', target: '1998', value: 1 },
+    { source: 'The Casket Lottery', target: 'Midwest Emo', value: 1 },
+    { source: 'Texas Is the Reason', target: 'Doghouse', value: 1 },
+    { source: 'Texas Is the Reason', target: '1995', value: 1 },
+    { source: 'Texas Is the Reason', target: 'Midwest Emo', value: 1 },
+    { source: 'Jejune', target: 'Doghouse', value: 1 },
+    { source: 'Jejune', target: '1995', value: 1 },
+
+    // Jimmy Eat World Crossover & Peers
+    { source: 'Sense Field', target: 'Jimmy Eat World', value: 1 },
+    { source: 'Sense Field', target: '1991', value: 1 },
+    { source: 'Sense Field', target: 'Alternative Rock', value: 1 },
+    { source: 'Christie Front Drive', target: 'Jimmy Eat World', value: 1 },
+    { source: 'Christie Front Drive', target: 'Crank! A Record Company', value: 1 },
+    { source: 'Christie Front Drive', target: '1993', value: 1 },
+    { source: 'Christie Front Drive', target: 'Emo', value: 1 },
+
+    // Post Hardcore & Broader Connections
+    { source: 'Saves The Day', target: 'Vagrant', value: 1 },
+    { source: 'Saves The Day', target: '1997', value: 1 },
+    { source: 'Saves The Day', target: 'Emo', value: 1 },
+    { source: 'Saves The Day', target: 'Post Hardcore', value: 1 },
+    { source: 'The Appleseed Cast', target: 'The Get Up Kids', value: 1 },
+    { source: 'The Appleseed Cast', target: 'Post Hardcore', value: 1 },
+    { source: 'The Appleseed Cast', target: '1997', value: 1 },
+    { source: 'The Appleseed Cast', target: 'Crank! A Record Company', value: 1 },
   ],
 };
 
@@ -131,10 +191,10 @@ const ExampleMusicGraph: React.FC = () => {
             });
 
             const simulation = d3.forceSimulation<Node, Link>(nodes)
-                .force("link", d3.forceLink<Node, Link>(links).id((d: any) => String(d.id)).distance(120).strength(0.2))
-                .force("charge", d3.forceManyBody().strength(-400))
+                .force("link", d3.forceLink<Node, Link>(links).id((d: any) => String(d.id)).distance(100).strength(0.25))
+                .force("charge", d3.forceManyBody().strength(-300))
                 .force("center", d3.forceCenter(width / 2, height / 2))
-                .force("collide", d3.forceCollide().radius(45))
+                .force("collide", d3.forceCollide().radius(38))
                 .velocityDecay(0.7);
 
             simulation.on("tick", () => {
@@ -241,7 +301,7 @@ const ExampleMusicGraph: React.FC = () => {
                 }
             );
 
-        const seedIds = ['Jimmy Eat World', 'blink-182'];
+        const seedIds = ['The Get Up Kids', 'Jimmy Eat World'];
         
         node.select(".node-icon")
             .text((d: any) => {

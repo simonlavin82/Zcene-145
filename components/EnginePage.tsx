@@ -167,7 +167,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 27, 
         title: "Unified Generation DNA & Multi-Seed Co-Anchoring", 
-        desc: "All generation modes share unified prompt DNA and organic target density (~18–26 Deep Cuts). Complex Generations operate Tabula Rasa (blank slate), dynamically co-anchor both the topological spiderweb and the editorial narrative across all seeds. The graph targets 10 to 16 NEW related artists (12 to 18 total artists with seeds), balancing The Crossover Bridge (5 to 6 shared-DNA artists/labels) with Native Ecosystems (4 to 5 scene peers per seed). In fertile scenes, the model exercises Upper-Bound Ambition (aiming for 13 to 16 new artists) while enforcing a Strict Anti-Filler Valve (stopping at 9–10 if sparse; never padding) to prevent hallucinated padding. All generated Deep Cuts reuse cached global bio/assets in Column 3, achieving $0.00 zero-latency hydration while preserving bespoke multi-seed topology." 
+        desc: "All generation modes share unified prompt DNA and organic target density (~18–26 Deep Cuts). Complex Generations operate Tabula Rasa (blank slate), dynamically co-anchor both the topological connections graph and the editorial narrative across all seeds. The graph targets 10 to 16 NEW related artists (12 to 18 total artists with seeds), balancing The Crossover Bridge (5 to 6 shared-DNA artists/labels) with Native Ecosystems (4 to 5 scene peers per seed). In fertile scenes, the model exercises Upper-Bound Ambition (aiming for 13 to 16 new artists) while enforcing a Strict Anti-Filler Valve (stopping at 9–10 if sparse; never padding) to prevent hallucinated padding. All generated Deep Cuts reuse cached global bio/assets in Column 3, achieving $0.00 zero-latency hydration while preserving bespoke multi-seed topology." 
     },
     { 
         id: 28, 
@@ -433,7 +433,7 @@ const AsyncHydrationDiagram: React.FC = () => (
                     </div>
                 </div>
                 <div className="flex-1 h-px bg-primary/50 relative">
-                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-zinc-900 text-[10px] text-primary px-2">Sync: Render Spiderweb</span>
+                    <span className="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-zinc-900 text-[10px] text-primary px-2">Sync: Render Connections</span>
                 </div>
                 <div className="bg-zinc-800 p-2.5 rounded-lg border border-zinc-600 text-zinc-300 w-44 text-center text-xs">
                     Graph Data Written

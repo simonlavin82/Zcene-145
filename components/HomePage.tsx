@@ -367,7 +367,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                         <span className="text-primary whitespace-nowrap">Own Music Discovery</span>
                     </h1>
                     <h2 className="text-xl md:text-2xl text-zinc-400 max-w-3xl mx-auto">
-                        Zcene lets you explore music through a <span className="text-white">visual spiderweb</span> map, revealing connections across genres, labels, scenes and eras.
+                        Zcene lets you explore music through an interactive <span className="text-white">visual connections map</span>, revealing deep relationships across genres, labels, scenes and eras.
                     </h2>
                     <div className="flex flex-col items-center gap-4">
                         <button
@@ -407,13 +407,13 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
             </motion.div>
         </section>
 
-        {/* Feature: Artists (Zinc 900) */}
-        <section className="py-24 sm:py-32 bg-zinc-900/50 border-y border-zinc-800/50">
+        {/* Feature: Roots (Zinc 900) */}
+        <section id="roots" className="py-24 sm:py-32 bg-zinc-900/50 border-y border-zinc-800/50">
             <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="max-w-3xl mx-auto text-center space-y-8">
-                    <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Artists</h2>
+                    <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Roots</h2>
                     <h3 className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                        Instead of endless playlists, <span className="text-white font-medium">navigate your taste</span>, uncover hidden connections, and discover artists that genuinely fit your sound.
+                        Define the genesis of your taste. Start with your <span className="text-white font-medium">favorite root artists</span> or select from your personal library to anchor the exploration engine.
                     </h3>
                 </div>
                 <div 
@@ -425,14 +425,14 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
             </div>
         </section>
 
-        {/* Feature: Spiderweb (Background Dark) */}
+        {/* Feature: Connections (Background Dark) */}
         <section id="features" className="py-24 sm:py-32 bg-background-dark">
             <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="max-w-3xl mx-auto text-center space-y-12">
                     <div className="space-y-8">
-                        <h2 className="text-4xl sm:text-5xl md:text-6xl font-medium text-white tracking-tighter uppercase">Spiderweb</h2>
+                        <h2 className="text-4xl sm:text-5xl md:text-6xl font-medium text-white tracking-tighter uppercase">Connections</h2>
                         <h3 className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                            Don’t just browse your collection, <span className="text-white font-medium">explore it visually</span> with an immersive spiderweb map. <span className="text-white font-medium">You're in control</span>, toggle seed artists, recommendations, labels, genres, origins and eras.
+                            Don’t just browse static lists, <span className="text-white font-medium">explore music visually</span> through dynamic relational graphs. <span className="text-white font-medium">You're in control</span>—toggle root artists, discoveries, record labels, genres, origins, and eras.
                         </h3>
                     </div>
                 </div>
@@ -452,7 +452,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                     <div className="space-y-8">
                         <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Deep Cuts</h2>
                         <h3 className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                            Dig deeper into the artists you love, add new ones, and explore <span className="text-white font-medium">bios, connections, discogs</span> and external links. This is how you <span className="text-white font-medium">curate</span> your next music journey.
+                            Dig deeper into the artists you love, explore <span className="text-white font-medium">editorial insights, Core Taste resonance</span>, release artwork, and instant audio previews. This is how you <span className="text-white font-medium">curate</span> your next musical obsession.
                         </h3>
                     </div>
                 </div>
