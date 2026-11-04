@@ -1164,7 +1164,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="mb-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Zcene Categorical Palette</h3>
                                     <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-2xl">
-                                        These vibrant "Style Profile" colors are the universal source of truth for all sequential UI mappings. They are used to dynamically color Dashboard Crates (to create physical-record visual rhythm) and to assign visual distinction to nodes in the D3 Spiderweb graph.
+                                        These vibrant "Style Profile" colors are the universal source of truth for all sequential UI mappings. They are used to dynamically color Dashboard Crates (to create physical-record visual rhythm) and to assign visual distinction to nodes in the D3 Connections graph.
                                     </p>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
@@ -1217,7 +1217,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span className="px-2.5 py-1 text-[10px] font-mono uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full">Full-Width Canvas</span>
                                         </div>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            The interactive D3 spiderweb graph engine bypasses standard layout containers to occupy 100% of the viewport width and height.
+                                            The interactive D3 connections graph engine bypasses standard layout containers to occupy 100% of the viewport width and height.
                                         </p>
                                         <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 font-mono text-xs text-emerald-300 overflow-x-auto">
                                             absolute inset-0 w-full h-full
@@ -1250,7 +1250,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8">
                                     <IconDisplay icon={<span className="material-symbols-outlined !text-[14px]">star</span>} name="Metadata Only" pxSize="14px" description="Used for inline tags and small metadata markers." implementation="!text-[14px]" overrideIconClass="!text-[14px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">left_panel_open</span>} name="Standard UI" pxSize="18px" description="Primary interactive controls, sidebar toggles, and spiderweb legend symbols." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">left_panel_open</span>} name="Standard UI" pxSize="18px" description="Primary interactive controls, sidebar toggles, and connections legend symbols." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<InstagramIcon />} name="Interactive Social" pxSize="18px" description="Social platform linking. Uses a matching stroke weight." implementation="w-4.5 h-4.5" overrideIconClass="!text-[18px]" />
                                 </div>
                             </div>
@@ -1337,7 +1337,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <div className="space-y-12">
                             <div>
                                 <p className="text-base text-zinc-400 mb-8 leading-relaxed max-w-3xl">
-                                    The legend provides visual decoding of node types and acts as a behavioral filter for the spiderweb. It is <strong>fully responsive</strong>, automatically switching to a compact mobile panel if the viewport or container becomes too narrow for the horizontal bar.
+                                    The legend provides visual decoding of node types and acts as a behavioral filter for the connections map. It is <strong>fully responsive</strong>, automatically switching to a compact mobile panel if the viewport or container becomes too narrow for the horizontal bar.
                                 </p>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="flex items-center gap-3 group cursor-pointer">
@@ -1394,11 +1394,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     Interactive legend items are contained within <code className="text-primary">rounded-xl</code> boxes to signal clickability. The symbols themselves maintain their geometric integrity.
                                 </p>
 
-                                {/* Spiderweb Hover Container Component Documentation */}
+                                {/* Connections Hover Container Component Documentation */}
                                 <div className="mt-12 space-y-6">
-                                    <h3 className="text-xl font-medium text-zinc-200">Spiderweb Hover Container</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Connections Hover Container</h3>
                                     <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
-                                        A contextual container displayed over the graph nodes on hover. It renders high-contrast, real-time relational information organized into direct metadata connections and core 'Spiderweb DNA' background recommendations.
+                                        A contextual container displayed over the graph nodes on hover. It renders high-contrast, real-time relational information organized into direct metadata connections and core 'Connections DNA' background recommendations.
                                     </p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                         <div className="space-y-8">
@@ -1529,7 +1529,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     <section id="spiderweb-controls">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Connections Controls</h2>
                         <p className="text-base text-zinc-300 leading-relaxed max-w-3xl mb-12">
-                            The Spiderweb canvas employs a dedicated set of floating controls utilizing the <code>CanvasControlStyles</code> primitive. These controls ensure consistent interaction models for zoom, centering, filtering, and search logic overlaying the D3 canvas.
+                            The Connections canvas employs a dedicated set of floating controls utilizing the <code>CanvasControlStyles</code> primitive. These controls ensure consistent interaction models for zoom, centering, filtering, and search logic overlaying the D3 canvas.
                         </p>
                         
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
@@ -2613,7 +2613,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="border-b border-zinc-800 pb-4">
                                 <h3 className="text-xl font-medium text-zinc-200">Discovery Network Metric Badges</h3>
                                 <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-3xl">
-                                    Displayed in the card footer and table list of the project dashboard. Each badge exposes a live discovery-network count directly inside its label, using a <strong>label-first</strong> syntax that mirrors the spiderweb filter legends. The four badges always render in a fixed sequence.
+                                    Displayed in the card footer and table list of the project dashboard. Each badge exposes a live discovery-network count directly inside its label, using a <strong>label-first</strong> syntax that mirrors the connections filter legends. The four badges always render in a fixed sequence.
                                 </p>
                             </div>
 
@@ -2705,7 +2705,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h4 className="text-base font-medium text-white">Label-First Copy Format</h4>
                                 </div>
                                 <p className="text-sm text-zinc-400 leading-relaxed max-w-3xl">
-                                    All discovery metric badges use a <strong>label-first</strong> syntax — the descriptive label appears before the numeric value, separated by a colon and space. This mirrors the language used in the spiderweb filter legends and creates instant visual alignment across the product.
+                                    All discovery metric badges use a <strong>label-first</strong> syntax — the descriptive label appears before the numeric value, separated by a colon and space. This mirrors the language used in the connections filter legends and creates instant visual alignment across the product.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"ROOT ARTISTS: X"</div>
@@ -3557,7 +3557,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             subtext="Mapping your Zcene connections... This usually takes a minute or two to find the best musical paths."
                                         />
                                     </div>
-                                    <p className="text-sm text-zinc-500 leading-relaxed">Used during the primary spiderweb generation when high-volume relational data is being structured.</p>
+                                    <p className="text-sm text-zinc-500 leading-relaxed">Used during the primary connections graph generation when high-volume relational data is being structured.</p>
                                 </div>
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">In-Panel Detail Loader</h3>
@@ -3882,7 +3882,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         title: 'Filtering',
                                         trigger: 'Post-Graph',
                                         position: 'bottom (or top on mobile)',
-                                        anchor: 'desktopLegendAreaRef / mobileLegendAreaRef (Spiderweb Legend Area)',
+                                        anchor: 'desktopLegendAreaRef / mobileLegendAreaRef (Connections Legend Area)',
                                         content: 'Drag, zoom and toggle node types to focus on what matters most: Seeds, Artists, Genres, Labels, Origins, Founded.',
                                         description: 'Introduces interactive navigation (pan/zoom) and node filtering capabilities in the central graph canvas.'
                                     },
@@ -4164,9 +4164,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                      <h3 className="text-xl font-medium text-zinc-200">Desktop (lg+)</h3>
                                     <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 aspect-video relative flex gap-2">
-                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Seeds</div>
+                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Roots</div>
                                         <div className="flex-grow h-full bg-zinc-900 border border-zinc-800 rounded-xl flex flex-col">
-                                            <div className="flex-grow flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Spiderweb</div>
+                                            <div className="flex-grow flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Connections</div>
                                             <div className="h-8 bg-zinc-800 border-t border-zinc-700 mx-2 mb-2 rounded-xl flex items-center justify-center text-[8px] text-zinc-500">Ad Space</div>
                                         </div>
                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Deep Cut</div>
@@ -4188,7 +4188,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="h-6 bg-zinc-800 border-t border-zinc-700 mt-2 rounded-xl flex items-center justify-center text-[8px] text-zinc-500">Fixed Footer Ad</div>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Stacked navigation using a high-fidelity tab system. Panels occupy 100% of the viewport width with a persistent flex-shrink ad footer pinned to the bottom. Dynamic landing routing defaults to the 'SPIDERWEB' tab if project seeds exist.
+                                        Stacked navigation using a high-fidelity tab system. Panels occupy 100% of the viewport width with a persistent flex-shrink ad footer pinned to the bottom. Dynamic landing routing defaults to the 'CONNECTIONS' tab if project seeds exist.
                                     </p>
                                 </div>
                             </div>
@@ -4283,7 +4283,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-sm text-zinc-400 leading-relaxed">
                                             <strong>Trigger:</strong> Click 2 (desktop) or Tap 2 (mobile) on the already peeked node (or Deep Cut pagination selection).
                                             <br /><br />
-                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter and opens the sidebar Details Panel (which now houses the standard square <code>Explore</code> icon button with a compass icon and node removal controls in its header, keeping the spiderweb canvas pristine). All 1st-degree yellow connection lines remain illuminated to maintain visual context.
+                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter and opens the sidebar Details Panel (which now houses the standard square <code>Explore</code> icon button with a compass icon and node removal controls in its header, keeping the connections canvas pristine). All 1st-degree yellow connection lines remain illuminated to maintain visual context.
                                         </p>
                                     </div>
                                 </div>
@@ -4423,7 +4423,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-md space-y-3">
                                     <h4 className="text-lg font-medium text-white">Immersive & Visual</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        We use metaphors of sight and space. We "uncover," "map," and "explore" the Spiderweb. We don't just show lists; we build connections and offer a Deep Cut into the artists you love. The dark UI is reflected in a mood that feels like a late-night record store session.
+                                        We use metaphors of sight and space. We "uncover," "map," and "explore" Connections. We don't just show lists; we build connections and offer a Deep Cut into the artists you love. The dark UI is reflected in a mood that feels like a late-night record store session.
                                     </p>
                                 </div>
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-md space-y-3">
@@ -4505,7 +4505,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
 
                                 <div className="space-y-6">
-                                    <h3 className="text-xl font-medium text-zinc-200">Spiderweb Feature Visual</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Connections Feature Visual</h3>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
                                         The core interactive experience. This visual uses a live, simplified D3 simulation to show real-time physics, node categorization symbols, and the floating legend UI.
                                     </p>
@@ -4798,7 +4798,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4">
                                     <h4 className="text-lg font-medium text-white">Mobile Footer Standard</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Mobile viewports employ a persistent footer to house advertisements. This ensures the unit remains visible regardless of the active dashboard tab (Artists, Spiderweb, or Deep Cut). To maintain the immersive feel, vertical spacing is kept to a strict minimum.
+                                        Mobile viewports employ a persistent footer to house advertisements. This ensures the unit remains visible regardless of the active dashboard tab (Roots, Connections, or Deep Cut). To maintain the immersive feel, vertical spacing is kept to a strict minimum.
                                     </p>
                                     <div className="grid grid-cols-2 gap-4 pt-2">
                                         <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
@@ -4819,7 +4819,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Desktop Placement</h4>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            On Desktop, the advertisement container is anchored to the bottom of the central column (Spiderweb view). It is separated from the interactive map by a 2-pixel gap and is contained within its own <strong>bg-zinc-900 rounded-none</strong> box.
+                                            On Desktop, the advertisement container is anchored to the bottom of the central column (Connections view). It is separated from the interactive map by a 2-pixel gap and is contained within its own <strong>bg-zinc-900 rounded-none</strong> box.
                                         </p>
                                         <ul className="list-disc list-outside pl-4 text-xs text-zinc-500 space-y-1">
                                             <li>Resizing sidebars triggers an immediate ad swap if width cross-threshold occurs.</li>

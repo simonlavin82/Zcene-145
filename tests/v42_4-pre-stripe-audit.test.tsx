@@ -167,8 +167,8 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     expect(deepCutsSrc).toContain('5/5 Hits');
     expect(deepCutsSrc).toContain('2/5 Hits');
     expect(deepCutsSrc).toContain('https://is1-ssl.mzstatic.com/image/thumb/Music/54/81/df/mzi.hvbwtrse.jpg/600x600bb.jpg');
-    expect(deepCutsSrc).toContain('Matt Pryor');
     expect(deepCutsSrc).toContain('Vagrant, Doghouse');
+    expect(deepCutsSrc).toContain('Essential listening');
     expect(deepCutsSrc).not.toContain('Sunami');
     expect(deepCutsSrc).not.toContain('Concrete Cowboy');
 
@@ -178,6 +178,30 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     expect(archSrc).toContain('rich connections graph density');
     expect(archSrc).toContain('Connections graph node tooltips must prioritize');
     expect(archSrc).toContain('hasUniqueSpiderweb: true'); // Immutable contract preserved
+  });
+
+  it('7. Architecture V42.5: Purges em-dashes and verifies un-cropped Deep Cuts expanded view parity', () => {
+    const homeSrc = fs.readFileSync(path.resolve(__dirname, '../components/HomePage.tsx'), 'utf-8');
+    const helpSrc = fs.readFileSync(path.resolve(__dirname, '../components/HelpPage.tsx'), 'utf-8');
+    const deepCutsSrc = fs.readFileSync(path.resolve(__dirname, '../components/CollectionIntelligenceVisual.tsx'), 'utf-8');
+
+    // Em-dash purge verification
+    expect(homeSrc).not.toContain('—');
+    expect(helpSrc).not.toContain('—');
+    expect(homeSrc).toContain('<span className="text-white font-medium">You\'re in control</span>. Toggle root artists, discoveries, record labels, genres, origins, and eras.');
+
+    // Deep Cuts Un-cropped Container & Expanded View Parity
+    expect(deepCutsSrc).toContain('min-h-[');
+    expect(deepCutsSrc).toContain('ARTIST');
+    expect(deepCutsSrc).toContain('ROOT');
+    expect(deepCutsSrc).toContain('LIBRARY');
+    expect(deepCutsSrc).toContain('ChevronLeft');
+    expect(deepCutsSrc).toContain('ChevronRight');
+    expect(deepCutsSrc).toContain('Layers');
+    expect(deepCutsSrc).toContain('Flame');
+    expect(deepCutsSrc).toContain('Pin');
+    // Flush Core Taste bars with no enclosing box border
+    expect(deepCutsSrc).not.toContain('bg-zinc-950/40 p-3.5 rounded-xl border border-zinc-800/70');
   });
 });
 

@@ -593,7 +593,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                     <div className="flex gap-4">
                                         <span className="material-symbols-outlined text-primary">cloud_done</span>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            <strong className="text-zinc-200">Cloud Sync:</strong> Every node you select and every map you build is synced instantly to your private Firestore database. Switch between laptop and mobile flawlessly—everything will be exactly as you left it.
+                                            <strong className="text-zinc-200">Cloud Sync:</strong> Every node you select and every map you build is synced instantly to your private Firestore database. Switch between laptop and mobile flawlessly. Everything will be exactly as you left it.
                                         </p>
                                     </div>
                                     <div className="flex gap-4">

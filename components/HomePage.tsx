@@ -418,7 +418,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                 </div>
                 <div 
                     onClick={handleVisualInteraction}
-                    className="mt-16 max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
+                    className="mt-16 w-full max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
                 >
                     <ArtistFeatureVisual />
                 </div>
@@ -432,13 +432,13 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                     <div className="space-y-8">
                         <h2 className="text-4xl sm:text-5xl md:text-6xl font-medium text-white tracking-tighter uppercase">Connections</h2>
                         <h3 className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                            Don’t just browse static lists, <span className="text-white font-medium">explore music visually</span> through dynamic relational graphs. <span className="text-white font-medium">You're in control</span>—toggle root artists, discoveries, record labels, genres, origins, and eras.
+                            Don’t just browse static lists, <span className="text-white font-medium">explore music visually</span> through dynamic relational graphs. <span className="text-white font-medium">You're in control</span>. Toggle root artists, discoveries, record labels, genres, origins, and eras.
                         </h3>
                     </div>
                 </div>
                 <div 
                     onClick={handleVisualInteraction}
-                    className="mt-16 max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
+                    className="mt-16 w-full max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
                 >
                     <ExampleMusicGraph />
                 </div>
@@ -458,7 +458,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                 </div>
                 <div 
                     onClick={handleVisualInteraction}
-                    className="mt-16 max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
+                    className="mt-16 w-full max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
                 >
                     <CollectionIntelligenceVisual />
                 </div>

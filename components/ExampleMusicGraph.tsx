@@ -339,11 +339,11 @@ const ExampleMusicGraph: React.FC = () => {
         const forceX = d3.forceX<Node>(width / 2);
         const forceY = d3.forceY<Node>(height / 2);
 
-        forceX.strength(0.005).x(width / 2);
-        forceY.strength(0.005).y(height / 2);
+        forceX.strength(0.01).x(width / 2);
+        forceY.strength(0.01).y(height / 2);
         simulation.force('center', d3.forceCenter(width / 2, height / 2));
-        (simulation.force("charge") as d3.ForceManyBody<Node>).strength(-500);
-        simulation.force("collide", d3.forceCollide().radius(width < 600 ? 40 : 45));
+        (simulation.force("charge") as d3.ForceManyBody<Node>).strength(-320);
+        simulation.force("collide", d3.forceCollide().radius(width < 600 ? 32 : 36));
 
         simulation.force("x", forceX).force("y", forceY);
         
@@ -370,7 +370,7 @@ const ExampleMusicGraph: React.FC = () => {
     const nodePos = getAnimatingNodePos();
 
     return (
-        <div className={`w-full aspect-[3/4] md:aspect-video bg-zinc-950 border border-zinc-800/50 shadow-2xl overflow-hidden relative pointer-events-none select-none`}>
+        <div className="w-full aspect-[4/5] sm:aspect-[4/3] md:aspect-[16/10] min-h-[500px] md:min-h-[580px] bg-zinc-950 border border-zinc-800/50 shadow-2xl overflow-hidden relative pointer-events-none select-none">
              {/* Background Image Overlay */}
              <img 
                 src="https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg" 
