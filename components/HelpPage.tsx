@@ -4,6 +4,7 @@ import * as d3 from 'd3';
 import { ZceneLogo, LegendSymbol, InstagramIcon, MicIcon, StackIcon } from './Icons';
 import Header from './Header';
 import { BackButton } from './DesignSystem';
+import { GlobalFooter } from './GlobalFooter';
 import {
   ZCENE_SUPPORT_EMAIL,
   ZCENE_SUPPORT_MAILTO,
@@ -790,40 +791,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                 </main>
             </div>
 
-            <footer className="w-full p-12 text-zinc-400 text-sm z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
-                <div className="container mx-auto">
-                    <div className="flex flex-col items-center gap-8">
-                        <button onClick={() => onNavigate(View.Home)} className="cursor-pointer">
-                            <ZceneLogo className="h-10 w-auto text-primary" />
-                        </button>
-                        <nav className="flex flex-wrap justify-center gap-x-8 gap-y-3 font-medium">
-                            <button onClick={() => onNavigate(View.Home)} className="hover:text-primary transition-colors text-base">Home</button>
-                            <button onClick={() => onNavigate(View.Graph)} className="hover:text-primary transition-colors text-base">App</button>
-                            <button onClick={() => onNavigate(View.Help)} className="hover:text-primary transition-colors text-base">Help</button>
-                            {isAdmin && (
-                                <>
-                                    <button onClick={() => onNavigate(View.StyleGuide)} className="hover:text-primary transition-colors text-base">Design System</button>
-                                    <button onClick={() => onNavigate(View.Engine)} className="hover:text-primary transition-colors text-base">Engine</button>
-                                </>
-                            )}
-                        </nav>
-                        <div className="flex items-center gap-6">
-                            <a href={ZCENE_INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-                                <InstagramIcon className="w-6 h-6 hover:text-primary transition-colors" />
-                            </a>
-                        </div>
-                        <div className="text-xs text-zinc-400 flex flex-wrap items-center justify-center gap-2">
-                            <span>Official Support:</span>
-                            <a href={ZCENE_SUPPORT_MAILTO} className="text-zinc-300 hover:text-primary transition-colors underline underline-offset-4">
-                                {ZCENE_SUPPORT_EMAIL}
-                            </a>
-                        </div>
-                    </div>
-                    <div className="mt-8 border-t border-zinc-600/30 pt-8 text-center">
-                        <p className="text-zinc-500">© 2026 Zcene. All Rights Reserved.</p>
-                    </div>
-                </div>
-            </footer>
+            <GlobalFooter onNavigate={onNavigate} isAdmin={isAdmin} currentView={View.Help} />
         </div>
     );
 };

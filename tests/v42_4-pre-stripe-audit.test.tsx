@@ -68,8 +68,8 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     expect(homeSrc).toContain('Settlement & Tip Jar');
     expect(homeSrc).toContain('Settle payment for your confirmed T-shirt order, or drop a tip to help fund server compute');
 
-    // Landing Page Footer
-    expect(homeSrc).toContain('Official Support:');
+    // Landing Page Footer via GlobalFooter
+    expect(homeSrc).toContain('GlobalFooter');
     expect(homeSrc).toContain('ZCENE_SUPPORT_EMAIL');
   });
 
@@ -99,23 +99,33 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     expect(helpSrc).toContain('Message on Instagram');
     expect(helpSrc).toContain('Billing & Refund Reviews:');
 
-    // Help Footer
-    expect(helpSrc).toContain('Official Support:');
+    // Help Footer via GlobalFooter
+    expect(helpSrc).toContain('GlobalFooter');
   });
 
-  it('4. Replaces legacy zcene.io links with canonical zcene.online and adds Contact Support across Profile Menus', () => {
+  it('4. Replaces legacy zcene.io links with canonical zcene.online, declutters Profile Menus & establishes V42.8 GlobalFooter', () => {
     const headerSrc = fs.readFileSync(path.resolve(__dirname, '../components/Header.tsx'), 'utf-8');
     const homeSrc = fs.readFileSync(path.resolve(__dirname, '../components/HomePage.tsx'), 'utf-8');
+    const helpSrc = fs.readFileSync(path.resolve(__dirname, '../components/HelpPage.tsx'), 'utf-8');
+    const footerSrc = fs.readFileSync(path.resolve(__dirname, '../components/GlobalFooter.tsx'), 'utf-8');
 
     // No legacy instagram.com/zcene.io
     expect(headerSrc).not.toContain('instagram.com/zcene.io');
     expect(homeSrc).not.toContain('instagram.com/zcene.io');
 
-    // Profile menu has Contact Support in Header and HomePage
-    expect(headerSrc).toContain('ZCENE_SUPPORT_MAILTO');
-    expect(headerSrc).toContain('Contact Support');
-    expect(homeSrc).toContain('ZCENE_SUPPORT_MAILTO');
-    expect(homeSrc).toContain('Contact Support');
+    // Profile menu has Contact Support removed in Header and HomePage
+    expect(headerSrc).not.toContain('Contact Support');
+    expect(homeSrc).not.toContain('Contact Support');
+
+    // GlobalFooter exports centralized support and community links
+    expect(footerSrc).toContain('Official Support:');
+    expect(footerSrc).toContain('ZCENE_SUPPORT_EMAIL');
+    expect(footerSrc).toContain('ZCENE_SUPPORT_MAILTO');
+    expect(footerSrc).toContain('ZCENE_INSTAGRAM_URL');
+    expect(footerSrc).toContain('v42.8');
+    expect(footerSrc).toContain('© 2026 Zcene. All Rights Reserved.');
+    expect(homeSrc).toContain('GlobalFooter');
+    expect(helpSrc).toContain('GlobalFooter');
   });
 
   it('5. Surfaces billing support and refund reassurance across SharedModals, UsageAnalyticsPage, and index.html', () => {

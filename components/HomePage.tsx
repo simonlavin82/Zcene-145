@@ -9,6 +9,7 @@ import HeroBackgroundGraph from './HeroBackgroundGraph';
 import CollectionIntelligenceVisual from './CollectionIntelligenceVisual';
 import ArtistFeatureVisual from './ArtistFeatureVisual';
 import AdSenseUnit from './AdSenseUnit';
+import { GlobalFooter } from './GlobalFooter';
 import { analyticsService } from '../services/analyticsService';
 import {
   ZCENE_SUPPORT_EMAIL,
@@ -31,8 +32,6 @@ interface HomePageProps {
 }
 
 const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = false, isActive, user, isAuthInitialized, onLogin, onLogout, isAdmin, onRestartWalkthrough }) => {
-  const [isCopied, setIsCopied] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastInteractionRef = useRef<{ count: number; time: number }>({ count: 0, time: 0 });
@@ -122,42 +121,6 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
     if (supportEl && containerRef.current) {
       const topPos = supportEl.offsetTop;
       containerRef.current.scrollTo({ top: topPos, behavior: 'smooth' });
-    }
-  };
-
-  const handleShareSite = async () => {
-    if (isSharing) return;
-    
-    const baseUrl = window.location.origin + window.location.pathname;
-    analyticsService.track('Share Initiated', { type: 'home_footer' });
-
-    if (navigator.share) {
-        setIsSharing(true);
-        try {
-            // Native share is instant to trigger but we want to clear the state 
-            // once triggered so the underlying UI isn't spinning indefinitely
-            const shareData = {
-                title: 'Zcene - Own Music Discovery',
-                text: 'Check out Zcene, the most immersive music discovery app to visualize your collection.',
-                url: baseUrl,
-            };
-            setIsSharing(false);
-            await navigator.share(shareData);
-        } catch (err: any) {
-            if (err.name !== 'AbortError') {
-                console.error("Native share failed", err);
-            }
-        } finally {
-            setIsSharing(false);
-        }
-    } else {
-        try {
-            await navigator.clipboard.writeText(baseUrl);
-            setIsCopied(true);
-            setTimeout(() => setIsCopied(false), 2000);
-        } catch (err) {
-            console.error("Clipboard copy failed", err);
-        }
     }
   };
 
@@ -291,15 +254,6 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                             Discovery Ledger
                           </button>
                         )}
-
-                        <a
-                          href={ZCENE_SUPPORT_MAILTO}
-                          onClick={() => setIsProfileOpen(false)}
-                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
-                        >
-                          <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">mail</span>
-                          Contact Support
-                        </a>
 
                         <button
                           onClick={() => {
@@ -612,55 +566,12 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
       </main>
       
       {/* Footer */}
-      <footer className="w-full p-8 text-zinc-400 text-sm z-10 relative bg-zinc-900">
-        <div className="container mx-auto">
-            <div className="flex flex-col items-center gap-8">
-                <div onClick={scrollToTop} className="cursor-pointer">
-                    <ZceneLogo className="h-8 w-auto text-primary" />
-                </div>
-                <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 font-medium">
-                    <button onClick={scrollToTop} className="hover:text-primary transition-colors">Home</button>
-                    <button onClick={() => onNavigate(View.Graph)} className="hover:text-primary transition-colors">App</button>
-                    <button onClick={() => onNavigate(View.Help)} className="hover:text-primary transition-colors">Help</button>
-                    {isAdmin && (
-                        <>
-                            <button onClick={() => onNavigate(View.StyleGuide)} className="hover:text-primary transition-colors">Design System</button>
-                            <button onClick={() => onNavigate(View.Engine)} className="hover:text-primary transition-colors">Engine</button>
-                        </>
-                    )}
-                </nav>
-                <div className="flex items-center gap-4 relative">
-                    <a href={ZCENE_INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-                        <InstagramIcon className="w-5 h-5 hover:text-primary transition-colors" />
-                    </a>
-                    <div className="relative">
-                        <button 
-                            onClick={handleShareSite} 
-                            disabled={isSharing}
-                            className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors relative"
-                            title="Share Zcene"
-                        >
-                            <span className="material-symbols-outlined !text-[18px]">{isCopied ? 'check' : 'share'}</span>
-                        </button>
-                        {isCopied && (
-                            <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-primary text-brand-black text-[10px] font-bold py-1 px-2 rounded-none whitespace-nowrap">
-                                Link Copied
-                            </span>
-                        )}
-                    </div>
-                </div>
-                <div className="text-xs text-zinc-400 flex flex-wrap items-center justify-center gap-2">
-                    <span>Official Support:</span>
-                    <a href={ZCENE_SUPPORT_MAILTO} className="text-zinc-300 hover:text-primary transition-colors underline underline-offset-4">
-                        {ZCENE_SUPPORT_EMAIL}
-                    </a>
-                </div>
-            </div>
-            <div className="mt-8 border-t border-zinc-600/50 pt-8 text-center">
-                <p>© 2026 Zcene. All Rights Reserved.</p>
-            </div>
-        </div>
-      </footer>
+      <GlobalFooter 
+        onNavigate={onNavigate} 
+        isAdmin={isAdmin} 
+        showShare={true} 
+        currentView={View.Home} 
+      />
     </div>
   );
 };
