@@ -195,12 +195,16 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     // Deep Cuts Un-cropped Container & DetailsPanel Parity
     expect(deepCutsSrc).toContain('min-h-[');
     expect(deepCutsSrc).toContain('DetailsPanel');
+    expect(deepCutsSrc).toContain('isStaticMockup={true}');
+    expect(deepCutsSrc).toContain('overflow-hidden');
     expect(detailsPanelSrc).toContain('ROOT');
     expect(detailsPanelSrc).toContain('LIBRARY');
     expect(detailsPanelSrc).toContain('StackIcon');
     expect(detailsPanelSrc).toContain('Flame');
     expect(detailsPanelSrc).toContain('Pin');
     expect(detailsPanelSrc).toContain('{data.matches}/{data.totalActive} Hits');
+    expect(detailsPanelSrc).toContain('!isStaticMockup && links.purchase.length > 0');
+    expect(detailsPanelSrc).toContain('!isStaticMockup && !isMagazineViewOpen && isProfileGenuinelyDisplayed');
   });
 });
 

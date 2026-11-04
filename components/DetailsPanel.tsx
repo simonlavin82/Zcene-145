@@ -2502,7 +2502,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
     return (
         <div 
-          className="w-full h-full flex flex-col bg-zinc-900 overflow-hidden relative min-h-0 outline-none transition-colors duration-700"
+          className={`w-full ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-hidden'} flex flex-col bg-zinc-900 relative min-h-0 outline-none transition-colors duration-700`}
           style={{
             '--scene-accent': dominantColor,
             ...(isMagazineViewOpen ? {
@@ -2636,7 +2636,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     </div>
                 </div>
             ) : (
-                <div className="flex-grow flex flex-col min-h-0 h-full overflow-hidden">
+                <div className={`flex-grow flex flex-col min-h-0 ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-hidden'}`}>
                     {!isMagazineViewOpen && filteredAndSortedNodes.length > 0 && (
                         <div className="flex justify-between items-center w-full px-4 py-2 border-b border-zinc-700/50 bg-zinc-900 flex-shrink-0 gap-3">
                             {filteredAndSortedNodes.length > 1 && (
@@ -2700,7 +2700,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
                     <div 
                         id="magazine-scroll-container"
-                        className={`flex-grow relative min-h-0 ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800 overflow-x-clip' : 'overflow-hidden'}`}
+                        className={`${isStaticMockup ? 'overflow-hidden h-auto' : 'flex-grow relative min-h-0'} ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800 overflow-x-clip' : 'overflow-hidden'}`}
                         onScroll={isMagazineViewOpen ? handleScroll : undefined}
                         onTouchStart={handleTouchStart}
                         onTouchMove={handleTouchMove}
@@ -2746,7 +2746,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         <div 
                             className={`${renderMode === 'magazine' 
                                 ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-12 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-[calc(env(safe-area-inset-bottom)_+_3rem)] transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
-                                : `flex h-full w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`
+                                : `flex ${isStaticMockup ? 'h-auto' : 'h-full'} w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`
                             } relative z-10`}
                             style={renderMode === 'panel' ? { 
                                 transform: `translateX(-${viewedIndex * 100}%)`,
@@ -2794,7 +2794,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             id={`magazine-card-${node.id}`}
                                             className={`${renderMode === 'magazine' 
                                                 ? 'inline-block w-full max-w-2xl text-left' 
-                                                : 'w-full h-full flex-shrink-0 overflow-hidden'}`}
+                                                : `w-full ${isStaticMockup ? 'h-auto' : 'h-full'} flex-shrink-0 overflow-hidden`}`}
                                         >
                                             <NodeDetailsCard
                                                 node={node}
@@ -2837,6 +2837,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 isActive={node.id === viewedNode?.id}
                                                 onStashArtist={onStashArtist}
                                                 onOpenStackDrawer={onOpenStackDrawer}
+                                                isStaticMockup={isStaticMockup}
                                             />
                                         </div>
                                     );
@@ -2850,7 +2851,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                         )}
 
-                        {!isMagazineViewOpen && isProfileGenuinelyDisplayed && (
+                        {!isStaticMockup && !isMagazineViewOpen && isProfileGenuinelyDisplayed && (
                             <div className={`absolute ${isSmallScreen ? 'bottom-[calc(env(safe-area-inset-bottom)+5.75rem)]' : 'bottom-6'} left-0 right-0 flex justify-center pointer-events-none z-50`}>
                                 <Button 
                                     variant="primary"

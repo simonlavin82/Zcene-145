@@ -107,7 +107,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
     const libraryArtists = useMemo(() => ['The Get Up Kids'], []);
 
     return (
-        <div className={`w-full min-h-[780px] sm:min-h-[820px] md:min-h-[860px] h-[860px] sm:h-[880px] bg-zinc-950 border border-zinc-800/50 flex items-center justify-center p-4 sm:p-6 md:p-8 overflow-hidden relative pointer-events-none select-none rounded-2xl ${className || ''}`}>
+        <div className={`w-full min-h-[720px] bg-zinc-950 border border-zinc-800/50 flex items-center justify-center p-4 sm:p-6 md:p-8 overflow-hidden relative pointer-events-none select-none rounded-2xl ${className || ''}`}>
              {/* Background Image Overlay */}
              <img 
                 src="https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png" 
@@ -117,8 +117,8 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
              {/* Gradient for depth */}
              <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-950/40 to-transparent z-0 pointer-events-none"></div>
 
-             {/* 1:1 DetailsPanel Reuse with Pristine Mock Data */}
-            <div className="w-full h-full max-w-xl bg-zinc-900 border border-zinc-600/50 rounded-2xl overflow-hidden shadow-2xl relative z-10 flex flex-col pointer-events-auto">
+             {/* Static Clean Deep Cuts Snapshot */}
+            <div className="w-full max-w-xl bg-zinc-900 border border-zinc-600/50 rounded-2xl overflow-hidden shadow-2xl relative z-10 flex flex-col pointer-events-auto">
                 <DetailsPanel 
                     selectedNode={mockSelectedNode}
                     activeNodes={mockActiveNodes}
@@ -128,6 +128,8 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                     onTogglePinNode={() => {}}
                     pinnedNodes={pinnedNodes}
                     onRefreshNode={() => {}}
+                    error={null}
+                    systemError={null}
                     graphData={mockGraphData}
                     libraryArtists={libraryArtists}
                     seedArtists={seedArtists}
@@ -152,6 +154,7 @@ const CollectionIntelligenceVisual: React.FC<{ className?: string }> = ({ classN
                     onOpenTasteModal={() => {}}
                     onStashArtist={() => {}}
                     onOpenStackDrawer={() => {}}
+                    isStaticMockup={true}
                 />
             </div>
         </div>
