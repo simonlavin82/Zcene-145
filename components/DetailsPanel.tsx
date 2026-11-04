@@ -281,6 +281,7 @@ interface NodeDetailsCardProps {
   isActive?: boolean;
   onStashArtist?: (artistName: string) => void;
   onOpenStackDrawer?: () => void;
+  isStaticMockup?: boolean;
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -443,7 +444,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
   onTogglePin, isPinned, pinSequence, onNodeClick, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, hasActiveDeepWebSession = false, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, onAddToStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer
+  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer,
+  isStaticMockup = false
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
         if (!user) {
@@ -548,7 +550,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     // On Magazine exit, Effect 1 above has already reset the guard to null in this same commit,
     // so the node.id check correctly passes and the scroll fires for the current node.
     useEffect(() => {
-        if (isFullScreenMode || !isActive || !panelScrollRef.current || !details || !isLocked) return;
+        if (isStaticMockup || isFullScreenMode || !isActive || !panelScrollRef.current || !details || !isLocked) return;
 
         // Simple guard: null (cleared by invalidator on Magazine exit) or a different node → scroll.
         if (lastScrolledNodeId.current === node.id) return;
@@ -754,7 +756,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [imageTier, setImageTier] = useState<'source' | 'placeholder'>('source');
     const [imgLoaded, setImgLoaded] = useState(false);
     const [isIdCopied, setIsIdCopied] = useState(false);
-    const [isHeaderStuck, setIsHeaderStuck] = useState(true);
+    const [isHeaderStuck, setIsHeaderStuck] = useState(isStaticMockup ? false : true);
     const imgRef = useRef<HTMLImageElement>(null);
 
     const currentImageUrl = useMemo(() => {
@@ -1043,7 +1045,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const panelContent = (
         <>
-            <div className={`flex flex-col min-h-full ${isFullScreenMode ? '' : 'pb-[calc(env(safe-area-inset-bottom)+9rem)] sm:pb-20'}`}>
+            <div className={`flex flex-col ${isStaticMockup ? 'min-h-0 pb-6' : 'min-h-full'} ${isStaticMockup ? '' : isFullScreenMode ? '' : 'pb-[calc(env(safe-area-inset-bottom)+9rem)] sm:pb-20'}`}>
                 {/* 1. Action Icons (Not Sticky) — ref measures its rendered height for the dynamic scroll target */}
                 <div ref={actionIconsRef} className={`pt-3 ${isFullScreenMode ? 'px-0 bg-transparent' : 'px-4 bg-zinc-900'} z-20 flex-shrink-0`}>
                     <div className={`flex items-center justify-end gap-1 flex-shrink-0 ${isFullScreenMode ? 'w-fit ml-auto' : ''}`}>
@@ -1203,7 +1205,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                     )}
 
                     {details && (
-                        <div className={`space-y-6 text-zinc-300 ${isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
+                        <div className={`space-y-6 text-zinc-300 ${isStaticMockup ? 'pb-0' : isFullScreenMode ? 'pb-6' : 'pb-16'}`}>
                             {/* Compatibility Meter (Hidden for Labels) */}
                             {!isLabelNode && activeTasteProfilesData.length > 0 && (
                                 <div ref={styleBarContainerRef} className="flex flex-col gap-2 w-full -mt-1.5">
@@ -1520,7 +1522,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {links.purchase.length > 0 && (
+                            {!isStaticMockup && links.purchase.length > 0 && (
                                 <div className="pt-6">
                                     <button 
                                         onClick={() => setIsCatalogOpen(!isCatalogOpen)}
@@ -1595,6 +1597,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
 
+                            {!isStaticMockup && (
                             <div className="pt-6 border-t border-zinc-800">
                                 <button 
                                     onClick={() => setIsConnectionsOpen(!isConnectionsOpen)}
@@ -1813,6 +1816,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </>
                                 )}
                             </div>
+                            )}
                         </div>
                     )}
                 </div>
@@ -1838,9 +1842,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         <div 
           key="side-panel"
           ref={panelScrollRef}
-          className="w-full min-w-[320px] bg-zinc-900 relative break-words h-full border border-zinc-900 overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800 transition-all duration-500"
+          className={`w-full min-w-[320px] bg-zinc-900 relative break-words ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'} border border-zinc-900 transition-all duration-500`}
           style={{ overscrollBehaviorY: 'auto', '--scene-accent': localDominantColor } as React.CSSProperties}
-          onScroll={(e) => setIsHeaderStuck(e.currentTarget.scrollTop > 10)}
+          onScroll={isStaticMockup ? undefined : (e) => setIsHeaderStuck(e.currentTarget.scrollTop > 10)}
         >
             {panelContent}
         </div>
@@ -1894,6 +1898,7 @@ interface DetailsPanelProps {
   onOpenStackDrawer?: () => void;
   activeDeepWebSession?: { sessionId: string; remainingMessages: number } | null;
   onUpdateDeepWebSession?: (session: { sessionId: string; remainingMessages: number } | null | ((prev: { sessionId: string; remainingMessages: number } | null) => { sessionId: string; remainingMessages: number } | null)) => void;
+  isStaticMockup?: boolean;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -1903,7 +1908,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, onAddToStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false, tokenBalance = 0, projectId,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer,
-  activeDeepWebSession, onUpdateDeepWebSession
+  activeDeepWebSession, onUpdateDeepWebSession, isStaticMockup = false
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
