@@ -7,6 +7,7 @@ import { UserTaste } from '../types';
 import { Flame, MoreVertical } from 'lucide-react';
 
 import { MyTasteDialog } from './SharedModals';
+import { ZCENE_SUPPORT_MAILTO, ZCENE_INSTAGRAM_URL } from '../shared/tokenEconomy';
 
 interface HeaderProps {
   user: User | null;
@@ -505,11 +506,21 @@ const Header: React.FC<HeaderProps> = ({
                             Restart Walkthrough
                           </button>
 
-                          {/* 8. Instagram (External link) */}
+                          {/* 8. Contact Support */}
+                          <a
+                            href={ZCENE_SUPPORT_MAILTO}
+                            onClick={() => setIsProfileOpen(false)}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">mail</span>
+                            Contact Support
+                          </a>
+
+                          {/* 9. Instagram (External link) */}
                           <button
                             onClick={() => {
                               setIsProfileOpen(false);
-                              window.open('https://instagram.com/zcene.io', '_blank');
+                              window.open(ZCENE_INSTAGRAM_URL, '_blank');
                             }}
                             className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                           >

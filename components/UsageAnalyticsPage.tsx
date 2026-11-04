@@ -18,6 +18,8 @@ import {
     tokensToGbp,
     tokensToUsd,
     usdToGbp,
+    ZCENE_SUPPORT_EMAIL,
+    ZCENE_SUPPORT_MAILTO,
 } from '../shared/tokenEconomy';
 import { BackButton } from './DesignSystem';
 
@@ -2424,6 +2426,18 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                 <span><strong className="text-white font-mono">10T</strong> Multi-Seed / Anchored Zcene</span>
                                 <span><strong className="text-white font-mono">3T</strong> Deep Connections (3 Messages)</span>
                                 <span><strong className="text-emerald-300 font-mono">0T</strong> Shared Zcenes & Clones</span>
+                            </div>
+
+                            {/* Billing & Refund Support Help Link */}
+                            <div className="text-[11px] text-zinc-400 border-t border-zinc-800/80 pt-3 flex flex-wrap items-center justify-between gap-2">
+                                <span>Need assistance with a token top-up, transaction dispute, or refund?</span>
+                                <a
+                                    href={ZCENE_SUPPORT_MAILTO}
+                                    className="text-primary hover:underline font-medium inline-flex items-center gap-1.5"
+                                >
+                                    <span className="material-symbols-outlined !text-[14px]">mail</span>
+                                    <span>Contact {ZCENE_SUPPORT_EMAIL}</span>
+                                </a>
                             </div>
                         </div>
                     )}

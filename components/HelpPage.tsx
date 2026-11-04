@@ -4,6 +4,14 @@ import * as d3 from 'd3';
 import { ZceneLogo, LegendSymbol, InstagramIcon, MicIcon, StackIcon } from './Icons';
 import Header from './Header';
 import { BackButton } from './DesignSystem';
+import {
+  ZCENE_SUPPORT_EMAIL,
+  ZCENE_SUPPORT_MAILTO,
+  ZCENE_INSTAGRAM_URL,
+  ZCENE_INSTAGRAM_HANDLE,
+  TOKEN_PRICING,
+  TOP_UP_TIER_LIST,
+} from '../shared/tokenEconomy';
 
 // --- Visual Support Components ---
 
@@ -297,8 +305,10 @@ const HelpPage: React.FC<HelpPageProps> = ({
         { id: 'curating-stack', title: 'Curating your Stack' },
         { id: 'sharing-settings', title: 'Sharing & Settings' },
         { id: 'private-persistent', title: 'Private & Persistent' },
+        { id: 'token-economy', title: 'Token Economy & Pricing' },
         { id: 'legend-glossary', title: 'Legend Glossary' },
-        { id: 'troubleshooting', title: 'Troubleshooting' }
+        { id: 'troubleshooting', title: 'Troubleshooting' },
+        { id: 'contact-support', title: 'Official Support & Contact' }
     ];
 
     const scrollToSection = (sectionId: string, offset: number = 80) => {
@@ -597,6 +607,91 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         </div>
                     </HelpSection>
 
+                    <HelpSection id="token-economy" title="Token Economy & Pricing">
+                        <p className="text-zinc-400 max-w-3xl mb-8 text-base leading-relaxed">
+                            Zcene operates on a transparent, pay-as-you-go Token Economy with zero recurring subscriptions or surprise renewals. You only spend tokens when curating fresh visual webs or consulting the deep intelligence engine.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                            <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-primary">Single-Seed</span>
+                                    <span className="text-lg font-mono font-bold text-white">{TOKEN_PRICING.SINGLE_SEED}T</span>
+                                </div>
+                                <h4 className="text-base font-medium text-white">5 Tokens (~£0.50)</h4>
+                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                    Curate a full relational spiderweb from a single artist seed, mapping labels, genres, origins, and eras.
+                                </p>
+                            </div>
+
+                            <div className="p-6 bg-zinc-900/50 border border-primary/40 rounded-xl space-y-3 relative">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-primary">Multi-Seed / Anchored</span>
+                                    <span className="text-lg font-mono font-bold text-white">{TOKEN_PRICING.COMPLEX_QUERY}T</span>
+                                </div>
+                                <h4 className="text-base font-medium text-white">10 Tokens (~£1.00)</h4>
+                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                    Bridge multiple artists or constrain discovery with Level 2 & 3 era sliders, country boundaries, and canonical styles.
+                                </p>
+                            </div>
+
+                            <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-primary">Deep Connections</span>
+                                    <span className="text-lg font-mono font-bold text-white">{TOKEN_PRICING.DEEP_WEB_CONSULT}T</span>
+                                </div>
+                                <h4 className="text-base font-medium text-white">3 Tokens (~£0.30)</h4>
+                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                    Unlock 3 grounded artist intelligence consults with cross-Zcene memory, atomic debits, and zero expiration.
+                                </p>
+                            </div>
+
+                            <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-zinc-400">Pre-Flight Lookup</span>
+                                    <span className="text-lg font-mono font-bold text-zinc-300">{TOKEN_PRICING.PREFLIGHT_FLASH_FEE}T</span>
+                                </div>
+                                <h4 className="text-base font-medium text-white">1 Token (~£0.10)</h4>
+                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                    Lookup and disambiguate uncached artists. Automatically credited towards curation upon final confirmation.
+                                </p>
+                            </div>
+
+                            <div className="p-6 bg-zinc-900/50 border border-emerald-500/30 rounded-xl space-y-3 md:col-span-2">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Shared Links & Clones</span>
+                                    <span className="text-lg font-mono font-bold text-emerald-300">0T</span>
+                                </div>
+                                <h4 className="text-base font-medium text-white">Always Free to View & Clone</h4>
+                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                    Anyone with a shared Zcene link can view, pan, and clone the graph into their personal library for 0 Tokens.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Top-Up Bundles & Instant Delivery */}
+                        <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-xl space-y-4 mb-8">
+                            <h4 className="text-base font-medium text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary !text-[20px]">bolt</span>
+                                Prepaid Token Packs & Instant Digital Delivery
+                            </h4>
+                            <p className="text-sm text-zinc-400 leading-relaxed">
+                                Tokens are purchased in flexible bundles: <strong>Starter Crate (£5 for 50T)</strong>, <strong>Scene Explorer (£10 for 100T)</strong>, or <strong>Deep Archive (£15 for 150T)</strong>. Tokens are credited instantly and permanently to your authenticated Google account upon purchase.
+                            </p>
+                        </div>
+
+                        {/* Automated Error Refund Guarantee */}
+                        <div className="p-6 bg-primary/10 border border-primary/30 rounded-xl space-y-3">
+                            <h4 className="text-base font-semibold text-white flex items-center gap-2">
+                                <span className="material-symbols-outlined text-primary !text-[20px]">verified</span>
+                                Automated Error Refund Guarantee
+                            </h4>
+                            <p className="text-sm text-zinc-300 leading-relaxed">
+                                Zcene enforces a zero-risk curation policy. If an AI generation, grounding check, or network connection fails during curation, all debited tokens are refunded instantly and automatically back to your wallet balance. Every transaction and refund is committed to your permanent ledger in the Discovery Ledger.
+                            </p>
+                        </div>
+                    </HelpSection>
+
                     <HelpSection id="legend-glossary" title="Legend Glossary">
                         <p className="text-zinc-400 max-w-3xl mb-12 text-base leading-relaxed">
                             The Legend is your interactive filter. Hide or show different relationship types to focus your exploration.
@@ -630,12 +725,74 @@ const HelpPage: React.FC<HelpPageProps> = ({
                              </div>
                         </div>
                     </HelpSection>
+
+                    <HelpSection id="contact-support" title="Official Support & Contact">
+                        <p className="text-zinc-400 max-w-3xl mb-8 text-base leading-relaxed">
+                            Need help with an account question, a broken curation, a token balance inquiry, or an ad-hoc T-shirt order? Our team is available directly:
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
+                            <div className="p-8 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4 flex flex-col justify-between">
+                                <div className="space-y-3">
+                                    <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center border border-primary/30">
+                                        <span className="material-symbols-outlined !text-2xl">mail</span>
+                                    </div>
+                                    <h4 className="text-xl font-medium text-white">Email Support</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        Official inquiries, billing assistance, manual token adjustments, and bug reports. Responses typically arrive within 24–48 business hours.
+                                    </p>
+                                    <p className="text-xs font-mono text-primary font-semibold">
+                                        {ZCENE_SUPPORT_EMAIL}
+                                    </p>
+                                </div>
+                                <div>
+                                    <a
+                                      href={ZCENE_SUPPORT_MAILTO}
+                                      className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-medium text-brand-black hover:opacity-90 transition-all active:scale-95 shadow-white/20"
+                                    >
+                                      <span className="material-symbols-outlined !text-[18px]">send</span>
+                                      Email Support
+                                    </a>
+                                </div>
+                            </div>
+
+                            <div className="p-8 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4 flex flex-col justify-between">
+                                <div className="space-y-3">
+                                    <div className="w-10 h-10 rounded-xl bg-primary/20 text-primary flex items-center justify-center border border-primary/30">
+                                        <InstagramIcon className="w-5 h-5 text-primary" />
+                                    </div>
+                                    <h4 className="text-xl font-medium text-white">Community & T-Shirt Orders</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        Direct messages for custom merchandise orders, artist feature requests, and music scene feedback.
+                                    </p>
+                                    <p className="text-xs font-mono text-zinc-400 font-semibold">
+                                        {ZCENE_INSTAGRAM_HANDLE}
+                                    </p>
+                                </div>
+                                <div>
+                                    <a
+                                      href={ZCENE_INSTAGRAM_URL}
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-all active:scale-95"
+                                    >
+                                      <InstagramIcon className="w-4 h-4 text-white" />
+                                      Message on Instagram
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-xl text-xs text-zinc-400 leading-relaxed">
+                            <strong className="text-zinc-200">Billing & Refund Reviews:</strong> If you believe a system error was not automatically refunded to your token ledger, please send your authenticated account email and project name to <a href={ZCENE_SUPPORT_MAILTO} className="text-primary hover:underline">{ZCENE_SUPPORT_EMAIL}</a> for an immediate review.
+                        </div>
+                    </HelpSection>
                 </main>
             </div>
 
             <footer className="w-full p-12 text-zinc-400 text-sm z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto">
-                    <div className="flex flex-col items-center gap-10">
+                    <div className="flex flex-col items-center gap-8">
                         <button onClick={() => onNavigate(View.Home)} className="cursor-pointer">
                             <ZceneLogo className="h-10 w-auto text-primary" />
                         </button>
@@ -651,12 +808,18 @@ const HelpPage: React.FC<HelpPageProps> = ({
                             )}
                         </nav>
                         <div className="flex items-center gap-6">
-                            <a href="https://www.instagram.com/zcene.online/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                            <a href={ZCENE_INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
                                 <InstagramIcon className="w-6 h-6 hover:text-primary transition-colors" />
                             </a>
                         </div>
+                        <div className="text-xs text-zinc-400 flex flex-wrap items-center justify-center gap-2">
+                            <span>Official Support:</span>
+                            <a href={ZCENE_SUPPORT_MAILTO} className="text-zinc-300 hover:text-primary transition-colors underline underline-offset-4">
+                                {ZCENE_SUPPORT_EMAIL}
+                            </a>
+                        </div>
                     </div>
-                    <div className="mt-12 border-t border-zinc-600/30 pt-12 text-center">
+                    <div className="mt-8 border-t border-zinc-600/30 pt-8 text-center">
                         <p className="text-zinc-500">© 2026 Zcene. All Rights Reserved.</p>
                     </div>
                 </div>

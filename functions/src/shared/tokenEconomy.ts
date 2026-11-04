@@ -1,4 +1,14 @@
-export const ADMIN_EMAIL = 'zcene.online@gmail.com';
+// --- Official Support & Brand Contacts (Single Source of Truth) ---
+export const ZCENE_SUPPORT_EMAIL = 'zcene.online@gmail.com';
+export const ZCENE_SUPPORT_MAILTO = `mailto:${ZCENE_SUPPORT_EMAIL}?subject=Zcene%20Support%20Inquiry`;
+export const ZCENE_TSHIRT_MAILTO = `mailto:${ZCENE_SUPPORT_EMAIL}?subject=Zcene%20T-Shirt%20Order&body=${encodeURIComponent(
+  `Hi Zcene team,\n\nI would like to order an official Zcene T-shirt.\n\n- Color (Black/White): \n- Size (S/M/L/XL/XXL): \n- Delivery City & Country: \n\nThank you!`
+)}`;
+export const ZCENE_INSTAGRAM_URL = 'https://www.instagram.com/zcene.online/';
+export const ZCENE_INSTAGRAM_HANDLE = '@zcene.online';
+export const ZCENE_BUYMEACOFFEE_URL = 'https://buymeacoffee.com/zcene';
+
+export const ADMIN_EMAIL = ZCENE_SUPPORT_EMAIL;
 
 export function isAdminEmail(email?: string | null): boolean {
   if (!email || typeof email !== 'string') return false;

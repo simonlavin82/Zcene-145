@@ -10,6 +10,13 @@ import CollectionIntelligenceVisual from './CollectionIntelligenceVisual';
 import ArtistFeatureVisual from './ArtistFeatureVisual';
 import AdSenseUnit from './AdSenseUnit';
 import { analyticsService } from '../services/analyticsService';
+import {
+  ZCENE_SUPPORT_EMAIL,
+  ZCENE_SUPPORT_MAILTO,
+  ZCENE_TSHIRT_MAILTO,
+  ZCENE_INSTAGRAM_URL,
+  ZCENE_BUYMEACOFFEE_URL,
+} from '../shared/tokenEconomy';
 
 interface HomePageProps {
   onNavigate: (view: View) => void;
@@ -175,7 +182,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
               onClick={scrollToSupport}
               className="rounded-xl border border-white bg-transparent px-4 py-1.5 font-medium text-white transition-colors hover:bg-white/10 text-sm"
             >
-              Support
+              Merch & Support
             </button>
             <div className="relative">
               <button 
@@ -285,10 +292,19 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                           </button>
                         )}
 
+                        <a
+                          href={ZCENE_SUPPORT_MAILTO}
+                          onClick={() => setIsProfileOpen(false)}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                        >
+                          <span className="material-symbols-outlined !text-[16px] text-zinc-500 group-hover:text-primary">mail</span>
+                          Contact Support
+                        </a>
+
                         <button
                           onClick={() => {
                             setIsProfileOpen(false);
-                            window.open('https://instagram.com/zcene.io', '_blank');
+                            window.open(ZCENE_INSTAGRAM_URL, '_blank');
                           }}
                           className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                         >
@@ -368,7 +384,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                         >
                           {hasExistingGraph ? 'Resume Your Zcene' : 'Create Your Zcene'}
                         </button>
-                        <p className="text-base text-zinc-500">Completely Free. Start by signing in with Google.</p>
+                        <p className="text-base text-zinc-400">Independent, ad-free music discovery. Pay-as-you-go token curation & 0T shared viewing.</p>
                         {!user && <p className="text-xs text-zinc-600 font-normal mt-1">We collect your email address via Google Sign-In to manage your account.</p>}
                     </div>
                 </div>
@@ -452,21 +468,26 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
         {/* Support Section (Background Dark) */}
         <section id="support" className="py-20 sm:py-32 bg-background-dark">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl sm:text-5xl font-medium text-white tracking-tight mb-4">Support The Zcene</h2>
+            <h2 className="text-3xl sm:text-5xl font-medium text-white tracking-tight mb-4">Official Merchandise & Support</h2>
             <h3 className="text-zinc-400 max-w-xl mx-auto mb-12 text-base">
-              Zcene is <span className="text-white font-medium">free</span> and built independently. If you find it useful, please consider supporting its future.
+              Zcene is built <span className="text-white font-medium">independently and 100% ad-free</span>. Order an exclusive made-to-order T-shirt or fuel the server engine directly.
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
-                {/* Left Card: Buy Me a Coffee */}
+                {/* Left Card: Buy Me a Coffee (Tip Jar & Order Settlement) */}
                 <div className="bg-zinc-900/50 border border-zinc-800 p-8 space-y-8 flex flex-col rounded-none">
                     <div className="flex-grow space-y-4">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-none">
+                                Settlement & Tip Jar
+                            </span>
+                        </div>
                         <h4 className="text-2xl font-bold text-white uppercase tracking-tight">Buy Me a Coffee</h4>
                         <p className="text-zinc-400 text-base leading-relaxed">
-                            A simple, friendly way to help keep the servers running and the code flowing.
+                            Settle payment for your confirmed T-shirt order, or drop a tip to help fund server compute and continuous development.
                         </p>
                     </div>
                     <a
-                      href="https://buymeacoffee.com/zcene"
+                      href={ZCENE_BUYMEACOFFEE_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-shrink-0 self-start hover:scale-105 transition-transform"
@@ -475,28 +496,42 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                     </a>
                 </div>
 
-                {/* Right Card: T-shirt */}
+                {/* Right Card: T-shirt (Ad-Hoc Order Flow) */}
                 <div id="merch" className="relative bg-zinc-900/50 border-2 border-primary p-8 space-y-8 flex flex-col rounded-none shadow-primary/5">
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-brand-black px-4 py-1 rounded-none text-[10px] font-black tracking-[0.2em] uppercase">
-                        ZCENESTER
+                        MADE TO ORDER
                     </div>
                     <div className="flex-grow space-y-4">
-                        <h4 className="text-2xl font-bold text-white uppercase tracking-tight">Buy a T-Shirt</h4>
+                        <h4 className="text-2xl font-bold text-white uppercase tracking-tight">Order Official T-Shirt</h4>
                         <p className="text-zinc-400 text-base leading-relaxed">
-                            Represent the community with exclusive, high-quality Zcene T-shirts.
+                            Represent the community with exclusive, high-quality Black & White Zcene T-shirts, made to order.
                         </p>
-                        <p className="text-zinc-500 text-sm italic">
-                            Message me directly to purchase your t-shirt on Instagram.
-                        </p>
+                        <div className="text-xs text-zinc-400 space-y-2 bg-zinc-950/70 p-4 border border-zinc-800/80">
+                            <p className="font-semibold text-zinc-300 uppercase tracking-wider text-[10px]">How to Order:</p>
+                            <ol className="list-decimal list-inside space-y-1.5 text-zinc-400 leading-relaxed">
+                                <li>Contact us with your size (S–XXL), color (Black/White), and delivery location.</li>
+                                <li>Once confirmed, settle payment via Buy Me a Coffee.</li>
+                            </ol>
+                        </div>
                     </div>
-                    <a
-                      href="https://www.instagram.com/zcene.online/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="self-start rounded-xl bg-white px-8 py-3.5 text-sm font-medium text-brand-black hover:opacity-90 transition-all active:scale-95 shadow-white/20"
-                    >
-                      Order via Instagram
-                    </a>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <a
+                          href={ZCENE_TSHIRT_MAILTO}
+                          className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-medium text-brand-black hover:opacity-90 transition-all active:scale-95 shadow-white/20 whitespace-nowrap"
+                        >
+                          <span className="material-symbols-outlined !text-[18px]">mail</span>
+                          Email Order Inquiry
+                        </a>
+                        <a
+                          href={ZCENE_INSTAGRAM_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-700 transition-all active:scale-95 whitespace-nowrap"
+                        >
+                          <InstagramIcon className="w-4 h-4 text-white" />
+                          Order via Instagram
+                        </a>
+                    </div>
                 </div>
             </div>
 
@@ -595,7 +630,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                     )}
                 </nav>
                 <div className="flex items-center gap-4 relative">
-                    <a href="https://www.instagram.com/zcene.online/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
+                    <a href={ZCENE_INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" aria-label="Instagram">
                         <InstagramIcon className="w-5 h-5 hover:text-primary transition-colors" />
                     </a>
                     <div className="relative">
@@ -613,6 +648,12 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                             </span>
                         )}
                     </div>
+                </div>
+                <div className="text-xs text-zinc-400 flex flex-wrap items-center justify-center gap-2">
+                    <span>Official Support:</span>
+                    <a href={ZCENE_SUPPORT_MAILTO} className="text-zinc-300 hover:text-primary transition-colors underline underline-offset-4">
+                        {ZCENE_SUPPORT_EMAIL}
+                    </a>
                 </div>
             </div>
             <div className="mt-8 border-t border-zinc-600/50 pt-8 text-center">

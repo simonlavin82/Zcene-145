@@ -21,6 +21,8 @@ import {
   TOP_UP_TIERS,
   TOP_UP_TIER_LIST,
   TokenTopUpTierId,
+  ZCENE_SUPPORT_EMAIL,
+  ZCENE_SUPPORT_MAILTO,
 } from '../shared/tokenEconomy';
 
 // --- My Stack Dialog Component ---
@@ -873,6 +875,12 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
                 <strong className="text-primary">{currentBalance + selectedTier.tokens} Tokens</strong>
               </span>
             </div>
+            <p className="text-[10px] text-zinc-500 pt-1.5 border-t border-zinc-800/60 leading-relaxed">
+              Questions about billing or token balances? Contact support at{' '}
+              <a href={ZCENE_SUPPORT_MAILTO} className="text-zinc-400 hover:text-primary underline">
+                {ZCENE_SUPPORT_EMAIL}
+              </a>.
+            </p>
           </div>
 
           {errorMsg && (
@@ -1215,7 +1223,7 @@ export const TokenConfirmationDialog: React.FC<{
 
                 {type !== 'live_chat_search' && (
                   <p className="text-[11px] text-zinc-500 leading-relaxed pt-1 border-t border-zinc-800/70">
-                    Includes a 1-Token artist lookup if uncached; the remaining balance is only charged when you confirm generation.
+                    Includes a 1-Token artist lookup if uncached; the remaining balance is only charged when you confirm generation. Failed or interrupted curations are automatically refunded to your token balance immediately.
                   </p>
                 )}
               </div>
