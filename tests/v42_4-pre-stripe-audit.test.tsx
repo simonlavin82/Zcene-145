@@ -163,13 +163,22 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     expect(homeSrc).toContain('>Connections</h2>');
     expect(homeSrc).not.toContain('>Spiderweb</h2>');
 
-    // ExampleMusicGraph UI Parity (Get Up Kids + Jimmy Eat World)
+    // ExampleMusicGraph UI Parity (Get Up Kids + Jimmy Eat World) & 1:1 Visual Parity with MusicGraph.tsx
     expect(exampleGraphSrc).toContain("['The Get Up Kids', 'Jimmy Eat World']");
     expect(exampleGraphSrc).toContain("id: 'The Get Up Kids'");
     expect(exampleGraphSrc).toContain("id: 'Jimmy Eat World'");
     expect(exampleGraphSrc).toContain("id: 'Vagrant'");
     expect(exampleGraphSrc).toContain("id: 'Doghouse'");
     expect(exampleGraphSrc).toContain("id: 'Midwest Emo'");
+    expect(exampleGraphSrc).toContain("width < 730");
+    expect(exampleGraphSrc).toContain("#F6E468");
+    expect(exampleGraphSrc).toContain("Root Artist");
+    expect(exampleGraphSrc).toContain("Artist");
+    expect(exampleGraphSrc).toContain("Label");
+    expect(exampleGraphSrc).toContain("Genre");
+    expect(exampleGraphSrc).toContain("Origin");
+    expect(exampleGraphSrc).toContain("Founded");
+    expect(exampleGraphSrc).toContain("CanvasControlStyles");
 
     // CollectionIntelligenceVisual UI Parity via DetailsPanel Reuse
     expect(deepCutsSrc).toContain('DetailsPanel');
