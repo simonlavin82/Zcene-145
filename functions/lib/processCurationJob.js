@@ -221,18 +221,41 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
         return;
     }
     const jobId = event.params.jobId;
-    const jobData = snapshot.data();
-    console.log(`[Curation Backend] Processing job ${jobId} with status: ${jobData.status}`);
-    if (jobData.status !== "pending") {
-        console.log(`Job ${jobId} is not in pending state. Skipping.`);
+    const jobDocRef = db.collection("curationJobs").doc(jobId);
+    let jobData = null;
+    let isClaimed = false;
+    try {
+        await db.runTransaction(async (transaction) => {
+            const freshSnap = await transaction.get(jobDocRef);
+            if (!freshSnap.exists) {
+                console.warn(`[Curation Backend] [Idempotency] Job ${jobId} does not exist in Firestore. Skipping.`);
+                return;
+            }
+            const liveData = freshSnap.data();
+            if (liveData?.status !== "pending") {
+                console.log(`[Curation Backend] [Idempotency] Job ${jobId} already claimed or resolved with status: "${liveData?.status}". Duplicate event delivery rejected (CloudEvent ID: ${event.id || 'unknown'}).`);
+                return;
+            }
+            // Atomically transition status: pending -> processing
+            transaction.update(jobDocRef, {
+                status: "processing",
+                claimedAt: firestore_2.FieldValue.serverTimestamp(),
+                claimedByEventId: event.id || null,
+                updatedAt: firestore_2.FieldValue.serverTimestamp()
+            });
+            jobData = liveData;
+            isClaimed = true;
+        });
+    }
+    catch (claimErr) {
+        console.error(`[Curation Backend] [Idempotency] Transaction error attempting to claim job ${jobId}:`, claimErr.message);
+        return; // Exit cleanly with 200 OK to prevent Eventarc crash loop
+    }
+    if (!isClaimed || !jobData) {
+        console.log(`[Curation Backend] [Idempotency] Exiting invocation without processing (Job ${jobId} already active or completed).`);
         return;
     }
-    // Update status to processing
-    const jobDocRef = db.collection("curationJobs").doc(jobId);
-    await jobDocRef.update({
-        status: "processing",
-        updatedAt: firestore_2.FieldValue.serverTimestamp()
-    });
+    console.log(`[Curation Backend] Successfully claimed job ${jobId} (CloudEvent ID: ${event.id || 'unknown'}). Status transitioned to 'processing'.`);
     const { jobType, inputPayload } = jobData;
     if (inputPayload?.projectId && jobData.userId) {
         await updateProjectStatus(jobData.userId, inputPayload.projectId, { status: "curating" });
@@ -522,6 +545,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const chunk = recommendedEntities.slice(i, i + batchSize);
                     console.log(`[Curation Backend] Hydrating batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(recommendedEntities.length / batchSize)} (${chunk.length} entities)...`);
                     const batchStartTime = Date.now();
+                    let batchAiCallsCount = 0;
                     const chunkResults = await Promise.all(chunk.map(async (entityObj, idx) => {
                         const rawName = entityObj.name;
                         const isLabel = entityObj.type === 'label';
@@ -686,6 +710,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             await new Promise(resolve => setTimeout(resolve, idx * 1000));
                         }
                         if (requiresTextHydration) {
+                            batchAiCallsCount++;
                             console.log(`[Curation Backend] Cache miss (or missing text). Hydrating details for ${isLabel ? 'label' : 'artist'}: ${searchArtistName}...`);
                             // Change 2 — Per-node transient retry with 2-second backoff.
                             // Now also retries on JSON parse failures or schema validation errors (AI hallucination glitches).
@@ -701,6 +726,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                     console.warn(`[Curation Backend] Transient error for ${artistNormId}. Retrying in 8s...`, firstErr.message);
                                     await new Promise(resolve => setTimeout(resolve, 8000));
                                     try {
+                                        batchAiCallsCount++;
                                         details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, cleanSeedArtistsContext, hydrationHints, usageCollector);
                                         console.log(`[Curation Backend] Retry succeeded for: ${artistNormId}`);
                                     }
@@ -730,6 +756,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         }
                                     }
                                     if (!details.youtubeVideoId && details.youtubeSearchQuery) {
+                                        batchAiCallsCount++;
                                         const scrapedId = await (0, curatorService_1.scrapeVideoIdBackend)(searchArtistName, artistNormId);
                                         if (scrapedId) {
                                             const playable = await (0, curatorService_1.checkVideoPlayability)(scrapedId);
@@ -809,21 +836,25 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         }
                     }
                     // ── Dynamic Rate-Limit Cooldown ──────────────────────────────────────────────
-                    // The Gemini 15 RPM quota requires a minimum 25-second window between batches
-                    // of 3 entities (~6 calls). If the batch itself consumed ≥25s (e.g. because
-                    // one entity needed full googleSearch grounding), the rate-limit window has
-                    // already elapsed and no additional sleep is needed. We recover this dead time
-                    // by sleeping only the remaining delta — or zero if the batch ran long.
+                    // The Gemini 15 RPM quota requires a minimum 25-second window between full batches
+                    // of 3 entities (~6 calls). If the batch made 0 Gemini calls (100% cache hits),
+                    // the rate-limit window does not need to elapse and cooldown is skipped completely.
+                    // For partial batches, the window scales proportionally to batchAiCallsCount.
                     if (i + batchSize < recommendedEntities.length) {
                         const batchElapsedMs = Date.now() - batchStartTime;
-                        const RATE_LIMIT_WINDOW_MS = 25000;
-                        const remainingCooldownMs = Math.max(0, RATE_LIMIT_WINDOW_MS - batchElapsedMs);
-                        if (remainingCooldownMs > 0) {
-                            console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active). Cooling down for ${Math.round(remainingCooldownMs / 1000)}s to respect rate limits...`);
-                            await new Promise(resolve => setTimeout(resolve, remainingCooldownMs));
+                        if (batchAiCallsCount === 0) {
+                            console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active, 0 Gemini calls). 100% cache hits — skipping rate-limit cooldown.`);
                         }
                         else {
-                            console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active). Rate-limit window already elapsed — skipping cooldown.`);
+                            const dynamicWindowMs = Math.min(25000, Math.max(8000, Math.ceil((batchAiCallsCount / 6) * 25000)));
+                            const remainingCooldownMs = Math.max(0, dynamicWindowMs - batchElapsedMs);
+                            if (remainingCooldownMs > 0) {
+                                console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active, ${batchAiCallsCount} Gemini calls). Cooling down for ${Math.round(remainingCooldownMs / 1000)}s to respect rate limits...`);
+                                await new Promise(resolve => setTimeout(resolve, remainingCooldownMs));
+                            }
+                            else {
+                                console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active, ${batchAiCallsCount} Gemini calls). Rate-limit window already elapsed — skipping cooldown.`);
+                            }
                         }
                     }
                 }
