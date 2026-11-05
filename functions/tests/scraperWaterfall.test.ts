@@ -246,5 +246,108 @@ describe('Rule 38: 4-Tier Asset Disambiguation Waterfall (scrapeImageUrlBackend)
       expect(reconciled.some(r => r.albumName === 'To Live and Withstand')).toBe(true);
       expect(reconciled.find(r => r.albumName === 'To Live and Withstand')?.releaseYear).toBe('2023');
     });
+
+    it('Zero-Match Backfill Prohibition: reconcileDiscographyWithITunes returns [] when 0 releases match and does not backfill impostor albums', () => {
+      const impostorItunesAlbums = [
+        { wrapperType: 'collection', collectionName: 'Live from Snake River', releaseDate: '2025-10-11T07:00:00Z', trackCount: 9 },
+        { wrapperType: 'collection', collectionName: '4 Decades', releaseDate: '2026-03-15T07:00:00Z', trackCount: 10 }
+      ];
+
+      const realLLMDiscography = [
+        { albumName: 'Next Time From the Heart', releaseYear: '1988' },
+        { albumName: 'When the World Stood Still', releaseYear: '1990' }
+      ];
+
+      const reconciled = reconcileDiscographyWithITunes(realLLMDiscography, impostorItunesAlbums, 'Reason to Believe');
+      expect(reconciled).toEqual([]);
+    });
+  });
+
+  describe('Tightened Rule 38 Edge Cases: Out-of-Print & Conflated Artists', () => {
+    it('Observation A: Reason to Believe (Out-of-Print 1986 Hardcore Band) - Rejects uncorroborated Rock candidate #1832738374 and falls back to Tier 4', async () => {
+      const result = await scrapeImageUrlBackend(
+        'Reason to Believe',
+        'artist',
+        'Melodic Hardcore',
+        'Reason to Believe was a seminal Southern California melodic hardcore group formed in 1986.',
+        'Orange County, California, USA',
+        [
+          { albumName: 'Next Time From the Heart', releaseYear: '1988' },
+          { albumName: 'When the World Stood Still', releaseYear: '1990' }
+        ]
+      );
+
+      // Must cleanly fall back to Tier 4 not-found
+      expect(result.imageUrl).toBeNull();
+      expect(result.reconciledDiscography).toEqual([]);
+      expect(result.itunesArtistId).toBeNull();
+    });
+
+    it('Observation B: State of the Nation - Correctly blocks conflated Dance candidate #14114464 with single partial match and falls back to Tier 4', async () => {
+      const result = await scrapeImageUrlBackend(
+        'State of the Nation',
+        'artist',
+        'Post-Hardcore',
+        'State of the Nation formed in 1992 as a melodic post-hardcore group.',
+        'Los Angeles, USA',
+        [
+          { albumName: 'Objective?', releaseYear: '1994' },
+          { albumName: 'State of the Nation', releaseYear: '1995' }
+        ]
+      );
+
+      // Conflated Dance profile must not serve EDM artwork or discography
+      expect(result.imageUrl).toBeNull();
+      expect(result.reconciledDiscography).toEqual([]);
+      expect(result.itunesArtistId).toBeNull();
+    });
+
+    it('Zero Regression: Sense Field, Farside, and Gameface continue to verify with authentic artwork and discography', async () => {
+      const farside = await scrapeImageUrlBackend(
+        'Farside',
+        'artist',
+        'Post-Hardcore',
+        'Farside is an American post-hardcore band formed in 1989.',
+        'Orange County, California, USA',
+        [
+          { albumName: 'Rochambeau', releaseYear: '1992' },
+          { albumName: 'The Monroe Doctrine', releaseYear: '1999' }
+        ]
+      );
+      expect(farside.imageUrl).toMatch(/^https:\/\/.*600x600bb\.jpg$/);
+      expect(farside.itunesArtistId).toBe(1645381285);
+      expect(farside.reconciledDiscography.length).toBeGreaterThanOrEqual(2);
+
+      const senseField = await scrapeImageUrlBackend(
+        'Sense Field',
+        'artist',
+        'Post-Hardcore',
+        'Sense Field was an American post-hardcore band formed in Redondo Beach, California in 1991.',
+        'Redondo Beach, California, USA',
+        [
+          { albumName: 'Building', releaseYear: '1996' },
+          { albumName: 'Tonight and Forever', releaseYear: '2001' }
+        ]
+      );
+      expect(senseField.imageUrl).toMatch(/^https:\/\/.*600x600bb\.jpg$/);
+      expect(senseField.itunesArtistId).toBe(497079);
+      expect(senseField.reconciledDiscography.length).toBeGreaterThanOrEqual(2);
+
+      const gameface = await scrapeImageUrlBackend(
+        'Gameface',
+        'artist',
+        'Emo',
+        'Gameface is an American punk rock and emo band from Orange County, California, formed in 1990.',
+        'Orange County, California, USA',
+        [
+          { albumName: 'Good', releaseYear: '1993' },
+          { albumName: 'Always On', releaseYear: '1999' },
+          { albumName: 'Now Is What Matters Most', releaseYear: '2014' }
+        ]
+      );
+      expect(gameface.imageUrl).toMatch(/^https:\/\/.*600x600bb\.jpg$/);
+      expect(gameface.itunesArtistId).toBe(19547255);
+      expect(gameface.reconciledDiscography.length).toBeGreaterThanOrEqual(2);
+    });
   });
 });
