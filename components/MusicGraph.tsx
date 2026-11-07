@@ -996,6 +996,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     }
                 }
 
+                // Notify parent that simulation has settled regardless of initial zoom state
+                if (onSimulationCompleteRef.current) {
+                    onSimulationCompleteRef.current();
+                }
+
                 if (!hasInitialCentered.current && fitGraphToScreenRef.current) {
                     hasInitialCentered.current = true;
                     
@@ -1006,7 +1011,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                                 if (svgRef.current && zoomRef.current) {
                                     d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
                                 }
-                                if (onSimulationCompleteRef.current) onSimulationCompleteRef.current();
                             }, 50);
                         }
                     }, 150);

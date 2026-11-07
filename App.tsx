@@ -6307,7 +6307,7 @@ const App: React.FC = () => {
                 }
               }
             }
-          } else if (data.graphData) {
+          } else if (incomingStatus !== 'curating' && data.graphData) {
             // --- VERY LEGACY FORMAT: full graph blob stored inline ---
             console.log(`[ProjectLoader] Full blob legacy format — loading graphData inline.`);
             const g = normalizeGraphData(typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData);
@@ -6531,7 +6531,33 @@ const App: React.FC = () => {
 
       if (job.status === 'completed') {
         setIsLoading(false);
-        console.log(`[Curation Reconnect] Job completed. Handled by backend project update.`);
+        console.log(`[Curation Reconnect] Job completed. Authoritatively clearing activeJobId & unlocking curation state.`);
+
+        setActiveJobId(null);
+        activeJobIdRef.current = null;
+        setProjectStatus('completed');
+        projectStatusRef.current = 'completed';
+        isHydratingSessionRef.current = false;
+
+        // Synchronize graphData directly if present in job result and local graph is lagging
+        if (job.result?.graphData) {
+          try {
+            const parsedGraph = typeof job.result.graphData === 'string'
+              ? JSON.parse(job.result.graphData)
+              : job.result.graphData;
+            if (parsedGraph && Array.isArray(parsedGraph.nodes) && parsedGraph.nodes.length > 0) {
+              const normalized = normalizeGraphData(parsedGraph);
+              normalized.links = normalized.links.map((l: any) => ({
+                ...l,
+                source: typeof l.source === 'object' ? l.source.id : l.source,
+                target: typeof l.target === 'object' ? l.target.id : l.target,
+              }));
+              syncGraphDataState(normalized);
+            }
+          } catch (e) {
+            console.warn('[Curation Reconnect] Failed to parse graphData from reconnected job:', e);
+          }
+        }
 
         // CLIENT RECOVERY: If the user reconnected after a mobile drop, the Cloud Function
         // has already written graphData + detailsCache to the project doc, but the in-memory

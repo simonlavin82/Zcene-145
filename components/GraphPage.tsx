@@ -1201,6 +1201,23 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isSimulationSettling, setIsSimulationSettling] = useState(true);
+
+  // Simulation Settling Safety Timeout: If not loading, not hydrating, and nodes are present,
+  // ensure the connections overlay blur/spinner never deadlocks longer than 2.5s.
+  useEffect(() => {
+    if (!isLoading && !isHydrating && data.nodes.length > 0 && isSimulationSettling) {
+      const timer = setTimeout(() => {
+        setIsSimulationSettling(false);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, isHydrating, data.nodes.length, isSimulationSettling]);
+
+  useEffect(() => {
+    if (isLoading || isHydrating) {
+      setIsSimulationSettling(true);
+    }
+  }, [isLoading, isHydrating]);
   
   const [isSmallScreen, setIsSmallScreen] = useState(() => {
       if (typeof window !== 'undefined') {

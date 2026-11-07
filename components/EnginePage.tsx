@@ -342,6 +342,13 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <div className="text-white font-medium text-sm mb-3">Background Worker</div>
                         <ul className="text-[11px] text-zinc-400 space-y-3 break-words [overflow-wrap:anywhere]">
                             <li>
+                                <span className="text-primary font-medium">1. Update Job | Atomic Claim Lock</span>
+                                <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
+                                    <li>Atomic Firestore transaction (<code>db.runTransaction</code>) checks live <code>curationJobs/&#123;jobId&#125;</code> status. Transitions <code>'pending' &rarr; 'processing'</code>, stamps <code>claimedAt</code> &amp; <code>claimedByEventId</code>, and sets project status to <code>'curating'</code>.</li>
+                                    <li>Suppresses duplicate Eventarc deliveries (exits 200 OK immediately if status &ne; 'pending') to prevent race-condition re-runs.</li>
+                                </ul>
+                            </li>
+                            <li>
                                 <span className="text-primary font-medium">2. Hydrate Node Batch | 3.6 Flash (low) [Rules 8, 38 & 40]</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
                                     <li>Read Gate (isFullyQualifiedEntityProfile + Origin-Suffix Parity): Requires complete structured schema and origin matching <code>-iso</code> suffix (100% agnostic to audio preview fields). Rejects foreign homonyms and prose-fallback stubs.</li>
@@ -399,8 +406,8 @@ const DiscoveryFlowDiagram: React.FC = () => (
             <div className="w-px bg-zinc-800/50 justify-self-center hidden xl:block" />
 
             {/* Rules Ledger */}
-            <div className="flex flex-col flex-1 min-w-0">
-                <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 h-[560px] flex flex-col">
+            <div className="flex flex-col flex-1 min-w-0 lg:relative">
+                <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 h-[560px] xl:h-auto xl:absolute xl:inset-0 flex flex-col">
                     <div className="text-white font-medium text-sm mb-2 sticky top-0 bg-zinc-900 py-1 border-b border-zinc-800 z-10 flex items-center justify-between">
                         <span>Rules Ledger</span>
                         <span className="text-[10px] font-mono text-primary uppercase">43 Laws</span>
