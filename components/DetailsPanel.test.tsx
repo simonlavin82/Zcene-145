@@ -866,6 +866,66 @@ describe('DetailsPanel', () => {
                 'Revelation',
             ]);
         });
+
+        it('renders Multi-Scene Zine view without throwing when scene.seedArtists is a "::"-delimited string (e.g. "Sense Field::Reason To Believe")', () => {
+            const artist1 = { id: 'sense-field-us', type: 'artist' as const, label: 'Sense Field' };
+            const artist2 = { id: 'reason-to-believe-us', type: 'artist' as const, label: 'Reason To Believe' };
+            const artist3 = { id: 'jimmy-eat-world-us', type: 'artist' as const, label: 'Jimmy Eat World' };
+            const detailsMap = new Map([
+                ['sense-field-us', { summary: 'Sense Field pioneered melodic post-hardcore.', details: { artist: 'Sense Field', origin: 'Los Angeles, USA', genre: 'Post-Hardcore' }, links: [] } as any],
+                ['reason-to-believe-us', { summary: 'Reason To Believe bridged hardcore and melody.', details: { artist: 'Reason To Believe', origin: 'Orange County, USA', genre: 'Hardcore Punk' }, links: [] } as any],
+                ['jimmy-eat-world-us', { summary: 'Jimmy Eat World defined 2000s alternative emo.', details: { artist: 'Jimmy Eat World', origin: 'Mesa, Arizona, USA', genre: 'Emo' }, links: [] } as any],
+            ]);
+
+            const mockScenes: any[] = [
+                {
+                    id: 'scene-1',
+                    sceneId: 'scene-1',
+                    sceneIndex: 0,
+                    title: 'Scene 1',
+                    seedArtists: 'Sense Field::Reason To Believe',
+                    seedIds: ['sense-field-us', 'reason-to-believe-us'],
+                    synthesisRationale: 'Scene 1 explores Southern California post-hardcore roots.',
+                    graphData: {
+                        nodes: [artist1, artist2],
+                        links: [],
+                    },
+                },
+                {
+                    id: 'scene-2',
+                    sceneId: 'scene-2',
+                    sceneIndex: 1,
+                    title: 'Scene 2',
+                    seedArtists: 'Jimmy Eat World',
+                    seedIds: ['jimmy-eat-world-us'],
+                    synthesisRationale: 'Scene 2 traces the Arizona emo crossover.',
+                    graphData: {
+                        nodes: [artist3],
+                        links: [],
+                    },
+                },
+            ];
+
+            render(
+                <DetailsPanel
+                    {...defaultProps}
+                    selectedNode={artist1}
+                    activeNodes={[artist1, artist2, artist3]}
+                    detailsCache={detailsMap}
+                    seedArtists={['Sense Field', 'Reason To Believe']}
+                    scenes={mockScenes}
+                    activeSceneId="scene-1"
+                    overarchingRationale="Overarching editorial connecting Sense Field, Reason To Believe, and Jimmy Eat World."
+                    isMagazineViewOpen={true}
+                />
+            );
+
+            // Verify stacked Zine renders both Scene breakdown headers with formatted "::"-delimited seedArtists without throwing
+            expect(screen.getByText(/ROOTS:\s*Sense Field \+ Reason To Believe/i)).toBeInTheDocument();
+            expect(screen.getByText(/ROOTS:\s*Jimmy Eat World/i)).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: 'Sense Field + Reason To Believe', level: 2 })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: 'Jimmy Eat World', level: 2 })).toBeInTheDocument();
+        });
     });
 });
 

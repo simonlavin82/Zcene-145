@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, ProjectScene, COST_PER_AI_CALL } from '../types';
-import { stripSceneNamespace } from '../shared/multiSceneUtils';
+import { stripSceneNamespace, toSeedArtistsArray } from '../shared/multiSceneUtils';
 import { streamNodeChat, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
 import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
@@ -2496,8 +2496,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 list.push(clean);
             }
         };
-        (seedArtists || []).forEach(register);
-        (scenes || []).forEach(sc => (sc.seedArtists || []).forEach(register));
+        toSeedArtistsArray(seedArtists).forEach(register);
+        (scenes || []).forEach(sc => toSeedArtistsArray(sc?.seedArtists).forEach(register));
         return list;
     }, [seedArtists, scenes]);
 
@@ -2793,31 +2793,33 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 {/* 2) MIDDLE LAYER: INDIVIDUAL SCENE EDITORIALS (H2) */}
                                 <div className="space-y-12" data-testid="scene-editorials-stack">
                                     {scenes.map((scene, idx) => {
+                                        const sceneKey = scene.sceneId || scene.id || `scene-${idx + 1}`;
+                                        const sceneSeeds = toSeedArtistsArray(scene.seedArtists);
                                         const sceneRationale = sanitizeRationaleMarkdown(scene.synthesisRationale, scene.graphData?.nodes?.length);
-                                        const firstSeedNorm = scene.seedArtists?.[0] ? normalizeArtistId(scene.seedArtists[0]) : '';
+                                        const firstSeedNorm = sceneSeeds[0] ? normalizeArtistId(sceneSeeds[0]) : '';
                                         const seedDetailsFallback = firstSeedNorm ? detailsCache.get(firstSeedNorm)?.summary : '';
                                         const effectiveSceneCopy = sceneRationale || seedDetailsFallback || '';
-                                        if (!effectiveSceneCopy && (!scene.seedArtists || scene.seedArtists.length === 0)) {
+                                        if (!effectiveSceneCopy && sceneSeeds.length === 0) {
                                             return null;
                                         }
                                         return (
                                             <div
-                                                key={scene.sceneId}
-                                                data-testid={`zine-scene-section-${scene.sceneId}`}
+                                                key={sceneKey}
+                                                data-testid={`zine-scene-section-${sceneKey}`}
                                                 className="pb-10 last:pb-2 border-b last:border-b-0 border-zinc-800/50"
                                             >
                                                 <div className="flex items-center flex-wrap gap-2 mb-4">
                                                     <span className="text-[10px] uppercase tracking-widest text-zinc-300 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-zinc-700 font-mono whitespace-nowrap">
                                                         SCENE {idx + 1}
                                                     </span>
-                                                    {scene.seedArtists && scene.seedArtists.length > 0 && (
+                                                    {sceneSeeds.length > 0 && (
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
-                                                            ROOTS: {scene.seedArtists.join(' + ')}
+                                                            ROOTS: {sceneSeeds.join(' + ')}
                                                         </span>
                                                     )}
                                                 </div>
                                                 <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-8 leading-tight" style={{ wordBreak: 'break-word' }}>
-                                                    {scene.title || scene.seedArtists?.join(' + ') || `Scene ${idx + 1}`}
+                                                    {sceneSeeds.length > 0 ? sceneSeeds.join(' + ') : (scene.title || scene.name || `Scene ${idx + 1}`)}
                                                 </h2>
                                                 {effectiveSceneCopy && (
                                                     <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">

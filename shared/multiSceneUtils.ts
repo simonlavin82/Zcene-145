@@ -49,6 +49,42 @@ export function normalizeCanonicalEntityId(id: string): string {
     .replace(/^-|-$/g, '');
 }
 
+/**
+ * Defensive universal normalizer that converts any `seedArtists` representation
+ * (`string[]`, `'::'`-delimited `string`, `null`, `undefined`, etc.) into a clean `string[]`.
+ * Guarantees `.filter()`, `.map()`, `.forEach()`, and `.join()` never throw.
+ */
+export function toSeedArtistsArray(raw: unknown): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) {
+    const out: string[] = [];
+    for (const item of raw) {
+      if (typeof item === 'string') {
+        for (const part of item.split('::')) {
+          const trimmed = part.trim();
+          if (trimmed) out.push(trimmed);
+        }
+      }
+    }
+    return out;
+  }
+  if (typeof raw === 'string') {
+    return raw
+      .split('::')
+      .map((s) => s.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
+/**
+ * Defensive universal normalizer that converts any `seedArtists` representation
+ * (`string[]` or `'::'`-delimited `string`) into the canonical `'::'`-delimited `string`.
+ */
+export function toSeedArtistsString(raw: unknown): string {
+  return toSeedArtistsArray(raw).join('::');
+}
+
 export function isCanonicalSeedMatch(nodeIdOrLabel: string, seedList: string[]): boolean {
   if (!nodeIdOrLabel || !Array.isArray(seedList) || seedList.length === 0) return false;
   const targetNorm = normalizeCanonicalEntityId(nodeIdOrLabel);
@@ -66,36 +102,187 @@ export function isCanonicalSeedMatch(nodeIdOrLabel: string, seedList: string[]):
   });
 }
 
-export function createEmptyProjectScene(
-  sceneIndex: number,
-  seedArtists: string = '',
-  discoveryFilters: DiscoveryFilters = {}
+/**
+ * Canonicalizes a `ProjectScene` object so that `sceneId` & `id`, `title` & `name`,
+ * `seedArtists` (string), and `seedIds` & `seedArtistIds` (string[]) are always
+ * present and synchronized across frontend and backend boundaries.
+ */
+export function normalizeProjectScene(
+  raw: Partial<ProjectScene> | Record<string, any> | null | undefined,
+  fallbackIndex: number = 0
 ): ProjectScene {
-  const sceneId = `scene-${sceneIndex + 1}`;
-  const seeds = seedArtists
-    .split('::')
-    .map((s) => s.trim())
-    .filter(Boolean);
-  const title = seeds.length > 0 ? seeds.join(' + ') : `Scene ${sceneIndex + 1}`;
+  const s = raw || {};
+  const sceneIndex =
+    typeof s.sceneIndex === 'number' && Number.isFinite(s.sceneIndex) && s.sceneIndex >= 0
+      ? Math.floor(s.sceneIndex)
+      : Math.max(0, Math.floor(fallbackIndex));
+  const sceneId = String(s.sceneId || s.id || `scene-${sceneIndex + 1}`).trim();
+
+  let graphData: GraphData = { nodes: [], links: [] };
+  if (s.graphData) {
+    try {
+      const parsedGraph =
+        typeof s.graphData === 'string' ? JSON.parse(s.graphData) : s.graphData;
+      if (parsedGraph && typeof parsedGraph === 'object') {
+        graphData = {
+          nodes: Array.isArray(parsedGraph.nodes) ? parsedGraph.nodes : [],
+          links: Array.isArray(parsedGraph.links) ? parsedGraph.links : [],
+          ...(parsedGraph.synthesisRationale
+            ? { synthesisRationale: parsedGraph.synthesisRationale }
+            : {}),
+        };
+      }
+    } catch {
+      graphData = { nodes: [], links: [] };
+    }
+  }
+
+  let discoveryFilters: DiscoveryFilters = {};
+  if (s.discoveryFilters) {
+    try {
+      const parsedFilters =
+        typeof s.discoveryFilters === 'string'
+          ? JSON.parse(s.discoveryFilters)
+          : s.discoveryFilters;
+      if (parsedFilters && typeof parsedFilters === 'object') {
+        discoveryFilters = parsedFilters;
+      }
+    } catch {
+      discoveryFilters = {};
+    }
+  }
+
+  const seedsArray = toSeedArtistsArray(s.seedArtists);
+  const seedArtists = seedsArray.join('::');
+  const rawSeedIds =
+    Array.isArray(s.seedIds) && s.seedIds.length > 0
+      ? s.seedIds
+      : Array.isArray(s.seedArtistIds) && s.seedArtistIds.length > 0
+        ? s.seedArtistIds
+        : [];
+  const seedIds =
+    rawSeedIds.length > 0
+      ? rawSeedIds.map((id: any) => String(id).trim()).filter(Boolean)
+      : seedsArray.map((seed) => normalizeCanonicalEntityId(seed)).filter(Boolean);
+
+  const rawTitle = String(s.title || s.name || '').trim();
+  const isGenericDefaultTitle = /^Scene\s+\d+$/i.test(rawTitle);
+  const title =
+    rawTitle && (!isGenericDefaultTitle || seedsArray.length === 0)
+      ? rawTitle
+      : seedsArray.length > 0
+        ? seedsArray.join(' + ')
+        : `Scene ${sceneIndex + 1}`;
+
+  const status =
+    s.status ||
+    (graphData.nodes && graphData.nodes.length > 0 ? 'ready' : 'unmapped');
 
   return {
     id: sceneId,
     sceneId,
     sceneIndex,
     title,
+    name: title,
     seedArtists,
-    seedIds: seeds.map((s) => normalizeCanonicalEntityId(s)),
-    discoveryFilters: discoveryFilters || {},
-    graphData: { nodes: [], links: [] },
-    synthesisRationale: '',
-    artistSnippets: {},
-    centerOffset: getSceneCenterOffset(sceneIndex),
-    status: 'unmapped',
-    updatedAt: Date.now(),
+    seedIds,
+    seedArtistIds: seedIds,
+    ...(Array.isArray(s.activeNodes) ? { activeNodes: s.activeNodes } : {}),
+    discoveryFilters,
+    graphData,
+    synthesisRationale: s.synthesisRationale || graphData.synthesisRationale || '',
+    artistSnippets: s.artistSnippets && typeof s.artistSnippets === 'object' ? s.artistSnippets : {},
+    centerOffset: s.centerOffset || getSceneCenterOffset(sceneIndex),
+    status,
+    ...(s.pathway ? { pathway: s.pathway } : {}),
+    ...(s.generationType ? { generationType: s.generationType } : {}),
+    updatedAt: typeof s.updatedAt === 'number' ? s.updatedAt : Date.now(),
   };
 }
 
+export function createEmptyProjectScene(
+  sceneIndex: number,
+  seedArtists: string | string[] = '',
+  discoveryFilters: DiscoveryFilters = {}
+): ProjectScene {
+  return normalizeProjectScene(
+    {
+      sceneIndex,
+      seedArtists: toSeedArtistsString(seedArtists),
+      discoveryFilters: discoveryFilters || {},
+      graphData: { nodes: [], links: [] },
+      synthesisRationale: '',
+      artistSnippets: {},
+      centerOffset: getSceneCenterOffset(sceneIndex),
+      status: 'unmapped',
+      updatedAt: Date.now(),
+    },
+    sceneIndex
+  );
+}
+
 export const createEmptyScene = createEmptyProjectScene;
+
+/**
+ * Normalizes a `CrossSceneLink` so both `sourceSceneId`/`targetSceneId` and
+ * `fromSceneId`/`toSceneId` (plus `sourceCanonicalId`/`targetCanonicalId` and
+ * `fromNodeId`/`toNodeId`) are always populated and consistent.
+ */
+export function normalizeCrossSceneLink(
+  raw: Partial<CrossSceneLink> | Record<string, any> | null | undefined
+): CrossSceneLink | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const sourceSceneId = String(raw.sourceSceneId || raw.fromSceneId || '').trim();
+  const targetSceneId = String(raw.targetSceneId || raw.toSceneId || '').trim();
+  if (!sourceSceneId || !targetSceneId || sourceSceneId === targetSceneId) return null;
+
+  const sourceCanonicalId = stripSceneNamespace(
+    String(raw.sourceCanonicalId || raw.fromNodeId || raw.sourceNodeId || '').trim()
+  );
+  const targetCanonicalId = stripSceneNamespace(
+    String(raw.targetCanonicalId || raw.toNodeId || raw.targetNodeId || '').trim()
+  );
+  if (!sourceCanonicalId || !targetCanonicalId) return null;
+
+  const sourceNodeId =
+    raw.sourceNodeId && String(raw.sourceNodeId).includes('::')
+      ? String(raw.sourceNodeId).trim()
+      : namespaceSceneNodeId(sourceSceneId, sourceCanonicalId);
+  const targetNodeId =
+    raw.targetNodeId && String(raw.targetNodeId).includes('::')
+      ? String(raw.targetNodeId).trim()
+      : namespaceSceneNodeId(targetSceneId, targetCanonicalId);
+  const id = String(raw.id || `${sourceNodeId}--${targetNodeId}`).trim();
+  const bridgeType = raw.bridgeType === 'sonic_lineage' ? 'sonic_lineage' : 'identity';
+  const forwardContext = String(
+    raw.forwardContext || 'bridges both constellations as a shared anchor with'
+  ).trim();
+  const inverseContext = String(raw.inverseContext || forwardContext).trim();
+  const weight =
+    typeof raw.weight === 'number' && Number.isFinite(raw.weight)
+      ? raw.weight
+      : bridgeType === 'identity'
+        ? 1.0
+        : 0.85;
+
+  return {
+    id,
+    sourceSceneId,
+    targetSceneId,
+    fromSceneId: sourceSceneId,
+    toSceneId: targetSceneId,
+    sourceNodeId,
+    targetNodeId,
+    fromNodeId: sourceCanonicalId,
+    toNodeId: targetCanonicalId,
+    sourceCanonicalId,
+    targetCanonicalId,
+    bridgeType,
+    forwardContext,
+    inverseContext,
+    weight,
+  };
+}
 
 /**
  * Deterministically identifies shared canonical Artist or Label entities across Scene pairs
@@ -114,7 +301,9 @@ export function computeDeterministicIdentityBridges(scenes: ProjectScene[]): Cro
 
     const seedsA = sceneA.seedIds?.length
       ? sceneA.seedIds
-      : (sceneA.seedArtists || '').split('::').map((s) => s.trim()).filter(Boolean);
+      : sceneA.seedArtistIds?.length
+        ? sceneA.seedArtistIds
+        : toSeedArtistsArray(sceneA.seedArtists);
 
     for (let j = i + 1; j < scenes.length; j++) {
       const sceneB = scenes[j];
@@ -123,7 +312,9 @@ export function computeDeterministicIdentityBridges(scenes: ProjectScene[]): Cro
 
       const seedsB = sceneB.seedIds?.length
         ? sceneB.seedIds
-        : (sceneB.seedArtists || '').split('::').map((s) => s.trim()).filter(Boolean);
+        : sceneB.seedArtistIds?.length
+          ? sceneB.seedArtistIds
+          : toSeedArtistsArray(sceneB.seedArtists);
 
       for (const nodeA of nodesA) {
         if (nodeA.type !== 'artist' && nodeA.type !== 'label') continue;
@@ -173,7 +364,7 @@ export function computeDeterministicIdentityBridges(scenes: ProjectScene[]): Cro
           inverseContext = 'anchors both scenes through shared label roster with';
         }
 
-        bridges.push({
+        const normalizedBridge = normalizeCrossSceneLink({
           id: bridgeId,
           sourceSceneId: sceneAId,
           targetSceneId: sceneBId,
@@ -186,6 +377,7 @@ export function computeDeterministicIdentityBridges(scenes: ProjectScene[]): Cro
           inverseContext,
           weight: 1.0,
         });
+        if (normalizedBridge) bridges.push(normalizedBridge);
       }
     }
   }
@@ -204,18 +396,23 @@ export function mergeCrossSceneLinks(
   const merged = new Map<string, CrossSceneLink>();
 
   const makePairKey = (link: CrossSceneLink): string => {
-    const a = `${link.sourceSceneId}::${normalizeCanonicalEntityId(link.sourceCanonicalId)}`;
-    const b = `${link.targetSceneId}::${normalizeCanonicalEntityId(link.targetCanonicalId)}`;
+    const srcScene = link.sourceSceneId || link.fromSceneId || '';
+    const tgtScene = link.targetSceneId || link.toSceneId || '';
+    const srcCanon = link.sourceCanonicalId || link.fromNodeId || stripSceneNamespace(link.sourceNodeId || '');
+    const tgtCanon = link.targetCanonicalId || link.toNodeId || stripSceneNamespace(link.targetNodeId || '');
+    const a = `${srcScene}::${normalizeCanonicalEntityId(srcCanon)}`;
+    const b = `${tgtScene}::${normalizeCanonicalEntityId(tgtCanon)}`;
     return [a, b].sort().join('--');
   };
 
-  for (const d of deterministicBridges || []) {
-    merged.set(makePairKey(d), d);
+  for (const rawD of deterministicBridges || []) {
+    const d = normalizeCrossSceneLink(rawD);
+    if (d) merged.set(makePairKey(d), d);
   }
 
-  for (const ai of aiBridges || []) {
-    if (!ai || !ai.sourceSceneId || !ai.targetSceneId) continue;
-    if (ai.sourceSceneId === ai.targetSceneId) continue;
+  for (const rawAi of aiBridges || []) {
+    const ai = normalizeCrossSceneLink(rawAi);
+    if (!ai) continue;
     const key = makePairKey(ai);
     if (!merged.has(key)) {
       merged.set(key, ai);
@@ -258,10 +455,9 @@ export function buildCompositeCanvasGraph(
     const center = scene.centerOffset || getSceneCenterOffset(sceneIndex);
     const seedList = scene.seedIds?.length
       ? scene.seedIds
-      : (scene.seedArtists || '')
-          .split('::')
-          .map((s) => s.trim())
-          .filter(Boolean);
+      : scene.seedArtistIds?.length
+        ? scene.seedArtistIds
+        : toSeedArtistsArray(scene.seedArtists);
 
     const rawNodes = scene.graphData?.nodes || [];
     const rawLinks = scene.graphData?.links || [];
@@ -358,8 +554,12 @@ export function buildCompositeCanvasGraph(
   const allBridges = mergeCrossSceneLinks(deterministicBridges, crossSceneLinks);
 
   for (const bridge of allBridges) {
-    const srcId = bridge.sourceNodeId || namespaceSceneNodeId(bridge.sourceSceneId, bridge.sourceCanonicalId);
-    const tgtId = bridge.targetNodeId || namespaceSceneNodeId(bridge.targetSceneId, bridge.targetCanonicalId);
+    const srcSceneId = bridge.sourceSceneId || bridge.fromSceneId || 'scene-1';
+    const tgtSceneId = bridge.targetSceneId || bridge.toSceneId || 'scene-2';
+    const srcCanonId = bridge.sourceCanonicalId || bridge.fromNodeId || '';
+    const tgtCanonId = bridge.targetCanonicalId || bridge.toNodeId || '';
+    const srcId = bridge.sourceNodeId || namespaceSceneNodeId(srcSceneId, srcCanonId);
+    const tgtId = bridge.targetNodeId || namespaceSceneNodeId(tgtSceneId, tgtCanonId);
     if (!nodeExistsSet.has(srcId.toLowerCase()) || !nodeExistsSet.has(tgtId.toLowerCase())) {
       continue;
     }
@@ -374,8 +574,8 @@ export function buildCompositeCanvasGraph(
       context: bridge.forwardContext,
       isCrossSceneBridge: true,
       bridgeType: bridge.bridgeType,
-      sourceSceneId: bridge.sourceSceneId,
-      targetSceneId: bridge.targetSceneId,
+      sourceSceneId: srcSceneId,
+      targetSceneId: tgtSceneId,
     });
   }
 
@@ -403,10 +603,9 @@ export function computeDeduplicatedActiveNodes(scenes: ProjectScene[]): string[]
     const nodes = scene?.graphData?.nodes || [];
     const seedList = scene.seedIds?.length
       ? scene.seedIds
-      : (scene.seedArtists || '')
-          .split('::')
-          .map((s) => s.trim())
-          .filter(Boolean);
+      : scene.seedArtistIds?.length
+        ? scene.seedArtistIds
+        : toSeedArtistsArray(scene.seedArtists);
 
     // 1. Scene Seed Artists first
     for (const node of nodes) {
@@ -492,7 +691,7 @@ export function buildCanonicalDeduplicatedNodesFromScenes(scenes: ProjectScene[]
           ...rawNode,
           id: canonId,
           canonicalId: canonId,
-          sceneId: scene.sceneId,
+          sceneId: scene.sceneId || scene.id,
           sceneIndex: scene.sceneIndex,
           isSeed: isRootInAnyScene,
           isSceneSeed: isRootInAnyScene,
@@ -526,12 +725,11 @@ export function getAllProjectSeedIds(scenes: ProjectScene[]): string[] {
   for (const scene of scenes) {
     const list = scene?.seedIds?.length
       ? scene.seedIds
-      : (scene?.seedArtists || '')
-          .split('::')
-          .map((s) => s.trim())
-          .filter(Boolean);
+      : scene?.seedArtistIds?.length
+        ? scene.seedArtistIds
+        : toSeedArtistsArray(scene?.seedArtists);
     for (const s of list) {
-      const clean = stripSceneNamespace(s).trim();
+      const clean = stripSceneNamespace(String(s)).trim();
       const norm = normalizeCanonicalEntityId(clean);
       if (norm && !seen.has(norm)) {
         seen.add(norm);
@@ -548,10 +746,7 @@ export function getAllProjectSeedArtistsString(scenes: ProjectScene[]): string {
   const names: string[] = [];
 
   for (const scene of scenes) {
-    const rawNames = (scene?.seedArtists || '')
-      .split('::')
-      .map((s) => s.trim())
-      .filter(Boolean);
+    const rawNames = toSeedArtistsArray(scene?.seedArtists);
     for (const name of rawNames) {
       const norm = normalizeCanonicalEntityId(name);
       if (norm && !seen.has(norm)) {
@@ -570,44 +765,7 @@ export function parseProjectScenes(
   try {
     const parsed = typeof rawScenes === 'string' ? JSON.parse(rawScenes) : rawScenes;
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((s: any, idx: number) => {
-      const sceneIndex = typeof s.sceneIndex === 'number' ? s.sceneIndex : idx;
-      const sceneId = s.sceneId || s.id || `scene-${sceneIndex + 1}`;
-      let graphData: GraphData = { nodes: [], links: [] };
-      if (s.graphData) {
-        graphData = typeof s.graphData === 'string' ? JSON.parse(s.graphData) : s.graphData;
-      }
-      let discoveryFilters: DiscoveryFilters = {};
-      if (s.discoveryFilters) {
-        discoveryFilters =
-          typeof s.discoveryFilters === 'string'
-            ? JSON.parse(s.discoveryFilters)
-            : s.discoveryFilters;
-      }
-      const seeds = (s.seedArtists || '')
-        .split('::')
-        .map((seed: string) => seed.trim())
-        .filter(Boolean);
-
-      return {
-        id: sceneId,
-        sceneId,
-        sceneIndex,
-        title: s.title || (seeds.length > 0 ? seeds.join(' + ') : `Scene ${sceneIndex + 1}`),
-        seedArtists: s.seedArtists || '',
-        seedIds: Array.isArray(s.seedIds)
-          ? s.seedIds
-          : seeds.map((seed: string) => normalizeCanonicalEntityId(seed)),
-        discoveryFilters,
-        graphData: graphData || { nodes: [], links: [] },
-        synthesisRationale: s.synthesisRationale || graphData?.synthesisRationale || '',
-        artistSnippets: s.artistSnippets || {},
-        centerOffset: s.centerOffset || getSceneCenterOffset(sceneIndex),
-        status: s.status || (graphData?.nodes?.length > 0 ? 'ready' : 'unmapped'),
-        pathway: s.pathway,
-        updatedAt: s.updatedAt || Date.now(),
-      };
-    });
+    return parsed.map((s: any, idx: number) => normalizeProjectScene(s, idx));
   } catch (e) {
     console.warn('[parseProjectScenes] Failed to parse scenes:', e);
     return [];
@@ -620,10 +778,12 @@ export function parseCrossSceneLinks(
   if (!rawLinks) return [];
   try {
     const parsed = typeof rawLinks === 'string' ? JSON.parse(rawLinks) : rawLinks;
-    return Array.isArray(parsed) ? parsed : [];
+    if (!Array.isArray(parsed)) return [];
+    return parsed
+      .map((l: any) => normalizeCrossSceneLink(l))
+      .filter((l): l is CrossSceneLink => l !== null);
   } catch (e) {
     console.warn('[parseCrossSceneLinks] Failed to parse crossSceneLinks:', e);
     return [];
   }
 }
-

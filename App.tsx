@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink } from './types';
-import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeterministicIdentityBridges, createEmptyScene, getSceneCenterOffset, stripSceneNamespace } from './shared/multiSceneUtils';
+import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeterministicIdentityBridges, createEmptyScene, getSceneCenterOffset, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
 import { qualifyCacheEntry, deriveRoutingDecision, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
@@ -1641,18 +1641,20 @@ const App: React.FC = () => {
   useEffect(() => {
     if (isProjectLoadingRef.current || scenes.length === 0) return;
     setScenes(prev => {
-      const idx = prev.findIndex(s => s.id === activeSceneId);
+      const idx = prev.findIndex(s => (s.sceneId || s.id) === activeSceneId);
       if (idx === -1) return prev;
       const current = prev[idx];
       const filtersEq = areFiltersEqual(current.discoveryFilters, discoveryFilters);
       if (current.seedArtists === seedArtists && filtersEq) return prev;
       const updated = [...prev];
-      updated[idx] = {
+      const nextSeedIds = toSeedArtistsArray(seedArtists).map(s => normalizeArtistId(s)).filter(Boolean);
+      updated[idx] = normalizeProjectScene({
         ...current,
         seedArtists,
-        seedArtistIds: (seedArtists || '').split('::').map(s => normalizeArtistId(s.trim())).filter(Boolean),
+        seedIds: nextSeedIds,
+        seedArtistIds: nextSeedIds,
         discoveryFilters: discoveryFilters || {}
-      };
+      }, idx);
       scenesRef.current = updated;
       return updated;
     });
@@ -1665,13 +1667,15 @@ const App: React.FC = () => {
     sessionTokenApprovedRef.current = false;
 
     const currentScenes = scenesRef.current;
-    const targetScene = currentScenes.find(s => s.id === targetSceneId);
+    const targetScene = currentScenes.find(s => (s.sceneId || s.id) === targetSceneId);
     if (!targetScene) return;
 
-    activeSceneIdRef.current = targetSceneId;
-    setActiveSceneId(targetSceneId);
-    setSeedArtists(targetScene.seedArtists || '');
-    seedArtistsRef.current = targetScene.seedArtists || '';
+    const resolvedId = targetScene.sceneId || targetScene.id;
+    activeSceneIdRef.current = resolvedId;
+    setActiveSceneId(resolvedId);
+    const seedStr = toSeedArtistsString(targetScene.seedArtists);
+    setSeedArtists(seedStr);
+    seedArtistsRef.current = seedStr;
     const nextFilters = targetScene.discoveryFilters || {};
     setDiscoveryFilters(nextFilters);
     discoveryFiltersRef.current = nextFilters;
@@ -1700,48 +1704,52 @@ const App: React.FC = () => {
           })),
         synthesisRationale: currentGraph.synthesisRationale
       };
+      const initSeedIds = toSeedArtistsArray(seedArtistsRef.current).map(s => normalizeArtistId(s)).filter(Boolean);
       baseScenes = [
-        {
+        normalizeProjectScene({
           ...createEmptyScene(0),
           seedArtists: seedArtistsRef.current || '',
-          seedArtistIds: (seedArtistsRef.current || '').split('::').map(s => normalizeArtistId(s.trim())).filter(Boolean),
+          seedIds: initSeedIds,
+          seedArtistIds: initSeedIds,
           discoveryFilters: discoveryFiltersRef.current || {},
           graphData: unnamespacedGraph,
           synthesisRationale: currentGraph.synthesisRationale || '',
           activeNodes: activeNodeIds.map(id => stripSceneNamespace(id)),
           status: (unnamespacedGraph.nodes?.length || 0) > 0 ? 'completed' : 'idle'
-        }
+        }, 0)
       ];
     } else {
-      baseScenes = baseScenes.map(s =>
-        s.id === activeSceneIdRef.current
-          ? {
+      baseScenes = baseScenes.map((s, idx) =>
+        (s.sceneId || s.id) === activeSceneIdRef.current
+          ? normalizeProjectScene({
               ...s,
               seedArtists: seedArtistsRef.current || s.seedArtists,
-              seedArtistIds: (seedArtistsRef.current || s.seedArtists || '').split('::').map(x => normalizeArtistId(x.trim())).filter(Boolean),
+              seedIds: toSeedArtistsArray(seedArtistsRef.current || s.seedArtists).map(x => normalizeArtistId(x)).filter(Boolean),
+              seedArtistIds: toSeedArtistsArray(seedArtistsRef.current || s.seedArtists).map(x => normalizeArtistId(x)).filter(Boolean),
               discoveryFilters: discoveryFiltersRef.current || s.discoveryFilters
-            }
-          : s
+            }, idx)
+          : normalizeProjectScene(s, idx)
       );
     }
 
     const nextIndex = baseScenes.length;
     let candidateId = `scene-${nextIndex + 1}`;
     let bump = nextIndex + 1;
-    while (baseScenes.some(s => s.id === candidateId)) {
+    while (baseScenes.some(s => (s.sceneId || s.id) === candidateId)) {
       bump++;
       candidateId = `scene-${bump}`;
     }
-    const newScene: ProjectScene = {
+    const newScene: ProjectScene = normalizeProjectScene({
       ...createEmptyScene(nextIndex),
-      id: candidateId
-    };
+      id: candidateId,
+      sceneId: candidateId
+    }, nextIndex);
 
     const nextScenes = [...baseScenes, newScene];
     scenesRef.current = nextScenes;
     setScenes(nextScenes);
-    activeSceneIdRef.current = newScene.id;
-    setActiveSceneId(newScene.id);
+    activeSceneIdRef.current = newScene.sceneId;
+    setActiveSceneId(newScene.sceneId);
     setSeedArtists('');
     seedArtistsRef.current = '';
     setDiscoveryFilters({});
@@ -1757,22 +1765,24 @@ const App: React.FC = () => {
     sessionTokenApprovedRef.current = false;
 
     const remaining = currentScenes
-      .filter(s => s.id !== sceneIdToRemove)
-      .map((s, idx) => ({
+      .filter(s => (s.sceneId || s.id) !== sceneIdToRemove)
+      .map((s, idx) => normalizeProjectScene({
         ...s,
         sceneIndex: idx,
+        title: `Scene ${idx + 1}`,
         name: `Scene ${idx + 1}`,
         centerOffset: getSceneCenterOffset(idx)
-      }));
+      }, idx));
 
     const nextBridges = remaining.length >= 2
       ? [
           ...computeDeterministicIdentityBridges(remaining),
-          ...crossSceneLinksRef.current.filter(
-            b => b.bridgeType === 'sonic_lineage' &&
-              remaining.some(s => s.id === b.fromSceneId) &&
-              remaining.some(s => s.id === b.toSceneId)
-          )
+          ...crossSceneLinksRef.current.filter(b => {
+            const normB = normalizeCrossSceneLink(b);
+            return normB.bridgeType === 'sonic_lineage' &&
+              remaining.some(s => (s.sceneId || s.id) === normB.sourceSceneId) &&
+              remaining.some(s => (s.sceneId || s.id) === normB.targetSceneId);
+          })
         ]
       : [];
 
@@ -1786,11 +1796,13 @@ const App: React.FC = () => {
     crossSceneLinksRef.current = nextBridges;
     setCrossSceneLinks(nextBridges);
 
-    const nextActive = remaining.find(s => s.id === activeSceneIdRef.current) || remaining[0];
-    activeSceneIdRef.current = nextActive.id;
-    setActiveSceneId(nextActive.id);
-    setSeedArtists(nextActive.seedArtists || '');
-    seedArtistsRef.current = nextActive.seedArtists || '';
+    const nextActive = remaining.find(s => (s.sceneId || s.id) === activeSceneIdRef.current) || remaining[0];
+    const nextActiveId = nextActive.sceneId || nextActive.id;
+    activeSceneIdRef.current = nextActiveId;
+    setActiveSceneId(nextActiveId);
+    const nextSeeds = toSeedArtistsString(nextActive.seedArtists);
+    setSeedArtists(nextSeeds);
+    seedArtistsRef.current = nextSeeds;
     const nextFilters = nextActive.discoveryFilters || {};
     setDiscoveryFilters(nextFilters);
     discoveryFiltersRef.current = nextFilters;
@@ -3351,21 +3363,25 @@ const App: React.FC = () => {
     // V43 Multi-Scene Direct Hit Assembly: update activeScene inside scenes and rebuild composite graph
     const targetSceneId = activeSceneIdRef.current || 'scene-1';
     const currentScenesList = scenesRef.current.length > 0 ? [...scenesRef.current] : [createEmptyScene(0)];
-    let targetSceneIdx = currentScenesList.findIndex(s => s.id === targetSceneId);
+    let targetSceneIdx = currentScenesList.findIndex(s => (s.sceneId || s.id) === targetSceneId);
     if (targetSceneIdx === -1) {
       targetSceneIdx = currentScenesList.length;
-      currentScenesList.push({ ...createEmptyScene(targetSceneIdx), id: targetSceneId });
+      currentScenesList.push(normalizeProjectScene({ ...createEmptyScene(targetSceneIdx), id: targetSceneId, sceneId: targetSceneId }, targetSceneIdx));
     }
     const sceneActiveNodeIds = normalizedGraph.nodes
       .filter((n: any) => n.type === 'artist' || n.type === 'label')
       .map((n: any) => stripSceneNamespace(n.canonicalId || n.id));
-    const updatedScene: ProjectScene = {
+    const normSeedIds = artistList.map(a => normalizeArtistId(a));
+    const updatedScene: ProjectScene = normalizeProjectScene({
       ...currentScenesList[targetSceneIdx],
       id: targetSceneId,
+      sceneId: targetSceneId,
       sceneIndex: targetSceneIdx,
-      name: currentScenesList[targetSceneIdx]?.name || `Scene ${targetSceneIdx + 1}`,
+      title: currentScenesList[targetSceneIdx]?.title || currentScenesList[targetSceneIdx]?.name || `Scene ${targetSceneIdx + 1}`,
+      name: currentScenesList[targetSceneIdx]?.name || currentScenesList[targetSceneIdx]?.title || `Scene ${targetSceneIdx + 1}`,
       seedArtists: artistsString,
-      seedArtistIds: artistList.map(a => normalizeArtistId(a)),
+      seedIds: normSeedIds,
+      seedArtistIds: normSeedIds,
       discoveryFilters: discoveryFiltersRef.current || {},
       graphData: normalizedGraph,
       synthesisRationale: normalizedGraph.synthesisRationale || rationaleVal || '',
@@ -3373,18 +3389,19 @@ const App: React.FC = () => {
       centerOffset: getSceneCenterOffset(targetSceneIdx),
       status: 'completed',
       generationType: 'Direct Hit'
-    };
+    }, targetSceneIdx);
     currentScenesList[targetSceneIdx] = updatedScene;
 
     const populatedScenes = currentScenesList.filter(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
     const nextBridges = populatedScenes.length >= 2
       ? [
           ...computeDeterministicIdentityBridges(populatedScenes),
-          ...crossSceneLinksRef.current.filter(
-            b => b.bridgeType === 'sonic_lineage' &&
-              populatedScenes.some(s => s.id === b.fromSceneId) &&
-              populatedScenes.some(s => s.id === b.toSceneId)
-          )
+          ...crossSceneLinksRef.current.filter(b => {
+            const normB = normalizeCrossSceneLink(b);
+            return normB.bridgeType === 'sonic_lineage' &&
+              populatedScenes.some(s => (s.sceneId || s.id) === normB.sourceSceneId) &&
+              populatedScenes.some(s => (s.sceneId || s.id) === normB.targetSceneId);
+          })
         ]
       : [];
 
@@ -3437,8 +3454,8 @@ const App: React.FC = () => {
           ? rawNodeImage.trim()
           : null;
 
-        const allSeedNames = Array.from(new Set(populatedScenes.flatMap(s => (s.seedArtists || '').split('::').map(x => x.trim()).filter(Boolean))));
-        const allSeedIds = Array.from(new Set(populatedScenes.flatMap(s => s.seedArtistIds || [])));
+        const allSeedNames = Array.from(new Set(populatedScenes.flatMap(s => toSeedArtistsArray(s.seedArtists))));
+        const allSeedIds = Array.from(new Set(populatedScenes.flatMap(s => s.seedIds || s.seedArtistIds || [])));
 
         const payload: Record<string, any> = {
           schemaVersion: 43,
@@ -3525,12 +3542,13 @@ const App: React.FC = () => {
       setCurrentProjectId(targetProjectId);
       navigate(`/p/${targetProjectId}`);
 
-      const initialScene: ProjectScene = {
+      const initialScene: ProjectScene = normalizeProjectScene({
         ...createEmptyScene(0),
         seedArtists: seedSlug,
+        seedIds: [normalizeArtistId(seedSlug)],
         seedArtistIds: [normalizeArtistId(seedSlug)],
         status: 'curating'
-      };
+      }, 0);
 
       await setDoc(newDocRef, {
         name: cleanDisplayName || displaySeedLabel || seedSlug,
@@ -3546,7 +3564,7 @@ const App: React.FC = () => {
         supportsLabelDeepCuts: true,
         schemaVersion: 43,
         scenes: JSON.stringify([initialScene]),
-        activeSceneId: initialScene.id,
+        activeSceneId: initialScene.sceneId,
         overarchingRationale: '',
         crossSceneLinks: '[]',
         sceneCount: 1,
@@ -3566,17 +3584,20 @@ const App: React.FC = () => {
         const rationaleVal = directHitCacheDocData.synthesisRationale || parsedG?.synthesisRationale || '';
         if (rationaleVal && parsedG) parsedG.synthesisRationale = rationaleVal;
         const normG = applyHumanCasedLabels(normalizeGraphData(parsedG), displaySeedLabel || seedSlug);
-        let idx = previewScenes.findIndex(s => s.id === targetSceneId);
+        let idx = previewScenes.findIndex(s => (s.sceneId || s.id) === targetSceneId);
         if (idx === -1) {
           idx = previewScenes.length;
-          previewScenes.push({ ...createEmptyScene(idx), id: targetSceneId });
+          previewScenes.push(normalizeProjectScene({ ...createEmptyScene(idx), id: targetSceneId, sceneId: targetSceneId }, idx));
         }
-        previewScenes[idx] = {
+        previewScenes[idx] = normalizeProjectScene({
           ...previewScenes[idx],
           id: targetSceneId,
+          sceneId: targetSceneId,
           sceneIndex: idx,
-          name: previewScenes[idx]?.name || `Scene ${idx + 1}`,
+          title: previewScenes[idx]?.title || previewScenes[idx]?.name || `Scene ${idx + 1}`,
+          name: previewScenes[idx]?.name || previewScenes[idx]?.title || `Scene ${idx + 1}`,
           seedArtists: displaySeedLabel || seedSlug,
+          seedIds: [normalizeArtistId(seedSlug)],
           seedArtistIds: [normalizeArtistId(seedSlug)],
           discoveryFilters: discoveryFiltersRef.current || {},
           graphData: normG,
@@ -3585,7 +3606,7 @@ const App: React.FC = () => {
           centerOffset: getSceneCenterOffset(idx),
           status: 'completed',
           generationType: 'Direct Hit'
-        };
+        }, idx);
       } catch (e) {}
     }
     const populatedPreviewScenes = previewScenes.filter(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
@@ -4121,17 +4142,18 @@ const App: React.FC = () => {
           }
         }
 
-        const stepZeroScene: ProjectScene = {
+        const stepZeroScene: ProjectScene = normalizeProjectScene({
           ...createEmptyScene(0),
           seedArtists: artists,
+          seedIds: artistList.map(a => normalizeArtistId(a)),
           seedArtistIds: artistList.map(a => normalizeArtistId(a)),
           discoveryFilters: activeDiscoveryFilters,
           status: 'curating'
-        };
+        }, 0);
         scenesRef.current = [stepZeroScene];
         setScenes([stepZeroScene]);
-        activeSceneIdRef.current = stepZeroScene.id;
-        setActiveSceneId(stepZeroScene.id);
+        activeSceneIdRef.current = stepZeroScene.sceneId;
+        setActiveSceneId(stepZeroScene.sceneId);
 
         await setDoc(newDocRef, {
           name: defaultName,
@@ -4258,11 +4280,34 @@ const App: React.FC = () => {
 
     // Instantly commit the clean-slate pruned graph to React state to purge stale lineage data
     // (When other settled scenes exist on the multi-scene board, preserve them during curation)
+    const activeSceneKey = activeSceneIdRef.current || 'scene-1';
     const otherSettledScenes = scenesRef.current.filter(
-      s => s.id !== activeSceneIdRef.current && s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+      s => (s.sceneId || s.id) !== activeSceneKey && s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
     );
     if (otherSettledScenes.length === 0) {
       setGraphData(pruned || { nodes: [], links: [] });
+    }
+
+    // Synchronously update scenesRef.current and setScenes for the active scene BEFORE executeCurationPipeline is invoked
+    {
+      const nextSeedIds = artistList.map(a => normalizeArtistId(a));
+      const baseScenesList = scenesRef.current.length > 0 ? [...scenesRef.current] : [createEmptyScene(0)];
+      let sIdx = baseScenesList.findIndex(s => (s.sceneId || s.id) === activeSceneKey);
+      if (sIdx === -1) {
+        sIdx = 0;
+      }
+      baseScenesList[sIdx] = normalizeProjectScene({
+        ...baseScenesList[sIdx],
+        id: activeSceneKey,
+        sceneId: activeSceneKey,
+        sceneIndex: sIdx,
+        seedArtists: artists,
+        seedIds: nextSeedIds,
+        seedArtistIds: nextSeedIds,
+        discoveryFilters: activeDiscoveryFilters
+      }, sIdx);
+      scenesRef.current = baseScenesList;
+      setScenes(baseScenesList);
     }
 
     setIsLoading(true); setError(null); setSeedArtists(artists);
@@ -5246,13 +5291,13 @@ const App: React.FC = () => {
           // and forcefully derive the name from the fresh artists string.
           const isNewOrUntitled = !projectName || projectName === "Untitled Zcene";
           const targetSceneId = activeSceneIdRef.current || 'scene-1';
-          const targetSceneIdx = Math.max(0, scenesRef.current.findIndex(s => s.id === targetSceneId));
+          const targetSceneIdx = Math.max(0, scenesRef.current.findIndex(s => (s.sceneId || s.id) === targetSceneId));
           const allSceneSeedStrs = scenesRef.current.length > 1
             ? Array.from(new Set([
-                ...scenesRef.current.filter(s => s.id !== targetSceneId).flatMap(s => (s.seedArtists || '').split('::').map(x => x.trim()).filter(Boolean)),
-                ...artists.split('::').map(s => s.trim()).filter(Boolean)
+                ...scenesRef.current.filter(s => (s.sceneId || s.id) !== targetSceneId).flatMap(s => toSeedArtistsArray(s.seedArtists)),
+                ...toSeedArtistsArray(artists)
               ]))
-            : artists.split('::').map(s => s.trim()).filter(Boolean);
+            : toSeedArtistsArray(artists);
           if (isNewOrUntitled || (isLiveSynthesisTemp && !isRegeneration) || scenesRef.current.length > 1) {
             if (allSceneSeedStrs.length > 1) {
               defaultName = allSceneSeedStrs.map(formatSeed).join(' + ');
@@ -5267,6 +5312,7 @@ const App: React.FC = () => {
               activeJobId: jobId,
               seedArtists: artists,
               activeSceneId: targetSceneId,
+              scenes: JSON.stringify(scenesRef.current),
               name: defaultName,
               discoveryFilters: JSON.stringify(activeDiscoveryFilters),
               updatedAt: serverTimestamp()
@@ -5281,6 +5327,7 @@ const App: React.FC = () => {
               activeJobId: jobId,
               seedArtists: artists,
               activeSceneId: targetSceneId,
+              scenes: JSON.stringify(scenesRef.current),
               name: defaultName,
               discoveryFilters: JSON.stringify(activeDiscoveryFilters),
               updatedAt: serverTimestamp()
@@ -5304,7 +5351,23 @@ const App: React.FC = () => {
         
         const seedImageUrl = undefined;
         const targetSceneIdForJob = activeSceneIdRef.current || 'scene-1';
-        const targetSceneIdxForJob = Math.max(0, scenesRef.current.findIndex(s => s.id === targetSceneIdForJob));
+        const targetSceneIdxForJob = Math.max(0, scenesRef.current.findIndex(s => (s.sceneId || s.id) === targetSceneIdForJob));
+        const synchronizedScenesForJob = (scenesRef.current.length > 0 ? scenesRef.current : [createEmptyScene(0)]).map((s, idx) =>
+          (s.sceneId || s.id) === targetSceneIdForJob || idx === targetSceneIdxForJob
+            ? normalizeProjectScene({
+                ...s,
+                id: targetSceneIdForJob,
+                sceneId: targetSceneIdForJob,
+                sceneIndex: idx,
+                seedArtists: artists,
+                seedIds: artistList.map(a => normalizeArtistId(a)),
+                seedArtistIds: artistList.map(a => normalizeArtistId(a)),
+                discoveryFilters: activeDiscoveryFilters,
+                status: 'curating'
+              }, idx)
+            : normalizeProjectScene(s, idx)
+        );
+        scenesRef.current = synchronizedScenesForJob;
 
         graphPromise = generateGraphDataViaCloudJob(
           artists, // Raw display names to prevent LLM hallucinations
@@ -5340,7 +5403,7 @@ const App: React.FC = () => {
           curationSessionIdRef.current, // V38 Split-Debit session ID
           targetSceneIdForJob,
           targetSceneIdxForJob,
-          scenesRef.current.length > 0 ? scenesRef.current : undefined
+          synchronizedScenesForJob
         );
       } else {
         const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');
@@ -6413,20 +6476,19 @@ const App: React.FC = () => {
       // Always restore non-graph metadata (available in both new and legacy formats)
       if (data.scenes !== undefined) {
         try {
-          const parsedScenes: ProjectScene[] = typeof data.scenes === 'string'
-            ? JSON.parse(data.scenes)
-            : (Array.isArray(data.scenes) ? data.scenes : []);
+          const parsedScenes: ProjectScene[] = parseProjectScenes(data.scenes);
           if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
             scenesRef.current = parsedScenes;
             setScenes(parsedScenes);
-            const resolvedActiveSceneId = data.activeSceneId && parsedScenes.some(s => s.id === data.activeSceneId)
+            const resolvedActiveSceneId = data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId)
               ? data.activeSceneId
-              : parsedScenes[0].id;
+              : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
             activeSceneIdRef.current = resolvedActiveSceneId;
             setActiveSceneId(resolvedActiveSceneId);
-            const targetScene = parsedScenes.find(s => s.id === resolvedActiveSceneId) || parsedScenes[0];
+            const targetScene = parsedScenes.find(s => (s.sceneId || s.id) === resolvedActiveSceneId) || parsedScenes[0];
             if (targetScene?.seedArtists !== undefined) {
-              setSeedArtists((prev: any) => prev === targetScene.seedArtists ? prev : targetScene.seedArtists);
+              const targetSeedsStr = toSeedArtistsString(targetScene.seedArtists);
+              setSeedArtists((prev: any) => prev === targetSeedsStr ? prev : targetSeedsStr);
             }
             if (targetScene?.discoveryFilters) {
               setDiscoveryFilters((prev: any) => JSON.stringify(prev) === JSON.stringify(targetScene.discoveryFilters) ? prev : targetScene.discoveryFilters);
@@ -6445,9 +6507,7 @@ const App: React.FC = () => {
       }
       if (data.crossSceneLinks !== undefined) {
         try {
-          const parsedCrossLinks: CrossSceneLink[] = typeof data.crossSceneLinks === 'string'
-            ? JSON.parse(data.crossSceneLinks)
-            : (Array.isArray(data.crossSceneLinks) ? data.crossSceneLinks : []);
+          const parsedCrossLinks: CrossSceneLink[] = parseCrossSceneLinks(data.crossSceneLinks);
           crossSceneLinksRef.current = parsedCrossLinks;
           setCrossSceneLinks(parsedCrossLinks);
         } catch (e) {
@@ -6546,24 +6606,36 @@ const App: React.FC = () => {
         if (incomingStatus !== 'curating' && data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
           try {
             const parsed = JSON.parse(data.graphData);
-            if (parsed && parsed.nodes && parsed.nodes.length > 0) {
+            const populatedScenesFromDoc = (scenesRef.current || []).filter(
+              s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+            );
+            if ((parsed && parsed.nodes && parsed.nodes.length > 0) || populatedScenesFromDoc.length > 0) {
               console.log('[ProjectLoader] Hydrating directly from project graphData');
-              const g = normalizeGraphData(parsed);
-              g.links = g.links.map((l: any) => ({
-                ...l,
-                source: typeof l.source === 'object' ? l.source.id : l.source,
-                target: typeof l.target === 'object' ? l.target.id : l.target,
-              }));
-
-              // Re-apply saved canvas positions
+              let savedPositions: CanvasNodeRef[] = [];
               if (data.canvasLayout) {
                 try {
-                  const positions: Array<{ nodeId: string; x?: number; y?: number; fx?: number | null; fy?: number | null }> = JSON.parse(data.canvasLayout);
-                  positions.forEach(ref => {
+                  savedPositions = JSON.parse(data.canvasLayout);
+                } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
+              }
+
+              let g: GraphData;
+              if (populatedScenesFromDoc.length >= 2) {
+                g = buildCompositeCanvasGraph(populatedScenesFromDoc, crossSceneLinksRef.current || [], savedPositions);
+              } else if (parsed && parsed.nodes && parsed.nodes.length > 0) {
+                g = normalizeGraphData(parsed);
+                g.links = g.links.map((l: any) => ({
+                  ...l,
+                  source: typeof l.source === 'object' ? l.source.id : l.source,
+                  target: typeof l.target === 'object' ? l.target.id : l.target,
+                }));
+                if (savedPositions.length > 0) {
+                  savedPositions.forEach(ref => {
                     const node = g.nodes.find((n: any) => n.id === ref.nodeId);
                     if (node) { node.x = ref.x; node.y = ref.y; node.fx = ref.fx ?? null; node.fy = ref.fy ?? null; }
                   });
-                } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
+                }
+              } else {
+                g = buildCompositeCanvasGraph(populatedScenesFromDoc, crossSceneLinksRef.current || [], savedPositions);
               }
 
               if (data.detailsCache) {
@@ -6625,9 +6697,15 @@ const App: React.FC = () => {
 
               loadedFromGraphData = true;
             } else {
-              if (isHydratingSessionRef.current) {
-                console.log('[ProjectLoader] Project contains empty graph, but local session is actively hydrating. Bypassing fallback.');
-                loadedFromGraphData = true; // Pretend it loaded to prevent rogue legacy lookups
+              const hasLegacyLookupKeys =
+                (Array.isArray(data.artistIds) && data.artistIds.length > 0) ||
+                (Array.isArray(data.labelIds) && data.labelIds.length > 0) ||
+                Boolean(data.cacheKey);
+              if (isHydratingSessionRef.current || !hasLegacyLookupKeys) {
+                loadedFromGraphData = true;
+                if (!isHydratingSessionRef.current) {
+                  syncGraphDataState({ nodes: [], links: [] });
+                }
               } else {
                 console.warn('[ProjectLoader] Project document contains empty graph. Falling back to Phase 1 cache lookup.');
               }
@@ -7479,13 +7557,11 @@ const App: React.FC = () => {
                 
                 if (data.scenes !== undefined) {
                   try {
-                    const parsedScenes: ProjectScene[] = typeof data.scenes === 'string'
-                      ? JSON.parse(data.scenes)
-                      : (Array.isArray(data.scenes) ? data.scenes : []);
+                    const parsedScenes: ProjectScene[] = parseProjectScenes(data.scenes);
                     if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
                       scenesRef.current = parsedScenes;
                       setScenes(parsedScenes);
-                      const resolvedActiveId = data.activeSceneId || parsedScenes[0].id;
+                      const resolvedActiveId = data.activeSceneId || parsedScenes[0].sceneId || parsedScenes[0].id;
                       activeSceneIdRef.current = resolvedActiveId;
                       setActiveSceneId(resolvedActiveId);
                     }
@@ -7497,9 +7573,7 @@ const App: React.FC = () => {
                 }
                 if (data.crossSceneLinks !== undefined) {
                   try {
-                    const parsedCross: CrossSceneLink[] = typeof data.crossSceneLinks === 'string'
-                      ? JSON.parse(data.crossSceneLinks)
-                      : (Array.isArray(data.crossSceneLinks) ? data.crossSceneLinks : []);
+                    const parsedCross: CrossSceneLink[] = parseCrossSceneLinks(data.crossSceneLinks);
                     crossSceneLinksRef.current = parsedCross;
                     setCrossSceneLinks(parsedCross);
                   } catch (e) {}
@@ -8595,10 +8669,10 @@ const App: React.FC = () => {
     if (!graphData) return null;
     const seedList = scenes.length > 0
       ? Array.from(new Set([
-          ...scenes.flatMap(s => (s.seedArtists || '').split('::').map(x => x.trim()).filter(Boolean)),
-          ...seedArtists.split('::').map(s => s.trim()).filter(Boolean)
+          ...scenes.flatMap(s => toSeedArtistsArray(s.seedArtists)),
+          ...toSeedArtistsArray(seedArtists)
         ]))
-      : seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+      : toSeedArtistsArray(seedArtists);
     return {
       ...graphData,
       nodes: graphData.nodes.map(n => {

@@ -371,11 +371,15 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 console.log(`[Curation Backend] [Overarching-Only Mode] Synthesizing Overarching Zine & Cross-Scene Bridges across ${existingProjectScenes.length} scenes...`);
                 const detailsLookupObj = Object.fromEntries(existingProjectDetailsMap.entries());
                 const overarchingResult = await (0, curatorService_1.generateOverarchingZineBackend)(existingProjectScenes, detailsLookupObj, usageCollector);
-                const activeScene = existingProjectScenes.find((s) => s.sceneId === targetSceneId) ||
+                const activeScene = existingProjectScenes.find((s) => (s.sceneId || s.id) === targetSceneId) ||
                     existingProjectScenes[existingProjectScenes.length - 1];
                 const serializedCacheEntries = Array.from(existingProjectDetailsMap.entries());
+                const populatedExistingScenes = existingProjectScenes.filter((s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+                const compositeOverarchingGraph = populatedExistingScenes.length >= 2
+                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedExistingScenes, overarchingResult.crossSceneLinks)
+                    : (activeScene?.graphData || { nodes: [], links: [] });
                 result = {
-                    graphData: activeScene?.graphData || { nodes: [], links: [] },
+                    graphData: compositeOverarchingGraph,
                     detailsCache: JSON.stringify(serializedCacheEntries),
                     scenes: existingProjectScenes,
                     overarchingRationale: overarchingResult.overarchingRationale,
@@ -2073,12 +2077,15 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     return seedNamesMap[canonical] || seedNamesMap[norm] || (0, isoCountries_1.stripCountrySlug)(a);
                 })
                     .join(" + ");
-                const completedScene = {
+                const completedScene = (0, multiSceneUtils_1.normalizeProjectScene)({
+                    id: targetSceneId,
                     sceneId: targetSceneId,
                     sceneIndex: targetSceneIndex,
                     title: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
+                    name: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
                     seedArtists: cleanSeedArtistsContext,
                     seedIds: resolvedSeedArray.map((s) => s.id),
+                    seedArtistIds: resolvedSeedArray.map((s) => s.id),
                     discoveryFilters: inputPayload.filters || {},
                     graphData: finalGraph,
                     synthesisRationale: finalGraph.synthesisRationale || rootBreakdownStr || "",
@@ -2087,9 +2094,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     status: "ready",
                     pathway: isComplexGeneration ? "complex_generation" : "root_generation",
                     updatedAt: Date.now(),
-                };
+                }, targetSceneIndex);
                 const updatedScenes = [...existingProjectScenes];
-                const existingSceneIdx = updatedScenes.findIndex((s) => s.sceneId === targetSceneId);
+                const existingSceneIdx = updatedScenes.findIndex((s) => (s.sceneId || s.id) === targetSceneId);
                 if (existingSceneIdx !== -1) {
                     updatedScenes[existingSceneIdx] = completedScene;
                 }
@@ -2106,8 +2113,12 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     overarchingRationale = overarchingPayload.overarchingRationale;
                     crossSceneLinks = overarchingPayload.crossSceneLinks;
                 }
+                const populatedCompletedScenes = updatedScenes.filter((s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+                const projectGraphToPersist = populatedCompletedScenes.length >= 2
+                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedCompletedScenes, crossSceneLinks)
+                    : finalGraph;
                 result = {
-                    graphData: finalGraph,
+                    graphData: projectGraphToPersist,
                     detailsCache: JSON.stringify(unifiedDetailsCacheEntries),
                     scenes: updatedScenes,
                     overarchingRationale,

@@ -138,8 +138,11 @@ export interface ProjectScene {
   sceneId: string;                    // Deterministic slug: 'scene-1', 'scene-2', ...
   sceneIndex: number;                 // 0-based ordinal index (0, 1, 2, ...)
   title: string;                      // Default: seed names joined by ' + '
+  name?: string;                      // Alias of title for UI/legacy compatibility
   seedArtists: string;                // '::'-delimited seeds for this Scene
   seedIds: string[];                  // Canonical geographically-suffixed IDs
+  seedArtistIds?: string[];           // Alias of seedIds
+  activeNodes?: string[];             // Optional per-scene active canonical entity IDs
   discoveryFilters: DiscoveryFilters; // Per-scene 3-Tier Anchors (Era, Origin, Genre, Label)
   graphData: GraphData;               // Un-namespaced canonical scene topology
   synthesisRationale: string;         // Scene-specific Zine editorial markdown
@@ -147,6 +150,7 @@ export interface ProjectScene {
   centerOffset: SceneCenterOffset;    // { x: 1000 + sceneIndex * 1600, y: 1000 }
   status: 'unmapped' | 'curating' | 'ready' | 'failed' | 'completed' | 'idle';
   pathway?: 'direct_hit' | 'root_generation' | 'complex_generation';
+  generationType?: string;
   updatedAt: number;
 }
 
@@ -154,8 +158,12 @@ export interface CrossSceneLink {
   id: string;                         // `${sourceSceneId}::${sourceCanonicalId}--${targetSceneId}::${targetCanonicalId}`
   sourceSceneId: string;
   targetSceneId: string;
+  fromSceneId?: string;               // Alias of sourceSceneId
+  toSceneId?: string;                 // Alias of targetSceneId
   sourceNodeId: string;               // Namespaced canvas node ID: e.g. 'scene-1::jimmy-eat-world-us'
   targetNodeId: string;               // Namespaced canvas node ID: e.g. 'scene-2::jimmy-eat-world-us'
+  fromNodeId?: string;                // Alias of sourceCanonicalId
+  toNodeId?: string;                  // Alias of targetCanonicalId
   sourceCanonicalId: string;          // e.g. 'jimmy-eat-world-us'
   targetCanonicalId: string;          // e.g. 'jimmy-eat-world-us'
   bridgeType: 'identity' | 'sonic_lineage';

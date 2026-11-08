@@ -580,12 +580,15 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                         // Graceful fallback if project doc doesn't exist yet or in unit test mocks without .get()
                     }
                 }
-                const activeScenePayload = {
+                const activeScenePayload = (0, multiSceneUtils_1.normalizeProjectScene)({
+                    id: targetSceneId,
                     sceneId: targetSceneId,
                     sceneIndex: targetSceneIndex,
                     title: displaySeeds || `Scene ${targetSceneIndex + 1}`,
+                    name: displaySeeds || `Scene ${targetSceneIndex + 1}`,
                     seedArtists: resolvedSeedArray.map(s => s.name || s.id).join('::'),
                     seedIds: resolvedSeedArray.map(s => s.id),
+                    seedArtistIds: resolvedSeedArray.map(s => s.id),
                     discoveryFilters: payload.filters || {},
                     graphData: finalGraph,
                     synthesisRationale: finalGraph.synthesisRationale || "",
@@ -598,8 +601,8 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                             ? "complex_generation"
                             : "root_generation",
                     updatedAt: Date.now(),
-                };
-                const existingIdx = updatedScenes.findIndex(s => s.sceneId === targetSceneId);
+                }, targetSceneIndex);
+                const existingIdx = updatedScenes.findIndex(s => (s.sceneId || s.id) === targetSceneId);
                 if (existingIdx !== -1) {
                     updatedScenes[existingIdx] = activeScenePayload;
                 }
@@ -607,9 +610,13 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     updatedScenes.push(activeScenePayload);
                 }
                 updatedScenes.sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
+                const populatedUpdatedScenes = updatedScenes.filter(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+                const compositeProjectGraph = populatedUpdatedScenes.length >= 2
+                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedUpdatedScenes, [])
+                    : finalGraph;
                 console.log(`[Pipeline Diamond] -> Initiating Curation Pipeline for ${payload.projectId} (scene=${targetSceneId}) with type: ${determinedGenerationType}`);
                 const projectUpdate = {
-                    graphData: JSON.stringify(finalGraph),
+                    graphData: JSON.stringify(compositeProjectGraph),
                     schemaVersion: 43,
                     scenes: JSON.stringify(updatedScenes),
                     activeSceneId: targetSceneId,

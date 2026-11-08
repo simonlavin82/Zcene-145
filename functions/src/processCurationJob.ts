@@ -49,6 +49,8 @@ import {
   computeDeduplicatedActiveNodes,
   getAllProjectSeedIds,
   stripSceneNamespace,
+  normalizeProjectScene,
+  buildCompositeCanvasGraph,
 } from "./shared/multiSceneUtils";
 import { refundProjectSettlementOnError } from "./tokenWallet";
 
@@ -436,12 +438,18 @@ export const processCurationJob = onDocumentCreated({
           usageCollector
         );
         const activeScene =
-          existingProjectScenes.find((s) => s.sceneId === targetSceneId) ||
+          existingProjectScenes.find((s) => (s.sceneId || s.id) === targetSceneId) ||
           existingProjectScenes[existingProjectScenes.length - 1];
         const serializedCacheEntries = Array.from(existingProjectDetailsMap.entries());
+        const populatedExistingScenes = existingProjectScenes.filter(
+          (s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+        );
+        const compositeOverarchingGraph = populatedExistingScenes.length >= 2
+          ? buildCompositeCanvasGraph(populatedExistingScenes, overarchingResult.crossSceneLinks)
+          : (activeScene?.graphData || { nodes: [], links: [] });
 
         result = {
-          graphData: activeScene?.graphData || { nodes: [], links: [] },
+          graphData: compositeOverarchingGraph,
           detailsCache: JSON.stringify(serializedCacheEntries),
           scenes: existingProjectScenes,
           overarchingRationale: overarchingResult.overarchingRationale,
@@ -2286,12 +2294,15 @@ export const processCurationJob = onDocumentCreated({
           })
           .join(" + ");
 
-        const completedScene: ProjectScene = {
+        const completedScene: ProjectScene = normalizeProjectScene({
+          id: targetSceneId,
           sceneId: targetSceneId,
           sceneIndex: targetSceneIndex,
           title: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
+          name: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
           seedArtists: cleanSeedArtistsContext,
           seedIds: resolvedSeedArray.map((s: any) => s.id),
+          seedArtistIds: resolvedSeedArray.map((s: any) => s.id),
           discoveryFilters: inputPayload.filters || {},
           graphData: finalGraph,
           synthesisRationale: finalGraph.synthesisRationale || rootBreakdownStr || "",
@@ -2300,10 +2311,10 @@ export const processCurationJob = onDocumentCreated({
           status: "ready",
           pathway: isComplexGeneration ? "complex_generation" : "root_generation",
           updatedAt: Date.now(),
-        };
+        }, targetSceneIndex);
 
         const updatedScenes: ProjectScene[] = [...existingProjectScenes];
-        const existingSceneIdx = updatedScenes.findIndex((s) => s.sceneId === targetSceneId);
+        const existingSceneIdx = updatedScenes.findIndex((s) => (s.sceneId || s.id) === targetSceneId);
         if (existingSceneIdx !== -1) {
           updatedScenes[existingSceneIdx] = completedScene;
         } else {
@@ -2327,8 +2338,15 @@ export const processCurationJob = onDocumentCreated({
           crossSceneLinks = overarchingPayload.crossSceneLinks;
         }
 
+        const populatedCompletedScenes = updatedScenes.filter(
+          (s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+        );
+        const projectGraphToPersist = populatedCompletedScenes.length >= 2
+          ? buildCompositeCanvasGraph(populatedCompletedScenes, crossSceneLinks)
+          : finalGraph;
+
         result = {
-          graphData: finalGraph,
+          graphData: projectGraphToPersist,
           detailsCache: JSON.stringify(unifiedDetailsCacheEntries),
           scenes: updatedScenes,
           overarchingRationale,

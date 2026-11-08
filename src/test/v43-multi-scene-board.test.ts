@@ -11,6 +11,11 @@ import {
   computeDeduplicatedActiveNodes,
   buildCanonicalDeduplicatedNodesFromScenes,
   parseProjectScenes,
+  parseCrossSceneLinks,
+  toSeedArtistsArray,
+  toSeedArtistsString,
+  normalizeProjectScene,
+  normalizeCrossSceneLink,
 } from '../../shared/multiSceneUtils';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
 import { computeProjectHydrationFingerprint } from '../../utils/projectHydrationFingerprint';
@@ -221,5 +226,59 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       overarchingRationale: 'Synthesized overarching multi-scene editorial.',
     });
     expect(fp1).not.toBe(fp2);
+  });
+
+  it('normalizes "::"-delimited string and string[] seedArtists seamlessly via toSeedArtistsArray, toSeedArtistsString, and normalizeProjectScene', () => {
+    expect(toSeedArtistsArray('Sense Field::Reason To Believe')).toEqual(['Sense Field', 'Reason To Believe']);
+    expect(toSeedArtistsArray(['Sense Field', 'Reason To Believe'])).toEqual(['Sense Field', 'Reason To Believe']);
+    expect(toSeedArtistsArray('')).toEqual([]);
+    expect(toSeedArtistsArray(null)).toEqual([]);
+
+    expect(toSeedArtistsString(['Sense Field', 'Reason To Believe'])).toBe('Sense Field::Reason To Believe');
+    expect(toSeedArtistsString('Sense Field::Reason To Believe')).toBe('Sense Field::Reason To Believe');
+
+    // Backend payload with sceneId (missing id) and string seedArtists
+    const normalized = normalizeProjectScene({
+      sceneId: 'scene-1',
+      sceneIndex: 0,
+      title: 'Sense Field + Reason To Believe',
+      seedArtists: 'Sense Field::Reason To Believe',
+      seedIds: ['sense-field-us', 'reason-to-believe-us'],
+    }, 0);
+
+    expect(normalized.id).toBe('scene-1');
+    expect(normalized.sceneId).toBe('scene-1');
+    expect(normalized.title).toBe('Sense Field + Reason To Believe');
+    expect(normalized.name).toBe('Sense Field + Reason To Believe');
+    expect(normalized.seedArtists).toBe('Sense Field::Reason To Believe');
+    expect(normalized.seedIds).toEqual(['sense-field-us', 'reason-to-believe-us']);
+    expect(normalized.seedArtistIds).toEqual(['sense-field-us', 'reason-to-believe-us']);
+
+    // parseProjectScenes normalizes both id/sceneId and title/name on serialized backend JSON
+    const parsedScenes = parseProjectScenes(JSON.stringify([{
+      sceneId: 'scene-1',
+      sceneIndex: 0,
+      title: 'Scene 1',
+      seedArtists: 'Sense Field::Reason To Believe',
+      seedIds: ['sense-field-us', 'reason-to-believe-us'],
+    }]));
+    expect(parsedScenes).toHaveLength(1);
+    expect(parsedScenes[0].id).toBe('scene-1');
+    expect(parsedScenes[0].sceneId).toBe('scene-1');
+    expect(toSeedArtistsArray(parsedScenes[0].seedArtists)).toEqual(['Sense Field', 'Reason To Believe']);
+
+    // CrossSceneLink dual-alias normalization
+    const normLink = normalizeCrossSceneLink({
+      fromSceneId: 'scene-1',
+      toSceneId: 'scene-2',
+      fromNodeId: 'scene-1::jimmy-eat-world-us',
+      toNodeId: 'scene-2::jimmy-eat-world-us',
+      bridgeType: 'identity',
+    });
+    expect(normLink.sourceSceneId).toBe('scene-1');
+    expect(normLink.targetSceneId).toBe('scene-2');
+    expect(normLink.fromSceneId).toBe('scene-1');
+    expect(normLink.toSceneId).toBe('scene-2');
+    expect(parseCrossSceneLinks(JSON.stringify([normLink]))[0].sourceSceneId).toBe('scene-1');
   });
 });

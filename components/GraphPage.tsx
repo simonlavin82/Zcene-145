@@ -5,6 +5,7 @@ import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName } from '../services/artistCacheService';
 import { hasActiveDiscoveryFilters, sanitizeAnchorLabelInput } from '../services/cacheQualification';
+import { toSeedArtistsArray } from '../shared/multiSceneUtils';
 import HelpPage from './HelpPage';
 import Header from './Header';
 import MusicGraph from './MusicGraph';
@@ -1674,7 +1675,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const artistIndicatorStyles = useMemo(() => isArtistPending ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700', [isArtistPending]);
   
   const activeScene = useMemo(
-    () => scenes.find(s => s.sceneId === activeSceneId) || scenes[0] || null,
+    () => scenes.find(s => (s.sceneId || s.id) === activeSceneId) || scenes[0] || null,
     [scenes, activeSceneId]
   );
   const isFirstGeneration = useMemo(() => data.nodes.length === 0 && !seedArtists, [data.nodes.length, seedArtists]);
@@ -2031,15 +2032,17 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 {scenes.length > 0 && (
                   <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Project Scenes">
                     {scenes.map((scene, idx) => {
-                      const isCurrent = scene.sceneId === (activeScene?.sceneId || activeSceneId);
-                      const seedCount = (scene.seedArtists || []).filter(Boolean).length;
+                      const sceneKey = scene.sceneId || scene.id || `scene-${idx + 1}`;
+                      const activeSceneKey = activeScene?.sceneId || activeScene?.id || activeSceneId;
+                      const isCurrent = sceneKey === activeSceneKey;
+                      const seedCount = toSeedArtistsArray(scene.seedArtists).length;
                       return (
                         <div
-                          key={scene.sceneId}
+                          key={sceneKey}
                           role="tab"
                           aria-selected={isCurrent}
-                          data-testid={`scene-pill-${scene.sceneId}`}
-                          onClick={() => onSelectScene?.(scene.sceneId)}
+                          data-testid={`scene-pill-${sceneKey}`}
+                          onClick={() => onSelectScene?.(sceneKey)}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none ${
                             isCurrent
                               ? 'bg-zinc-800 text-primary border border-zinc-700 ring-1 ring-primary/30 shadow-sm'
@@ -2055,10 +2058,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
                           {!isGuest && scenes.length > 1 && onRemoveScene && (
                             <button
                               type="button"
-                              data-testid={`remove-scene-${scene.sceneId}`}
+                              data-testid={`remove-scene-${sceneKey}`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onRemoveScene(scene.sceneId);
+                                onRemoveScene(sceneKey);
                               }}
                               className="ml-0.5 text-zinc-500 hover:text-red-400 transition-colors leading-none"
                               title={`Remove Scene ${idx + 1}`}
