@@ -11,6 +11,10 @@ export enum View {
 
 export interface Node {
   id: string;
+  canonicalId?: string;
+  sceneId?: string;
+  sceneIndex?: number;
+  isSceneSeed?: boolean;
   label?: string;
   type: 'artist' | 'genre' | 'label' | 'country' | 'founded';
   group: number;
@@ -35,6 +39,11 @@ export interface Link {
   forwardContext?: string;
   inverseContext?: string;
   context?: string;
+  sceneId?: string;
+  isCrossSceneBridge?: boolean;
+  bridgeType?: 'identity' | 'sonic_lineage';
+  sourceSceneId?: string;
+  targetSceneId?: string;
 }
 
 export interface GraphData {
@@ -106,13 +115,53 @@ export interface StackItem {
   displayName?: string;
 }
 
-/** A lean position reference stored inside a user project's canvasLayout (artist nodes only). */
+/** A lean position reference stored inside a user project's canvasLayout (artist/label nodes). */
 export interface CanvasNodeRef {
   nodeId: string;
+  id?: string;
+  canonicalId?: string;
+  sceneId?: string;
+  type?: 'artist' | 'label' | 'genre' | 'year' | 'country' | 'founded';
   x?: number;
   y?: number;
   fx?: number | null;
   fy?: number | null;
+}
+
+export interface SceneCenterOffset {
+  x: number; // Deterministic cluster center X: 1000 + sceneIndex * 1600
+  y: number; // Deterministic cluster center Y: 1000
+}
+
+export interface ProjectScene {
+  id?: string;                        // Alias of sceneId ('scene-1', 'scene-2', ...)
+  sceneId: string;                    // Deterministic slug: 'scene-1', 'scene-2', ...
+  sceneIndex: number;                 // 0-based ordinal index (0, 1, 2, ...)
+  title: string;                      // Default: seed names joined by ' + '
+  seedArtists: string;                // '::'-delimited seeds for this Scene
+  seedIds: string[];                  // Canonical geographically-suffixed IDs
+  discoveryFilters: DiscoveryFilters; // Per-scene 3-Tier Anchors (Era, Origin, Genre, Label)
+  graphData: GraphData;               // Un-namespaced canonical scene topology
+  synthesisRationale: string;         // Scene-specific Zine editorial markdown
+  artistSnippets?: Record<string, string>; // Scene-specific 1-sentence epicenter hooks keyed by canonical ID
+  centerOffset: SceneCenterOffset;    // { x: 1000 + sceneIndex * 1600, y: 1000 }
+  status: 'unmapped' | 'curating' | 'ready' | 'failed' | 'completed' | 'idle';
+  pathway?: 'direct_hit' | 'root_generation' | 'complex_generation';
+  updatedAt: number;
+}
+
+export interface CrossSceneLink {
+  id: string;                         // `${sourceSceneId}::${sourceCanonicalId}--${targetSceneId}::${targetCanonicalId}`
+  sourceSceneId: string;
+  targetSceneId: string;
+  sourceNodeId: string;               // Namespaced canvas node ID: e.g. 'scene-1::jimmy-eat-world-us'
+  targetNodeId: string;               // Namespaced canvas node ID: e.g. 'scene-2::jimmy-eat-world-us'
+  sourceCanonicalId: string;          // e.g. 'jimmy-eat-world-us'
+  targetCanonicalId: string;          // e.g. 'jimmy-eat-world-us'
+  bridgeType: 'identity' | 'sonic_lineage';
+  forwardContext: string;             // 3-8 word directional predicate (Rule 26) omitting both entity names
+  inverseContext: string;             // 3-8 word inverse predicate omitting both entity names
+  weight: number;                     // 1.0 for 'identity'; 0.4-0.95 for 'sonic_lineage'
 }
 
 /**
@@ -180,13 +229,20 @@ export interface DisambiguationCandidateStub {
 export interface Project {
   id: string;
   name: string;
+  schemaVersion?: 43 | number;
+  scenes?: string | ProjectScene[] | null;         // V43 Authoritative Multi-Scene array (JSON or parsed)
+  activeSceneId?: string;                          // Currently focused Scene in ROOTS panel (e.g. 'scene-1')
+  overarchingRationale?: string | null;            // Master Overarching Zine Editorial (when scenes.length >= 2)
+  crossSceneLinks?: string | CrossSceneLink[] | null; // Deterministic identity + AI sonic_lineage cross-scene bridges
+  seedArtistIds?: string[];                        // Union of all scene.seedIds across all scenes
+  sceneCount?: number;
   seedArtists: string;
   // --- Phase 1+: per-artist reference fields ---
   /** Array of normalized artist IDs pointing to individual /artists/{id} cache docs. */
   artistIds?: string[];     // e.g. ['buggin', 'end-it', 'spaced']
   /** Array of normalized label IDs pointing to individual /labels/{id} cache docs. */
   labelIds?: string[];      // e.g. ['relapse-records', 'armageddon-label']
-  canvasLayout?: string | null;    // JSON CanvasNodeRef[] — artist positions only; nullified on Stage 2 compaction
+  canvasLayout?: string | null;    // JSON CanvasNodeRef[] — namespaced scene-k::canonicalId positions; nullified on Stage 2 compaction
   // --- DEPRECATED (Phase 1): compound cacheKey — kept for backward-compatible reads of old project docs ---
   /** @deprecated Use `artistIds` instead. Retained for backward-compatible hydration of legacy projects. */
   cacheKey?: string;

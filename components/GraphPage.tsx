@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste, CanvasNodeRef, ERA_MIN_BOUND, ERA_MAX_BOUND, CANONICAL_COUNTRIES_22, CANONICAL_GENRE_TAXONOMY, CANONICAL_GENRES_FLAT } from '../types';
+import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste, CanvasNodeRef, ProjectScene, CrossSceneLink, ERA_MIN_BOUND, ERA_MAX_BOUND, CANONICAL_COUNTRIES_22, CANONICAL_GENRE_TAXONOMY, CANONICAL_GENRES_FLAT } from '../types';
 import { User, db } from '../services/firebase';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -121,6 +121,14 @@ interface GraphPageProps {
   /** Phase A — Coordinate Memory: passed through to MusicGraph, fired when
    * the D3 simulation settles with final artist/label node positions. */
   onCoordinatesSettled?: (layout: CanvasNodeRef[]) => void;
+  /** V43 Multi-Scene Infinite Board & Layered Zine props */
+  scenes?: ProjectScene[];
+  activeSceneId?: string;
+  onSelectScene?: (sceneId: string) => void;
+  onAddScene?: () => void;
+  onRemoveScene?: (sceneId: string) => void;
+  overarchingRationale?: string;
+  crossSceneLinks?: CrossSceneLink[];
 }
 
 const DEFAULT_LEFT_PANEL_WIDTH = 320;
@@ -1164,6 +1172,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onCoordinatesSettled,
   isHydrating,
   activeDeepWebSession: propsActiveDeepWebSession,
+  scenes = [],
+  activeSceneId,
+  onSelectScene,
+  onAddScene,
+  onRemoveScene,
+  overarchingRationale,
+  crossSceneLinks,
 }) => {
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const hasInitializedPanelRef = useRef(false);
@@ -1658,7 +1673,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const unreadDetailsCount = useMemo(() => activeNodes.filter(n => !readNodeIds.has(n.id.trim().toLowerCase())).length, [activeNodes, readNodeIds]);
   const artistIndicatorStyles = useMemo(() => isArtistPending ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700', [isArtistPending]);
   
+  const activeScene = useMemo(
+    () => scenes.find(s => s.sceneId === activeSceneId) || scenes[0] || null,
+    [scenes, activeSceneId]
+  );
   const isFirstGeneration = useMemo(() => data.nodes.length === 0 && !seedArtists, [data.nodes.length, seedArtists]);
+  const isActiveSceneEmpty = useMemo(
+    () => activeScene ? (activeScene.graphData?.nodes?.length || 0) === 0 : isFirstGeneration,
+    [activeScene, isFirstGeneration]
+  );
 
   const handleApplyChanges = () => {
     if (!user) {
@@ -1698,7 +1721,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     
     const newSeed = enabledArtists.join('::');
     
-    if (!isFirstGeneration) {
+    if (!isActiveSceneEmpty) {
       setPendingUpdateSeed(newSeed);
       setConfirmOverwrite(false);
       setIsUpdateModalOpen(true);
@@ -1976,14 +1999,81 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const createButtonLabel = useMemo(() => {
     const hasSearch = searchTerm.trim().length > 0;
     if (hasSearch) {
-        return isFirstGeneration ? 'Add & Create Zcene' : 'Add & Update Zcene';
+        return isActiveSceneEmpty ? 'Add & Create Zcene' : 'Add & Update Zcene';
     }
-    return isFirstGeneration ? 'Create Zcene' : 'Update Zcene';
-  }, [searchTerm, isFirstGeneration]);
+    return isActiveSceneEmpty ? 'Create Zcene' : 'Update Zcene';
+  }, [searchTerm, isActiveSceneEmpty]);
 
   const ArtistsPanelContent = (
     <div className="flex flex-col flex-1 bg-zinc-900 overflow-hidden relative">
         <div className="flex-grow overflow-y-auto" style={{ overscrollBehaviorY: 'contain', flexBasis: 0 }}>
+            {/* V43 Multi-Scene Switcher Strip */}
+            {(scenes.length > 0 || (!isGuest && onAddScene)) && (
+              <div className="px-4 pt-4 pb-2 border-b border-zinc-800/80">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Scenes
+                  </h3>
+                  {!isGuest && onAddScene && (
+                    <button
+                      type="button"
+                      data-testid="add-scene-button"
+                      onClick={onAddScene}
+                      disabled={isLoading || Boolean(isHydrating)}
+                      className="flex items-center gap-1 px-2.5 py-1 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white text-[11px] font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      title="Add a new Scene cluster to this Zcene board"
+                    >
+                      <span className="material-symbols-outlined !text-[14px]">add</span>
+                      <span>Add Scene</span>
+                    </button>
+                  )}
+                </div>
+                {scenes.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Project Scenes">
+                    {scenes.map((scene, idx) => {
+                      const isCurrent = scene.sceneId === (activeScene?.sceneId || activeSceneId);
+                      const seedCount = (scene.seedArtists || []).filter(Boolean).length;
+                      return (
+                        <div
+                          key={scene.sceneId}
+                          role="tab"
+                          aria-selected={isCurrent}
+                          data-testid={`scene-pill-${scene.sceneId}`}
+                          onClick={() => onSelectScene?.(scene.sceneId)}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none ${
+                            isCurrent
+                              ? 'bg-zinc-800 text-primary border border-zinc-700 ring-1 ring-primary/30 shadow-sm'
+                              : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:border-zinc-700'
+                          }`}
+                        >
+                          <span>Scene {idx + 1}</span>
+                          {seedCount > 0 && (
+                            <span className={`text-[10px] font-mono px-1 rounded ${isCurrent ? 'bg-primary/15 text-primary' : 'bg-zinc-900 text-zinc-500'}`}>
+                              {seedCount}
+                            </span>
+                          )}
+                          {!isGuest && scenes.length > 1 && onRemoveScene && (
+                            <button
+                              type="button"
+                              data-testid={`remove-scene-${scene.sceneId}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onRemoveScene(scene.sceneId);
+                              }}
+                              className="ml-0.5 text-zinc-500 hover:text-red-400 transition-colors leading-none"
+                              title={`Remove Scene ${idx + 1}`}
+                              aria-label={`Remove Scene ${idx + 1}`}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="px-4 pt-4 pb-2">
             {!isGuest && (
               <div className="mb-3">
@@ -2248,6 +2338,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
       <DetailsPanel 
           projectId={projectId}
           projectName={projectName}
+          scenes={scenes}
+          activeSceneId={activeSceneId}
+          overarchingRationale={overarchingRationale}
           activeDeepWebSession={effectiveDeepWebSession}
           onUpdateDeepWebSession={setDeepWebSession}
           selectedNode={selectedNode} 

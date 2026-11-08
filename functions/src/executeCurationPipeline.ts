@@ -24,6 +24,12 @@ import {
 } from "./shared/isoCountries";
 import { upsertBareRouterStub } from "./services/routerStubService";
 import { computeBaseProjectTokenCost } from "./shared/tokenEconomy";
+import { ProjectScene } from "./types";
+import {
+  getSceneCenterOffset,
+  parseProjectScenes,
+  getAllProjectSeedIds,
+} from "./shared/multiSceneUtils";
 import {
   requireAuthenticatedCaller,
   chargePreFlightLookupIfNeeded,
@@ -623,22 +629,81 @@ export const executeCurationPipeline = onCall({
      }
   }
 
+  const targetSceneId: string = payload.targetSceneId || payload.activeSceneId || "scene-1";
+  const parsedSceneIdx = parseInt(String(targetSceneId).replace(/^scene-/i, ""), 10);
+  const targetSceneIndex: number =
+    typeof payload.sceneIndex === "number" && payload.sceneIndex >= 0
+      ? payload.sceneIndex
+      : Number.isFinite(parsedSceneIdx) && parsedSceneIdx >= 1
+        ? parsedSceneIdx - 1
+        : 0;
+
+  let updatedScenes: ProjectScene[] = parseProjectScenes(payload.scenes);
+
   if (payload.userId && payload.projectId) {
     try {
-      console.log(`[Pipeline Diamond] -> Initiating Curation Pipeline for ${payload.projectId} with type: ${determinedGenerationType}`);
+      const projectDocRef = db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId);
+      if (updatedScenes.length === 0) {
+        try {
+          const existingProjSnap = await projectDocRef.get();
+          if (existingProjSnap.exists) {
+            const existingProjData = existingProjSnap.data();
+            if (existingProjData?.scenes) {
+              updatedScenes = parseProjectScenes(existingProjData.scenes);
+            }
+          }
+        } catch (readErr) {
+          // Graceful fallback if project doc doesn't exist yet or in unit test mocks without .get()
+        }
+      }
+
+      const activeScenePayload: ProjectScene = {
+        sceneId: targetSceneId,
+        sceneIndex: targetSceneIndex,
+        title: displaySeeds || `Scene ${targetSceneIndex + 1}`,
+        seedArtists: resolvedSeedArray.map(s => s.name || s.id).join('::'),
+        seedIds: resolvedSeedArray.map(s => s.id),
+        discoveryFilters: payload.filters || {},
+        graphData: finalGraph,
+        synthesisRationale: finalGraph.synthesisRationale || "",
+        artistSnippets: {},
+        centerOffset: getSceneCenterOffset(targetSceneIndex),
+        status: determinedGenerationType === "Direct Hit" ? "ready" : "curating",
+        pathway:
+          determinedGenerationType === "Direct Hit"
+            ? "direct_hit"
+            : determinedGenerationType === "Complex Generation"
+              ? "complex_generation"
+              : "root_generation",
+        updatedAt: Date.now(),
+      };
+
+      const existingIdx = updatedScenes.findIndex(s => s.sceneId === targetSceneId);
+      if (existingIdx !== -1) {
+        updatedScenes[existingIdx] = activeScenePayload;
+      } else {
+        updatedScenes.push(activeScenePayload);
+      }
+      updatedScenes.sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
+
+      console.log(`[Pipeline Diamond] -> Initiating Curation Pipeline for ${payload.projectId} (scene=${targetSceneId}) with type: ${determinedGenerationType}`);
       const projectUpdate: any = {
         graphData: JSON.stringify(finalGraph),
-        schemaVersion: 2,
+        schemaVersion: 43,
+        scenes: JSON.stringify(updatedScenes),
+        activeSceneId: targetSceneId,
+        sceneCount: updatedScenes.length,
+        seedArtistIds: getAllProjectSeedIds(updatedScenes),
         supportsLabelDeepCuts: true,
         generationType: determinedGenerationType,
         tokensSpent: settlement.tokensSpent,
         updatedAt: FieldValue.serverTimestamp()
       };
       
-      await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).set(projectUpdate, { merge: true });
-      console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} graphData via Admin SDK`);
+      await projectDocRef.set(projectUpdate, { merge: true });
+      console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} graphData & scenes via Admin SDK`);
       
-      if (determinedGenerationType !== "Direct Hit") {
+      if (determinedGenerationType !== "Direct Hit" || updatedScenes.length >= 2) {
         // Persist end-to-end lockedSeeds map (keyed by BOTH canonical suffixed ID and bare ID)
         // so Column 3 hydration & iTunes scraping never suffer disambiguation amnesia.
         const lockedSeeds: Record<string, { id: string; bareId: string; name: string; origin: string; countryIso: string | null; genre: string }> = {};
@@ -680,6 +745,10 @@ export const executeCurationPipeline = onCall({
           updatedAt: FieldValue.serverTimestamp(),
           inputPayload: {
              ...payload,
+             mode: determinedGenerationType === "Direct Hit" && updatedScenes.length >= 2 ? "overarching_only" : "standard",
+             targetSceneId,
+             sceneIndex: targetSceneIndex,
+             scenes: updatedScenes,
              curationSessionId: settlement.curationSessionId,
              tokensSpent: settlement.tokensSpent,
              artists: resolvedSeedArray.map(s => s.id).join('::'),
@@ -696,10 +765,10 @@ export const executeCurationPipeline = onCall({
              seedStubs: seedStubs
           }
         });
-        console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration (lockedSeeds=${resolvedSeedArray.map(s => s.id).join(', ')})`);
+        console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration (scene=${targetSceneId}, lockedSeeds=${resolvedSeedArray.map(s => s.id).join(', ')})`);
 
         // Update project with activeJobId
-        await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).set({
+        await projectDocRef.set({
            activeJobId: curationJobId
         }, { merge: true });
       } else {
@@ -716,6 +785,8 @@ export const executeCurationPipeline = onCall({
 
   return {
       graphData: finalGraph,
+      targetSceneId,
+      scenes: updatedScenes,
       detailsCache: "[]",
       rootBreakdown: null,
       activeJobId: curationJobId,

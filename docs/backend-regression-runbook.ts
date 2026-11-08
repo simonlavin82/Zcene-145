@@ -1,5 +1,5 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V42 Regression Suite (Full-Stack)
+# V43 Regression Suite (Full-Stack)
 
 This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator.
 
@@ -45,6 +45,10 @@ cd functions && npx vitest run tests/idempotencyAndCooldown.test.ts
 # Run V42.1 Escape Hatch Blank-Input UX & Zero "Is connected to" Tooltip tests
 npx vitest run tests/v42_1-escape-hatch-and-tooltips.test.tsx
 
+# Run V43 Multi-Scene Infinite Board, Scene Namespacing & Layered Zine tests
+npx vitest run src/test/v43-multi-scene-board.test.ts
+cd functions && npx vitest run src/__tests__/v43MultiScenePipeline.test.ts
+
 # Or run with UI for visual tracing:
 npx vitest --ui
 \`\`\`
@@ -75,25 +79,26 @@ npx vitest --ui
     *   *Circuit Breaker & Kill Switch:* Asserts that exceeding 100 heals in 24 hours trips the auto-kill circuit breaker, throws \`resource-exhausted\`, and honors the admin toggle in \`adminLedger/system/settings\`.
     *   *Telemetry Audit:* Validates receipt creation in \`adminLedger/system/jitHeals\` with accurate token counts and list-price cost calculations.
 
-## Database Purge Runbook Protocol
+## Database Purge Runbook Protocol (V43 Multi-Scene Migration)
 
-When rolling out global entity cache schema shifts (such as mandatory Style enums or canonical ISO-3166 slug migrations), global entity cache purges target only regenerable Tier 1 / Tier 2 collections while strictly preserving user-owned financial and workspace records under V41/V42 [Rule 43].
+When rolling out the V43 Multi-Scene Infinite Board & Layered Zine schema (\`schemaVersion: 43\`), Tier 1 Global Assets (\`/artists\` and \`/labels\`) are canonical and 100% unchanged. Therefore, \`scripts/execute_v43_purge.cjs\` purges legacy V42 project workspaces and ephemeral shares/jobs while **strictly preserving Tier 1 \`/artists\` and \`/labels\`**, user wallets, and financial ledgers.
 
 ### Purge Targets:
-1. \`/artists\` — Global artist entity library
-2. \`/labels\` — Global label entity library
+1. \`users/{uid}/projects\` (via \`collectionGroup('projects')\`) — Legacy V42 single-scene project workspaces
+2. \`/sharedZcenes\` & \`/sharedzcenes\` — Ephemeral guest share snapshots
 3. \`curationJobs\` — Active and historical curation job records
-4. \`/sharedZcenes\` & \`/sharedzcenes\` — Ephemeral guest share snapshots
-5. \`adminLedger/system/jitHeals\` — Historical JIT healing receipts
+4. \`curationSessions\` — Ephemeral pre-flight split-debit session records
 
 ### Strictly Preserved:
-* Root \`users/{uid}\` documents — User accounts, authentication data, token balances, settings, and custom Style / Taste Profiles (\`tasteProfiles\`).
-* \`users/{uid}/projects\` & \`users/{uid}/tokenTransactions\` — User-saved project workspaces and token transaction receipts (under V41/V42 [Rule 43], user projects and token receipts are immutable financial ledger records and are **never** wiped during global cache purges).
-* \`adminLedger/system/settings\` — Platform-wide settings and JIT kill-switch toggles.
+* **Tier 1 Global Assets (\`/artists\` & \`/labels\`)** — Canonical verified entity biographies, discographies, iTunes artwork, and single-seed subgraphs.
+* Root \`users/{uid}\` documents — User accounts, authentication data, token balances (\`tokenBalance\`), settings, and custom Style / Taste Profiles (\`tasteProfiles\`).
+* \`users/{uid}/tokenTransactions\` — Immutable user token transaction and top-up receipts.
+* \`adminLedger\` (\`adminLedger/system/settings\`, \`adminLedger/system/jitHeals\`) — Platform-wide settings, JIT kill-switch toggles, and historical cost telemetry.
+* \`deepWebSessions\` — Account-wide 3-message Deep Connections passes (\`{uid}_global_deepweb_pass\`).
 
 ### Execution Command:
 \`\`\`bash
-# Run automated purge script
-node scripts/execute_v36_purge.cjs
+# Run automated V43 workspace & ephemeral purge script (preserving Tier 1 /artists & /labels)
+node scripts/execute_v43_purge.cjs
 \`\`\`
 `;

@@ -798,22 +798,22 @@ describe('DetailsPanel', () => {
 
         it('suppresses Magazine button while isGlobalLoading is true (initial synthesis / graph mapping)', () => {
             render(<DetailsPanel {...defaultProps} isGlobalLoading={true} />);
-            expect(screen.queryByRole('button', { name: /magazine/i })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: /zine/i })).not.toBeInTheDocument();
         });
 
-        it('suppresses Magazine button when activeNodes is empty', () => {
+        it('suppresses Zine button when activeNodes is empty', () => {
             render(<DetailsPanel {...defaultProps} activeNodes={[]} selectedNode={null} />);
-            expect(screen.queryByRole('button', { name: /magazine/i })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: /zine/i })).not.toBeInTheDocument();
         });
 
-        it('suppresses Magazine button while the active profile details are loading', () => {
+        it('suppresses Zine button while the active profile details are loading', () => {
             render(<DetailsPanel {...defaultProps} loadingNodeIds={new Set(['spaced-us'])} />);
-            expect(screen.queryByRole('button', { name: /magazine/i })).not.toBeInTheDocument();
+            expect(screen.queryByRole('button', { name: /zine/i })).not.toBeInTheDocument();
         });
 
-        it('renders Magazine button when graph mapping is complete and active profile is displayed', () => {
+        it('renders Zine button when graph mapping is complete and active profile is displayed', () => {
             render(<DetailsPanel {...defaultProps} />);
-            expect(screen.getByRole('button', { name: /magazine/i })).toBeInTheDocument();
+            expect(screen.getByRole('button', { name: /zine/i })).toBeInTheDocument();
         });
 
         it('renders Create Your Zcene empty state instead of stuck Scanning live cultural archives spinner when Box 4 is cancelled on an empty graph with staged seedArtists', () => {

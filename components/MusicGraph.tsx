@@ -8,6 +8,7 @@ import { CanvasControlStyles, InputSizes, Button } from './DesignSystem';
 import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
 import { normalizeArtistId, isNodeInSeedList, cleanLabelDisplayName } from '../services/artistCacheService';
 import { sanitizeDirectionalLinkContext, resolveFallbackRelationContext } from '../shared/linkContext';
+import { getSceneCenterOffset, stripSceneNamespace } from '../shared/multiSceneUtils';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 
@@ -16,6 +17,27 @@ const VIRTUAL_WIDTH = 2000;
 const VIRTUAL_HEIGHT = 2000;
 const VIRTUAL_CENTER_X = VIRTUAL_WIDTH / 2;
 const VIRTUAL_CENTER_Y = VIRTUAL_HEIGHT / 2;
+
+const isNodeSeedInOwnScene = (node: Node, seedArtists: string[]): boolean => {
+  if (node.type !== 'artist') return false;
+  if (typeof node.isSceneSeed === 'boolean') return node.isSceneSeed;
+  const canonicalId = stripSceneNamespace(node.canonicalId || node.id);
+  return isNodeInSeedList(canonicalId || node.label || '', seedArtists);
+};
+
+const computeBridgePathD = (d: any): string => {
+  const x1 = (d?.source as any)?.x;
+  const y1 = (d?.source as any)?.y;
+  const x2 = (d?.target as any)?.x;
+  const y2 = (d?.target as any)?.y;
+  if (isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) return '';
+  const mx = (x1 + x2) / 2;
+  const my = (y1 + y2) / 2;
+  const dx = Math.abs(x2 - x1);
+  const arcLift = Math.min(260, Math.max(90, dx * 0.16));
+  const cy = my - arcLift;
+  return `M ${x1},${y1} Q ${mx},${cy} ${x2},${y2}`;
+};
 
 interface MusicGraphProps {
   data: GraphData;
@@ -49,7 +71,10 @@ const isSameNodeId = (id1: any, id2: any): boolean => {
   if (!id1 || !id2) return false;
   const s1 = String(id1).toLowerCase();
   const s2 = String(id2).toLowerCase();
-  return s1 === s2 || normalizeArtistId(s1) === normalizeArtistId(s2);
+  if (s1 === s2 || normalizeArtistId(s1) === normalizeArtistId(s2)) return true;
+  const c1 = stripSceneNamespace(s1);
+  const c2 = stripSceneNamespace(s2);
+  return Boolean(c1 && c2 && (c1 === c2 || normalizeArtistId(c1) === normalizeArtistId(c2)));
 };
 
 const escapeRegExp = (string: string) => {
@@ -67,6 +92,7 @@ const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistsOrSet: Set<s
   });
   
   links.forEach(l => {
+    if (l.isCrossSceneBridge) return;
     const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
     const targetId = typeof l.target === 'object' ? l.target.id : l.target;
     if (adj.has(sourceId) && adj.has(targetId)) {
@@ -79,7 +105,7 @@ const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistsOrSet: Set<s
   
   // Seed nodes get depth 0
   nodes.forEach(n => {
-    const isSeed = n.type === 'artist' && isNodeInSeedList(n.id || n.label || '', seedList);
+    const isSeed = isNodeSeedInOwnScene(n, seedList);
     if (isSeed) {
       depths.set(n.id, 0);
       queue.push(n.id);
@@ -273,7 +299,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // 1. Identify visible artists based on filters (Seed/Recommended)
     const visibleArtists = data.nodes.filter(node => {
         if (node.type !== 'artist') return false;
-        const isSeed = isNodeInSeedList(node.id || node.label || '', seedArtists);
+        const isSeed = isNodeSeedInOwnScene(node, seedArtists);
         return (isSeed && activeFilters.seed) || (!isSeed && activeFilters.recommended);
     });
     const visibleArtistIds = new Set<string>(visibleArtists.map(n => String(n.id).toLowerCase()));
@@ -334,49 +360,65 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const activeInteractionNode = selectedNode || peekedNode;
     if (!activeInteractionNode) return null;
     const selectedIdStr = String(activeInteractionNode.id);
-    const highlighted = new Set<string>([selectedIdStr, selectedIdStr.toLowerCase(), normalizeArtistId(selectedIdStr)]);
+    const canonSelected = stripSceneNamespace(activeInteractionNode.canonicalId || selectedIdStr);
+    const highlighted = new Set<string>([
+      selectedIdStr,
+      selectedIdStr.toLowerCase(),
+      normalizeArtistId(selectedIdStr),
+      canonSelected,
+      canonSelected.toLowerCase(),
+      normalizeArtistId(canonSelected),
+    ]);
+    visibleNodes.forEach(n => {
+      if (isSameNodeId(n.id, selectedIdStr)) {
+        highlighted.add(String(n.id));
+        highlighted.add(String(n.id).toLowerCase());
+      }
+    });
     
     const primaryConnections = new Set<string>();
     visibleLinks.forEach(link => {
         const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id);
         const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
+        const canonSource = stripSceneNamespace(sourceId);
+        const canonTarget = stripSceneNamespace(targetId);
         
-        const isSourceSelected = highlighted.has(sourceId) || highlighted.has(sourceId.toLowerCase()) || highlighted.has(normalizeArtistId(sourceId));
-        const isTargetSelected = highlighted.has(targetId) || highlighted.has(targetId.toLowerCase()) || highlighted.has(normalizeArtistId(targetId));
+        const isSourceSelected = highlighted.has(sourceId) || highlighted.has(sourceId.toLowerCase()) || highlighted.has(normalizeArtistId(canonSource));
+        const isTargetSelected = highlighted.has(targetId) || highlighted.has(targetId.toLowerCase()) || highlighted.has(normalizeArtistId(canonTarget));
 
         if (isSourceSelected) { 
             highlighted.add(targetId); 
             highlighted.add(targetId.toLowerCase());
-            highlighted.add(normalizeArtistId(targetId));
+            highlighted.add(normalizeArtistId(canonTarget));
             primaryConnections.add(targetId); 
             primaryConnections.add(targetId.toLowerCase());
-            primaryConnections.add(normalizeArtistId(targetId));
+            primaryConnections.add(normalizeArtistId(canonTarget));
         }
         if (isTargetSelected) { 
             highlighted.add(sourceId); 
             highlighted.add(sourceId.toLowerCase());
-            highlighted.add(normalizeArtistId(sourceId));
+            highlighted.add(normalizeArtistId(canonSource));
             primaryConnections.add(sourceId); 
             primaryConnections.add(sourceId.toLowerCase());
-            primaryConnections.add(normalizeArtistId(sourceId));
+            primaryConnections.add(normalizeArtistId(canonSource));
         }
     });
     if (activeInteractionNode.type !== 'artist') return highlighted;
     visibleLinks.forEach(link => {
         const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id);
         const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
-        const isSourcePrimary = primaryConnections.has(sourceId) || primaryConnections.has(sourceId.toLowerCase()) || primaryConnections.has(normalizeArtistId(sourceId));
-        const isTargetPrimary = primaryConnections.has(targetId) || primaryConnections.has(targetId.toLowerCase()) || primaryConnections.has(normalizeArtistId(targetId));
+        const isSourcePrimary = primaryConnections.has(sourceId) || primaryConnections.has(sourceId.toLowerCase());
+        const isTargetPrimary = primaryConnections.has(targetId) || primaryConnections.has(targetId.toLowerCase());
         
         if (isSourcePrimary) { 
             highlighted.add(targetId); 
             highlighted.add(targetId.toLowerCase());
-            highlighted.add(normalizeArtistId(targetId));
+            highlighted.add(normalizeArtistId(stripSceneNamespace(targetId)));
         }
         if (isTargetPrimary) { 
             highlighted.add(sourceId); 
             highlighted.add(sourceId.toLowerCase());
-            highlighted.add(normalizeArtistId(sourceId));
+            highlighted.add(normalizeArtistId(stripSceneNamespace(sourceId)));
         }
     });
     return highlighted;
@@ -406,12 +448,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const query = trimmedQuery.toLowerCase();
     const newHighlighted = new Set<string>();
     visibleNodes.forEach(node => {
-        // Match against both the display label (title-cased) and the raw id slug
-        const displayName = (node.label || node.id).replace(/-/g, ' ');
-        if (displayName.toLowerCase().includes(query) || String(node.id).toLowerCase().includes(query)) {
+        // Match against both the display label (title-cased) and the raw canonical id slug
+        const canonId = stripSceneNamespace(String(node.canonicalId || node.id));
+        const displayName = (node.label || canonId).replace(/-/g, ' ');
+        if (displayName.toLowerCase().includes(query) || canonId.toLowerCase().includes(query)) {
             newHighlighted.add(String(node.id));
             newHighlighted.add(String(node.id).toLowerCase());
-            newHighlighted.add(normalizeArtistId(String(node.id)));
+            newHighlighted.add(canonId);
+            newHighlighted.add(canonId.toLowerCase());
+            newHighlighted.add(normalizeArtistId(canonId));
         }
     });
     setHighlightedNodes(newHighlighted);
@@ -479,7 +524,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       const scaleY = (height - padding * 2) / (contentHeight || 1);
       
       const maxScale = isSmallScreenRef.current ? 0.75 : 1;
-      const minScale = 0.15;
+      const minScale = 0.22;
       let k = Math.max(minScale, Math.min(scaleX, scaleY, maxScale));
       
       if (typeof window !== 'undefined' && window.innerWidth < 768) {
@@ -515,14 +560,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // to their display form ("Buggin", "Hardcore Punk") only for legacy cache docs
     // where the .label field was not populated at write time.
     const toDisplayLabel = (node: Node): string => {
+        const canonRaw = stripSceneNamespace(String(node.canonicalId || node.id || ''));
         if (node.type === 'label') {
-            return cleanLabelDisplayName(node.label || node.id);
+            return cleanLabelDisplayName(node.label || canonRaw);
         }
         if (node.label && typeof node.label === 'string' && node.label.trim()) {
             return node.label.trim();
         }
-        const raw = String(node.id || '');
-        return raw
+        return canonRaw
             .replace(/-/g, ' ')
             .replace(/\b\w/g, c => c.toUpperCase());
     };
@@ -587,15 +632,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         });
 
         const neighborNodeIds = new Set<string>();
+        const dCanonId = stripSceneNamespace(d.canonicalId || d.id);
         neighborNodeIds.add(d.id.toLowerCase());
-        neighborNodeIds.add(normalizeArtistId(d.id));
+        neighborNodeIds.add(normalizeArtistId(dCanonId));
         firstDegreeLinks.forEach(l => {
             const sId = nodeId(l.source);
             const tId = nodeId(l.target);
             neighborNodeIds.add(sId.toLowerCase());
-            neighborNodeIds.add(normalizeArtistId(sId));
+            neighborNodeIds.add(normalizeArtistId(stripSceneNamespace(sId)));
             neighborNodeIds.add(tId.toLowerCase());
-            neighborNodeIds.add(normalizeArtistId(tId));
+            neighborNodeIds.add(normalizeArtistId(stripSceneNamespace(tId)));
         });
 
         if (svgRef.current) {
@@ -617,6 +663,22 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     return isFirstDegreeLink ? 0.9 : 0.05;
                 });
 
+            // Highlight connected Cross-Scene Bridge Lines
+            svg.selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+                .transition().duration(200)
+                .attr("stroke-opacity", (l: any) => {
+                    const sId = nodeId(l.source);
+                    const tId = nodeId(l.target);
+                    const isFirstDegreeLink = isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
+                    return isFirstDegreeLink ? 0.95 : 0.12;
+                })
+                .attr("stroke-width", (l: any) => {
+                    const sId = nodeId(l.source);
+                    const tId = nodeId(l.target);
+                    const isFirstDegreeLink = isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
+                    return isFirstDegreeLink ? 2.5 : 1.75;
+                });
+
             // Spotlight constellation nodes and dim others
             svg.selectAll<SVGGElement, Node>("g.node-element")
                 .transition().duration(200)
@@ -626,15 +688,18 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                                           Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
                                           !activeFilters[nodeType];
                     if (isFilteredOut) return 0.1;
-                    return neighborNodeIds.has(n.id.toLowerCase()) || neighborNodeIds.has(normalizeArtistId(n.id)) ? 1 : 0.15;
+                    const nCanon = stripSceneNamespace(n.canonicalId || n.id);
+                    return neighborNodeIds.has(n.id.toLowerCase()) || neighborNodeIds.has(normalizeArtistId(nCanon)) ? 1 : 0.15;
                 });
 
             if (d.type === 'artist') {
+                const isDirectNodeMatch = (id: string) =>
+                    id === d.id || (!String(d.id).includes('::') && isSameNodeId(id, d.id));
                 const directArtistLinks = visibleLinks.filter(l => {
                     const sId = nodeId(l.source);
                     const tId = nodeId(l.target);
-                    if (sId !== d.id && tId !== d.id) return false;
-                    const otherId = sId === d.id ? tId : sId;
+                    if (!isDirectNodeMatch(sId) && !isDirectNodeMatch(tId)) return false;
+                    const otherId = isDirectNodeMatch(sId) ? tId : sId;
                     const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
                     return otherNode?.type === 'artist';
                 });
@@ -652,7 +717,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 directArtistLinks.forEach(l => {
                     const sId = nodeId(l.source);
                     const tId = nodeId(l.target);
-                    const otherId = sId === d.id ? tId : sId;
+                    const isSource = isDirectNodeMatch(sId);
+                    const otherId = isSource ? tId : sId;
                     const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
                     if (!otherNode) return;
                     
@@ -661,7 +727,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         connectionsByArtist.set(normOtherId, { node: otherNode, contexts: [] });
                     }
                     const entry = connectionsByArtist.get(normOtherId)!;
-                    const rawContextStr = (sId === d.id) ? l.forwardContext : l.inverseContext;
+                    const rawContextStr = isSource ? l.forwardContext : l.inverseContext;
                     const sanitizedContext = sanitizeDirectionalLinkContext(
                         rawContextStr,
                         sourceDisplayLabel,
@@ -689,18 +755,24 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                           ];
                     const rawContext = formatRelationContext(resolvedContexts);
                     const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
+                    const isCrossScenePeer = d.sceneId && node.sceneId && d.sceneId !== node.sceneId;
+                    const targetName = isCrossScenePeer
+                        ? `${toDisplayLabel(node)} (Scene ${(node.sceneIndex ?? 0) + 1})`
+                        : toDisplayLabel(node);
                     return {
                         context: capitalizedContext,
-                        targetName: toDisplayLabel(node)
+                        targetName
                     };
                 });
 
-                // Fetch DNA/Recommendation Reason
-                const normId = normalizeArtistId(d.id);
+                // Fetch DNA/Recommendation Reason using canonical ID
+                const canonId = stripSceneNamespace(d.canonicalId || d.id);
+                const normId = normalizeArtistId(canonId);
                 const nodeDna = d.narrativeSnippet ||
-                                detailsCache?.get(d.id)?.recommendationReason ||
-                                detailsCache?.get(d.id.toLowerCase())?.recommendationReason ||
-                                detailsCache?.get(normId)?.recommendationReason;
+                                detailsCache?.get(canonId)?.recommendationReason ||
+                                detailsCache?.get(canonId.toLowerCase())?.recommendationReason ||
+                                detailsCache?.get(normId)?.recommendationReason ||
+                                detailsCache?.get(d.id)?.recommendationReason;
 
                 // Check raw connections for fallback type
                 const hasRawConnections = data.links.some(l => {
@@ -809,6 +881,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
                     if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
                     return 0.3;
+                });
+
+            // Restore Cross-Scene Bridge Lines
+            svg.selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+                .transition().duration(200)
+                .attr("stroke-width", 1.75)
+                .attr("stroke-opacity", (l: any) => {
+                    const s = typeof l.source === 'string' ? l.source : l.source.id;
+                    const t = typeof l.target === 'string' ? l.target : l.target.id;
+                    if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.85 : 0.15;
+                    return 0.65;
                 });
         }
     };
@@ -929,6 +1012,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         const val = (d.target as any).y;
                         return isNaN(val) ? 0 : val;
                     });
+
+                 currentContainer.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                    .attr("d", (d: any) => computeBridgePathD(d));
+
+                 currentContainer.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-interactive-link")
+                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                    .attr("d", (d: any) => computeBridgePathD(d));
 
                   // Update active hovered link/node coordinates
                   if (activeHoveredLinkRef.current && svgRef.current) {
@@ -1077,9 +1168,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 }
             }
 
-            // Fallback placement near the virtual center
-            n.x = VIRTUAL_CENTER_X + (Math.random() - 0.5) * 100;
-            n.y = VIRTUAL_CENTER_Y + (Math.random() - 0.5) * 100;
+            // Fallback placement near the node's own Scene center offset
+            const sceneCenter = getSceneCenterOffset(n.sceneIndex ?? 0);
+            n.x = sceneCenter.x + (Math.random() - 0.5) * 100;
+            n.y = sceneCenter.y + (Math.random() - 0.5) * 100;
             n.vx = 0;
             n.vy = 0;
         }
@@ -1092,6 +1184,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const nodeDegrees = new Map<string, number>();
     const nodeTotalWeights = new Map<string, number>();
     visibleLinks.forEach(l => {
+        if (l.isCrossSceneBridge) return;
         const s = typeof l.source === 'object' ? l.source.id : l.source;
         const t = typeof l.target === 'object' ? l.target.id : l.target;
         nodeDegrees.set(s, (nodeDegrees.get(s) || 0) + 1);
@@ -1107,9 +1200,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const chargeForce = simulation.force("charge") as d3.ForceManyBody<Node>;
     const collideForce = simulation.force("collide") as d3.ForceCollide<Node>;
 
-    // 1. Seed Anchoring & Global Gravity
+    // 1. Seed Anchoring & Global Gravity (Per-Scene Center Offsets)
     const numSeeds = seedArtistSet.size;
     const numNodes = visibleNodes.length;
+    const hasMultipleScenes = visibleNodes.some(n => (n.sceneIndex ?? 0) > 0);
     
     // Multi-seed or high-density projects (node count > 35) trigger wider spacing
     const isExpandedLayout = numSeeds > 1 || numNodes > 35;
@@ -1119,21 +1213,24 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const seedStrength = numSeeds > 1 ? 0.15 : 0.4;
 
     forceX.strength((d: Node) => {
-        const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
+        const isSeed = isNodeSeedInOwnScene(d, seedArtists);
         return isSeed ? seedStrength : globalGravityStrength;
-    }).x(VIRTUAL_CENTER_X);
+    }).x((d: Node) => getSceneCenterOffset(d.sceneIndex ?? 0).x);
 
     forceY.strength((d: Node) => {
-        const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
+        const isSeed = isNodeSeedInOwnScene(d, seedArtists);
         return isSeed ? seedStrength : globalGravityStrength;
-    }).y(VIRTUAL_CENTER_Y);
+    }).y((d: Node) => getSceneCenterOffset(d.sceneIndex ?? 0).y);
 
-    simulation.force('center', d3.forceCenter(VIRTUAL_CENTER_X, VIRTUAL_CENTER_Y).strength(0.005));
+    simulation.force(
+        'center',
+        hasMultipleScenes ? null : d3.forceCenter(VIRTUAL_CENTER_X, VIRTUAL_CENTER_Y).strength(0.005)
+    );
 
     // 2 & 3. Balanced Repulsion: Spaced but cohesive
     chargeForce.strength((d: Node) => {
         if (d.type === 'artist') {
-            const isSeed = isNodeInSeedList(d.id || d.label || '', seedArtists);
+            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
             return isSeed ? -800 : -500; // Moderated repulsion
         }
         
@@ -1197,8 +1294,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         return (300 - (weight * 220)) * spacingMultiplier;
     });
 
-    // Re-tensioned dynamic link strengths
+    // Re-tensioned dynamic link strengths (0 for Cross-Scene Bridge Lines so clusters stay independent)
     (simulation.force("link") as d3.ForceLink<Node, Link>).strength(d => {
+        if (d.isCrossSceneBridge) return 0;
         const s = d.source as Node;
         const t = d.target as Node;
         
@@ -1220,7 +1318,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     const getNodeColor = (node: Node) => {
         if (node.type === 'artist') {
-            return isNodeInSeedList(node.id || node.label || '', seedArtists) ? nodeTypeColorMap.seed : nodeTypeColorMap.ai;
+            return isNodeSeedInOwnScene(node, seedArtists) ? nodeTypeColorMap.seed : nodeTypeColorMap.ai;
         }
         if (!node.type) return zceneFallbackColor;
         return nodeTypeColorMap[node.type] || colorScale(node.type);
@@ -1326,7 +1424,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("fill", d => getNodeColor(d))
         .attr("opacity", d => d.isLoading || d.isPending ? 0.35 : 1)
         .style("font-size", d => {
-            const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
+            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
             if (isSeed) return "28px";
             if (d.type === 'artist') return "28px";
             if (d.type === 'country') return "26px";
@@ -1334,7 +1432,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return "20px";
         })
         .text(d => {
-            const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
+            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
             if (isSeed) return 'album';
             if (d.type === 'artist') return 'equalizer';
             if (d.type === 'genre') return 'library_music';
@@ -1393,8 +1491,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         });
 
     const nodeId = (n: any) => String(typeof n === 'string' ? n : n.id);
+    const intraSceneLinks = visibleLinks.filter(l => !l.isCrossSceneBridge);
+    const bridgeLinks = visibleLinks.filter(l => Boolean(l.isCrossSceneBridge));
+
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
-        .data(visibleLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
+        .data(intraSceneLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
         .join("line")
         .attr("class", "visual-line")
         .attr("stroke", (d: any) => {
@@ -1448,12 +1549,65 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .style("pointer-events", "none");
 
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
-        .data(visibleLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
+        .data(intraSceneLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
         .join("line")
         .attr("class", "interactive-link")
         .attr("stroke", "transparent")
         .attr("stroke-width", 16)
         .style("cursor", "default");
+
+    // Cross-Scene Curved Bridge Lines (Identity: #F6E468, Sonic Lineage: #a855f7)
+    container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+        .data(bridgeLinks, (d: any) => `bridge:${nodeId(d.source)}-${nodeId(d.target)}`)
+        .join("path")
+        .attr("class", "bridge-visual-line")
+        .attr("fill", "none")
+        .attr("stroke", (d: any) => d.bridgeType === 'identity' ? "#F6E468" : "#a855f7")
+        .attr("stroke-width", 1.75)
+        .attr("stroke-dasharray", "6,4")
+        .attr("stroke-opacity", 0.65)
+        .attr("d", (d: any) => computeBridgePathD(d))
+        .style("pointer-events", "none");
+
+    container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-interactive-link")
+        .data(bridgeLinks, (d: any) => `bridge:${nodeId(d.source)}-${nodeId(d.target)}`)
+        .join("path")
+        .attr("class", "bridge-interactive-link")
+        .attr("fill", "none")
+        .attr("stroke", "transparent")
+        .attr("stroke-width", 18)
+        .attr("d", (d: any) => computeBridgePathD(d))
+        .style("cursor", "pointer")
+        .on("mouseenter", (event, d: any) => {
+            if (isSmallScreen) return;
+            const sNode = typeof d.source === 'object' ? d.source : visibleNodes.find(n => n.id === d.source);
+            const tNode = typeof d.target === 'object' ? d.target : visibleNodes.find(n => n.id === d.target);
+            if (!sNode || !tNode || !svgRef.current) return;
+            const sLabel = toDisplayLabel(sNode);
+            const tLabel = toDisplayLabel(tNode);
+            const rawContext = sanitizeDirectionalLinkContext(d.forwardContext || d.context, sLabel, tLabel) || "bridges cross-scene sonic lineage with";
+            const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
+            const transform = d3.zoomTransform(svgRef.current);
+            const midX = ((sNode.x ?? 0) + (tNode.x ?? 0)) / 2;
+            const midY = ((sNode.y ?? 0) + (tNode.y ?? 0)) / 2;
+            setHoveredLink({
+                sourceId: `${sLabel} (Scene ${(sNode.sceneIndex ?? 0) + 1})`,
+                connections: [{
+                    context: capitalizedContext,
+                    targetName: `${tLabel} (Scene ${(tNode.sceneIndex ?? 0) + 1})`
+                }],
+                x: transform.applyX(midX),
+                y: transform.applyY(midY)
+            });
+        })
+        .on("mouseleave", () => {
+            if (!isSmallScreen) {
+                const activeNode = selectedNodeRef.current || peekedNodeRef.current;
+                if (!activeNode) {
+                    setHoveredLink(null);
+                }
+            }
+        });
 
     // Check if the set of artists has structurally changed
     const currentArtists = visibleNodes.filter(n => n.type === 'artist');
@@ -1613,14 +1767,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke-width", d => {
             const activeNode = !isSearchActive ? (selectedNode || peekedNode) : null;
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
-            const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
+            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
             if (isSelected) return 4;
             return isSeed ? 3 : 2;
         })
         .attr("stroke", d => {
             const activeNode = !isSearchActive ? (selectedNode || peekedNode) : null;
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
-            const isSeed = d.type === 'artist' && isNodeInSeedList(d.id || d.label || '', seedArtists);
+            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
             if (isSelected) return '#F6E468';
             return isSeed ? '#F6E468' : 'transparent';
         });

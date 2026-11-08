@@ -545,7 +545,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
   });
 
   describe('Part 5: Architecture & Master Blueprint Parity Gate', () => {
-    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V42', () => {
+    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V43', () => {
       const truthPath = path.resolve(__dirname, '../architecture_truth.md');
       const truthContent = fs.readFileSync(truthPath, 'utf8');
 
@@ -555,27 +555,31 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       const runbookPath = path.resolve(__dirname, '../docs/backend-regression-runbook.ts');
       const runbookContent = fs.readFileSync(runbookPath, 'utf8');
 
-      // Check V42 headers & badges
-      expect(truthContent).toContain('V42 — 43 Laws');
-      expect(engineContent).toContain('Zcene V42 Blueprint');
-      expect(engineContent).toContain('V42 Locked');
-      expect(engineContent).toContain('V42 Full-Stack Regression Runbook');
-      expect(runbookContent).toContain('# V42 Regression Suite (Full-Stack)');
+      // Check V43 headers & badges (44 Laws)
+      expect(truthContent).toContain('V43 — 44 Laws');
+      expect(engineContent).toContain('Zcene V43 Blueprint');
+      expect(engineContent).toContain('V43 Locked');
+      expect(engineContent).toContain('44 Laws');
+      expect(engineContent).toContain('V43 Full-Stack Regression Runbook');
+      expect(runbookContent).toContain('# V43 Regression Suite (Full-Stack)');
       expect(runbookContent).toContain('cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts');
+      expect(runbookContent).toContain('npx vitest run src/test/v43-multi-scene-board.test.ts');
 
-      // Check Rule 43 Purge Protocol alignment (projects & tokenTransactions preserved, never purged)
+      // Check V43 Purge Protocol alignment (Tier 1 /artists & /labels and tokenTransactions preserved)
       const purgeTargetsSlice = runbookContent.split('### Purge Targets:')[1]?.split('### Strictly Preserved:')[0] || '';
       const preservedSlice = runbookContent.split('### Strictly Preserved:')[1] || '';
-      expect(purgeTargetsSlice).not.toContain('users/{uid}/projects');
+      expect(purgeTargetsSlice).not.toContain('`/artists`');
+      expect(purgeTargetsSlice).not.toContain('`/labels`');
       expect(purgeTargetsSlice).not.toContain('users/{uid}/tokenTransactions');
-      expect(preservedSlice).toContain('users/{uid}/projects');
+      expect(preservedSlice).toContain('/artists');
+      expect(preservedSlice).toContain('/labels');
       expect(preservedSlice).toContain('users/{uid}/tokenTransactions');
 
-      // Check Rule 29: Canonical Presentation Sort & One-SVG Concentric Watermark
+      // Check Rule 29 & Rule 44: Canonical Presentation Sort & Multi-Scene Infinite Board
       expect(truthContent).toContain('### 29. Universal Payload Serializer');
-      expect(truthContent).toContain('V41 Audio Flow & Presentation Sort Parity');
+      expect(truthContent).toContain('### 44. Multi-Scene Infinite Board, Scene Namespacing & Layered Zine Hierarchy');
       expect(engineContent).toContain('Universal Payload Serializer');
-      expect(engineContent).toContain('V41 Audio Flow & Presentation Sort Parity');
+      expect(engineContent).toContain('Multi-Scene Infinite Board, Scene Namespacing & Layered Zine Hierarchy');
 
       // Check Rule 43: 2-Stage 30-Day Trash & Immutable Discovery Ledger
       expect(truthContent).toContain('43. Token Economy, 2-Stage 30-Day Trash & Immutable Discovery Ledger Accounting');

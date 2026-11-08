@@ -11,6 +11,7 @@ const cacheQualification_1 = require("./services/cacheQualification");
 const isoCountries_1 = require("./shared/isoCountries");
 const executeCurationPipeline_1 = require("./executeCurationPipeline");
 const routerStubService_1 = require("./services/routerStubService");
+const multiSceneUtils_1 = require("./shared/multiSceneUtils");
 const tokenWallet_1 = require("./tokenWallet");
 // Initialize Firebase Admin SDK if not already done
 if ((0, app_1.getApps)().length === 0) {
@@ -273,6 +274,66 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 collectedTokens[model].total += usage.totalTokenCount;
             }
         };
+        const targetSceneId = inputPayload?.targetSceneId || inputPayload?.activeSceneId || "scene-1";
+        const parsedTargetIdx = parseInt(String(targetSceneId).replace(/^scene-/i, ""), 10);
+        const targetSceneIndex = typeof inputPayload?.sceneIndex === "number" && inputPayload.sceneIndex >= 0
+            ? inputPayload.sceneIndex
+            : Number.isFinite(parsedTargetIdx) && parsedTargetIdx >= 1
+                ? parsedTargetIdx - 1
+                : 0;
+        let existingProjectScenes = (0, multiSceneUtils_1.parseProjectScenes)(inputPayload?.scenes);
+        const existingProjectDetailsMap = new Map();
+        const ingestDetailsCacheIntoMap = (rawCache) => {
+            if (!rawCache)
+                return;
+            try {
+                const parsed = typeof rawCache === "string" ? JSON.parse(rawCache) : rawCache;
+                if (Array.isArray(parsed)) {
+                    for (const item of parsed) {
+                        if (Array.isArray(item) && item.length === 2 && item[0] && item[1]) {
+                            const key = (0, multiSceneUtils_1.stripSceneNamespace)(String(item[0]));
+                            existingProjectDetailsMap.set(key, item[1]);
+                            existingProjectDetailsMap.set((0, curatorService_1.normalizeArtistId)(key), item[1]);
+                        }
+                    }
+                }
+                else if (parsed && typeof parsed === "object") {
+                    for (const [k, v] of Object.entries(parsed)) {
+                        if (k && v) {
+                            const key = (0, multiSceneUtils_1.stripSceneNamespace)(k);
+                            existingProjectDetailsMap.set(key, v);
+                            existingProjectDetailsMap.set((0, curatorService_1.normalizeArtistId)(key), v);
+                        }
+                    }
+                }
+            }
+            catch {
+                // Ignore malformed cache
+            }
+        };
+        ingestDetailsCacheIntoMap(inputPayload?.detailsCache || inputPayload?.existingDetailsCache);
+        if (inputPayload?.projectId && jobData.userId) {
+            try {
+                const projSnap = await db
+                    .collection("users")
+                    .doc(jobData.userId)
+                    .collection("projects")
+                    .doc(inputPayload.projectId)
+                    .get();
+                if (projSnap && projSnap.exists) {
+                    const projData = projSnap.data();
+                    if (existingProjectScenes.length === 0 && projData?.scenes) {
+                        existingProjectScenes = (0, multiSceneUtils_1.parseProjectScenes)(projData.scenes);
+                    }
+                    if (projData?.detailsCache) {
+                        ingestDetailsCacheIntoMap(projData.detailsCache);
+                    }
+                }
+            }
+            catch {
+                // Safe fallback if project doc isn't mocked in unit tests
+            }
+        }
         if (jobType === "graph_generation") {
             // Determine if we should run in mock mode
             const isEmulator = false; // TEMPORARILY DISABLED: process.env.FUNCTIONS_EMULATOR === "true";
@@ -304,6 +365,21 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         links: [],
                     },
                     detailsCache: JSON.stringify(mockDetails)
+                };
+            }
+            else if (inputPayload?.mode === "overarching_only" && existingProjectScenes.length >= 2) {
+                console.log(`[Curation Backend] [Overarching-Only Mode] Synthesizing Overarching Zine & Cross-Scene Bridges across ${existingProjectScenes.length} scenes...`);
+                const detailsLookupObj = Object.fromEntries(existingProjectDetailsMap.entries());
+                const overarchingResult = await (0, curatorService_1.generateOverarchingZineBackend)(existingProjectScenes, detailsLookupObj, usageCollector);
+                const activeScene = existingProjectScenes.find((s) => s.sceneId === targetSceneId) ||
+                    existingProjectScenes[existingProjectScenes.length - 1];
+                const serializedCacheEntries = Array.from(existingProjectDetailsMap.entries());
+                result = {
+                    graphData: activeScene?.graphData || { nodes: [], links: [] },
+                    detailsCache: JSON.stringify(serializedCacheEntries),
+                    scenes: existingProjectScenes,
+                    overarchingRationale: overarchingResult.overarchingRationale,
+                    crossSceneLinks: overarchingResult.crossSceneLinks,
                 };
             }
             else {
@@ -614,50 +690,60 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 expectedNodeIso = (0, isoCountries_1.extractTrailingCountryIso)(artistNormId);
                             }
                         }
-                        // 1. Check local Firestore Cache first
+                        // 0. V43 Cross-Scene Project Cache Reuse ([Rule 44]):
+                        // Check existing project detailsCache (from prior Scenes) FIRST before querying Firestore or calling 3.6 Flash.
                         let details = null;
-                        try {
-                            const collName = isLabel ? "labels" : "artists";
-                            const cacheDoc = await db.collection(collName).doc(artistNormId).get();
-                            if (cacheDoc.exists) {
-                                const cacheData = cacheDoc.data();
-                                if (cacheData && cacheData.detailsCache) {
-                                    let cachedDetails = cacheData.detailsCache;
-                                    if (typeof cachedDetails === 'string') {
-                                        try {
-                                            cachedDetails = JSON.parse(cachedDetails);
-                                        }
-                                        catch (e) { }
-                                    }
-                                    if (cachedDetails) {
-                                        // Un-nest array wrapper layer if legacy format [ [ "name", { ... } ] ]
-                                        if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
-                                            const match = cachedDetails.find((item) => (0, curatorService_1.normalizeArtistId)(item[0]) === artistNormId);
-                                            if (match && match[1]) {
-                                                cachedDetails = match[1];
+                        const priorSceneCached = existingProjectDetailsMap.get(artistNormId) ||
+                            existingProjectDetailsMap.get((0, curatorService_1.normalizeArtistId)(artistNormId));
+                        if (priorSceneCached && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(priorSceneCached, isLabel, expectedNodeIso)) {
+                            details = { ...priorSceneCached, _isReadOnly: true };
+                            console.log(`[Curation Backend] [V43 Cross-Scene Cache Hit] Reusing project detailsCache for: ${artistNormId}`);
+                        }
+                        // 1. Check local Firestore Cache if not already resolved from prior scene
+                        if (!details) {
+                            try {
+                                const collName = isLabel ? "labels" : "artists";
+                                const cacheDoc = await db.collection(collName).doc(artistNormId).get();
+                                if (cacheDoc.exists) {
+                                    const cacheData = cacheDoc.data();
+                                    if (cacheData && cacheData.detailsCache) {
+                                        let cachedDetails = cacheData.detailsCache;
+                                        if (typeof cachedDetails === 'string') {
+                                            try {
+                                                cachedDetails = JSON.parse(cachedDetails);
                                             }
-                                            else {
-                                                cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                                            catch (e) { }
+                                        }
+                                        if (cachedDetails) {
+                                            // Un-nest array wrapper layer if legacy format [ [ "name", { ... } ] ]
+                                            if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                                                const match = cachedDetails.find((item) => (0, curatorService_1.normalizeArtistId)(item[0]) === artistNormId);
+                                                if (match && match[1]) {
+                                                    cachedDetails = match[1];
+                                                }
+                                                else {
+                                                    cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                                                }
                                             }
-                                        }
-                                        // Architecture V33 (Rule 8 & Rule 40) Universal Cache Validation:
-                                        // A cached document is only a valid hit if it satisfies isFullyQualifiedEntityProfile
-                                        // (summary > 50 chars, genre, origin, founded, non-empty discography >= 1 album for artists,
-                                        // authentic recommendationReason free of prose-fallback text, and non-empty imageUrl).
-                                        const isCacheComplete = (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, isLabel, expectedNodeIso);
-                                        if (isCacheComplete) {
-                                            details = cachedDetails;
-                                            console.log(`[Curation Backend] Direct cache hit (complete) for details of: ${artistNormId}`);
-                                        }
-                                        else if (cachedDetails) {
-                                            console.log(`[Curation Backend] Cache doc found but failed V33 qualification gate for: ${artistNormId}. Routing to full hydration.`);
+                                            // Architecture V33 (Rule 8 & Rule 40) Universal Cache Validation:
+                                            // A cached document is only a valid hit if it satisfies isFullyQualifiedEntityProfile
+                                            // (summary > 50 chars, genre, origin, founded, non-empty discography >= 1 album for artists,
+                                            // authentic recommendationReason free of prose-fallback text, and non-empty imageUrl).
+                                            const isCacheComplete = (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, isLabel, expectedNodeIso);
+                                            if (isCacheComplete) {
+                                                details = cachedDetails;
+                                                console.log(`[Curation Backend] Direct cache hit (complete) for details of: ${artistNormId}`);
+                                            }
+                                            else if (cachedDetails) {
+                                                console.log(`[Curation Backend] Cache doc found but failed V33 qualification gate for: ${artistNormId}. Routing to full hydration.`);
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
-                        catch (cacheErr) {
-                            console.warn(`[Curation Backend] Direct cache lookup failed for details of: ${artistNormId}`, cacheErr);
+                            catch (cacheErr) {
+                                console.warn(`[Curation Backend] Direct cache lookup failed for details of: ${artistNormId}`, cacheErr);
+                            }
                         }
                         // 2. Fetch from Gemini if cache miss or partial hydration needed
                         let requiresTextHydration = false;
@@ -998,8 +1084,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     }
                 }
                 let rootBreakdownStr = "";
+                const sceneArtistSnippetsMap = {};
                 try {
-                    // Step 3 (V10): Native JSON Generation (Root Breakdown + 1-Sentence Hooks)
+                    // Step 3A (V10/V43): Native JSON Generation (Scene Root Breakdown + 1-Sentence Hooks)
                     const rootBreakdownPayload = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries, usageCollector, inputPayload.filters);
                     if (rootBreakdownPayload) {
                         rootBreakdownStr = rootBreakdownPayload.editorialMarkdown;
@@ -1007,11 +1094,18 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         // Apply native 1-sentence hooks for tooltips (Rule 26)
                         if (rootBreakdownPayload.artistSnippets && Array.isArray(rootBreakdownPayload.artistSnippets)) {
                             console.log(`[Curation Backend] Step 3: Natively extracted ${rootBreakdownPayload.artistSnippets.length} epicenter hooks.`);
+                            rootBreakdownPayload.artistSnippets.forEach((s) => {
+                                if (s?.id && s?.snippet) {
+                                    sceneArtistSnippetsMap[s.id] = s.snippet;
+                                    sceneArtistSnippetsMap[(0, curatorService_1.normalizeArtistId)(s.id)] = s.snippet;
+                                }
+                            });
                             finalGraph.nodes.forEach((n) => {
                                 const snippetObj = rootBreakdownPayload.artistSnippets.find((s) => (0, curatorService_1.normalizeArtistId)(s.id) === (0, curatorService_1.normalizeArtistId)(n.id) ||
                                     s.id.toLowerCase() === n.id.toLowerCase());
                                 if (snippetObj && snippetObj.snippet) {
                                     n.narrativeSnippet = snippetObj.snippet;
+                                    sceneArtistSnippetsMap[n.id] = snippetObj.snippet;
                                 }
                             });
                         }
@@ -1957,9 +2051,67 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         }
                     });
                 }
+                // V43 Multi-Scene Assembly & Step 3B Overarching Zine Synthesis ([Rule 44]):
+                // Merge existing project detailsCache with the newly hydrated detailsCacheEntries so
+                // shared and prior-scene entities remain in the unified project detailsCache.
+                const mergedDetailsMap = new Map();
+                for (const [k, v] of existingProjectDetailsMap.entries()) {
+                    if (k && v)
+                        mergedDetailsMap.set(k, v);
+                }
+                for (const [k, v] of detailsCacheEntries) {
+                    if (k && v)
+                        mergedDetailsMap.set(k, v);
+                }
+                const unifiedDetailsCacheEntries = existingProjectScenes.length > 1 || existingProjectDetailsMap.size > 0
+                    ? Array.from(mergedDetailsMap.entries())
+                    : detailsCacheEntries;
+                const completedSceneTitle = artistList
+                    .map((a) => {
+                    const norm = (0, curatorService_1.normalizeArtistId)(a);
+                    const canonical = resolvedSeedNormMap.get(norm) ?? norm;
+                    return seedNamesMap[canonical] || seedNamesMap[norm] || (0, isoCountries_1.stripCountrySlug)(a);
+                })
+                    .join(" + ");
+                const completedScene = {
+                    sceneId: targetSceneId,
+                    sceneIndex: targetSceneIndex,
+                    title: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
+                    seedArtists: cleanSeedArtistsContext,
+                    seedIds: resolvedSeedArray.map((s) => s.id),
+                    discoveryFilters: inputPayload.filters || {},
+                    graphData: finalGraph,
+                    synthesisRationale: finalGraph.synthesisRationale || rootBreakdownStr || "",
+                    artistSnippets: sceneArtistSnippetsMap,
+                    centerOffset: (0, multiSceneUtils_1.getSceneCenterOffset)(targetSceneIndex),
+                    status: "ready",
+                    pathway: isComplexGeneration ? "complex_generation" : "root_generation",
+                    updatedAt: Date.now(),
+                };
+                const updatedScenes = [...existingProjectScenes];
+                const existingSceneIdx = updatedScenes.findIndex((s) => s.sceneId === targetSceneId);
+                if (existingSceneIdx !== -1) {
+                    updatedScenes[existingSceneIdx] = completedScene;
+                }
+                else {
+                    updatedScenes.push(completedScene);
+                }
+                updatedScenes.sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
+                let overarchingRationale = "";
+                let crossSceneLinks = [];
+                if (updatedScenes.length >= 2) {
+                    console.log(`[Curation Backend] [Step 3B: Overarching Zine Synthesis] Synthesizing Master Editorial & Cross-Scene Bridges across ${updatedScenes.length} scenes...`);
+                    const unifiedDetailsObj = Object.fromEntries(unifiedDetailsCacheEntries);
+                    const overarchingPayload = await (0, curatorService_1.generateOverarchingZineBackend)(updatedScenes, unifiedDetailsObj, usageCollector);
+                    overarchingRationale = overarchingPayload.overarchingRationale;
+                    crossSceneLinks = overarchingPayload.crossSceneLinks;
+                }
                 result = {
                     graphData: finalGraph,
-                    detailsCache: JSON.stringify(detailsCacheEntries),
+                    detailsCache: JSON.stringify(unifiedDetailsCacheEntries),
+                    scenes: updatedScenes,
+                    overarchingRationale,
+                    crossSceneLinks,
                     ...(resolvedAnchorResolution ? { anchorResolution: resolvedAnchorResolution } : {})
                 };
             }
@@ -1978,16 +2130,20 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
         console.log(`[Curation Backend] Successfully completed job ${jobId} (set TTL expireAt +24h)`);
         if (inputPayload?.projectId && jobData.userId && result?.graphData) {
             const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
-            const artistEntityIds = graphObj.nodes
-                ? graphObj.nodes.filter((n) => n.type === 'artist' || !n.type).map((n) => (0, curatorService_1.normalizeArtistId)(n.id))
-                : [];
-            const labelEntityIds = graphObj.nodes
-                ? graphObj.nodes.filter((n) => n.type === 'label').map((n) => (0, curatorService_1.normalizeLabelId)(n.id))
-                : [];
-            // Phase 2B — Canonical Seed Pinning: build a seed-first ordered activeNodes array
-            // from the completed graph topology. The worker previously never wrote activeNodes,
-            // leaving the project doc with a stale frontend-written array (seed could be at any
-            // index). This write makes the worker the authoritative source of truth for ordering.
+            const finalProjectScenes = Array.isArray(result.scenes)
+                ? result.scenes
+                : existingProjectScenes;
+            const isMultiSceneProject = finalProjectScenes.length >= 2;
+            const allNodesAcrossScenes = isMultiSceneProject
+                ? finalProjectScenes.flatMap((s) => s.graphData?.nodes || [])
+                : (graphObj.nodes || []);
+            const artistEntityIds = Array.from(new Set(allNodesAcrossScenes
+                .filter((n) => n.type === 'artist' || !n.type)
+                .map((n) => (0, curatorService_1.normalizeArtistId)((0, multiSceneUtils_1.stripSceneNamespace)(n.id)))));
+            const labelEntityIds = Array.from(new Set(allNodesAcrossScenes
+                .filter((n) => n.type === 'label')
+                .map((n) => (0, curatorService_1.normalizeLabelId)((0, multiSceneUtils_1.stripSceneNamespace)(n.id)))));
+            // Phase 2B — Canonical Seed Pinning & V43 Multi-Scene Deduplication ([Rule 29], [Rule 44])
             const seedNormList = (inputPayload.artists || '')
                 .split('::')
                 .map((a) => (0, curatorService_1.normalizeArtistId)(a.trim()))
@@ -1996,9 +2152,12 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 const normId = (0, curatorService_1.normalizeArtistId)(nodeId);
                 return seedNormList.some((s) => normId === s || normId.startsWith(s + '-') || s.startsWith(normId + '-'));
             };
-            const hoistedActiveNodes = [];
-            // 1. Seeds first — in the order they appear in the graph topology
-            if (graphObj.nodes) {
+            let hoistedActiveNodes = [];
+            if (isMultiSceneProject) {
+                hoistedActiveNodes = (0, multiSceneUtils_1.computeDeduplicatedActiveNodes)(finalProjectScenes);
+            }
+            else if (graphObj.nodes) {
+                // 1. Seeds first — in the order they appear in the graph topology
                 graphObj.nodes.forEach((n) => {
                     if (isSeedNode(n.id))
                         hoistedActiveNodes.push(n.id);
@@ -2011,16 +2170,20 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 });
             }
             console.log(`[Curation Backend] [Phase 2B] Hoisted activeNodes: seed at [0]="${hoistedActiveNodes[0]}", total=${hoistedActiveNodes.length}`);
-            // Column 3, Node 7 (Architecture V29): Extract and freeze seedImageUrls array from isolated detailsCache snapshot to project root
-            const rawSeedString = inputPayload.seedArtists || inputPayload.artists || '';
-            const seedTokens = rawSeedString.split('::').map((a) => a.trim()).filter(Boolean);
+            // Column 3, Node 7 (Architecture V29 / V43): Extract and freeze seedImageUrls array from isolated detailsCache snapshot to project root
+            const allProjectSeeds = isMultiSceneProject
+                ? (0, multiSceneUtils_1.getAllProjectSeedIds)(finalProjectScenes)
+                : (inputPayload.seedArtists || inputPayload.artists || '')
+                    .split('::')
+                    .map((a) => a.trim())
+                    .filter(Boolean);
             const extractedSeedImageUrls = [];
             let extractedSeedImageUrl = null;
             try {
                 if (result.detailsCache) {
                     const parsedCache = typeof result.detailsCache === 'string' ? JSON.parse(result.detailsCache) : result.detailsCache;
                     if (Array.isArray(parsedCache)) {
-                        for (const seed of seedTokens) {
+                        for (const seed of allProjectSeeds) {
                             const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
                             const match = parsedCache.find((item) => {
                                 const key = (0, curatorService_1.normalizeArtistId)(item[0]);
@@ -2067,7 +2230,18 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             }
             await updateProjectStatus(jobData.userId, inputPayload.projectId, {
                 status: "completed",
+                schemaVersion: 43,
                 graphData: JSON.stringify(result.graphData),
+                ...(finalProjectScenes.length > 0
+                    ? {
+                        scenes: JSON.stringify(finalProjectScenes),
+                        activeSceneId: targetSceneId,
+                        sceneCount: finalProjectScenes.length,
+                        seedArtistIds: (0, multiSceneUtils_1.getAllProjectSeedIds)(finalProjectScenes),
+                        overarchingRationale: result.overarchingRationale || "",
+                        crossSceneLinks: JSON.stringify(result.crossSceneLinks || []),
+                    }
+                    : {}),
                 artistIds: artistEntityIds,
                 labelIds: labelEntityIds,
                 activeJobId: null,

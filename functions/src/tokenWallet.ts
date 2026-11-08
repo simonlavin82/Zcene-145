@@ -590,8 +590,10 @@ export async function refundProjectSettlementOnError(params: {
 }
 
 /**
- * Column 1 Direct Hit Settlement Callable (Rule 20 & Rule 43).
+ * Column 1 Direct Hit Settlement Callable (Rule 20, Rule 43 & Rule 44).
  * Settles -5 Tokens on pure cached Direct Hits, or -4 Tokens remainder on Post-Validation Cache Intercept hits.
+ * When a Direct Hit is added as Scene >= 2 (scenes.length >= 2), optionally queues an 'overarching_only'
+ * background curation job at 0 extra user token cost so Overarching Zine + Cross-Scene Bridges synthesize automatically.
  */
 export const authorizeDirectHitCallable = onCall(
   {
@@ -600,18 +602,30 @@ export const authorizeDirectHitCallable = onCall(
   },
   async (request) => {
     const caller = requireAuthenticatedCaller(request);
-    const { projectId, seedArtistId, projectName, curationSessionId } = request.data || {};
+    const {
+      projectId,
+      seedArtistId,
+      projectName,
+      curationSessionId,
+      targetSceneId,
+      scenes,
+      detailsCache,
+      triggerOverarchingSynthesis,
+    } = request.data || {};
 
     if (!seedArtistId && !projectName) {
       throw new HttpsError("invalid-argument", "Missing Direct Hit artist identifier.");
     }
 
     const label = (projectName || seedArtistId || "Zcene").toString().trim();
+    const cleanProjectId =
+      typeof projectId === "string" && projectId.trim() ? projectId.trim() : undefined;
+
     const settlement = await settleCurationProjectTokens({
       caller,
       curationSessionId,
       totalProjectCost: TOKEN_PRICING.SINGLE_SEED,
-      projectId: typeof projectId === "string" && projectId.trim() ? projectId.trim() : undefined,
+      projectId: cleanProjectId,
       txType: "spend_direct_hit",
       description: `Zcene Curation: ${label}`,
       generationTypeToStamp: "Direct Hit",
@@ -621,9 +635,57 @@ export const authorizeDirectHitCallable = onCall(
       anchorResolution: { cacheHits: 1, cacheMisses: 0 },
     });
 
+    let activeJobId: string | null = null;
+    const parsedScenes = Array.isArray(scenes)
+      ? scenes
+      : typeof scenes === "string"
+        ? (() => {
+            try {
+              return JSON.parse(scenes);
+            } catch {
+              return [];
+            }
+          })()
+        : [];
+
+    if (cleanProjectId && (triggerOverarchingSynthesis || parsedScenes.length >= 2)) {
+      try {
+        const jobRef = db.collection("curationJobs").doc();
+        activeJobId = jobRef.id;
+        await jobRef.set({
+          status: "pending",
+          jobType: "graph_generation",
+          userId: caller.uid,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          inputPayload: {
+            mode: "overarching_only",
+            projectId: cleanProjectId,
+            userId: caller.uid,
+            targetSceneId: targetSceneId || `scene-${parsedScenes.length}`,
+            scenes: parsedScenes,
+            detailsCache: detailsCache || null,
+            artists: String(seedArtistId || label),
+            generationType: "Direct Hit",
+            tokensSpent: settlement.tokensSpent,
+            curationSessionId: settlement.curationSessionId,
+          },
+        });
+        await db
+          .collection("users")
+          .doc(caller.uid)
+          .collection("projects")
+          .doc(cleanProjectId)
+          .set({ activeJobId }, { merge: true });
+      } catch (jobErr) {
+        console.warn("[authorizeDirectHitCallable] Non-fatal error queueing overarching_only job:", jobErr);
+      }
+    }
+
     return {
       success: true,
       ...settlement,
+      ...(activeJobId ? { activeJobId } : {}),
     };
   }
 );

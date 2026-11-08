@@ -122,7 +122,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 18, 
         title: "Authorization Lifecycle & Split-Debit Session Scoping", 
-        desc: "Legacy shared API_PASSWORD is completely retired in favor of cryptographic Firebase Auth (request.auth / Bearer ID tokens). Token authorization and curationSessions/{sessionId} split-debit state are strictly scoped to the active generation event and reset immediately on modal cancellation, API failure, or project unmount." 
+        desc: "Legacy shared API_PASSWORD is completely retired in favor of cryptographic Firebase Auth (request.auth / Bearer ID tokens). Token authorization and curationSessions/{sessionId} split-debit state are strictly scoped to the active Scene generation event and reset immediately on modal cancellation, API failure, scene switch/addition, or project unmount." 
     },
     { 
         id: 19, 
@@ -132,12 +132,12 @@ const ARCHITECTURE_RULES = [
     { 
         id: 20, 
         title: "Mandatory Disambiguation & Settlement on Direct Hits", 
-        desc: "Single-seed Topology Hits and Ambiguous Cache Hits MUST NEVER bypass Box 3 (Token Spend & Top-Up Gate) or Box 4 (Confirm Your Artists), and MUST settle via authorizeDirectHitCallable (-5T pure cache hit, or -4T remainder after 1T Flash lookup) before rendering." 
+        desc: "Single-seed Topology Hits and Ambiguous Cache Hits MUST NEVER bypass Box 3 (Token Spend & Top-Up Gate) or Box 4 (Confirm Your Artists), and MUST settle via authorizeDirectHitCallable (-5T pure cache hit, or -4T remainder after 1T Flash lookup) before rendering. When a Direct Hit is added as Scene >= 2, authorizeDirectHitCallable asynchronously queues an overarching_only background pass at 0 extra user token cost to synthesize overarchingRationale and crossSceneLinks." 
     },
     { 
         id: 21, 
         title: "Locked Topology & Coordinate Memory", 
-        desc: "Node positions are strictly derived from AI-evaluated link weights. Direct D3 node dragging is permanently disabled. Settled (fx, fy) coordinates are persisted to the owned project's canvasLayout (5s debounce) to permanently lock orientation." 
+        desc: "Node positions are strictly derived from AI-evaluated link weights around deterministic per-scene centers (1000 + sceneIndex * 1600, 1000). Direct D3 node dragging is permanently disabled. Settled (fx, fy) coordinates (keyed by namespaced ID scene-k::canonicalId) are persisted to the owned project's canvasLayout (5s debounce) so existing scenes remain frozen when new scenes are added." 
     },
     { 
         id: 22, 
@@ -152,17 +152,17 @@ const ARCHITECTURE_RULES = [
     { 
         id: 24, 
         title: "Verbal Identity", 
-        desc: "The Root Breakdown system prompt must enforce the \"late-night record curator\" voice. Academic language and regional English constraints are strictly prohibited." 
+        desc: "Both the Scene Zine (generateRootsBreakdownBackend) and Overarching Multi-Scene Zine (generateOverarchingZineBackend) system prompts must enforce the \"late-night record curator\" voice with zero em-dashes. Academic language and regional English constraints are strictly prohibited." 
     },
     { 
         id: 25, 
         title: "Selective Coordinate Amnesia", 
-        desc: "When generating a shared link, fixed coordinates (fx, fy) are intentionally stripped so guests experience a fresh, organic D3 layout. This is a post-serialization mutation strictly applied to ephemeral guest links." 
+        desc: "When generating a shared link, fixed coordinates (fx, fy) are intentionally stripped from both composite graphData and per-scene graphData so guests experience a fresh, organic D3 layout around each scene's deterministic centerOffset. This is a post-serialization mutation strictly applied to ephemeral guest links." 
     },
     { 
         id: 26, 
         title: "Contextual Tooltips", 
-        desc: "Hover states and tooltips must prioritize native narrative snippets (node.narrativeSnippet) generated during the Root Breakdown over generic database summaries. Edge relationships output sanitized 3–8 word bi-directional predicate phrases (forwardContext / inverseContext) omitting endpoint names, with deterministic graph/narrative fallback resolution (shared label → narrative co-mention → shared genre/country scene → 'shares scene lineage with') so generic 'Is connected to' copy never renders." 
+        desc: "Hover states and tooltips must prioritize native narrative snippets (node.narrativeSnippet) generated during the Scene Zine synthesis over generic database summaries. Intra-scene and Cross-Scene Bridge relationships output sanitized 3–8 word bi-directional predicate phrases (forwardContext / inverseContext) omitting endpoint names, with deterministic graph/narrative fallback resolution (shared label → narrative co-mention → shared genre/country scene → 'shares scene lineage with') so generic 'Is connected to' copy never renders." 
     },
     { 
         id: 27, 
@@ -177,7 +177,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 29, 
         title: "Universal Payload Serializer", 
-        desc: "Project saving, autosave, and share generation derive from a single source of truth to guarantee 1:1 data parity (including curation elements like pinned/styled nodes). Share links apply a post-serialization blacklist for ephemeral constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, tokensSpent, and anchorResolution during frontend autosave (merge: true) to prevent clobbering server-stamped token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot. V41 Audio Flow & Presentation Sort Parity: Client hydration and autosave pipelines preserve itunesArtistId, previewUrl, and previewTrackName across project saving, cloning, and reconciliation while strictly keeping LLM schemas free of audio fields to prevent hallucinations. The UI enforces the Canonical Presentation Sort (Audio Flow) grouping Artists before Record Labels in Deep Cuts and Magazine View while preserving graph traversal order, overlaid with the One-SVG Concentric Artwork Watermark." 
+        desc: "Project saving, autosave, and share generation derive from a single source of truth (schemaVersion: 43, including scenes, activeSceneId, overarchingRationale, and crossSceneLinks) to guarantee 1:1 data parity. Share links apply a post-serialization blacklist for ephemeral constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, tokensSpent, and anchorResolution during frontend autosave (merge: true) to prevent clobbering server-stamped token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot across all scenes. V41/V43 Audio Flow & Presentation Sort Parity: Client hydration and autosave pipelines preserve itunesArtistId, previewUrl, and previewTrackName across project saving, cloning, and reconciliation while strictly keeping LLM schemas free of audio fields. The UI enforces the Canonical Presentation Sort (Audio Flow) across canonical-deduplicated Deep Cuts (elevating isSeed: true if an artist is a Root in any Scene), grouping Artists before Record Labels in Deep Cuts and Zine View while preserving graph traversal order, overlaid with the One-SVG Concentric Artwork Watermark." 
     },
     { 
         id: 30, 
@@ -232,22 +232,27 @@ const ARCHITECTURE_RULES = [
     { 
         id: 40, 
         title: "Synthesis Rationale & Deep Cut Integrity (Read/Write Gates)", 
-        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile + Origin-Suffix Parity: summary > 50 chars, genre/origin/founded matching the entity's -iso suffix, canonical style for artists, Array.isArray(profile.discography) where honest empty arrays [] are accepted for unindexed underground artists and non-arrays/null are rejected, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Foreign homonym profiles and prose-fallback stubs are hard-rejected. V40 Audio Agnosticism: isFullyQualifiedEntityProfile is 100% agnostic to itunesArtistId, previewUrl, and previewTrackName. If Step 3 Root Breakdown exceeds 90s or throws 504, execution immediately fails over to 3.6 Flash (low). Step 4B locks canonical ISO artist suffixes (-be, -th) over free-text origins." 
+        desc: "Direct Hits strictly require a non-empty synthesisRationale (>= 50 chars) AND a fully qualified profile (isFullyQualifiedEntityProfile + Origin-Suffix Parity: summary > 50 chars, genre/origin/founded matching the entity's -iso suffix, canonical style for artists, Array.isArray(profile.discography) where honest empty arrays [] are accepted for unindexed underground artists and non-arrays/null are rejected, valid imageUrl or terminal 'not-found' monogram, and authentic recommendationReason) at both the Read Gate and Write Gate (Step 6). Foreign homonym profiles and prose-fallback stubs are hard-rejected. V40 Audio Agnosticism: isFullyQualifiedEntityProfile is 100% agnostic to itunesArtistId, previewUrl, and previewTrackName. Both Step 3 Scene Zine (generateRootsBreakdownBackend) and Step 3B Overarching Multi-Scene Zine (generateOverarchingZineBackend) bound primary 3.1 Pro high synthesis by 90s and fail over immediately to 3.6 Flash (low) on timeout/504. Step 4B locks canonical ISO artist suffixes (-be, -th) over free-text origins." 
     },
     { 
         id: 41, 
         title: "3-Tier Anchor Hierarchy & Dual-Layer Scene Gravity", 
-        desc: "Enforces a strict 3-Tier Anchor System: Tier 1 (Artist Seeds — Sacred Genesis, immune to secondary filters), Tier 2 (Hard Spatial & Temporal Guardrails: 1965 to N-2 (Current Year - 2) Era Slider & 22 Canonical Countries with Include/Exclude toggle and cross-era lineage authorization), and Tier 3 (Dual-Layer Scene Gravity: Canonical Genres & Creatable Anchor Labels). Separates Editorial Narrative Context from Topological Truth: Step 2B executes the Level 2 Post-Hydration Boundary Audit BEFORE Step 3 Magazine synthesis so boundary violators are pruned prior to prose generation, while anchorResolution strictly evaluates physical graph nodes with granular partial Tier 3 telemetry (e.g., Genre Applied; Label Bypassed — Narrative Gravity Only)." 
+        desc: "Enforces a strict 3-Tier Anchor System: Tier 1 (Artist Seeds — Sacred Genesis, immune to secondary filters), Tier 2 (Hard Spatial & Temporal Guardrails: 1965 to N-2 (Current Year - 2) Era Slider & 22 Canonical Countries with Include/Exclude toggle and cross-era lineage authorization), and Tier 3 (Dual-Layer Scene Gravity: Canonical Genres & Creatable Anchor Labels). Separates Editorial Narrative Context from Topological Truth: Step 2B executes the Level 2 Post-Hydration Boundary Audit BEFORE Step 3 Zine synthesis so boundary violators are pruned prior to prose generation, while anchorResolution strictly evaluates physical graph nodes with granular partial Tier 3 telemetry (e.g., Genre Applied; Label Bypassed — Narrative Gravity Only)." 
     },
     { 
         id: 42, 
         title: "Data Lifecycle, 3-Tier Storage Matrix & Session TTLs", 
-        desc: "Enforces a strict 3-tier storage matrix: Tier 1 (Global Assets /artists & /labels: Soft-expires 365d (createdAt + 365d); updatedAt mutations do not reset clock; anti-sweep law prohibits automated cron-sweeps), Tier 2 (Ephemeral Snapshots & Sessions /sharedZcenes: +30d hard TTL; /curationJobs: completedAt +24h; /curationSessions: +24h sliding; /deepWebSessions: no TTL account pass until all 3 messages consumed), and Tier 3 (Owned Projects /users/{uid}/projects: permanent user storage, Coordinate Memory preserves settled positions)." 
+        desc: "Enforces a strict 3-tier storage matrix: Tier 1 (Global Assets /artists & /labels: Soft-expires 365d (createdAt + 365d); updatedAt mutations do not reset clock; anti-sweep law prohibits automated cron-sweeps), Tier 2 (Ephemeral Snapshots & Sessions /sharedZcenes: +30d hard TTL; /curationJobs: completedAt +24h; /curationSessions: +24h sliding; /deepWebSessions: no TTL account pass until all 3 messages consumed), and Tier 3 (Owned Projects /users/{uid}/projects: schemaVersion: 43 multi-scene workspaces, 2-Stage 30-Day Trash lifecycle, Coordinate Memory preserves settled per-scene positions)." 
     },
     { 
         id: 43, 
         title: "Prepaid Token Economy, 2-Stage Trash & Immutable Discovery Ledger", 
-        desc: "Zcene enforces a server-authoritative prepaid Token Economy on users/{uid} (tokenBalance, tokenTransactions; 1T = £0.10 / ~$0.13 USD), write-locked against client mutation in firestore.rules. Standard users top up via <SimulatedStripeModal> (£5=50T, £10=100T, £15=150T) and spend value-based tokens: 5T Single-Seed, 10T Complex, 3T Deep Connections (account-wide {uid}_global_deepweb_pass, no TTL), with 1T non-refundable pre-flight credited against final settlement. Workspace deletions follow a 2-Stage 30-Day Trash lifecycle: Stage 1 preserves 100% of graphData/canvasLayout for 0T user restoration; Stage 2 compacts heavy blobs to null upon permanent purge while preserving telemetry headers. Cloud Functions dual-write exact apiUsage, costUsd, seedArtist, and anchorResolution to users/{uid}/tokenTransactions. On load, The Discovery Ledger automatically reconciles tokenTransactions against projects, reconstituting historical deleted runs as [ARCHIVED] so Executive P&L KPI cards (Token Revenue Earned, Actual AI API Cost across Customer + Admin + JIT, Net Gross Profit & Margin, Cache Hit Efficiency) and the unified [ACTIVE]/[TRASHED]/[ARCHIVED] Token Activity & Top-Up Receipts table retain 100% lifetime accuracy, paired with Author-Targeted Wallet Inspection." 
+        desc: "Zcene enforces a server-authoritative prepaid Token Economy on users/{uid} (tokenBalance, tokenTransactions; 1T = £0.10 / ~$0.13 USD), write-locked against client mutation in firestore.rules. Standard users top up via <SimulatedStripeModal> (£5=50T, £10=100T, £15=150T) and spend value-based tokens strictly per Scene: 5T Single-Seed Scene, 10T Complex Scene, 3T Deep Connections (account-wide {uid}_global_deepweb_pass, no TTL), with 1T non-refundable pre-flight credited against final settlement (0 extra user tokens for Overarching Zine synthesis on Scene >= 2 Direct Hits). Workspace deletions follow a 2-Stage 30-Day Trash lifecycle: Stage 1 preserves 100% of graphData/scenes/canvasLayout for 0T user restoration; Stage 2 compacts heavy blobs to null upon permanent purge while preserving telemetry headers. Cloud Functions dual-write exact apiUsage, costUsd, seedArtist, and anchorResolution to users/{uid}/tokenTransactions. On load, The Discovery Ledger automatically reconciles tokenTransactions against projects, reconstituting historical deleted runs as [ARCHIVED] so Executive P&L KPI cards and unified activity tables retain 100% lifetime accuracy." 
+    },
+    { 
+        id: 44, 
+        title: "Multi-Scene Infinite Board, Scene Namespacing & Layered Zine Hierarchy", 
+        desc: "Projects (schemaVersion: 43) support multiple independent ProjectScenes (scene-1..scene-N) on a single infinite CONNECTIONS canvas. Each Scene renders at its deterministic cluster center (1000 + sceneIndex * 1600, 1000) with namespaced canvas IDs (scene-k::canonicalId) so duplicate nodes remain in their respective Scene clusters while sharing canonical Deep Cut profiles. Settled scenes remain frozen in Coordinate Memory ([Rule 21]) when new scenes are added. Shared entities (identity, gold #F6E468) and AI sonic bridges (sonic_lineage, purple #a855f7) render as non-physics quadratic Bézier Cross-Scene Bridge Lines with [Rule 26] hover predicates. The Zine view renders a stacked hierarchy when scenes.length >= 2: H1 OVERARCHING ZINE at top → sequential H2 SCENE k editorials → canonical-deduplicated DEEP CUTS grid (elevating Root badges if an artist is a Root in any Scene)." 
     }
 ];
 
@@ -263,10 +268,10 @@ const DiscoveryFlowDiagram: React.FC = () => (
                         <div className="text-white font-medium text-sm mb-3">React UI</div>
                         <ul className="text-[11px] text-zinc-400 space-y-3 break-words [overflow-wrap:anywhere]">
                             <li>
-                                <span className="text-primary font-medium">1 & 2. Submit Seed(s) + Check Global Topology Cache:</span> Evaluates <code>hasActiveDiscoveryFilters</code> & per-seed cache status; 100% of curations enter Box 3.
+                                <span className="text-primary font-medium">1 & 2. Submit Seed(s) + Check Global Topology Cache ([Rule 44]):</span> Scoped to active <code>targetSceneId</code> (<code>Scene 1..N</code> switcher pills + <code>+ Add Scene</code> in ROOTS). Evaluates <code>hasActiveDiscoveryFilters</code> & per-seed cache status; 100% of curations enter Box 3.
                             </li>
                             <li>
-                                <span className="text-primary font-medium">3. Token Spend & Top-Up Gate ([Rules 18, 43]):</span> <code>&lt;TokenConfirmationDialog&gt;</code> intercepts every curation (<code>5T</code> Single-Seed/Direct Hit, <code>10T</code> Complex; <code>3T</code> Deep Connections 3-message account pass; prompts <code>&lt;SimulatedStripeModal&gt;</code> <code>£5/£10/£15</code> if low balance). Cached <code>Topology Hit</code> & <code>Ambiguous Hit (Cache)</code> bypass Flash into Box 4; <code>Cache Miss</code> enters Flash 3.6.
+                                <span className="text-primary font-medium">3. Token Spend & Top-Up Gate ([Rules 18, 43]):</span> <code>&lt;TokenConfirmationDialog&gt;</code> intercepts every Scene curation (<code>5T</code> Single-Seed/Direct Hit, <code>10T</code> Complex per Scene; <code>3T</code> Deep Connections 3-message account pass; prompts <code>&lt;SimulatedStripeModal&gt;</code> <code>£5/£10/£15</code> if low balance). Cached <code>Topology Hit</code> & <code>Ambiguous Hit (Cache)</code> bypass Flash into Box 4; <code>Cache Miss</code> enters Flash 3.6.
                             </li>
                             <li>
                                 <span className="text-primary font-medium">Flash 3.6 Collision Detection (-1T Pre-Flight):</span> Calls <code>validateSeedOriginCallable</code> (<code>thinking_level: minimal</code>, Zero Search Grounding). Deducts non-refundable <code>1T</code> lookup fee once per uncached batch and mints Evolved Stubs.
@@ -274,12 +279,12 @@ const DiscoveryFlowDiagram: React.FC = () => (
                             <li>
                                 <span className="text-primary font-medium">4. Confirm Your Artists & Escape Hatch ([Rules 11, 20]):</span> <code>&lt;ConsolidatedValidationModal&gt;</code> presents verified cards, disambiguation radio, and Escape Hatch (<code>-1T</code> per re-query).
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li><span className="text-zinc-300">Direct Hit / Typo Corrected Exit:</span> Routes through <code>authorizeDirectHitCallable</code> (settling <code>-5T</code> or <code>-4T</code> remainder) directly to Box 7.</li>
+                                    <li><span className="text-zinc-300">Direct Hit / Typo Corrected Exit:</span> Routes through <code>authorizeDirectHitCallable</code> (settling <code>-5T</code> or <code>-4T</code> remainder) directly to Box 7 (queuing <code>overarching_only</code> background synthesis at <code>0T</code> when Scene &ge; 2).</li>
                                     <li><span className="text-zinc-300">Zero-Pollution Rejection:</span> Unverified Escape Hatch inputs rejected inline; zero unverified stubs written.</li>
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Zcene (V41 Audio Flow):</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering D3 Canvas, Magazine View, and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>). Enforces <strong>Canonical Presentation Sort (Audio Flow)</strong>: a stable presentation sort grouping Artists before Record Labels in Deep Cuts and Magazine View while preserving backend graph traversal order. Overlays <code>&lt;AudioPreviewPlayer key=&#123;node.id&#125;&gt;</code> with One-SVG Concentric Artwork Watermark on artist artwork for on-demand 30s audio previews (Labels strictly excluded; single global playback).
+                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Multi-Scene Zcene ([Rules 29, 44]):</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering Multi-Scene Infinite Board D3 Canvas (scenes at <code>(1000 + sceneIndex * 1600, 1000)</code> with namespaced IDs <code>scene-k::canonicalId</code> &amp; curved quadratic Bézier Cross-Scene Bridge Lines), stacked <strong>Zine</strong> View (<code>OVERARCHING ZINE</code> H1 &rarr; <code>SCENE k</code> H2s &rarr; canonical-deduplicated <code>DEEP CUTS</code> grid), and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>). Enforces <strong>Canonical Presentation Sort (Audio Flow)</strong> with One-SVG Concentric Artwork Watermark on artist artwork for on-demand 30s audio previews.
                             </li>
                         </ul>
                     </div>
@@ -363,11 +368,10 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">3. Root Breakdown | 3.1 Pro (high) + 3-Tier Lineage Framing</span>
+                                <span className="text-primary font-medium">3. Scene Zine &amp; Step 3B Overarching Multi-Scene Zine ([Rules 24, 40, 44])</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Synthesizes narrative in 2 AM record curator voice, weaving active Tier 2 & Tier 3 anchors.</li>
-                                    <li>Outputs structured JSON with markdown, 1-sentence hooks, and bi-directional edge context.</li>
-                                    <li>90s timeout fallback to 3.6 Flash prevents 504 DEADLINE_EXCEEDED errors.</li>
+                                    <li>Synthesizes Scene narrative in 2 AM record curator voice (zero em-dashes), weaving active Tier 2 &amp; Tier 3 anchors.</li>
+                                    <li>When <code>scenes.length &gt;= 2</code>, runs <code>generateOverarchingZineBackend</code> (<code>3.1 Pro high</code>, 90s timeout failover to <code>3.6 Flash low</code>) to synthesize <code>overarchingRationale</code> and <code>crossSceneLinks</code> (<code>sonic_lineage</code> + deterministic <code>identity</code> bridges).</li>
                                 </ul>
                             </li>
                             <li>
@@ -410,7 +414,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 h-[560px] xl:h-auto xl:absolute xl:inset-0 flex flex-col">
                     <div className="text-white font-medium text-sm mb-2 sticky top-0 bg-zinc-900 py-1 border-b border-zinc-800 z-10 flex items-center justify-between">
                         <span>Rules Ledger</span>
-                        <span className="text-[10px] font-mono text-primary uppercase">43 Laws</span>
+                        <span className="text-[10px] font-mono text-primary uppercase">44 Laws</span>
                     </div>
                     <div className="space-y-2 pt-2 overflow-y-auto pr-1 flex-1">
                         {ARCHITECTURE_RULES.map(rule => (
@@ -585,7 +589,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V42 Full-Stack Regression Runbook
+                    V43 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -741,7 +745,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         ))}
                     </nav>
                     <div className="mt-8 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono pl-2">
-                        Zcene V42 Blueprint<br/>
+                        Zcene V43 Blueprint<br/>
                         100% Anti-Regression
                     </div>
                 </aside>
@@ -755,7 +759,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V42 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V43 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.

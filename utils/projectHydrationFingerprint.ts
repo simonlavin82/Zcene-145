@@ -55,6 +55,16 @@ export const computeProjectHydrationFingerprint = (
         Array.isArray(data.artistIds) ? [...data.artistIds].map(String).sort().join(',') : '',
         Array.isArray(data.labelIds) ? [...data.labelIds].map(String).sort().join(',') : '',
       ].join(';');
+  const multiSceneSig =
+    data.overarchingRationale || data.scenes || data.crossSceneLinks
+      ? fnv1aHash(
+          `${String(data.overarchingRationale ?? '')}|${
+            typeof data.scenes === 'string' ? data.scenes : JSON.stringify(data.scenes ?? '')
+          }|${
+            typeof data.crossSceneLinks === 'string' ? data.crossSceneLinks : JSON.stringify(data.crossSceneLinks ?? '')
+          }`
+        )
+      : '';
   const canonicalPayload = [
     projectId,
     String(data.status ?? ''),
@@ -64,6 +74,7 @@ export const computeProjectHydrationFingerprint = (
     fnv1aHash(graphSig),
     fnv1aHash(rawDetails),
     entityIdsSig,
+    ...(multiSceneSig ? [multiSceneSig] : []),
   ].join('::');
   return `${projectId}:${fnv1aHash(canonicalPayload)}`;
 };

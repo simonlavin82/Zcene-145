@@ -3,7 +3,8 @@ import React, { useState, useCallback, useRef, useEffect, useMemo } from 'react'
 import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
-import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub } from './types';
+import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink } from './types';
+import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeterministicIdentityBridges, createEmptyScene, getSceneCenterOffset, stripSceneNamespace } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
 import { qualifyCacheEntry, deriveRoutingDecision, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
@@ -102,7 +103,10 @@ const generateGraphDataViaCloudJob = async (
   confirmTokenUsageHook?: (type: any, cached: any, missing: any, enrichment: any, showBack: any, errorMsg?: string, tokenCost?: number) => Promise<string | false | 'back'>,
   closeTokenConfirmationHook?: () => void,
   seedNames?: Record<string, string>,
-  curationSessionId?: string | null
+  curationSessionId?: string | null,
+  targetSceneId?: string,
+  sceneIndex?: number,
+  scenes?: ProjectScene[]
 ): Promise<{ graphData: GraphData, activeJobId?: string }> => {
   let success = false;
   let finalGraphData = null;
@@ -124,7 +128,10 @@ const generateGraphDataViaCloudJob = async (
       ...(isSmartBypass !== undefined && { isSmartBypass }),
       ...(isSandboxMode !== undefined && { isSandboxMode }),
       ...(seedImageUrl && { seedImageUrl }),
-      ...(curationSessionId && { curationSessionId })
+      ...(curationSessionId && { curationSessionId }),
+      ...(targetSceneId && { targetSceneId }),
+      ...(sceneIndex !== undefined && { sceneIndex }),
+      ...(scenes && { scenes })
     };
 
     try {
@@ -1136,13 +1143,51 @@ const App: React.FC = () => {
   const [isCreatingProject, setIsCreatingProject] = useState(false);
   const [currentCacheKey, setCurrentCacheKey] = useState<string | null>(null);
   const [supportsLabelDeepCuts, setSupportsLabelDeepCuts] = useState<boolean>(true);
+  const [scenes, setScenes] = useState<ProjectScene[]>([]);
+  const [activeSceneId, setActiveSceneId] = useState<string>('scene-1');
+  const [overarchingRationale, setOverarchingRationale] = useState<string>('');
+  const [crossSceneLinks, setCrossSceneLinks] = useState<CrossSceneLink[]>([]);
   const healedNodeIdsRef = useRef<Set<string>>(new Set());
 
   const activeNodes = useMemo(() => {
     if (!graphData || !graphData.nodes) return [];
+    const seenCanonical = new Set<string>();
+    const allScenesSeedLower = new Set(
+      (scenes.length > 0
+        ? scenes.flatMap(s => (s.seedArtists || '').split('::'))
+        : (seedArtists || '').split('::')
+      )
+        .map(s => normalizeArtistId(s.trim()).toLowerCase())
+        .filter(Boolean)
+    );
     const resolved = activeNodeIds
-      .map(id => graphData.nodes.find(n => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id) || isArtistIdMatch(n.id, id)))
-      .filter((n): n is Node => !!n && (n.type === 'artist' || n.type === 'label'));
+      .map(rawId => {
+        const id = stripSceneNamespace(rawId);
+        const match = graphData.nodes.find(n => {
+          const nCanon = stripSceneNamespace(n.canonicalId || n.id);
+          return nCanon.toLowerCase() === id.toLowerCase() ||
+            normalizeArtistId(nCanon) === normalizeArtistId(id) ||
+            isArtistIdMatch(nCanon, id);
+        });
+        if (!match || (match.type !== 'artist' && match.type !== 'label')) return null;
+        const canonId = stripSceneNamespace(match.canonicalId || match.id);
+        const dedupKey = match.type === 'label'
+          ? `label:${normalizeLabelId(match.label || canonId)}`
+          : `artist:${normalizeArtistId(canonId)}`;
+        if (seenCanonical.has(dedupKey)) return null;
+        seenCanonical.add(dedupKey);
+        const isRootInAnyScene = match.type === 'artist' && (
+          allScenesSeedLower.has(normalizeArtistId(canonId).toLowerCase()) ||
+          Array.from(allScenesSeedLower).some(seed => isArtistIdMatch(canonId, seed))
+        );
+        return {
+          ...match,
+          id: canonId,
+          canonicalId: canonId,
+          ...(isRootInAnyScene ? { isSeed: true } : {})
+        } as Node;
+      })
+      .filter((n): n is Node => !!n);
 
     // Canonical Presentation Sort (Audio Flow):
     // Artists strictly precede Record Labels while preserving original graph traversal order.
@@ -1153,7 +1198,7 @@ const App: React.FC = () => {
       if (isLabelA && !isLabelB) return 1;
       return 0; // Stable sort: preserves original discovery sequence
     });
-  }, [activeNodeIds, graphData]);
+  }, [activeNodeIds, graphData, scenes, seedArtists]);
   const [isStackDialogOpen, setIsStackDialogOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const isAdmin = useMemo(() => {
@@ -1572,6 +1617,10 @@ const App: React.FC = () => {
   // coordinatePersistTimerRef: debounce handle cleared on rapid re-fires
   const lastSettledLayoutRef = useRef<string>('');
   const coordinatePersistTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scenesRef = useRef<ProjectScene[]>([]);
+  const activeSceneIdRef = useRef<string>('scene-1');
+  const overarchingRationaleRef = useRef<string>('');
+  const crossSceneLinksRef = useRef<CrossSceneLink[]>([]);
 
   useEffect(() => { currentProjectOwnerIdRef.current = currentProjectOwnerId; }, [currentProjectOwnerId]);
   useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
@@ -1583,6 +1632,183 @@ const App: React.FC = () => {
   useEffect(() => { discoveryFiltersRef.current = discoveryFilters; }, [discoveryFilters]);
   useEffect(() => { lastViewedStackCountRef.current = lastViewedStackCount; }, [lastViewedStackCount]);
   useEffect(() => { currentCacheKeyRef.current = currentCacheKey; }, [currentCacheKey]);
+  useEffect(() => { scenesRef.current = scenes; }, [scenes]);
+  useEffect(() => { activeSceneIdRef.current = activeSceneId; }, [activeSceneId]);
+  useEffect(() => { overarchingRationaleRef.current = overarchingRationale; }, [overarchingRationale]);
+  useEffect(() => { crossSceneLinksRef.current = crossSceneLinks; }, [crossSceneLinks]);
+
+  // Keep activeScene's seedArtists and discoveryFilters synced in scenes array as user edits ROOTS panel
+  useEffect(() => {
+    if (isProjectLoadingRef.current || scenes.length === 0) return;
+    setScenes(prev => {
+      const idx = prev.findIndex(s => s.id === activeSceneId);
+      if (idx === -1) return prev;
+      const current = prev[idx];
+      const filtersEq = areFiltersEqual(current.discoveryFilters, discoveryFilters);
+      if (current.seedArtists === seedArtists && filtersEq) return prev;
+      const updated = [...prev];
+      updated[idx] = {
+        ...current,
+        seedArtists,
+        seedArtistIds: (seedArtists || '').split('::').map(s => normalizeArtistId(s.trim())).filter(Boolean),
+        discoveryFilters: discoveryFilters || {}
+      };
+      scenesRef.current = updated;
+      return updated;
+    });
+  }, [seedArtists, discoveryFilters, activeSceneId]);
+
+  // V43 Multi-Scene Handlers (Rule 44)
+  const handleSelectScene = useCallback((targetSceneId: string) => {
+    if (targetSceneId === activeSceneIdRef.current) return;
+    curationSessionIdRef.current = null;
+    sessionTokenApprovedRef.current = false;
+
+    const currentScenes = scenesRef.current;
+    const targetScene = currentScenes.find(s => s.id === targetSceneId);
+    if (!targetScene) return;
+
+    activeSceneIdRef.current = targetSceneId;
+    setActiveSceneId(targetSceneId);
+    setSeedArtists(targetScene.seedArtists || '');
+    seedArtistsRef.current = targetScene.seedArtists || '';
+    const nextFilters = targetScene.discoveryFilters || {};
+    setDiscoveryFilters(nextFilters);
+    discoveryFiltersRef.current = nextFilters;
+    setLastAppliedFilters(nextFilters);
+  }, []);
+
+  const handleAddScene = useCallback(() => {
+    curationSessionIdRef.current = null;
+    sessionTokenApprovedRef.current = false;
+
+    let baseScenes: ProjectScene[] = scenesRef.current;
+    if (baseScenes.length === 0) {
+      const currentGraph = graphDataRef.current || { nodes: [], links: [] };
+      const unnamespacedGraph: GraphData = {
+        nodes: (currentGraph.nodes || []).map(n => ({
+          ...n,
+          id: stripSceneNamespace(n.canonicalId || n.id),
+          canonicalId: stripSceneNamespace(n.canonicalId || n.id)
+        })),
+        links: (currentGraph.links || [])
+          .filter(l => !l.isCrossSceneBridge)
+          .map(l => ({
+            ...l,
+            source: stripSceneNamespace(typeof l.source === 'object' ? (l.source as Node).id : l.source),
+            target: stripSceneNamespace(typeof l.target === 'object' ? (l.target as Node).id : l.target)
+          })),
+        synthesisRationale: currentGraph.synthesisRationale
+      };
+      baseScenes = [
+        {
+          ...createEmptyScene(0),
+          seedArtists: seedArtistsRef.current || '',
+          seedArtistIds: (seedArtistsRef.current || '').split('::').map(s => normalizeArtistId(s.trim())).filter(Boolean),
+          discoveryFilters: discoveryFiltersRef.current || {},
+          graphData: unnamespacedGraph,
+          synthesisRationale: currentGraph.synthesisRationale || '',
+          activeNodes: activeNodeIds.map(id => stripSceneNamespace(id)),
+          status: (unnamespacedGraph.nodes?.length || 0) > 0 ? 'completed' : 'idle'
+        }
+      ];
+    } else {
+      baseScenes = baseScenes.map(s =>
+        s.id === activeSceneIdRef.current
+          ? {
+              ...s,
+              seedArtists: seedArtistsRef.current || s.seedArtists,
+              seedArtistIds: (seedArtistsRef.current || s.seedArtists || '').split('::').map(x => normalizeArtistId(x.trim())).filter(Boolean),
+              discoveryFilters: discoveryFiltersRef.current || s.discoveryFilters
+            }
+          : s
+      );
+    }
+
+    const nextIndex = baseScenes.length;
+    let candidateId = `scene-${nextIndex + 1}`;
+    let bump = nextIndex + 1;
+    while (baseScenes.some(s => s.id === candidateId)) {
+      bump++;
+      candidateId = `scene-${bump}`;
+    }
+    const newScene: ProjectScene = {
+      ...createEmptyScene(nextIndex),
+      id: candidateId
+    };
+
+    const nextScenes = [...baseScenes, newScene];
+    scenesRef.current = nextScenes;
+    setScenes(nextScenes);
+    activeSceneIdRef.current = newScene.id;
+    setActiveSceneId(newScene.id);
+    setSeedArtists('');
+    seedArtistsRef.current = '';
+    setDiscoveryFilters({});
+    discoveryFiltersRef.current = {};
+    setLastAppliedFilters({});
+  }, [activeNodeIds]);
+
+  const handleRemoveScene = useCallback((sceneIdToRemove: string) => {
+    const currentScenes = scenesRef.current;
+    if (currentScenes.length <= 1) return;
+
+    curationSessionIdRef.current = null;
+    sessionTokenApprovedRef.current = false;
+
+    const remaining = currentScenes
+      .filter(s => s.id !== sceneIdToRemove)
+      .map((s, idx) => ({
+        ...s,
+        sceneIndex: idx,
+        name: `Scene ${idx + 1}`,
+        centerOffset: getSceneCenterOffset(idx)
+      }));
+
+    const nextBridges = remaining.length >= 2
+      ? [
+          ...computeDeterministicIdentityBridges(remaining),
+          ...crossSceneLinksRef.current.filter(
+            b => b.bridgeType === 'sonic_lineage' &&
+              remaining.some(s => s.id === b.fromSceneId) &&
+              remaining.some(s => s.id === b.toSceneId)
+          )
+        ]
+      : [];
+
+    if (remaining.length < 2) {
+      overarchingRationaleRef.current = '';
+      setOverarchingRationale('');
+    }
+
+    scenesRef.current = remaining;
+    setScenes(remaining);
+    crossSceneLinksRef.current = nextBridges;
+    setCrossSceneLinks(nextBridges);
+
+    const nextActive = remaining.find(s => s.id === activeSceneIdRef.current) || remaining[0];
+    activeSceneIdRef.current = nextActive.id;
+    setActiveSceneId(nextActive.id);
+    setSeedArtists(nextActive.seedArtists || '');
+    seedArtistsRef.current = nextActive.seedArtists || '';
+    const nextFilters = nextActive.discoveryFilters || {};
+    setDiscoveryFilters(nextFilters);
+    discoveryFiltersRef.current = nextFilters;
+    setLastAppliedFilters(nextFilters);
+
+    const populatedScenes = remaining.filter(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+    if (populatedScenes.length > 0) {
+      let existingLayout: CanvasNodeRef[] = [];
+      if (lastSettledLayoutRef.current) {
+        try { existingLayout = JSON.parse(lastSettledLayoutRef.current); } catch {}
+      }
+      const composite = buildCompositeCanvasGraph(populatedScenes, nextBridges, existingLayout);
+      graphDataRef.current = composite;
+      setGraphData(composite);
+      const dedupedNodes = buildCanonicalDeduplicatedNodesFromScenes(populatedScenes);
+      setActiveNodeIds(dedupedNodes.map(n => n.id));
+    }
+  }, []);
 
   const handleUpdateChatHistories = useCallback((
     updaterOrMap: Map<string, ChatMessage[]> | ((prev: Map<string, ChatMessage[]>) => Map<string, ChatMessage[]>)
@@ -1777,6 +2003,15 @@ const App: React.FC = () => {
     setChatHistories(new Map());
     setCurrentCacheKey(null);
     setSupportsLabelDeepCuts(true);
+    const initialScene = createEmptyScene(0);
+    scenesRef.current = [initialScene];
+    setScenes([initialScene]);
+    activeSceneIdRef.current = initialScene.id;
+    setActiveSceneId(initialScene.id);
+    overarchingRationaleRef.current = '';
+    setOverarchingRationale('');
+    crossSceneLinksRef.current = [];
+    setCrossSceneLinks([]);
 
     // Update route immediately
     navigate(`/p/${newId}`);
@@ -1797,7 +2032,12 @@ const App: React.FC = () => {
         isMagazineViewOpen: false,
         authorId: user.uid,
         supportsLabelDeepCuts: true,
-        schemaVersion: 2,
+        schemaVersion: 43,
+        scenes: JSON.stringify([initialScene]),
+        activeSceneId: initialScene.id,
+        overarchingRationale: '',
+        crossSceneLinks: '[]',
+        sceneCount: 1,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       });
@@ -2125,17 +2365,17 @@ const App: React.FC = () => {
     if (projectName && projectName.trim()) {
       return projectName;
     }
-    if (seedArtists) {
-      const seeds = seedArtists.split('::').map(s => s.trim()).filter(Boolean);
-      if (seeds.length > 1) {
-        return seeds.map(s => cleanArtistDisplayName(s, graphData?.nodes)).join(' + ');
-      }
-      if (seeds.length === 1) {
-        return cleanArtistDisplayName(seeds[0], graphData?.nodes);
-      }
+    const allSeedNames = scenes.length > 0
+      ? Array.from(new Set(scenes.flatMap(s => (s.seedArtists || '').split('::').map(x => x.trim()).filter(Boolean))))
+      : seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+    if (allSeedNames.length > 1) {
+      return allSeedNames.map(s => cleanArtistDisplayName(s, graphData?.nodes)).join(' + ');
+    }
+    if (allSeedNames.length === 1) {
+      return cleanArtistDisplayName(allSeedNames[0], graphData?.nodes);
     }
     return 'Untitled Zcene';
-  }, [projectName, seedArtists, graphData]);
+  }, [projectName, seedArtists, scenes, graphData]);
 
   useEffect(() => {
     if (displayProjectName && displayProjectName !== 'Untitled Zcene') {
@@ -2233,6 +2473,17 @@ const App: React.FC = () => {
     setActiveNodeIds([]);
     setDetailsCache(new Map());
     setChatHistories(new Map());
+    const freshScene = createEmptyScene(0);
+    scenesRef.current = [freshScene];
+    setScenes([freshScene]);
+    activeSceneIdRef.current = freshScene.id;
+    setActiveSceneId(freshScene.id);
+    overarchingRationaleRef.current = '';
+    setOverarchingRationale('');
+    crossSceneLinksRef.current = [];
+    setCrossSceneLinks([]);
+    curationSessionIdRef.current = null;
+    sessionTokenApprovedRef.current = false;
     setError(null);
     setDetailsError(null);
     setLoadingNodeIds(new Set());
@@ -2281,12 +2532,19 @@ const App: React.FC = () => {
   }, []);
 
 
-  const handleNodeClick = useCallback(async (node: Node | null, forceActionState = false) => {
-    if (!node) {
+  const handleNodeClick = useCallback(async (rawNode: Node | null, forceActionState = false) => {
+    if (!rawNode) {
        setSelectedNode(null);
        setPeekedNode(null);
        return;
     }
+
+    // V43 Multi-Scene Canonical Resolution: strip 'scene-k::' namespace so DetailsPanel & detailsCache
+    // always operate on canonical entity IDs while canvas preserves per-scene duplicates.
+    const canonicalNodeId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
+    const node: Node = rawNode.id !== canonicalNodeId
+      ? { ...rawNode, id: canonicalNodeId, canonicalId: canonicalNodeId }
+      : rawNode;
 
     const isTouchInteraction = isSmallScreen || (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
     const isAlreadySelected = selectedNode && (
@@ -2349,18 +2607,18 @@ const App: React.FC = () => {
     if (graphData) {
       connectedCountries = graphData.links
         .filter((l: any) => {
-          const sId = typeof l.source === 'string' ? l.source : l.source.id;
-          const tId = typeof l.target === 'string' ? l.target : l.target.id;
+          const sId = stripSceneNamespace(typeof l.source === 'string' ? l.source : l.source.id);
+          const tId = stripSceneNamespace(typeof l.target === 'string' ? l.target : l.target.id);
           return sId.toLowerCase() === node.id.toLowerCase() || tId.toLowerCase() === node.id.toLowerCase();
         })
         .map((l: any) => {
-          const sId = typeof l.source === 'string' ? l.source : l.source.id;
-          const tId = typeof l.target === 'string' ? l.target : l.target.id;
+          const sId = stripSceneNamespace(typeof l.source === 'string' ? l.source : l.source.id);
+          const tId = stripSceneNamespace(typeof l.target === 'string' ? l.target : l.target.id);
           const otherId = sId.toLowerCase() === node.id.toLowerCase() ? tId : sId;
-          return graphData.nodes.find((no: any) => no.id.toLowerCase() === otherId.toLowerCase());
+          return graphData.nodes.find((no: any) => stripSceneNamespace(no.canonicalId || no.id).toLowerCase() === otherId.toLowerCase());
         })
         .filter((no: any) => no && no.type === 'country')
-        .map((no: any) => no.label || no.id);
+        .map((no: any) => no.label || stripSceneNamespace(no.canonicalId || no.id));
         
       if (node.type !== 'label' && connectedCountries.length > 0) {
         const countryNorm = extractCountrySlug(connectedCountries[0]);
@@ -2605,11 +2863,12 @@ const App: React.FC = () => {
             console.warn("[Node Click] Global fallback read failed:", err);
         }
 
-    const isNodeInGraph = graphData && graphData.nodes.some((n: any) => 
-      n.id.toLowerCase() === node.id.toLowerCase() || 
-      normalizeArtistId(n.id) === normalizeArtistId(node.id) || 
-      isArtistIdMatch(n.id, node.id)
-    );
+    const isNodeInGraph = graphData && graphData.nodes.some((n: any) => {
+      const nCanon = stripSceneNamespace(n.canonicalId || n.id);
+      return nCanon.toLowerCase() === node.id.toLowerCase() || 
+        normalizeArtistId(nCanon) === normalizeArtistId(node.id) || 
+        isArtistIdMatch(nCanon, node.id);
+    });
 
     // Gate B (Direct User Interaction on Rendered Nodes - Rule 37):
     // Trigger on-demand JIT healing ONLY if the clicked node is genuinely missing from:
@@ -2796,30 +3055,43 @@ const App: React.FC = () => {
       .filter((n: any) => n.type === 'artist' || n.type === 'label')
       .map((n: any) => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
 
-    const artistEntityIds = graphData.nodes
-      .filter((n: any) => n.type === 'artist')
-      .map((n: any) => normalizeArtistId(n.id));
-    const labelEntityIds = graphData.nodes
-      .filter((n: any) => n.type === 'label')
-      .map((n: any) => normalizeLabelId(n.label || n.id));
+    const artistEntityIds = Array.from(new Set(
+      graphData.nodes
+        .filter((n: any) => n.type === 'artist')
+        .map((n: any) => normalizeArtistId(stripSceneNamespace(n.canonicalId || n.id)))
+    ));
+    const labelEntityIds = Array.from(new Set(
+      graphData.nodes
+        .filter((n: any) => n.type === 'label')
+        .map((n: any) => normalizeLabelId(n.label || stripSceneNamespace(n.canonicalId || n.id)))
+    ));
     const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
+    const allSeedIds = scenesRef.current.length > 0
+      ? Array.from(new Set(scenesRef.current.flatMap(s => s.seedArtistIds || (s.seedArtists || '').split('::').map(x => normalizeArtistId(x.trim())).filter(Boolean))))
+      : normalizedIds;
 
-    // Rule 29 & 43: Server-owned telemetry and billing fields (generationType, apiUsage, deepWebApiUsage, anchorResolution, tokensSpent)
+    // Rule 29 & 43 & 44: Server-owned telemetry and billing fields (generationType, apiUsage, deepWebApiUsage, anchorResolution, tokensSpent)
     // are intentionally omitted from client auto-saves and shared clones to preserve backend authority.
     const basePayload: Record<string, any> = {
       name: (projectName && projectName.trim()) 
         ? projectName 
         : (actualDisplayName || (seedArtists ? seedList[0] : 'Untitled Zcene')),
       seedArtists,
-      activeNodes: hoistedSaveActiveNodes,
+      seedArtistIds: allSeedIds,
+      activeNodes: hoistedSaveActiveNodes.map(id => stripSceneNamespace(id)),
       pinnedNodes: Array.from(pinnedNodes),
       chatHistories: JSON.stringify(Array.from(chatHistories.entries())),
       discoveryFilters: JSON.stringify(discoveryFiltersRef.current || discoveryFilters),
       lastViewedStackCount,
       isMagazineViewOpen: false,
       authorId: user?.uid || 'guest',
-      schemaVersion: 2,
+      schemaVersion: 43,
       supportsLabelDeepCuts: true,
+      scenes: JSON.stringify(scenesRef.current),
+      activeSceneId: activeSceneIdRef.current || 'scene-1',
+      overarchingRationale: overarchingRationaleRef.current || '',
+      crossSceneLinks: JSON.stringify(crossSceneLinksRef.current || []),
+      sceneCount: Math.max(1, scenesRef.current.length),
       createdAt: serverTimestamp(),
       updatedAt: serverTimestamp(),
       artistIds: artistEntityIds.length > 0 ? artistEntityIds : normalizedIds,
@@ -3076,6 +3348,64 @@ const App: React.FC = () => {
     try { await batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links); } catch (e) {}
     artistList.forEach(name => { approvedSeedsRef.current.add(normalizeArtistId(name)); });
 
+    // V43 Multi-Scene Direct Hit Assembly: update activeScene inside scenes and rebuild composite graph
+    const targetSceneId = activeSceneIdRef.current || 'scene-1';
+    const currentScenesList = scenesRef.current.length > 0 ? [...scenesRef.current] : [createEmptyScene(0)];
+    let targetSceneIdx = currentScenesList.findIndex(s => s.id === targetSceneId);
+    if (targetSceneIdx === -1) {
+      targetSceneIdx = currentScenesList.length;
+      currentScenesList.push({ ...createEmptyScene(targetSceneIdx), id: targetSceneId });
+    }
+    const sceneActiveNodeIds = normalizedGraph.nodes
+      .filter((n: any) => n.type === 'artist' || n.type === 'label')
+      .map((n: any) => stripSceneNamespace(n.canonicalId || n.id));
+    const updatedScene: ProjectScene = {
+      ...currentScenesList[targetSceneIdx],
+      id: targetSceneId,
+      sceneIndex: targetSceneIdx,
+      name: currentScenesList[targetSceneIdx]?.name || `Scene ${targetSceneIdx + 1}`,
+      seedArtists: artistsString,
+      seedArtistIds: artistList.map(a => normalizeArtistId(a)),
+      discoveryFilters: discoveryFiltersRef.current || {},
+      graphData: normalizedGraph,
+      synthesisRationale: normalizedGraph.synthesisRationale || rationaleVal || '',
+      activeNodes: sceneActiveNodeIds,
+      centerOffset: getSceneCenterOffset(targetSceneIdx),
+      status: 'completed',
+      generationType: 'Direct Hit'
+    };
+    currentScenesList[targetSceneIdx] = updatedScene;
+
+    const populatedScenes = currentScenesList.filter(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+    const nextBridges = populatedScenes.length >= 2
+      ? [
+          ...computeDeterministicIdentityBridges(populatedScenes),
+          ...crossSceneLinksRef.current.filter(
+            b => b.bridgeType === 'sonic_lineage' &&
+              populatedScenes.some(s => s.id === b.fromSceneId) &&
+              populatedScenes.some(s => s.id === b.toSceneId)
+          )
+        ]
+      : [];
+
+    let existingLayout: CanvasNodeRef[] = [];
+    if (lastSettledLayoutRef.current) {
+      try { existingLayout = JSON.parse(lastSettledLayoutRef.current); } catch {}
+    } else if (graphDataRef.current?.nodes) {
+      existingLayout = graphDataRef.current.nodes
+        .filter((n: any) => (n.type === 'artist' || n.type === 'label') && typeof n.x === 'number' && typeof n.y === 'number')
+        .map((n: any) => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
+    }
+
+    const compositeGraph = populatedScenes.length > 0
+      ? buildCompositeCanvasGraph(populatedScenes, nextBridges, existingLayout)
+      : normalizedGraph;
+
+    scenesRef.current = currentScenesList;
+    setScenes(currentScenesList);
+    crossSceneLinksRef.current = nextBridges;
+    setCrossSceneLinks(nextBridges);
+
     let targetProjectId = currentProjectIdRef.current;
     let isNewProject = false;
     
@@ -3091,9 +3421,13 @@ const App: React.FC = () => {
     if (targetProjectId && user && !isGuest) {
       const projectPath = `users/${user.uid}/projects/${targetProjectId}`;
       try {
+        const dedupedCanonicalNodes = buildCanonicalDeduplicatedNodesFromScenes(populatedScenes);
         const hoistedActiveNodes: string[] = [];
-        if (primaryNode) hoistedActiveNodes.push(primaryNode.id);
-        normalizedGraph.nodes.forEach((n: any) => { if (!hoistedActiveNodes.includes(n.id)) hoistedActiveNodes.push(n.id); });
+        if (primaryNode) hoistedActiveNodes.push(stripSceneNamespace(primaryNode.canonicalId || primaryNode.id));
+        dedupedCanonicalNodes.forEach((n: any) => {
+          const cid = stripSceneNamespace(n.canonicalId || n.id);
+          if (!hoistedActiveNodes.includes(cid)) hoistedActiveNodes.push(cid);
+        });
 
         const primaryMatchedNode = primaryNode 
           ? normalizedGraph.nodes.find((n: any) => n.id === primaryNode.id) 
@@ -3103,12 +3437,23 @@ const App: React.FC = () => {
           ? rawNodeImage.trim()
           : null;
 
+        const allSeedNames = Array.from(new Set(populatedScenes.flatMap(s => (s.seedArtists || '').split('::').map(x => x.trim()).filter(Boolean))));
+        const allSeedIds = Array.from(new Set(populatedScenes.flatMap(s => s.seedArtistIds || [])));
+
         const payload: Record<string, any> = {
-          graphData: JSON.stringify(normalizedGraph),
+          schemaVersion: 43,
+          scenes: JSON.stringify(currentScenesList),
+          activeSceneId: targetSceneId,
+          overarchingRationale: overarchingRationaleRef.current || '',
+          crossSceneLinks: JSON.stringify(nextBridges),
+          sceneCount: currentScenesList.length,
+          seedArtistIds: allSeedIds,
+          graphData: JSON.stringify(compositeGraph),
           activeNodes: hoistedActiveNodes,
           seedArtists: artistsString,
           detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
-          status: 'completed',
+          status: activeJobIdRef.current ? 'curating' : 'completed',
+          ...(activeJobIdRef.current ? { activeJobId: activeJobIdRef.current } : {}),
           generationType: 'Direct Hit',
           seedImageUrls: [directHitImageUrl],
           ...(directHitImageUrl ? { seedImageUrl: directHitImageUrl } : {}),
@@ -3118,10 +3463,9 @@ const App: React.FC = () => {
         if (isNewProject) {
            await setDoc(doc(db, projectPath), {
               ...payload,
-              name: artistsString,
+              name: allSeedNames.join(' + ') || artistsString,
               authorId: user.uid,
               createdAt: serverTimestamp(),
-              schemaVersion: 2,
               chatHistories: '[]',
               discoveryFilters: '{}',
               lastViewedStackCount: 0,
@@ -3135,20 +3479,26 @@ const App: React.FC = () => {
           setActiveNodeIds(hoistedActiveNodes);
         }
         if (primaryMatchedNode) {
-          setSelectedNode(primaryMatchedNode);
+          setSelectedNode({
+            ...primaryMatchedNode,
+            id: stripSceneNamespace(primaryMatchedNode.canonicalId || primaryMatchedNode.id),
+            canonicalId: stripSceneNamespace(primaryMatchedNode.canonicalId || primaryMatchedNode.id)
+          });
           hasAutoSelectedRef.current = targetProjectId;
         }
         lastHydratedProjectFingerprintRef.current = computeProjectHydrationFingerprint(targetProjectId, payload);
       } catch (e) { }
     }
     
-    graphDataRef.current = normalizedGraph;
-    setGraphData(normalizedGraph);
+    graphDataRef.current = compositeGraph;
+    setGraphData(compositeGraph);
     setSeedArtists(artistsString);
-    projectStatusRef.current = 'completed';
-    setProjectStatus('completed');
+    if (!activeJobIdRef.current) {
+      projectStatusRef.current = 'completed';
+      setProjectStatus('completed');
+      setIsLoading(false);
+    }
 
-    setIsLoading(false);
     isFetchingDetailsRef.current = false;
     isHydratingSessionRef.current = false;
     isProjectLoadingRef.current = false;
@@ -3159,12 +3509,14 @@ const App: React.FC = () => {
     seedSlug: string,
     displaySeedLabel: string,
     isRegeneration: boolean = false,
-    graphToEnhance?: GraphData | null
+    graphToEnhance?: GraphData | null,
+    directHitCacheDocData?: any
   ): Promise<boolean> => {
     if (!user || isGuest) return true;
 
     let targetProjectId = currentProjectIdRef.current || currentProjectId;
     const cleanDisplayName = formatSeed(displaySeedLabel || seedSlug);
+    const targetSceneId = activeSceneIdRef.current || 'scene-1';
 
     if (!targetProjectId && !isRegeneration && !graphToEnhance) {
       const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
@@ -3172,6 +3524,13 @@ const App: React.FC = () => {
       currentProjectIdRef.current = targetProjectId;
       setCurrentProjectId(targetProjectId);
       navigate(`/p/${targetProjectId}`);
+
+      const initialScene: ProjectScene = {
+        ...createEmptyScene(0),
+        seedArtists: seedSlug,
+        seedArtistIds: [normalizeArtistId(seedSlug)],
+        status: 'curating'
+      };
 
       await setDoc(newDocRef, {
         name: cleanDisplayName || displaySeedLabel || seedSlug,
@@ -3185,22 +3544,73 @@ const App: React.FC = () => {
         isMagazineViewOpen: false,
         authorId: user.uid,
         supportsLabelDeepCuts: true,
-        schemaVersion: 2,
+        schemaVersion: 43,
+        scenes: JSON.stringify([initialScene]),
+        activeSceneId: initialScene.id,
+        overarchingRationale: '',
+        crossSceneLinks: '[]',
+        sceneCount: 1,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp(),
         status: 'curating'
       });
     }
 
+    // Build preview scenes list so if Scene >= 2 is a Direct Hit, authorizeDirectHitCallable can queue overarching_only synthesis
+    let previewScenes: ProjectScene[] = scenesRef.current.length > 0 ? [...scenesRef.current] : [createEmptyScene(0)];
+    if (directHitCacheDocData?.graphData) {
+      try {
+        const parsedG = typeof directHitCacheDocData.graphData === 'string'
+          ? JSON.parse(directHitCacheDocData.graphData)
+          : directHitCacheDocData.graphData;
+        const rationaleVal = directHitCacheDocData.synthesisRationale || parsedG?.synthesisRationale || '';
+        if (rationaleVal && parsedG) parsedG.synthesisRationale = rationaleVal;
+        const normG = applyHumanCasedLabels(normalizeGraphData(parsedG), displaySeedLabel || seedSlug);
+        let idx = previewScenes.findIndex(s => s.id === targetSceneId);
+        if (idx === -1) {
+          idx = previewScenes.length;
+          previewScenes.push({ ...createEmptyScene(idx), id: targetSceneId });
+        }
+        previewScenes[idx] = {
+          ...previewScenes[idx],
+          id: targetSceneId,
+          sceneIndex: idx,
+          name: previewScenes[idx]?.name || `Scene ${idx + 1}`,
+          seedArtists: displaySeedLabel || seedSlug,
+          seedArtistIds: [normalizeArtistId(seedSlug)],
+          discoveryFilters: discoveryFiltersRef.current || {},
+          graphData: normG,
+          synthesisRationale: rationaleVal,
+          activeNodes: normG.nodes.filter((n: any) => n.type === 'artist' || n.type === 'label').map((n: any) => n.id),
+          centerOffset: getSceneCenterOffset(idx),
+          status: 'completed',
+          generationType: 'Direct Hit'
+        };
+      } catch (e) {}
+    }
+    const populatedPreviewScenes = previewScenes.filter(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+    const shouldTriggerOverarching = populatedPreviewScenes.length >= 2;
+
     const authorizeCallable = httpsCallable(functions, 'authorizeDirectHitCallable');
     while (true) {
       try {
-        await authorizeCallable({
+        const res = await authorizeCallable({
           projectId: targetProjectId || undefined,
           seedArtistId: normalizeArtistId(seedSlug),
           projectName: cleanDisplayName || displaySeedLabel || seedSlug,
           curationSessionId: curationSessionIdRef.current || undefined,
+          targetSceneId,
+          scenes: shouldTriggerOverarching ? previewScenes : undefined,
+          detailsCache: shouldTriggerOverarching ? JSON.stringify(Array.from(detailsCacheRef.current.entries())) : undefined,
+          triggerOverarchingSynthesis: shouldTriggerOverarching
         });
+        const resData = (res?.data || {}) as any;
+        if (resData.activeJobId) {
+          activeJobIdRef.current = resData.activeJobId;
+          setActiveJobId(resData.activeJobId);
+          projectStatusRef.current = 'curating';
+          setProjectStatus('curating');
+        }
         curationSessionIdRef.current = null;
         sessionTokenApprovedRef.current = false;
         return true;
@@ -3676,7 +4086,8 @@ const App: React.FC = () => {
             artistList[0],
             displayLabel,
             isRegeneration,
-            graphToEnhance
+            graphToEnhance,
+            singleCacheDocData
           );
           if (!authorized) {
             resetAbortedPreFlightState();
@@ -3710,6 +4121,18 @@ const App: React.FC = () => {
           }
         }
 
+        const stepZeroScene: ProjectScene = {
+          ...createEmptyScene(0),
+          seedArtists: artists,
+          seedArtistIds: artistList.map(a => normalizeArtistId(a)),
+          discoveryFilters: activeDiscoveryFilters,
+          status: 'curating'
+        };
+        scenesRef.current = [stepZeroScene];
+        setScenes([stepZeroScene]);
+        activeSceneIdRef.current = stepZeroScene.id;
+        setActiveSceneId(stepZeroScene.id);
+
         await setDoc(newDocRef, {
           name: defaultName,
           seedArtists: artists,
@@ -3722,7 +4145,12 @@ const App: React.FC = () => {
           isMagazineViewOpen: false,
           authorId: user.uid,
           supportsLabelDeepCuts: true,
-          schemaVersion: 2,
+          schemaVersion: 43,
+          scenes: JSON.stringify([stepZeroScene]),
+          activeSceneId: stepZeroScene.id,
+          overarchingRationale: '',
+          crossSceneLinks: '[]',
+          sceneCount: 1,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           status: 'curating'
@@ -3829,7 +4257,13 @@ const App: React.FC = () => {
     }
 
     // Instantly commit the clean-slate pruned graph to React state to purge stale lineage data
-    setGraphData(pruned || { nodes: [], links: [] });
+    // (When other settled scenes exist on the multi-scene board, preserve them during curation)
+    const otherSettledScenes = scenesRef.current.filter(
+      s => s.id !== activeSceneIdRef.current && s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+    );
+    if (otherSettledScenes.length === 0) {
+      setGraphData(pruned || { nodes: [], links: [] });
+    }
 
     setIsLoading(true); setError(null); setSeedArtists(artists);
     isFetchingDetailsRef.current = false;
@@ -4811,12 +5245,19 @@ const App: React.FC = () => {
           // If this is a transition/fork (isLiveSynthesisTemp) we must ignore the stale projectName 
           // and forcefully derive the name from the fresh artists string.
           const isNewOrUntitled = !projectName || projectName === "Untitled Zcene";
-          if (isNewOrUntitled || (isLiveSynthesisTemp && !isRegeneration)) {
-            const seeds = artists.split('::').map(s => s.trim()).filter(Boolean);
-            if (seeds.length > 1) {
-              defaultName = seeds.map(formatSeed).join(' + ');
-            } else if (seeds.length === 1) {
-              defaultName = formatSeed(seeds[0]);
+          const targetSceneId = activeSceneIdRef.current || 'scene-1';
+          const targetSceneIdx = Math.max(0, scenesRef.current.findIndex(s => s.id === targetSceneId));
+          const allSceneSeedStrs = scenesRef.current.length > 1
+            ? Array.from(new Set([
+                ...scenesRef.current.filter(s => s.id !== targetSceneId).flatMap(s => (s.seedArtists || '').split('::').map(x => x.trim()).filter(Boolean)),
+                ...artists.split('::').map(s => s.trim()).filter(Boolean)
+              ]))
+            : artists.split('::').map(s => s.trim()).filter(Boolean);
+          if (isNewOrUntitled || (isLiveSynthesisTemp && !isRegeneration) || scenesRef.current.length > 1) {
+            if (allSceneSeedStrs.length > 1) {
+              defaultName = allSceneSeedStrs.map(formatSeed).join(' + ');
+            } else if (allSceneSeedStrs.length === 1) {
+              defaultName = formatSeed(allSceneSeedStrs[0]);
             }
           }
 
@@ -4825,6 +5266,7 @@ const App: React.FC = () => {
               status: 'curating',
               activeJobId: jobId,
               seedArtists: artists,
+              activeSceneId: targetSceneId,
               name: defaultName,
               discoveryFilters: JSON.stringify(activeDiscoveryFilters),
               updatedAt: serverTimestamp()
@@ -4838,6 +5280,7 @@ const App: React.FC = () => {
               status: 'curating',
               activeJobId: jobId,
               seedArtists: artists,
+              activeSceneId: targetSceneId,
               name: defaultName,
               discoveryFilters: JSON.stringify(activeDiscoveryFilters),
               updatedAt: serverTimestamp()
@@ -4860,6 +5303,8 @@ const App: React.FC = () => {
         }
         
         const seedImageUrl = undefined;
+        const targetSceneIdForJob = activeSceneIdRef.current || 'scene-1';
+        const targetSceneIdxForJob = Math.max(0, scenesRef.current.findIndex(s => s.id === targetSceneIdForJob));
 
         graphPromise = generateGraphDataViaCloudJob(
           artists, // Raw display names to prevent LLM hallucinations
@@ -4892,7 +5337,10 @@ const App: React.FC = () => {
           confirmTokenUsage,            // confirmTokenUsageHook
           closeTokenConfirmation,       // closeTokenConfirmationHook
           activeSeedNames,              // seedNames map
-          curationSessionIdRef.current  // V38 Split-Debit session ID
+          curationSessionIdRef.current, // V38 Split-Debit session ID
+          targetSceneIdForJob,
+          targetSceneIdxForJob,
+          scenesRef.current.length > 0 ? scenesRef.current : undefined
         );
       } else {
         const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');
@@ -5499,6 +5947,13 @@ const App: React.FC = () => {
           coverImage: data.coverImage,
           seedImageUrl: data.seedImageUrl,
           seedImageUrls: data.seedImageUrls,
+          seedArtistIds: data.seedArtistIds,
+          sceneCount: data.sceneCount,
+          schemaVersion: data.schemaVersion,
+          scenes: typeof data.scenes === 'string' ? (() => { try { return JSON.parse(data.scenes); } catch { return undefined; } })() : data.scenes,
+          activeSceneId: data.activeSceneId,
+          overarchingRationale: data.overarchingRationale,
+          crossSceneLinks: typeof data.crossSceneLinks === 'string' ? (() => { try { return JSON.parse(data.crossSceneLinks); } catch { return undefined; } })() : data.crossSceneLinks,
           activeJobId: data.activeJobId,
           authorId: data.authorId,
           generationType: data.generationType,
@@ -5533,23 +5988,27 @@ const App: React.FC = () => {
     const results = new Map<string, NodeDetails>();
 
     await Promise.allSettled(artistNodes.map(async (n: any) => {
-      const simpleId = n.type === 'label' ? normalizeLabelId(n.label || n.id) : normalizeArtistId(n.id);
+      const rawEntityId = stripSceneNamespace(n.canonicalId || n.id);
+      const simpleId = n.type === 'label' ? normalizeLabelId(n.label || rawEntityId) : normalizeArtistId(rawEntityId);
 
       // Find connected countries in the graph links
       const connectedCountries = links
         .filter((l: any) => {
           const sId = typeof l.source === 'string' ? l.source : l.source.id;
           const tId = typeof l.target === 'string' ? l.target : l.target.id;
-          return sId.toLowerCase() === n.id.toLowerCase() || tId.toLowerCase() === n.id.toLowerCase();
+          return sId.toLowerCase() === n.id.toLowerCase() || tId.toLowerCase() === n.id.toLowerCase() ||
+                 stripSceneNamespace(sId).toLowerCase() === rawEntityId.toLowerCase() ||
+                 stripSceneNamespace(tId).toLowerCase() === rawEntityId.toLowerCase();
         })
         .map((l: any) => {
           const sId = typeof l.source === 'string' ? l.source : l.source.id;
           const tId = typeof l.target === 'string' ? l.target : l.target.id;
-          const otherId = sId.toLowerCase() === n.id.toLowerCase() ? tId : sId;
-          return nodes.find((no: any) => no.id.toLowerCase() === otherId.toLowerCase());
+          const isSourceMatch = sId.toLowerCase() === n.id.toLowerCase() || stripSceneNamespace(sId).toLowerCase() === rawEntityId.toLowerCase();
+          const otherId = isSourceMatch ? tId : sId;
+          return nodes.find((no: any) => no.id.toLowerCase() === otherId.toLowerCase() || stripSceneNamespace(no.canonicalId || no.id).toLowerCase() === stripSceneNamespace(otherId).toLowerCase());
         })
         .filter((no: any) => no && no.type === 'country')
-        .map((no: any) => no.label || no.id);
+        .map((no: any) => no.label || stripSceneNamespace(no.canonicalId || no.id));
 
       let cacheId = simpleId;
       if (n.type !== 'label' && connectedCountries.length > 0) {
@@ -5565,13 +6024,15 @@ const App: React.FC = () => {
       // Bypass the global database probe and NEVER trigger the JIT Healer.
       const localExisting = detailsCacheRef.current.get(cacheId) ||
                             detailsCacheRef.current.get(simpleId) ||
+                            detailsCacheRef.current.get(rawEntityId) ||
+                            detailsCacheRef.current.get(rawEntityId.toLowerCase()) ||
                             detailsCacheRef.current.get(n.id) ||
                             detailsCacheRef.current.get(n.id.toLowerCase());
       const hasValidStyle = n.type === 'label' || !!(localExisting?.details?.style || (localExisting as any)?.style);
       if (localExisting && localExisting.summary && localExisting.summary.trim().length >= 5 && !localExisting._isSentinel && hasValidStyle) {
         const aliasKeys = cacheId !== simpleId
-          ? [n.id, n.id.toLowerCase(), simpleId, cacheId]
-          : [n.id, n.id.toLowerCase(), simpleId];
+          ? [n.id, n.id.toLowerCase(), rawEntityId, rawEntityId.toLowerCase(), simpleId, cacheId]
+          : [n.id, n.id.toLowerCase(), rawEntityId, rawEntityId.toLowerCase(), simpleId];
         for (const aliasKey of aliasKeys) {
           if (!detailsCacheRef.current.has(aliasKey)) {
             results.set(aliasKey, localExisting);
@@ -5714,11 +6175,13 @@ const App: React.FC = () => {
         // Register under all lookup key variants
         results.set(n.id, payload);
         results.set(n.id.toLowerCase(), payload);
+        results.set(rawEntityId, payload);
+        results.set(rawEntityId.toLowerCase(), payload);
         results.set(simpleId, payload);
         if (cacheId !== simpleId) {
           results.set(cacheId, payload);
         }
-        console.log('[Batch Hydration] Loaded from global artists:', n.id, '→', cacheId);
+        console.log('[Batch Hydration] Loaded from global artists:', rawEntityId, '→', cacheId);
       } catch (e) {
         console.warn('[Batch Hydration] Failed for', n.id, e);
       }
@@ -5948,8 +6411,50 @@ const App: React.FC = () => {
       }
 
       // Always restore non-graph metadata (available in both new and legacy formats)
-      if (data.seedArtists) setSeedArtists((prev: any) => prev === data.seedArtists ? prev : data.seedArtists);
-      if (data.discoveryFilters) {
+      if (data.scenes !== undefined) {
+        try {
+          const parsedScenes: ProjectScene[] = typeof data.scenes === 'string'
+            ? JSON.parse(data.scenes)
+            : (Array.isArray(data.scenes) ? data.scenes : []);
+          if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
+            scenesRef.current = parsedScenes;
+            setScenes(parsedScenes);
+            const resolvedActiveSceneId = data.activeSceneId && parsedScenes.some(s => s.id === data.activeSceneId)
+              ? data.activeSceneId
+              : parsedScenes[0].id;
+            activeSceneIdRef.current = resolvedActiveSceneId;
+            setActiveSceneId(resolvedActiveSceneId);
+            const targetScene = parsedScenes.find(s => s.id === resolvedActiveSceneId) || parsedScenes[0];
+            if (targetScene?.seedArtists !== undefined) {
+              setSeedArtists((prev: any) => prev === targetScene.seedArtists ? prev : targetScene.seedArtists);
+            }
+            if (targetScene?.discoveryFilters) {
+              setDiscoveryFilters((prev: any) => JSON.stringify(prev) === JSON.stringify(targetScene.discoveryFilters) ? prev : targetScene.discoveryFilters);
+              setLastAppliedFilters(targetScene.discoveryFilters);
+            }
+          }
+        } catch (e) {
+          console.warn('[ProjectLoader] Failed to parse scenes:', e);
+        }
+      } else if (data.seedArtists) {
+        setSeedArtists((prev: any) => prev === data.seedArtists ? prev : data.seedArtists);
+      }
+      if (data.overarchingRationale !== undefined) {
+        overarchingRationaleRef.current = data.overarchingRationale || '';
+        setOverarchingRationale(data.overarchingRationale || '');
+      }
+      if (data.crossSceneLinks !== undefined) {
+        try {
+          const parsedCrossLinks: CrossSceneLink[] = typeof data.crossSceneLinks === 'string'
+            ? JSON.parse(data.crossSceneLinks)
+            : (Array.isArray(data.crossSceneLinks) ? data.crossSceneLinks : []);
+          crossSceneLinksRef.current = parsedCrossLinks;
+          setCrossSceneLinks(parsedCrossLinks);
+        } catch (e) {
+          console.warn('[ProjectLoader] Failed to parse crossSceneLinks:', e);
+        }
+      }
+      if (!data.scenes && data.discoveryFilters) {
         const parsedFilters = typeof data.discoveryFilters === 'string' && data.discoveryFilters.startsWith('{') ? JSON.parse(data.discoveryFilters) : null;
         if (parsedFilters) {
           setDiscoveryFilters((prev: any) => JSON.stringify(prev) === JSON.stringify(parsedFilters) ? prev : parsedFilters);
@@ -6080,7 +6585,8 @@ const App: React.FC = () => {
                   // Self-heal node labels with canonical stylized casing from authoritative detailsCache
                   g.nodes.forEach((node: Node) => {
                     if (node.type === 'artist' || !node.type) {
-                      const cached = newCacheMap.get(node.id) || newCacheMap.get(normalizeArtistId(node.id));
+                      const rawId = stripSceneNamespace(node.canonicalId || node.id);
+                      const cached = newCacheMap.get(rawId) || newCacheMap.get(normalizeArtistId(rawId)) || newCacheMap.get(node.id);
                       if (cached?.details?.artist && typeof cached.details.artist === 'string' && cached.details.artist.trim()) {
                         node.label = cached.details.artist.trim();
                       }
@@ -6107,12 +6613,12 @@ const App: React.FC = () => {
               // Restore active nodes — with seed-fallback for stale documents where activeNodes was never
               // written by the backend (legacy projects have activeNodes: [] from creation).
               if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                let resolvedActiveNodes = data.activeNodes;
-                const availableEntities = g.nodes.map((n: any) => n.id);
+                let resolvedActiveNodes = data.activeNodes.map((id: string) => stripSceneNamespace(id));
+                const availableEntities = Array.from(new Set(g.nodes.map((n: any) => stripSceneNamespace(n.canonicalId || n.id))));
                 if (availableEntities.length > resolvedActiveNodes.length) {
-  const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
-  resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
-}
+                  const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
+                  resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
+                }
                 setActiveNodeIdsIfChanged(resolvedActiveNodes);
                 
               }
@@ -6971,13 +7477,40 @@ const App: React.FC = () => {
                   console.warn("Guest batch hydration failed:", err);
                 }
                 
+                if (data.scenes !== undefined) {
+                  try {
+                    const parsedScenes: ProjectScene[] = typeof data.scenes === 'string'
+                      ? JSON.parse(data.scenes)
+                      : (Array.isArray(data.scenes) ? data.scenes : []);
+                    if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
+                      scenesRef.current = parsedScenes;
+                      setScenes(parsedScenes);
+                      const resolvedActiveId = data.activeSceneId || parsedScenes[0].id;
+                      activeSceneIdRef.current = resolvedActiveId;
+                      setActiveSceneId(resolvedActiveId);
+                    }
+                  } catch (e) {}
+                }
+                if (data.overarchingRationale !== undefined) {
+                  overarchingRationaleRef.current = data.overarchingRationale || '';
+                  setOverarchingRationale(data.overarchingRationale || '');
+                }
+                if (data.crossSceneLinks !== undefined) {
+                  try {
+                    const parsedCross: CrossSceneLink[] = typeof data.crossSceneLinks === 'string'
+                      ? JSON.parse(data.crossSceneLinks)
+                      : (Array.isArray(data.crossSceneLinks) ? data.crossSceneLinks : []);
+                    crossSceneLinksRef.current = parsedCross;
+                    setCrossSceneLinks(parsedCross);
+                  } catch (e) {}
+                }
                 if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                  let resolvedActiveNodes = data.activeNodes;
-                  const availableEntities = g.nodes.map((n: any) => n.id);
+                  let resolvedActiveNodes = data.activeNodes.map((id: string) => stripSceneNamespace(id));
+                  const availableEntities = Array.from(new Set(g.nodes.map((n: any) => stripSceneNamespace(n.canonicalId || n.id))));
                   if (availableEntities.length > resolvedActiveNodes.length) {
-  const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
-  resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
-}
+                    const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
+                    resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
+                  }
                   setActiveNodeIds(resolvedActiveNodes);
                   
                 }
@@ -8060,22 +8593,31 @@ const App: React.FC = () => {
 
   const formattedGraphData = useMemo(() => {
     if (!graphData) return null;
-    const seedList = seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+    const seedList = scenes.length > 0
+      ? Array.from(new Set([
+          ...scenes.flatMap(s => (s.seedArtists || '').split('::').map(x => x.trim()).filter(Boolean)),
+          ...seedArtists.split('::').map(s => s.trim()).filter(Boolean)
+        ]))
+      : seedArtists.split('::').map(s => s.trim()).filter(Boolean);
     return {
       ...graphData,
-      nodes: graphData.nodes.map(n => ({
-        ...n,
-        label: getNodeLabel(n, seedList, detailsCache)
-      }))
+      nodes: graphData.nodes.map(n => {
+        const canonicalId = stripSceneNamespace(n.canonicalId || n.id);
+        return {
+          ...n,
+          label: getNodeLabel({ ...n, id: canonicalId }, seedList, detailsCache)
+        };
+      })
     };
-  }, [graphData, seedArtists, detailsCache]);
+  }, [graphData, seedArtists, scenes, detailsCache]);
 
   const formattedSelectedNode = useMemo(() => {
     if (!selectedNode || !formattedGraphData) return selectedNode;
-    const match = formattedGraphData.nodes.find(n => n.id === selectedNode.id);
-    const isLoadingNode = loadingNodeIds.has(selectedNode.id) || 
-                          loadingNodeIds.has(selectedNode.id.toLowerCase()) || 
-                          loadingNodeIds.has(normalizeArtistId(selectedNode.id));
+    const selectedCanonicalId = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id);
+    const match = formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === selectedCanonicalId || n.id === selectedNode.id);
+    const isLoadingNode = loadingNodeIds.has(selectedCanonicalId) || 
+                          loadingNodeIds.has(selectedCanonicalId.toLowerCase()) || 
+                          loadingNodeIds.has(normalizeArtistId(selectedCanonicalId));
     return match 
       ? { ...selectedNode, label: match.label, isLoading: isLoadingNode } 
       : { ...selectedNode, isLoading: isLoadingNode };
@@ -8083,7 +8625,8 @@ const App: React.FC = () => {
 
   const formattedPeekedNode = useMemo(() => {
     if (!peekedNode || !formattedGraphData) return peekedNode;
-    const match = formattedGraphData.nodes.find(n => n.id === peekedNode.id);
+    const peekedCanonicalId = stripSceneNamespace(peekedNode.canonicalId || peekedNode.id);
+    const match = formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === peekedCanonicalId || n.id === peekedNode.id);
     return match 
       ? { ...peekedNode, label: match.label } 
       : peekedNode;
@@ -8092,7 +8635,8 @@ const App: React.FC = () => {
   const formattedActiveNodes = useMemo(() => {
     if (!activeNodes || !formattedGraphData) return activeNodes;
     return activeNodes.map(node => {
-      const match = formattedGraphData.nodes.find(n => n.id === node.id);
+      const canonicalId = stripSceneNamespace(node.canonicalId || node.id);
+      const match = formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === canonicalId || n.id === node.id);
       return match ? { ...node, label: match.label } : node;
     });
   }, [activeNodes, formattedGraphData]);
@@ -8189,6 +8733,13 @@ const App: React.FC = () => {
               activeDeepWebSession={activeDeepWebSession}
               areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
+              scenes={scenes}
+              activeSceneId={activeSceneId}
+              onSelectScene={handleSelectScene}
+              onAddScene={handleAddScene}
+              onRemoveScene={handleRemoveScene}
+              overarchingRationale={overarchingRationale}
+              crossSceneLinks={crossSceneLinks}
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} 
               onFork={async (n) => {
                 if (user && !isGuest) {
@@ -8204,6 +8755,10 @@ const App: React.FC = () => {
                     defaultName = formatSeed(seeds[0]);
                   }
 
+                  const forkedScene = createEmptyScene(0);
+                  forkedScene.seedArtists = n;
+                  forkedScene.status = 'curating';
+
                   await setDoc(newDocRef, {
                     name: defaultName,
                     seedArtists: n,
@@ -8216,7 +8771,12 @@ const App: React.FC = () => {
                     isMagazineViewOpen: false,
                     authorId: user.uid,
                     supportsLabelDeepCuts: true,
-                    schemaVersion: 2,
+                    schemaVersion: 43,
+                    scenes: [forkedScene],
+                    activeSceneId: forkedScene.id,
+                    overarchingRationale: '',
+                    crossSceneLinks: [],
+                    sceneCount: 1,
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
                     status: 'curating'
@@ -8228,6 +8788,14 @@ const App: React.FC = () => {
                   setGraphData({ nodes: [], links: [] });
                   setActiveNodeIds([]);
                   setSeedArtists(n);
+                  scenesRef.current = [forkedScene];
+                  setScenes([forkedScene]);
+                  activeSceneIdRef.current = forkedScene.id;
+                  setActiveSceneId(forkedScene.id);
+                  overarchingRationaleRef.current = '';
+                  setOverarchingRationale('');
+                  crossSceneLinksRef.current = [];
+                  setCrossSceneLinks([]);
                   setProjectName(defaultName);
                   setProjectStatus('curating');
                   setSelectedNode(null);
@@ -8241,9 +8809,21 @@ const App: React.FC = () => {
                   setCurrentProjectId(null);
                   currentProjectIdRef.current = null;
                   
+                  const forkedScene = createEmptyScene(0);
+                  forkedScene.seedArtists = n;
+                  forkedScene.status = 'curating';
+
                   setGraphData({ nodes: [], links: [] });
                   setActiveNodeIds([]);
                   setSeedArtists(n);
+                  scenesRef.current = [forkedScene];
+                  setScenes([forkedScene]);
+                  activeSceneIdRef.current = forkedScene.id;
+                  setActiveSceneId(forkedScene.id);
+                  overarchingRationaleRef.current = '';
+                  setOverarchingRationale('');
+                  crossSceneLinksRef.current = [];
+                  setCrossSceneLinks([]);
                   setProjectName("Untitled Zcene");
                   setProjectStatus('curating');
                   setSelectedNode(null);
@@ -8672,6 +9252,26 @@ export const applyShareBlacklistMutation = (sharePayload: any) => {
       target: typeof l.target === 'object' ? l.target.id : l.target,
     }));
     sharePayload.graphData = JSON.stringify(g);
+  }
+  if (Array.isArray(sharePayload.scenes)) {
+    sharePayload.scenes = sharePayload.scenes.map((scene: any) => {
+      if (!scene?.graphData) return scene;
+      return {
+        ...scene,
+        graphData: {
+          ...scene.graphData,
+          nodes: (scene.graphData.nodes || []).map((n: any) => {
+            const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n;
+            return cleanNode;
+          }),
+          links: (scene.graphData.links || []).map((l: any) => ({
+            ...l,
+            source: typeof l.source === 'object' ? l.source.id : l.source,
+            target: typeof l.target === 'object' ? l.target.id : l.target,
+          }))
+        }
+      };
+    });
   }
 
   // 2. TTL Injection: Ensure ephemeral garbage collection for shares

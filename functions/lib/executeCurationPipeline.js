@@ -11,6 +11,7 @@ Object.defineProperty(exports, "canonicalizeArtistSlugWithOrigin", { enumerable:
 Object.defineProperty(exports, "shouldAdoptCanonicalSlugCandidate", { enumerable: true, get: function () { return isoCountries_1.shouldAdoptCanonicalSlugCandidate; } });
 const routerStubService_1 = require("./services/routerStubService");
 const tokenEconomy_1 = require("./shared/tokenEconomy");
+const multiSceneUtils_1 = require("./shared/multiSceneUtils");
 const tokenWallet_1 = require("./tokenWallet");
 if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
@@ -554,20 +555,74 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 determinedGenerationType = "Root Generation";
             }
         }
+        const targetSceneId = payload.targetSceneId || payload.activeSceneId || "scene-1";
+        const parsedSceneIdx = parseInt(String(targetSceneId).replace(/^scene-/i, ""), 10);
+        const targetSceneIndex = typeof payload.sceneIndex === "number" && payload.sceneIndex >= 0
+            ? payload.sceneIndex
+            : Number.isFinite(parsedSceneIdx) && parsedSceneIdx >= 1
+                ? parsedSceneIdx - 1
+                : 0;
+        let updatedScenes = (0, multiSceneUtils_1.parseProjectScenes)(payload.scenes);
         if (payload.userId && payload.projectId) {
             try {
-                console.log(`[Pipeline Diamond] -> Initiating Curation Pipeline for ${payload.projectId} with type: ${determinedGenerationType}`);
+                const projectDocRef = db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId);
+                if (updatedScenes.length === 0) {
+                    try {
+                        const existingProjSnap = await projectDocRef.get();
+                        if (existingProjSnap.exists) {
+                            const existingProjData = existingProjSnap.data();
+                            if (existingProjData?.scenes) {
+                                updatedScenes = (0, multiSceneUtils_1.parseProjectScenes)(existingProjData.scenes);
+                            }
+                        }
+                    }
+                    catch (readErr) {
+                        // Graceful fallback if project doc doesn't exist yet or in unit test mocks without .get()
+                    }
+                }
+                const activeScenePayload = {
+                    sceneId: targetSceneId,
+                    sceneIndex: targetSceneIndex,
+                    title: displaySeeds || `Scene ${targetSceneIndex + 1}`,
+                    seedArtists: resolvedSeedArray.map(s => s.name || s.id).join('::'),
+                    seedIds: resolvedSeedArray.map(s => s.id),
+                    discoveryFilters: payload.filters || {},
+                    graphData: finalGraph,
+                    synthesisRationale: finalGraph.synthesisRationale || "",
+                    artistSnippets: {},
+                    centerOffset: (0, multiSceneUtils_1.getSceneCenterOffset)(targetSceneIndex),
+                    status: determinedGenerationType === "Direct Hit" ? "ready" : "curating",
+                    pathway: determinedGenerationType === "Direct Hit"
+                        ? "direct_hit"
+                        : determinedGenerationType === "Complex Generation"
+                            ? "complex_generation"
+                            : "root_generation",
+                    updatedAt: Date.now(),
+                };
+                const existingIdx = updatedScenes.findIndex(s => s.sceneId === targetSceneId);
+                if (existingIdx !== -1) {
+                    updatedScenes[existingIdx] = activeScenePayload;
+                }
+                else {
+                    updatedScenes.push(activeScenePayload);
+                }
+                updatedScenes.sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
+                console.log(`[Pipeline Diamond] -> Initiating Curation Pipeline for ${payload.projectId} (scene=${targetSceneId}) with type: ${determinedGenerationType}`);
                 const projectUpdate = {
                     graphData: JSON.stringify(finalGraph),
-                    schemaVersion: 2,
+                    schemaVersion: 43,
+                    scenes: JSON.stringify(updatedScenes),
+                    activeSceneId: targetSceneId,
+                    sceneCount: updatedScenes.length,
+                    seedArtistIds: (0, multiSceneUtils_1.getAllProjectSeedIds)(updatedScenes),
                     supportsLabelDeepCuts: true,
                     generationType: determinedGenerationType,
                     tokensSpent: settlement.tokensSpent,
                     updatedAt: firestore_1.FieldValue.serverTimestamp()
                 };
-                await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).set(projectUpdate, { merge: true });
-                console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} graphData via Admin SDK`);
-                if (determinedGenerationType !== "Direct Hit") {
+                await projectDocRef.set(projectUpdate, { merge: true });
+                console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} graphData & scenes via Admin SDK`);
+                if (determinedGenerationType !== "Direct Hit" || updatedScenes.length >= 2) {
                     // Persist end-to-end lockedSeeds map (keyed by BOTH canonical suffixed ID and bare ID)
                     // so Column 3 hydration & iTunes scraping never suffer disambiguation amnesia.
                     const lockedSeeds = {};
@@ -609,6 +664,10 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                         updatedAt: firestore_1.FieldValue.serverTimestamp(),
                         inputPayload: {
                             ...payload,
+                            mode: determinedGenerationType === "Direct Hit" && updatedScenes.length >= 2 ? "overarching_only" : "standard",
+                            targetSceneId,
+                            sceneIndex: targetSceneIndex,
+                            scenes: updatedScenes,
                             curationSessionId: settlement.curationSessionId,
                             tokensSpent: settlement.tokensSpent,
                             artists: resolvedSeedArray.map(s => s.id).join('::'),
@@ -625,9 +684,9 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                             seedStubs: seedStubs
                         }
                     });
-                    console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration (lockedSeeds=${resolvedSeedArray.map(s => s.id).join(', ')})`);
+                    console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration (scene=${targetSceneId}, lockedSeeds=${resolvedSeedArray.map(s => s.id).join(', ')})`);
                     // Update project with activeJobId
-                    await db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId).set({
+                    await projectDocRef.set({
                         activeJobId: curationJobId
                     }, { merge: true });
                 }
@@ -643,6 +702,8 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         console.log(`[Pipeline Diamond] -> Curation Phase 1 Complete, returning structural payload to client`);
         return {
             graphData: finalGraph,
+            targetSceneId,
+            scenes: updatedScenes,
             detailsCache: "[]",
             rootBreakdown: null,
             activeJobId: curationJobId,

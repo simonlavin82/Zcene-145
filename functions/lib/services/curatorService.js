@@ -1,10 +1,11 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.reconcileDiscographyWithITunes = exports.cleanCollectionTitle = exports.fetchArtistArtwork = exports.fetchArtistCollections = exports.evaluateGenreDistanceScore = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.buildHydrationIdentityLockBlock = exports.resolveSceneContextNodes = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.getNodeDetailsSchema = exports.LABEL_NODE_DETAILS_SCHEMA = exports.ARTIST_NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.reconcileDiscographyWithITunes = exports.cleanCollectionTitle = exports.fetchArtistArtwork = exports.fetchArtistCollections = exports.evaluateGenreDistanceScore = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.buildHydrationIdentityLockBlock = exports.resolveSceneContextNodes = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.getNodeDetailsSchema = exports.LABEL_NODE_DETAILS_SCHEMA = exports.ARTIST_NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateOverarchingZineBackend = exports.OVERARCHING_ZINE_SCHEMA = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
 const genai_1 = require("@google/genai");
 const types_1 = require("../types");
 const isoCountries_1 = require("../shared/isoCountries");
 const linkContext_1 = require("../shared/linkContext");
+const multiSceneUtils_1 = require("../shared/multiSceneUtils");
 const cacheQualification_1 = require("./cacheQualification");
 exports.GEMINI_FLASH_MODEL = process.env.GEMINI_FLASH_MODEL || "gemini-3.6-flash";
 // --- UTILITIES PORTED FROM artistCacheService.ts ---
@@ -957,6 +958,238 @@ ${JSON.stringify(detailsCacheEntries, null, 2)}`;
     }
 };
 exports.generateRootsBreakdownBackend = generateRootsBreakdownBackend;
+exports.OVERARCHING_ZINE_SCHEMA = {
+    type: genai_1.Type.OBJECT,
+    properties: {
+        overarchingRationale: {
+            type: genai_1.Type.STRING,
+            description: "A rich, 3-to-5 paragraph Master Overarching Zine Editorial in Markdown weaving together how Scene 1 through Scene N connect across eras, genres, geographies, and shared sonic lineage. NEVER use em-dashes (—) or long hyphens.",
+        },
+        crossSceneBridges: {
+            type: genai_1.Type.ARRAY,
+            description: "2 to 5 high-signal cross-scene connections linking a canonical artist/label in one Scene to a canonical artist/label in another Scene.",
+            items: {
+                type: genai_1.Type.OBJECT,
+                properties: {
+                    sourceSceneId: { type: genai_1.Type.STRING, description: "e.g., 'scene-1'" },
+                    targetSceneId: { type: genai_1.Type.STRING, description: "e.g., 'scene-2'" },
+                    sourceCanonicalId: { type: genai_1.Type.STRING, description: "Exact canonical node ID from sourceSceneId" },
+                    targetCanonicalId: { type: genai_1.Type.STRING, description: "Exact canonical node ID from targetSceneId" },
+                    bridgeType: {
+                        type: genai_1.Type.STRING,
+                        enum: ["identity", "sonic_lineage"],
+                        description: "'identity' if the exact same artist/label appears in both scenes; 'sonic_lineage' if connecting two distinct artists/labels across scenes.",
+                    },
+                    forwardContext: {
+                        type: genai_1.Type.STRING,
+                        description: "3-8 word directional predicate from source to target omitting both endpoint names (Rule 26).",
+                    },
+                    inverseContext: {
+                        type: genai_1.Type.STRING,
+                        description: "3-8 word directional predicate from target to source omitting both endpoint names (Rule 26).",
+                    },
+                    weight: { type: genai_1.Type.NUMBER },
+                },
+                required: [
+                    "sourceSceneId",
+                    "targetSceneId",
+                    "sourceCanonicalId",
+                    "targetCanonicalId",
+                    "bridgeType",
+                    "forwardContext",
+                    "inverseContext",
+                    "weight",
+                ],
+            },
+        },
+    },
+    required: ["overarchingRationale", "crossSceneBridges"],
+};
+const generateOverarchingZineBackend = async (scenes, detailsCache, usageCollector) => {
+    const deterministicBridges = (0, multiSceneUtils_1.computeDeterministicIdentityBridges)(scenes);
+    if (!Array.isArray(scenes) || scenes.length < 2) {
+        return {
+            overarchingRationale: "",
+            crossSceneLinks: deterministicBridges,
+        };
+    }
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+        throw new Error("GEMINI_API_KEY is not defined in environment secrets.");
+    }
+    // Build scene-by-scene lookup tables for strict endpoint verification & directional sanitization ([Rule 26], [Rule 44])
+    const sceneNodeLookup = new Map();
+    const sceneSummaries = scenes.map((scene, idx) => {
+        const sceneId = scene.sceneId || `scene-${idx + 1}`;
+        const nodeMap = new Map();
+        const validEntities = [];
+        for (const n of scene.graphData?.nodes || []) {
+            if (n.type !== "artist" && n.type !== "label")
+                continue;
+            const canonId = (0, multiSceneUtils_1.stripSceneNamespace)(n.canonicalId || n.id);
+            const normId = (0, multiSceneUtils_1.normalizeCanonicalEntityId)(canonId);
+            const label = n.label || (0, exports.titleCaseArtistId)((0, isoCountries_1.stripCountrySlug)(canonId));
+            nodeMap.set(canonId, { canonicalId: canonId, label, type: n.type });
+            nodeMap.set(normId, { canonicalId: canonId, label, type: n.type });
+            const cachedEntry = detailsCache?.[canonId] || detailsCache?.[normId];
+            validEntities.push({
+                canonicalId: canonId,
+                label,
+                type: n.type,
+                isSeed: Boolean(n.isSceneSeed || n.isSeed),
+                bioSnippet: scene.artistSnippets?.[canonId] ||
+                    n.narrativeSnippet ||
+                    cachedEntry?.recommendationReason ||
+                    (typeof cachedEntry?.summary === "string" ? cachedEntry.summary.slice(0, 180) : undefined),
+            });
+        }
+        sceneNodeLookup.set(sceneId, nodeMap);
+        return {
+            sceneId,
+            sceneNumber: idx + 1,
+            title: scene.title || scene.seedArtists?.replace(/::/g, " + ") || `Scene ${idx + 1}`,
+            seedArtists: (scene.seedArtists || "").split("::").filter(Boolean),
+            discoveryFilters: scene.discoveryFilters || {},
+            sceneEditorialSummary: (scene.synthesisRationale || "").slice(0, 900),
+            validArtistAndLabelNodes: validEntities,
+        };
+    });
+    const systemInstruction = `You are a late-night record curator — the kind of person who pulls an obscure 7" from a crate at 2am and traces how separate musical movements, eras, and scenes secretly wire into one another.
+Your task is to write the Overarching Zine Editorial (Master Multi-Scene Synthesis) for a multi-scene Zcene board containing ${scenes.length} distinct Scenes, AND identify 2 to 5 high-signal cross-scene bridges linking specific artists or record labels across different Scenes.
+
+FORMATTING & EDITORIAL RULES (Rule 24 & Rule 44 — non-negotiable):
+- Write 3 to 5 punchy paragraphs in Markdown for 'overarchingRationale'. **Bold** key artists, record labels, genres, and scenes on first mention.
+- Use bullet points where helpful to highlight cross-scene pivots, shared roster lineages, or sonic transformations across Scenes.
+- Treat every Scene as an integral chapter of a larger musical story: explain how Scene 1's foundation evolves into, contrasts with, or cross-pollinates Scene 2 (and any subsequent Scenes).
+- NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation (commas, colons, or semicolons).
+- For 'crossSceneBridges', only reference exact 'sourceSceneId', 'targetSceneId', 'sourceCanonicalId', and 'targetCanonicalId' values from the provided scene roster. 'sourceSceneId' and 'targetSceneId' MUST be different scenes.
+- Each bridge's 'forwardContext' and 'inverseContext' MUST be a concise 3-to-8 word directional verb/prepositional predicate phrase OMITTING both endpoint names (Rule 26), e.g., "passed the melodic post-hardcore torch to" / "inherited the melodic post-hardcore blueprint from". Never output generic "is connected to".`;
+    const prompt = `Synthesize the Overarching Zine Editorial and Cross-Scene Bridges across these ${scenes.length} Scenes:
+
+${JSON.stringify(sceneSummaries, null, 2)}
+
+Deterministic Shared-Entity Bridges Already Detected:
+${JSON.stringify(deterministicBridges.map((b) => ({
+        sourceSceneId: b.sourceSceneId,
+        targetSceneId: b.targetSceneId,
+        sourceCanonicalId: b.sourceCanonicalId,
+        targetCanonicalId: b.targetCanonicalId,
+        bridgeType: b.bridgeType,
+        forwardContext: b.forwardContext,
+    })), null, 2)}`;
+    const executeOverarchingSynthesis = async (model, thinkingLevel, timeoutMs) => {
+        const ai = new genai_1.GoogleGenAI({
+            apiKey,
+            httpOptions: { timeout: timeoutMs },
+        });
+        let timer = null;
+        const timeoutPromise = new Promise((_, reject) => {
+            timer = setTimeout(() => {
+                reject(new Error(`Overarching Zine synthesis timed out after ${timeoutMs}ms for ${model}`));
+            }, timeoutMs);
+            if (typeof timer?.unref === "function")
+                timer.unref();
+        });
+        try {
+            const response = await Promise.race([
+                ai.models.generateContent({
+                    model,
+                    contents: prompt,
+                    config: {
+                        systemInstruction,
+                        thinkingConfig: { thinkingLevel },
+                        responseMimeType: "application/json",
+                        responseSchema: exports.OVERARCHING_ZINE_SCHEMA,
+                    },
+                }),
+                timeoutPromise,
+            ]);
+            if (timer)
+                clearTimeout(timer);
+            if (usageCollector && response.usageMetadata) {
+                usageCollector.push(model, {
+                    promptTokenCount: response.usageMetadata.promptTokenCount || 0,
+                    candidatesTokenCount: response.usageMetadata.candidatesTokenCount || 0,
+                    totalTokenCount: response.usageMetadata.totalTokenCount || 0,
+                });
+            }
+            const text = response.text;
+            if (!text)
+                return null;
+            const cleaned = (0, exports.extractCleanJsonString)(text);
+            const parsed = JSON.parse(cleaned);
+            return parsed;
+        }
+        finally {
+            if (timer)
+                clearTimeout(timer);
+        }
+    };
+    let rawResult = null;
+    try {
+        rawResult = await executeOverarchingSynthesis("gemini-3.1-pro-preview", genai_1.ThinkingLevel.HIGH, 90000);
+    }
+    catch (proErr) {
+        console.warn(`[generateOverarchingZineBackend] 3.1 Pro synthesis failed or timed out (${proErr?.message || proErr}). Engaging resilient fallback to ${exports.GEMINI_FLASH_MODEL} (thinking_level: low)...`);
+        try {
+            rawResult = await executeOverarchingSynthesis(exports.GEMINI_FLASH_MODEL, genai_1.ThinkingLevel.LOW, 45000);
+        }
+        catch (flashErr) {
+            console.error("[generateOverarchingZineBackend] Both 3.1 Pro and Flash fallback failed:", flashErr);
+        }
+    }
+    let cleanRationale = (rawResult?.overarchingRationale || "")
+        .replace(/\\n/g, "\n")
+        .replace(/\s*—\s*/g, ", ")
+        .trim();
+    if (!cleanRationale) {
+        const sceneTitles = scenes.map((s, i) => `**${s.title || `Scene ${i + 1}`}**`).join(" and ");
+        cleanRationale = `Across ${sceneTitles}, a shared underground current links these distinct constellations into a single musical continuum.`;
+    }
+    const validAiBridges = [];
+    for (const rawBridge of rawResult?.crossSceneBridges || []) {
+        if (!rawBridge || !rawBridge.sourceSceneId || !rawBridge.targetSceneId)
+            continue;
+        if (rawBridge.sourceSceneId === rawBridge.targetSceneId)
+            continue;
+        const srcSceneMap = sceneNodeLookup.get(rawBridge.sourceSceneId);
+        const tgtSceneMap = sceneNodeLookup.get(rawBridge.targetSceneId);
+        if (!srcSceneMap || !tgtSceneMap)
+            continue;
+        const srcRaw = (0, multiSceneUtils_1.stripSceneNamespace)(rawBridge.sourceCanonicalId || "");
+        const tgtRaw = (0, multiSceneUtils_1.stripSceneNamespace)(rawBridge.targetCanonicalId || "");
+        const srcEntry = srcSceneMap.get(srcRaw) || srcSceneMap.get((0, multiSceneUtils_1.normalizeCanonicalEntityId)(srcRaw));
+        const tgtEntry = tgtSceneMap.get(tgtRaw) || tgtSceneMap.get((0, multiSceneUtils_1.normalizeCanonicalEntityId)(tgtRaw));
+        if (!srcEntry || !tgtEntry)
+            continue;
+        const cleanForward = (0, linkContext_1.sanitizeDirectionalLinkContext)(rawBridge.forwardContext, srcEntry.label, tgtEntry.label) ||
+            "bridges sonic lineage across scenes with";
+        const cleanInverse = (0, linkContext_1.sanitizeDirectionalLinkContext)(rawBridge.inverseContext, tgtEntry.label, srcEntry.label) ||
+            cleanForward;
+        const sourceNodeId = (0, multiSceneUtils_1.namespaceSceneNodeId)(rawBridge.sourceSceneId, srcEntry.canonicalId);
+        const targetNodeId = (0, multiSceneUtils_1.namespaceSceneNodeId)(rawBridge.targetSceneId, tgtEntry.canonicalId);
+        const isSameCanonical = (0, multiSceneUtils_1.normalizeCanonicalEntityId)(srcEntry.canonicalId) === (0, multiSceneUtils_1.normalizeCanonicalEntityId)(tgtEntry.canonicalId);
+        validAiBridges.push({
+            id: `${sourceNodeId}--${targetNodeId}`,
+            sourceSceneId: rawBridge.sourceSceneId,
+            targetSceneId: rawBridge.targetSceneId,
+            sourceNodeId,
+            targetNodeId,
+            sourceCanonicalId: srcEntry.canonicalId,
+            targetCanonicalId: tgtEntry.canonicalId,
+            bridgeType: isSameCanonical || rawBridge.bridgeType === "identity" ? "identity" : "sonic_lineage",
+            forwardContext: cleanForward,
+            inverseContext: cleanInverse,
+            weight: typeof rawBridge.weight === "number" ? Math.max(0.1, Math.min(1.0, rawBridge.weight)) : 0.85,
+        });
+    }
+    const finalCrossSceneLinks = (0, multiSceneUtils_1.mergeCrossSceneLinks)(deterministicBridges, validAiBridges);
+    return {
+        overarchingRationale: cleanRationale,
+        crossSceneLinks: finalCrossSceneLinks,
+    };
+};
+exports.generateOverarchingZineBackend = generateOverarchingZineBackend;
 const reconcileNarrativeEdges = async (apiKey, narrative, nodes, existingLinks, usageCollector) => {
     if (!narrative || !narrative.trim() || nodes.length === 0)
         return [];

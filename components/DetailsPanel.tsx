@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
-import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, COST_PER_AI_CALL } from '../types';
+import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, ProjectScene, COST_PER_AI_CALL } from '../types';
+import { stripSceneNamespace } from '../shared/multiSceneUtils';
 import { streamNodeChat, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
 import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
@@ -682,17 +683,20 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             "Recent history?"
         ];
         
-        const peerLinks = graphData.links.filter(l => 
-            ((typeof l.source === 'object' ? l.source.id : l.source) === node.id || 
-            (typeof l.target === 'object' ? l.target.id : l.target) === node.id)
-        );
+        const targetCanonId = stripSceneNamespace(node.canonicalId || node.id);
+        const peerLinks = graphData.links.filter(l => {
+            if (l.isCrossSceneBridge) return false;
+            const sCanon = stripSceneNamespace(typeof l.source === 'object' ? l.source.id : l.source);
+            const tCanon = stripSceneNamespace(typeof l.target === 'object' ? l.target.id : l.target);
+            return sCanon === targetCanonId || tCanon === targetCanonId;
+        });
         
         const peers = peerLinks.map(l => {
-            const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
-            const targetId = typeof l.target === 'object' ? l.target.id : l.target;
-            return sourceId === node.id ? targetId : sourceId;
+            const sourceId = stripSceneNamespace(typeof l.source === 'object' ? l.source.id : l.source);
+            const targetId = stripSceneNamespace(typeof l.target === 'object' ? l.target.id : l.target);
+            return sourceId === targetCanonId ? targetId : sourceId;
         }).filter(peerId => {
-            const peerNode = graphData.nodes.find(n => n.id === peerId);
+            const peerNode = graphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === peerId);
             return peerNode && peerNode.type === 'artist';
         });
 
@@ -722,7 +726,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         if (!graphData?.links || !graphData?.nodes) return '';
 
         const labelSet = new Set<string>();
-        const activeId = node.id;
+        const activeId = stripSceneNamespace(node.canonicalId || node.id);
         const activeNorm = normalizeArtistId(activeId);
 
         for (const link of graphData.links) {
@@ -735,8 +739,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
             if (!sourceNode || !targetNode) continue;
 
-            const isSourceActive = sourceNode.id === activeId || normalizeArtistId(sourceNode.id) === activeNorm;
-            const isTargetActive = targetNode.id === activeId || normalizeArtistId(targetNode.id) === activeNorm;
+            const sCanon = stripSceneNamespace(sourceNode.canonicalId || sourceNode.id);
+            const tCanon = stripSceneNamespace(targetNode.canonicalId || targetNode.id);
+            const isSourceActive = sCanon === activeId || normalizeArtistId(sCanon) === activeNorm;
+            const isTargetActive = tCanon === activeId || normalizeArtistId(tCanon) === activeNorm;
 
             if (isSourceActive && targetNode.type === 'label') {
                 const rawName = targetNode.label || targetNode.id;
@@ -785,7 +791,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const normalizedArtistNodeId = isArtistNode ? normalizeArtistId(resolvedArtistName) : '';
 
     const isLibraryArtist = isArtistNode && libraryArtistSet.has(normalizedArtistNodeId);
-    const isSeedArtist = isArtistNode && isNodeInSeedList(node.id || node.label || '', seedArtists);
+    const isSeedArtist = isArtistNode && (
+        Boolean(node.isSceneSeed) ||
+        isNodeInSeedList(stripSceneNamespace(node.canonicalId || node.id || node.label || ''), seedArtists)
+    );
 
     const activeTasteProfilesData = useMemo(() => {
         if (!userTaste || !Array.isArray(userTaste) || !details) return [];
@@ -1899,6 +1908,10 @@ interface DetailsPanelProps {
   activeDeepWebSession?: { sessionId: string; remainingMessages: number } | null;
   onUpdateDeepWebSession?: (session: { sessionId: string; remainingMessages: number } | null | ((prev: { sessionId: string; remainingMessages: number } | null) => { sessionId: string; remainingMessages: number } | null)) => void;
   isStaticMockup?: boolean;
+  /** V43 Multi-Scene Layered Zine props */
+  scenes?: ProjectScene[];
+  activeSceneId?: string;
+  overarchingRationale?: string;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -1908,7 +1921,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, onAddToStack,
   isGuest = false, onAuthRequest, user, userTaste, isAdmin = false, tokenBalance = 0, projectId,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer,
-  activeDeepWebSession, onUpdateDeepWebSession, isStaticMockup = false
+  activeDeepWebSession, onUpdateDeepWebSession, isStaticMockup = false,
+  scenes = [], activeSceneId, overarchingRationale
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
@@ -2470,35 +2484,58 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         return Math.max(0, count);
     }, [loadingNodeIds, viewedNode]);
 
-    const seedCount = seedArtists.length || 1;
+    const allScenesSeedArtists = useMemo(() => {
+        const set = new Set<string>();
+        const list: string[] = [];
+        const register = (s: string) => {
+            const clean = s?.trim();
+            if (!clean) return;
+            const norm = normalizeArtistId(clean);
+            if (!set.has(norm)) {
+                set.add(norm);
+                list.push(clean);
+            }
+        };
+        (seedArtists || []).forEach(register);
+        (scenes || []).forEach(sc => (sc.seedArtists || []).forEach(register));
+        return list;
+    }, [seedArtists, scenes]);
+
+    const seedCount = allScenesSeedArtists.length || 1;
     const aiArtistsCount = useMemo(() => {
-        if (!graphData?.nodes) return 0;
-        return graphData.nodes.filter(n => !isNodeInSeedList(n.id || n.label || '', seedArtists) && (n.type === 'artist' || !n.type)).length;
-    }, [graphData, seedArtists]);
+        return activeNodes.filter(n => n.type === 'artist' && !isNodeInSeedList(stripSceneNamespace(n.canonicalId || n.id || n.label || ''), allScenesSeedArtists)).length;
+    }, [activeNodes, allScenesSeedArtists]);
     const labelsCount = useMemo(() => {
-        if (!graphData?.nodes) return 0;
-        return graphData.nodes.filter(n => n.type === 'label').length;
-    }, [graphData]);
+        return activeNodes.filter(n => n.type === 'label').length;
+    }, [activeNodes]);
     const deepCutsCount = useMemo(() => {
         return activeNodes.filter(n => n.type === 'artist' || n.type === 'label' || !n.type).length;
     }, [activeNodes]);
 
-    const sanitizedRationaleText = useMemo(() => {
-        if (!graphData?.synthesisRationale) return '';
-        let sanitized = graphData.synthesisRationale;
-        
+    const sanitizeRationaleMarkdown = useCallback((rawText?: string, nodeCount?: number) => {
+        if (!rawText) return '';
+        let sanitized = rawText;
         sanitized = sanitized.replace(/^[ \t]*([•\-\*])[ \t]+/gm, '- ');
         sanitized = sanitized.replace(/(^|\n)([ \t]*-[ \t]*)[\n]+[ \t]*/g, '$1$2');
         sanitized = sanitized.replace(/([^\n])\n([ \t]*- )/g, '$1\n\n$2');
-        
         const cleanLines = sanitized.split('\n').filter(line => {
-            const isFallback = (!graphData.synthesisRationale && (graphData.nodes?.length === 1 || graphData.nodes?.length === 2));
+            const isFallback = (!rawText && (nodeCount === 1 || nodeCount === 2));
             if (isFallback && line.trim().startsWith('[')) return false;
             return true;
         });
-        
         return cleanLines.join('\n');
-    }, [graphData?.synthesisRationale, graphData?.nodes?.length]);
+    }, []);
+
+    const sanitizedRationaleText = useMemo(() => {
+        const primaryRationale = scenes.length === 1
+            ? (scenes[0]?.synthesisRationale || graphData?.synthesisRationale)
+            : graphData?.synthesisRationale;
+        return sanitizeRationaleMarkdown(primaryRationale, graphData?.nodes?.length);
+    }, [scenes, graphData?.synthesisRationale, graphData?.nodes?.length, sanitizeRationaleMarkdown]);
+
+    const sanitizedOverarchingRationale = useMemo(() => {
+        return sanitizeRationaleMarkdown(overarchingRationale);
+    }, [overarchingRationale, sanitizeRationaleMarkdown]);
 
     return (
         <div 
@@ -2588,7 +2625,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         variant="primary"
                                         size="md"
                                         onClick={() => onMagazineViewToggle(false)}
-                                        title="Close Magazine View"
+                                        title="Close Zine View"
                                     >
                                         <span>Close</span>
                                         <span className="material-symbols-outlined !text-[18px]">close</span>
@@ -2707,7 +2744,102 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         onTouchEnd={handleTouchEnd}
                         style={isMagazineViewOpen ? { touchAction: 'pan-y', overscrollBehaviorY: 'auto', overflowAnchor: 'none' } : {}}
                     >
-                        {isMagazineViewOpen && graphData?.synthesisRationale && (
+                        {isMagazineViewOpen && scenes.length >= 2 && (
+                            <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-8 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0" data-testid="zine-multi-scene-editorial">
+                                {/* 1) TOP LAYER: OVERARCHING ZINE H1 */}
+                                <div className="pb-12 mb-12 border-b border-zinc-800/60" data-testid="overarching-zine-section">
+                                    <div className="flex items-center flex-wrap gap-2 gap-y-2 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
+                                        <span className="text-[10px] uppercase tracking-widest text-primary font-bold px-2.5 py-0.5 bg-primary/15 rounded-full border border-primary/30 font-mono whitespace-nowrap">
+                                            OVERARCHING ZINE • {scenes.length} SCENES
+                                        </span>
+                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                            ROOT ARTISTS: {seedCount}
+                                        </span>
+                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                            ARTISTS: {aiArtistsCount}
+                                        </span>
+                                        {labelsCount > 0 && (
+                                            <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                                LABELS: {labelsCount}
+                                            </span>
+                                        )}
+                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                            DEEP CUTS: {deepCutsCount}
+                                        </span>
+                                    </div>
+                                    <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
+                                        {projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(' / ') : 'Zine')}
+                                    </h1>
+                                    {sanitizedOverarchingRationale ? (
+                                        <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
+                                            <Markdown
+                                                components={{
+                                                    p: ({node, children, ...props}) => <p className="mb-6" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</p>,
+                                                    strong: ({node, children, ...props}) => <strong className="font-semibold text-white" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</strong>,
+                                                    ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-6 space-y-2" {...props} />,
+                                                    li: ({node, children, ...props}) => <li className="marker:text-primary" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</li>
+                                                }}
+                                            >
+                                                {sanitizedOverarchingRationale}
+                                            </Markdown>
+                                        </div>
+                                    ) : (
+                                        <p className="text-sm text-zinc-400 font-mono">
+                                            Mapping cross-scene sonic bridges across {scenes.map((s, idx) => s.title || `Scene ${idx + 1}`).join(' • ')}...
+                                        </p>
+                                    )}
+                                </div>
+
+                                {/* 2) MIDDLE LAYER: INDIVIDUAL SCENE EDITORIALS (H2) */}
+                                <div className="space-y-12" data-testid="scene-editorials-stack">
+                                    {scenes.map((scene, idx) => {
+                                        const sceneRationale = sanitizeRationaleMarkdown(scene.synthesisRationale, scene.graphData?.nodes?.length);
+                                        const firstSeedNorm = scene.seedArtists?.[0] ? normalizeArtistId(scene.seedArtists[0]) : '';
+                                        const seedDetailsFallback = firstSeedNorm ? detailsCache.get(firstSeedNorm)?.summary : '';
+                                        const effectiveSceneCopy = sceneRationale || seedDetailsFallback || '';
+                                        if (!effectiveSceneCopy && (!scene.seedArtists || scene.seedArtists.length === 0)) {
+                                            return null;
+                                        }
+                                        return (
+                                            <div
+                                                key={scene.sceneId}
+                                                data-testid={`zine-scene-section-${scene.sceneId}`}
+                                                className="pb-10 last:pb-2 border-b last:border-b-0 border-zinc-800/50"
+                                            >
+                                                <div className="flex items-center flex-wrap gap-2 mb-4">
+                                                    <span className="text-[10px] uppercase tracking-widest text-zinc-300 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-zinc-700 font-mono whitespace-nowrap">
+                                                        SCENE {idx + 1}
+                                                    </span>
+                                                    {scene.seedArtists && scene.seedArtists.length > 0 && (
+                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
+                                                            ROOTS: {scene.seedArtists.join(' + ')}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-8 leading-tight" style={{ wordBreak: 'break-word' }}>
+                                                    {scene.title || scene.seedArtists?.join(' + ') || `Scene ${idx + 1}`}
+                                                </h2>
+                                                {effectiveSceneCopy && (
+                                                    <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
+                                                        <Markdown
+                                                            components={{
+                                                                p: ({node, children, ...props}) => <p className="mb-6" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</p>,
+                                                                strong: ({node, children, ...props}) => <strong className="font-semibold text-white" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</strong>,
+                                                                ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-6 space-y-2" {...props} />,
+                                                                li: ({node, children, ...props}) => <li className="marker:text-primary" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</li>
+                                                            }}
+                                                        >
+                                                            {effectiveSceneCopy}
+                                                        </Markdown>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        )}
+                        {isMagazineViewOpen && scenes.length < 2 && sanitizedRationaleText && (
                             <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-12 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0">
                                 <div className="flex items-center flex-wrap gap-2 gap-y-2 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
@@ -2726,7 +2858,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     </span>
                                 </div>
                                 <h1 className="text-7xl font-bold tracking-tighter text-white mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
-                                    {projectName || (seedArtists && seedArtists.length > 0 ? seedArtists.join(' / ') : 'Magazine')}
+                                    {projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(' / ') : 'Zine')}
                                 </h1>
                                 <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
                                     <Markdown
@@ -2803,7 +2935,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 isGlobalLoading={isGlobalLoading}
                                                 graphData={graphData}
                                                 libraryArtists={libraryArtists}
-                                                seedArtists={seedArtists}
+                                                seedArtists={allScenesSeedArtists}
                                                 onAddArtist={onAddArtist}
                                                 isSmallScreen={isSmallScreen}
                                                 onTogglePin={() => onTogglePinNode(node.id)}
@@ -2863,7 +2995,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     className="pointer-events-auto shadow-2xl active:scale-95"
                                 >
                                     <span className="material-symbols-outlined !text-[18px]">auto_stories</span>
-                                    <span>Magazine</span>
+                                    <span>Zine</span>
                                 </Button>
                             </div>
                         )}

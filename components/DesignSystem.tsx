@@ -477,9 +477,9 @@ export interface RootsBreakdownButtonProps {
 
 export const RootsBreakdownButton: React.FC<RootsBreakdownButtonProps> = ({ state, onClick, isLoading }) => {
   const btnTitle = {
-    disabled: isLoading ? "Magazine View in progress..." : "No Magazine View available",
-    attention: "New Magazine View available! Click to view",
-    neutral: "View Magazine"
+    disabled: isLoading ? "Zine View in progress..." : "No Zine View available",
+    attention: "New Zine View available! Click to view",
+    neutral: "View Zine"
   }[state];
 
   const variant = state === 'attention' ? 'outline' : 'secondary';
@@ -494,7 +494,7 @@ export const RootsBreakdownButton: React.FC<RootsBreakdownButtonProps> = ({ stat
       className="backdrop-blur-sm"
     >
       <Waypoints size={16} className="text-current" />
-      <span>Magazine</span>
+      <span>Zine</span>
     </Button>
   );
 };
