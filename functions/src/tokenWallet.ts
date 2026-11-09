@@ -8,6 +8,7 @@ import {
   TokenTopUpTierId,
   computeRemainingSettlementTokens,
 } from "./shared/tokenEconomy";
+import { compactDetailsCacheToCanonical } from "./shared/multiSceneUtils";
 
 if (getApps().length === 0) {
   initializeApp();
@@ -687,7 +688,7 @@ export const authorizeDirectHitCallable = onCall(
             userId: caller.uid,
             targetSceneId: targetSceneId || `scene-${parsedScenes.length}`,
             scenes: parsedScenes,
-            detailsCache: detailsCache || null,
+            detailsCache: detailsCache ? JSON.stringify(compactDetailsCacheToCanonical(detailsCache)) : null,
             artists: String(seedArtistId || label),
             generationType: "Direct Hit",
             tokensSpent: settlement.tokensSpent,

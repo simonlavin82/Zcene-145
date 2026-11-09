@@ -10,6 +10,7 @@ const https_1 = require("firebase-functions/v2/https");
 const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
 const tokenEconomy_1 = require("./shared/tokenEconomy");
+const multiSceneUtils_1 = require("./shared/multiSceneUtils");
 if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
 }
@@ -501,7 +502,7 @@ exports.authorizeDirectHitCallable = (0, https_1.onCall)({
                     userId: caller.uid,
                     targetSceneId: targetSceneId || `scene-${parsedScenes.length}`,
                     scenes: parsedScenes,
-                    detailsCache: detailsCache || null,
+                    detailsCache: detailsCache ? JSON.stringify((0, multiSceneUtils_1.compactDetailsCacheToCanonical)(detailsCache)) : null,
                     artists: String(seedArtistId || label),
                     generationType: "Direct Hit",
                     tokensSpent: settlement.tokensSpent,

@@ -22,6 +22,7 @@ import {
   detectLegacyStrideShiftX,
   migrateLegacyCanvasLayout,
   generateProjectTitleFromScenes,
+  compactDetailsCacheToCanonical,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
@@ -398,5 +399,61 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     // Without detailsCache, fallback formatting strips -us and Title Cases bare slugs
     const fallbackTitle = generateProjectTitleFromScenes(mockScenes, null);
     expect(fallbackTitle).toBe('Sense Field + Reason To Believe + Jimmy Eat World');
+  });
+
+  it('compactDetailsCacheToCanonical reduces alias duplicates to a single canonical entry while preserving 100% of profile fields', () => {
+    const rawAliases = [
+      ['Sense Field', { details: { artist: 'Sense Field', genre: 'Emo' }, summary: 'Bio 1' }],
+      ['sense field', { details: { artist: 'Sense Field', genre: 'Emo' }, summary: 'Bio 2' }],
+      ['sense-field', { details: { artist: 'Sense Field', genre: 'Emo' }, summary: 'Bio 3' }],
+      ['sense-field-us', {
+        details: { artist: 'Sense Field', genre: 'Emo / Post-Hardcore', origin: 'El Segundo, USA', founded: '1991' },
+        summary: 'Pioneered soaring, emotionally resonant melodic hardcore.',
+        discography: [{ albumName: 'Building', releaseYear: '1996' }],
+        members: ['Jon Bunch', 'Chris Fullmer'],
+        recommendationReason: 'Crucial melodic transition act.',
+        previewUrl: 'https://preview.url/sense-field.m4a',
+      }],
+      ['revelation', {
+        details: { artist: 'Revelation Records', genre: 'Hardcore' },
+        summary: 'Historic hardcore label.',
+        discography: [],
+      }],
+      ['Revelation Records', {
+        details: { artist: 'Revelation Records', genre: 'Hardcore' },
+        summary: 'Historic hardcore label.',
+        discography: [],
+      }],
+    ];
+
+    const mockNodes = [
+      { id: 'scene-1::sense-field-us', canonicalId: 'sense-field-us', name: 'Sense Field' },
+      { id: 'scene-1::revelation', canonicalId: 'revelation', name: 'Revelation Records' },
+    ];
+
+    const compacted = compactDetailsCacheToCanonical(rawAliases, mockNodes);
+
+    // 6 alias entries must compact to exactly 2 canonical entries
+    expect(compacted.length).toBe(2);
+
+    const keys = compacted.map(([k]) => k);
+    expect(keys).toContain('sense-field-us');
+    expect(keys).toContain('revelation');
+
+    // 100% of rich profile fields must be preserved on the canonical winner
+    const sfEntry = compacted.find(([k]) => k === 'sense-field-us');
+    expect(sfEntry).toBeDefined();
+    const sfProfile = sfEntry![1];
+    expect(sfProfile.details.origin).toBe('El Segundo, USA');
+    expect(sfProfile.summary).toBe('Pioneered soaring, emotionally resonant melodic hardcore.');
+    expect(sfProfile.discography).toEqual([{ albumName: 'Building', releaseYear: '1996' }]);
+    expect(sfProfile.members).toEqual(['Jon Bunch', 'Chris Fullmer']);
+    expect(sfProfile.recommendationReason).toBe('Crucial melodic transition act.');
+    expect(sfProfile.previewUrl).toBe('https://preview.url/sense-field.m4a');
+
+    // Verify idempotency: compacting already-compacted entries preserves them unchanged
+    const recompacted = compactDetailsCacheToCanonical(compacted, mockNodes);
+    expect(recompacted.length).toBe(2);
+    expect(recompacted.map(([k]) => k)).toEqual(keys);
   });
 });

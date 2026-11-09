@@ -29,6 +29,7 @@ exports.computeProjectCardMetrics = computeProjectCardMetrics;
 exports.parseProjectScenes = parseProjectScenes;
 exports.parseCrossSceneLinks = parseCrossSceneLinks;
 exports.generateProjectTitleFromScenes = generateProjectTitleFromScenes;
+exports.compactDetailsCacheToCanonical = compactDetailsCacheToCanonical;
 const isoCountries_1 = require("./isoCountries");
 exports.SCENE_BASE_CENTER_X = 1000;
 exports.SCENE_BASE_CENTER_Y = 1000;
@@ -1078,5 +1079,140 @@ function generateProjectTitleFromScenes(scenes, detailsCache) {
         }
     }
     return titleParts.length > 0 ? titleParts.join(' + ') : 'Untitled Zcene';
+}
+/**
+ * Compacts a detailsCache (Map, array of entries, or JSON string) into a deduplicated
+ * array of [canonicalKey, profile] entries, storing exactly one canonical entry per entity
+ * to prevent document bloat and respect Firestore's 1MB limit.
+ *
+ * Rules:
+ * 1. Strips any scene namespace prefixes (scene-k::) from keys.
+ * 2. Groups alias variants ("Sense Field", "sense-field", "sense-field-us", etc.) by base slug.
+ * 3. Prefers geographically-suffixed IDs (e.g. "sense-field-us") over bare slugs ("sense-field").
+ * 4. Preserves 100% of the profile fields, retaining the richest profile payload.
+ */
+function compactDetailsCacheToCanonical(rawCache, nodes) {
+    if (!rawCache)
+        return [];
+    let entries = [];
+    if (typeof rawCache === 'string') {
+        try {
+            const parsed = JSON.parse(rawCache);
+            return compactDetailsCacheToCanonical(parsed, nodes);
+        }
+        catch {
+            return [];
+        }
+    }
+    else if (rawCache instanceof Map || (typeof rawCache?.get === 'function' && typeof rawCache?.set === 'function')) {
+        entries = Array.from(rawCache.entries());
+    }
+    else if (Array.isArray(rawCache)) {
+        for (const item of rawCache) {
+            if (Array.isArray(item) && item.length >= 2) {
+                if (Array.isArray(item[1]) && item[1].length >= 2 && typeof item[1][1] === 'object') {
+                    // Defensive unwrap if nested under index: [ '1', [ 'Sense Field', profile ] ]
+                    entries.push([String(item[1][0]), item[1][1]]);
+                }
+                else {
+                    entries.push([String(item[0]), item[1]]);
+                }
+            }
+            else if (item && typeof item === 'object' && item.id) {
+                entries.push([String(item.id), item]);
+            }
+        }
+    }
+    else if (typeof rawCache === 'object') {
+        entries = Object.entries(rawCache);
+    }
+    if (entries.length === 0)
+        return [];
+    // ISO country suffix pattern (matches e.g. -us, -gb, -de, etc.)
+    const ISO_SUFFIX_REGEX = /-(?:us|gb|uk|de|fr|ca|au|jp|se|no|fi|nl|be|ch|at|es|it|br|mx|nz|ie|pl|za)$/i;
+    // Index any canonical node IDs passed in
+    const nodeCanonicalMap = new Map();
+    if (Array.isArray(nodes)) {
+        for (const n of nodes) {
+            if (!n)
+                continue;
+            const cleanId = stripSceneNamespace(n.id || '').trim().toLowerCase();
+            const cleanCanon = stripSceneNamespace(n.canonicalId || '').trim().toLowerCase();
+            const cleanName = normalizeCanonicalEntityId(n.name || n.details?.artist || '');
+            if (cleanCanon) {
+                if (cleanId)
+                    nodeCanonicalMap.set(cleanId, cleanCanon);
+                if (cleanName)
+                    nodeCanonicalMap.set(cleanName, cleanCanon);
+                const canonBaseSlug = cleanCanon.replace(ISO_SUFFIX_REGEX, '');
+                if (canonBaseSlug)
+                    nodeCanonicalMap.set(canonBaseSlug, cleanCanon);
+            }
+        }
+    }
+    const groups = new Map();
+    for (const [rawKey, profile] of entries) {
+        if (!rawKey || !profile || typeof profile !== 'object')
+            continue;
+        const cleanKey = stripSceneNamespace(String(rawKey)).trim();
+        if (!cleanKey)
+            continue;
+        const lowerKey = cleanKey.toLowerCase();
+        const artistName = profile.details?.artist || profile.artist || profile.name || profile.title || '';
+        const nameNorm = normalizeCanonicalEntityId(artistName);
+        // Base slug stripped of ISO suffix
+        const baseSlug = lowerKey.replace(ISO_SUFFIX_REGEX, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+        const canonicalOverride = nodeCanonicalMap.get(lowerKey) || nodeCanonicalMap.get(baseSlug) || (nameNorm ? nodeCanonicalMap.get(nameNorm) : undefined);
+        const groupKey = canonicalOverride ? canonicalOverride.replace(ISO_SUFFIX_REGEX, '') : (baseSlug || nameNorm);
+        if (!groupKey)
+            continue;
+        // Calculate score for canonical key selection:
+        // 3: Contains valid ISO country suffix (e.g. sense-field-us)
+        // 2: Matches a known node's canonicalId
+        // 1: Is a hyphenated slug (e.g. sense-field)
+        // 0: Contains spaces or uppercase
+        let score = 0;
+        if (ISO_SUFFIX_REGEX.test(lowerKey)) {
+            score = 3;
+        }
+        else if (nodeCanonicalMap.has(lowerKey) || (cleanKey === nodeCanonicalMap.get(groupKey))) {
+            score = 2;
+        }
+        else if (!cleanKey.includes(' ') && cleanKey === lowerKey) {
+            score = 1;
+        }
+        if (!groups.has(groupKey)) {
+            groups.set(groupKey, []);
+        }
+        groups.get(groupKey).push({ key: cleanKey, profile, score });
+    }
+    const result = [];
+    for (const [groupKey, candidates] of groups.entries()) {
+        // Sort candidates by score desc (highest priority key first)
+        candidates.sort((a, b) => {
+            if (b.score !== a.score)
+                return b.score - a.score;
+            const aHasSpace = a.key.includes(' ') ? 1 : 0;
+            const bHasSpace = b.key.includes(' ') ? 1 : 0;
+            if (aHasSpace !== bHasSpace)
+                return aHasSpace - bHasSpace;
+            return b.key.length - a.key.length;
+        });
+        let bestKey = candidates[0].key.toLowerCase();
+        if (nodeCanonicalMap.has(groupKey)) {
+            const explicitCanon = nodeCanonicalMap.get(groupKey);
+            if (explicitCanon)
+                bestKey = explicitCanon;
+        }
+        let bestProfile = candidates[0].profile;
+        for (const c of candidates) {
+            if ((c.profile.discography?.length || 0) > (bestProfile.discography?.length || 0) ||
+                (c.profile.summary?.length || 0) > (bestProfile.summary?.length || 0)) {
+                bestProfile = c.profile;
+            }
+        }
+        result.push([bestKey, bestProfile]);
+    }
+    return result;
 }
 //# sourceMappingURL=multiSceneUtils.js.map

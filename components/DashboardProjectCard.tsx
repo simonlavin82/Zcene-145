@@ -276,6 +276,9 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
         {!isUnmapped && (
           <div className="mt-3 flex items-center">
             <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
+              <span className="text-[9px] uppercase tracking-wide text-primary font-bold px-2 py-0.5 bg-primary/15 rounded-full border border-primary/30 font-mono whitespace-nowrap backdrop-blur-sm">
+                SCENES: {sceneCount || 1}
+              </span>
               <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                 ROOT ARTISTS: {rootArtistsCount}
               </span>

@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink } from './types';
-import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString } from './shared/multiSceneUtils';
+import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
 import { qualifyCacheEntry, deriveRoutingDecision, isLocallyRenderable, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
@@ -2515,7 +2515,10 @@ const App: React.FC = () => {
   const handleMenuNavigate = useCallback((path: string) => {
     switch (path) {
       case 'home': navigate('/'); break;
-      case 'dashboard': navigate('/dashboard'); break;
+      case 'dashboard':
+        setIsLoading(false);
+        navigate('/dashboard');
+        break;
       case 'help': navigate('/help'); break;
       case 'design': navigate('/design'); break;
       case 'engine': navigate('/engine'); break;
@@ -3180,7 +3183,7 @@ const App: React.FC = () => {
       labelIds: labelEntityIds,
       canvasLayout: JSON.stringify(canvasLayout),
       graphData: JSON.stringify(graphData),
-      detailsCache: JSON.stringify(Array.from(detailsCache.entries())),
+      detailsCache: JSON.stringify(compactDetailsCacheToCanonical(detailsCache, graphData?.nodes)),
       seedImageUrls: extractedSeedImageUrls,
     };
 
@@ -3557,7 +3560,7 @@ const App: React.FC = () => {
           graphData: JSON.stringify(compositeGraph),
           activeNodes: hoistedActiveNodes,
           seedArtists: projectSeedNames.join('::') || artistsString,
-          detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
+          detailsCache: JSON.stringify(compactDetailsCacheToCanonical(detailsCacheRef.current, compositeGraph.nodes)),
           status: activeJobIdRef.current ? 'curating' : 'completed',
           ...(activeJobIdRef.current ? { activeJobId: activeJobIdRef.current } : {}),
           generationType: 'Direct Hit',
@@ -3711,7 +3714,7 @@ const App: React.FC = () => {
           curationSessionId: curationSessionIdRef.current || undefined,
           targetSceneId,
           scenes: shouldTriggerOverarching ? sanitizeScenesForTransport(previewScenes) : undefined,
-          detailsCache: shouldTriggerOverarching ? JSON.stringify(Array.from(detailsCacheRef.current.entries())) : undefined,
+          detailsCache: shouldTriggerOverarching ? JSON.stringify(compactDetailsCacheToCanonical(detailsCacheRef.current)) : undefined,
           triggerOverarchingSynthesis: shouldTriggerOverarching
         });
         const resData = (res?.data || {}) as any;
@@ -5806,7 +5809,7 @@ const App: React.FC = () => {
             activeNodes: finalActive,
             seedArtists: projectScopedSeedArtists,
             ...(scenesRef.current.length > 0 ? { scenes: JSON.stringify(scenesRef.current) } : {}),
-            detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
+            detailsCache: JSON.stringify(compactDetailsCacheToCanonical(detailsCacheRef.current, final.nodes)),
             status: finalStatus,
             ...(activeJobId ? { activeJobId } : {}),
             updatedAt: serverTimestamp()
@@ -7508,11 +7511,6 @@ const App: React.FC = () => {
         if (user && !isFirebaseReady) return;
 
         if (isDashboardPath) {
-          // Guard against dashboard clearance during active curation hydration
-          if (isHydratingSessionRef.current || projectStatusRef.current === 'curating') {
-            console.log('[Routing] Guarding against dashboard project clearance during active curation hydration');
-            return;
-          }
           setPreviousWorkspace({ view: View.Dashboard, projectId: null });
           if (currentViewRef.current !== View.Dashboard) {
             if (currentViewRef.current === View.Home) {
@@ -7522,6 +7520,7 @@ const App: React.FC = () => {
                 setIsNavigatingToDashboard(false);
               }, 1500);
             }
+            setIsLoading(false);
             setCurrentView(View.Dashboard);
             setCurrentProjectId(null);
             setCurrentProjectOwnerId(null);
@@ -8995,7 +8994,7 @@ const App: React.FC = () => {
                       graphData: JSON.stringify(sanitizeGraphDataForTransport(forkComposite)),
                       canvasLayout: JSON.stringify(forkCanvasLayout),
                       activeNodes: forkActiveNodes,
-                      detailsCache: JSON.stringify(Array.from(detailsCacheRef.current.entries())),
+                      detailsCache: JSON.stringify(compactDetailsCacheToCanonical(detailsCacheRef.current, forkComposite.nodes)),
                       chatHistories: JSON.stringify(Array.from(chatHistoriesRef.current.entries())),
                       discoveryFilters: JSON.stringify(forkFilters),
                       lastViewedStackCount: 0,
@@ -9145,6 +9144,7 @@ const App: React.FC = () => {
                 if (isGuest) {
                   setIsExitBlockerModalOpen(true);
                 } else {
+                  setIsLoading(false);
                   navigate('/dashboard');
                 }
               }}

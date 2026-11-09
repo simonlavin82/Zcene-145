@@ -53,6 +53,7 @@ import {
   normalizeProjectScene,
   buildCompositeCanvasGraph,
   generateProjectTitleFromScenes,
+  compactDetailsCacheToCanonical,
 } from "./shared/multiSceneUtils";
 import { refundProjectSettlementOnError } from "./tokenWallet";
 
@@ -442,7 +443,6 @@ export const processCurationJob = onDocumentCreated({
         const activeScene =
           existingProjectScenes.find((s) => (s.sceneId || s.id) === targetSceneId) ||
           existingProjectScenes[existingProjectScenes.length - 1];
-        const serializedCacheEntries = Array.from(existingProjectDetailsMap.entries());
         const populatedExistingScenes = existingProjectScenes.filter(
           (s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
         );
@@ -450,9 +450,14 @@ export const processCurationJob = onDocumentCreated({
           ? buildCompositeCanvasGraph(populatedExistingScenes, overarchingResult.crossSceneLinks)
           : (activeScene?.graphData || { nodes: [], links: [] });
 
+        const compactedCacheEntries = compactDetailsCacheToCanonical(
+          existingProjectDetailsMap,
+          compositeOverarchingGraph.nodes
+        );
+
         result = {
           graphData: compositeOverarchingGraph,
-          detailsCache: JSON.stringify(serializedCacheEntries),
+          detailsCache: JSON.stringify(compactedCacheEntries),
           scenes: existingProjectScenes,
           overarchingRationale: overarchingResult.overarchingRationale,
           crossSceneLinks: overarchingResult.crossSceneLinks,
@@ -2349,7 +2354,7 @@ export const processCurationJob = onDocumentCreated({
 
         result = {
           graphData: projectGraphToPersist,
-          detailsCache: JSON.stringify(unifiedDetailsCacheEntries),
+          detailsCache: JSON.stringify(compactDetailsCacheToCanonical(unifiedDetailsCacheEntries, projectGraphToPersist.nodes)),
           scenes: updatedScenes,
           overarchingRationale,
           crossSceneLinks,
@@ -2474,7 +2479,7 @@ export const processCurationJob = onDocumentCreated({
             total: safeUsage.total || 0,
           };
         }
-      } else {
+      } else if (inputPayload?.mode !== 'overarching_only' && inputPayload?.generationType !== 'Direct Hit') {
         console.warn(`[Curation Backend] CRITICAL WARNING: inputPayload.foregroundApiUsage is empty or missing! Tokens dropped from Phase 1. Payload:`, inputPayload?.foregroundApiUsage);
       }
 

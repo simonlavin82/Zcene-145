@@ -373,14 +373,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 const overarchingResult = await (0, curatorService_1.generateOverarchingZineBackend)(existingProjectScenes, detailsLookupObj, usageCollector);
                 const activeScene = existingProjectScenes.find((s) => (s.sceneId || s.id) === targetSceneId) ||
                     existingProjectScenes[existingProjectScenes.length - 1];
-                const serializedCacheEntries = Array.from(existingProjectDetailsMap.entries());
                 const populatedExistingScenes = existingProjectScenes.filter((s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
                 const compositeOverarchingGraph = populatedExistingScenes.length >= 2
                     ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedExistingScenes, overarchingResult.crossSceneLinks)
                     : (activeScene?.graphData || { nodes: [], links: [] });
+                const compactedCacheEntries = (0, multiSceneUtils_1.compactDetailsCacheToCanonical)(existingProjectDetailsMap, compositeOverarchingGraph.nodes);
                 result = {
                     graphData: compositeOverarchingGraph,
-                    detailsCache: JSON.stringify(serializedCacheEntries),
+                    detailsCache: JSON.stringify(compactedCacheEntries),
                     scenes: existingProjectScenes,
                     overarchingRationale: overarchingResult.overarchingRationale,
                     crossSceneLinks: overarchingResult.crossSceneLinks,
@@ -2119,7 +2119,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     : finalGraph;
                 result = {
                     graphData: projectGraphToPersist,
-                    detailsCache: JSON.stringify(unifiedDetailsCacheEntries),
+                    detailsCache: JSON.stringify((0, multiSceneUtils_1.compactDetailsCacheToCanonical)(unifiedDetailsCacheEntries, projectGraphToPersist.nodes)),
                     scenes: updatedScenes,
                     overarchingRationale,
                     crossSceneLinks,
@@ -2228,7 +2228,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     };
                 }
             }
-            else {
+            else if (inputPayload?.mode !== 'overarching_only' && inputPayload?.generationType !== 'Direct Hit') {
                 console.warn(`[Curation Backend] CRITICAL WARNING: inputPayload.foregroundApiUsage is empty or missing! Tokens dropped from Phase 1. Payload:`, inputPayload?.foregroundApiUsage);
             }
             for (const [model, usage] of Object.entries(collectedTokens)) {
