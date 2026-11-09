@@ -667,7 +667,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                   folder
                                 </span>
                                 <span className="truncate max-w-[240px]">{displayTitle}</span>
-                                <span className="text-[10px] uppercase tracking-widest text-primary font-bold px-2 py-0.5 bg-primary/15 rounded-full border border-primary/30 font-mono whitespace-nowrap">
+                                <span className="text-[10px] uppercase tracking-widest text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap">
                                   SCENES: {sceneCount || 1}
                                 </span>
                               </div>

@@ -44,6 +44,8 @@ export interface Link {
   bridgeType?: 'identity' | 'sonic_lineage';
   sourceSceneId?: string;
   targetSceneId?: string;
+  sourceNodeId?: string;
+  targetNodeId?: string;
 }
 
 export interface GraphData {

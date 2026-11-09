@@ -7605,27 +7605,102 @@ const App: React.FC = () => {
               const shareSnap = await getDoc(shareRef);
               if (shareSnap.exists()) {
                 const data = shareSnap.data();
-                const parsedGraphData = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
-                
-                if (parsedGraphData && Array.isArray(parsedGraphData.nodes)) {
-                  parsedGraphData.nodes = parsedGraphData.nodes.map((n: any) => {
-                    const { index, vx, vy, x, y, fx, fy, ...rest } = n;
-                    return rest;
-                  });
-                }
-                
-                // Strip D3 object references from links
-                if (parsedGraphData && Array.isArray(parsedGraphData.links)) {
-                  parsedGraphData.links = parsedGraphData.links.map((l: any) => ({
-                    ...l,
-                    source: typeof l.source === 'object' ? l.source.id : l.source,
-                    target: typeof l.target === 'object' ? l.target.id : l.target
-                  }));
+                // 1. Parse scenes & crossSceneLinks FIRST
+                let parsedScenes: ProjectScene[] = [];
+                if (data.scenes !== undefined) {
+                  try {
+                    parsedScenes = parseProjectScenes(data.scenes);
+                    if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
+                      scenesRef.current = parsedScenes;
+                      setScenes(parsedScenes);
+                      const resolvedActiveId = data.activeSceneId || parsedScenes[0].sceneId || parsedScenes[0].id;
+                      activeSceneIdRef.current = resolvedActiveId;
+                      setActiveSceneId(resolvedActiveId);
+                      // Top-level seedArtists is project-scoped (all scenes); ROOTS input is scene-scoped.
+                      const sharedActiveScene = parsedScenes.find(s => (s.sceneId || s.id) === resolvedActiveId) || parsedScenes[0];
+                      const sharedActiveSeeds = toSeedArtistsString(sharedActiveScene?.seedArtists);
+                      if (sharedActiveSeeds) setSeedArtists(sharedActiveSeeds);
+                    }
+                  } catch (e) {}
                 }
 
-                const g = normalizeGraphData(parsedGraphData);
+                if (data.overarchingRationale !== undefined) {
+                  overarchingRationaleRef.current = data.overarchingRationale || '';
+                  setOverarchingRationale(data.overarchingRationale || '');
+                }
 
-                g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
+                let parsedCross: CrossSceneLink[] = [];
+                if (data.crossSceneLinks !== undefined) {
+                  try {
+                    parsedCross = parseCrossSceneLinks(data.crossSceneLinks);
+                    crossSceneLinksRef.current = parsedCross;
+                    setCrossSceneLinks(parsedCross);
+                  } catch (e) {}
+                }
+
+                // 2. Parse canvasLayout (Coordinate Memory)
+                let savedPositions: CanvasNodeRef[] = [];
+                if (data.canvasLayout) {
+                  try {
+                    const rawLayout = typeof data.canvasLayout === 'string' ? JSON.parse(data.canvasLayout) : data.canvasLayout;
+                    savedPositions = migrateLegacyCanvasLayout(rawLayout, parsedScenes);
+                  } catch (e) {
+                    console.warn('[SharedLoader] canvasLayout parse failed:', e);
+                  }
+                }
+
+                // 3. Assemble graphData (Preserve Multi-Scene Coordinates & Layout)
+                const populatedScenes = parsedScenes.filter(
+                  s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+                );
+
+                let g: GraphData;
+                if (populatedScenes.length >= 2) {
+                  g = buildCompositeCanvasGraph(populatedScenes, parsedCross, savedPositions);
+                } else {
+                  const parsedGraphData = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
+                  const isMultiScene = parsedScenes.length >= 2 || (data.sceneCount && data.sceneCount >= 2);
+                  
+                  if (parsedGraphData && Array.isArray(parsedGraphData.nodes)) {
+                    parsedGraphData.nodes = parsedGraphData.nodes.map((n: any) => {
+                      if (isMultiScene || savedPositions.length > 0) {
+                        const { index, vx, vy, ...rest } = n;
+                        return rest;
+                      }
+                      const { index, vx, vy, x, y, fx, fy, ...rest } = n;
+                      return rest;
+                    });
+                  }
+
+                  if (parsedGraphData && Array.isArray(parsedGraphData.links)) {
+                    parsedGraphData.links = parsedGraphData.links.map((l: any) => ({
+                      ...l,
+                      source: typeof l.source === 'object' ? l.source.id : l.source,
+                      target: typeof l.target === 'object' ? l.target.id : l.target
+                    }));
+                  }
+
+                  g = normalizeGraphData(parsedGraphData);
+
+                  if (savedPositions.length > 0) {
+                    const posMap = new Map(savedPositions.map(p => [p.nodeId, p]));
+                    g.nodes.forEach((n: any) => {
+                      const pos = posMap.get(n.id);
+                      if (pos && typeof pos.x === 'number' && typeof pos.y === 'number') {
+                        n.x = pos.x;
+                        n.y = pos.y;
+                        n.fx = pos.fx ?? null;
+                        n.fy = pos.fy ?? null;
+                      } else {
+                        n.fx = n.fx ?? null;
+                        n.fy = n.fy ?? null;
+                      }
+                    });
+                  } else {
+                    g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
+                  }
+                }
+
                 setGraphData(g);
                 setSeedArtists(data.seedArtists);
                 if (data.name !== undefined) setProjectName(data.name);
@@ -7653,33 +7728,6 @@ const App: React.FC = () => {
                   console.warn("Guest batch hydration failed:", err);
                 }
                 
-                if (data.scenes !== undefined) {
-                  try {
-                    const parsedScenes: ProjectScene[] = parseProjectScenes(data.scenes);
-                    if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
-                      scenesRef.current = parsedScenes;
-                      setScenes(parsedScenes);
-                      const resolvedActiveId = data.activeSceneId || parsedScenes[0].sceneId || parsedScenes[0].id;
-                      activeSceneIdRef.current = resolvedActiveId;
-                      setActiveSceneId(resolvedActiveId);
-                      // Top-level seedArtists is project-scoped (all scenes); ROOTS input is scene-scoped.
-                      const sharedActiveScene = parsedScenes.find(s => (s.sceneId || s.id) === resolvedActiveId) || parsedScenes[0];
-                      const sharedActiveSeeds = toSeedArtistsString(sharedActiveScene?.seedArtists);
-                      if (sharedActiveSeeds) setSeedArtists(sharedActiveSeeds);
-                    }
-                  } catch (e) {}
-                }
-                if (data.overarchingRationale !== undefined) {
-                  overarchingRationaleRef.current = data.overarchingRationale || '';
-                  setOverarchingRationale(data.overarchingRationale || '');
-                }
-                if (data.crossSceneLinks !== undefined) {
-                  try {
-                    const parsedCross: CrossSceneLink[] = parseCrossSceneLinks(data.crossSceneLinks);
-                    crossSceneLinksRef.current = parsedCross;
-                    setCrossSceneLinks(parsedCross);
-                  } catch (e) {}
-                }
                 if (data.activeNodes && Array.isArray(data.activeNodes)) {
                   let resolvedActiveNodes = data.activeNodes.map((id: string) => stripSceneNamespace(id));
                   const availableEntities = Array.from(new Set(g.nodes.map((n: any) => stripSceneNamespace(n.canonicalId || n.id))));
@@ -9522,40 +9570,76 @@ const App: React.FC = () => {
 };
 
 export const applyShareBlacklistMutation = (sharePayload: any) => {
-  // 1. D3 Amnesia: Delete rigid coordinate locks so guests get organic simulation
-  delete sharePayload.canvasLayout;
-  if (sharePayload.graphData) {
-    const g = JSON.parse(sharePayload.graphData);
-    g.nodes = (g.nodes || []).map((n: any) => {
-      const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n;
-      return cleanNode;
-    });
-    g.links = (g.links || []).map((l: any) => ({
-      ...l,
-      source: typeof l.source === 'object' ? l.source.id : l.source,
-      target: typeof l.target === 'object' ? l.target.id : l.target,
-    }));
-    sharePayload.graphData = JSON.stringify(g);
-  }
-  if (Array.isArray(sharePayload.scenes)) {
-    sharePayload.scenes = sharePayload.scenes.map((scene: any) => {
-      if (!scene?.graphData) return scene;
-      return {
-        ...scene,
-        graphData: {
-          ...scene.graphData,
-          nodes: (scene.graphData.nodes || []).map((n: any) => {
-            const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n;
-            return cleanNode;
-          }),
-          links: (scene.graphData.links || []).map((l: any) => ({
-            ...l,
-            source: typeof l.source === 'object' ? l.source.id : l.source,
-            target: typeof l.target === 'object' ? l.target.id : l.target,
-          }))
-        }
-      };
-    });
+  // Check if multi-scene project (scenes array/string with >= 2 scenes, sceneCount >= 2, or schemaVersion >= 43)
+  let sceneCount = 1;
+  try {
+    if (Array.isArray(sharePayload.scenes)) {
+      sceneCount = sharePayload.scenes.length;
+    } else if (typeof sharePayload.scenes === 'string') {
+      const parsed = JSON.parse(sharePayload.scenes);
+      if (Array.isArray(parsed)) sceneCount = parsed.length;
+    }
+  } catch (e) {}
+
+  const isMultiScene = sceneCount >= 2 || (sharePayload.sceneCount && sharePayload.sceneCount >= 2);
+
+  if (isMultiScene) {
+    // Multi-Scene Coordinate Memory: Preserve canvasLayout, scenes, crossSceneLinks, and node coordinates!
+    // Strip only transient simulation runtime fields (vx, vy, index), preserving x, y, fx, fy
+    if (sharePayload.graphData) {
+      try {
+        const g = typeof sharePayload.graphData === 'string' ? JSON.parse(sharePayload.graphData) : sharePayload.graphData;
+        g.nodes = (g.nodes || []).map((n: any) => {
+          const { vx, vy, index, ...cleanNode } = n;
+          return cleanNode;
+        });
+        g.links = (g.links || []).map((l: any) => ({
+          ...l,
+          source: typeof l.source === 'object' ? l.source.id : l.source,
+          target: typeof l.target === 'object' ? l.target.id : l.target,
+        }));
+        sharePayload.graphData = typeof sharePayload.graphData === 'string' ? JSON.stringify(g) : g;
+      } catch (e) {}
+    }
+    // Retain sharePayload.canvasLayout as-is (do NOT delete)
+  } else {
+    // 1. Single-scene legacy D3 Amnesia: Delete rigid coordinate locks so guests get organic simulation
+    delete sharePayload.canvasLayout;
+    if (sharePayload.graphData) {
+      try {
+        const g = typeof sharePayload.graphData === 'string' ? JSON.parse(sharePayload.graphData) : sharePayload.graphData;
+        g.nodes = (g.nodes || []).map((n: any) => {
+          const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n;
+          return cleanNode;
+        });
+        g.links = (g.links || []).map((l: any) => ({
+          ...l,
+          source: typeof l.source === 'object' ? l.source.id : l.source,
+          target: typeof l.target === 'object' ? l.target.id : l.target,
+        }));
+        sharePayload.graphData = typeof sharePayload.graphData === 'string' ? JSON.stringify(g) : g;
+      } catch (e) {}
+    }
+    if (Array.isArray(sharePayload.scenes)) {
+      sharePayload.scenes = sharePayload.scenes.map((scene: any) => {
+        if (!scene?.graphData) return scene;
+        return {
+          ...scene,
+          graphData: {
+            ...scene.graphData,
+            nodes: (scene.graphData.nodes || []).map((n: any) => {
+              const { x, y, vx, vy, fx, fy, index, ...cleanNode } = n;
+              return cleanNode;
+            }),
+            links: (scene.graphData.links || []).map((l: any) => ({
+              ...l,
+              source: typeof l.source === 'object' ? l.source.id : l.source,
+              target: typeof l.target === 'object' ? l.target.id : l.target,
+            }))
+          }
+        };
+      });
+    }
   }
 
   // 2. TTL Injection: Ensure ephemeral garbage collection for shares

@@ -695,12 +695,17 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
         const tgtCanonId = bridge.targetCanonicalId || bridge.toNodeId || '';
         const srcId = bridge.sourceNodeId || namespaceSceneNodeId(srcSceneId, srcCanonId);
         const tgtId = bridge.targetNodeId || namespaceSceneNodeId(tgtSceneId, tgtCanonId);
+        if (!srcId || !tgtId || srcId.toLowerCase() === tgtId.toLowerCase()) {
+            continue;
+        }
         if (!nodeExistsSet.has(srcId.toLowerCase()) || !nodeExistsSet.has(tgtId.toLowerCase())) {
             continue;
         }
         compositeLinks.push({
             source: srcId,
             target: tgtId,
+            sourceNodeId: srcId,
+            targetNodeId: tgtId,
             value: 2,
             weight: typeof bridge.weight === 'number' ? bridge.weight : 0.85,
             forwardContext: bridge.forwardContext,
