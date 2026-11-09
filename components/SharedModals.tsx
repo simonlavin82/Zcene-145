@@ -2032,6 +2032,8 @@ export interface PreFlightSeed {
   predictedOrigin: string;
   genre?: string;
   isKnownCacheHit: boolean;
+  /** V43.1: true only when the cached doc carries a locally renderable spiderweb (TOPOLOGY_HIT / USABLE_STALE). */
+  isTopologyHit?: boolean;
   candidateId?: string;
   isCorrected?: boolean;
   correctedQuery?: string;

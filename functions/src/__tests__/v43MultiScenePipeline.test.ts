@@ -189,7 +189,8 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
     const s2Node = composite.nodes.find((n) => n.id === 'scene-2::jimmy-eat-world-us');
     expect(s1Node?.fx).toBe(950);
     expect(s1Node?.fy).toBe(1000);
-    expect(s2Node?.x).toBeGreaterThan(2400);
+    expect(s2Node?.x).toBeGreaterThan(1750);
+    expect(s2Node?.x).toBeLessThan(2150);
     expect(computeDeduplicatedActiveNodes([scene1, scene2])).toEqual([
       'sense-field-us',
       'reason-to-believe-us',

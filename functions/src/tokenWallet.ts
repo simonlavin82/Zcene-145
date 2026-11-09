@@ -348,6 +348,8 @@ export async function settleCurationProjectTokens(params: {
   curationSessionId?: string;
   totalProjectCost: 5 | 10;
   projectId?: string;
+  targetSceneId?: string;
+  sceneTitle?: string;
   txType: "spend_direct_hit" | "spend_live_synthesis";
   description: string;
   generationTypeToStamp?: string;
@@ -380,6 +382,27 @@ export async function settleCurationProjectTokens(params: {
         { merge: true }
       );
     }
+    const adminTxRef = db.collection("users").doc(caller.uid).collection("tokenTransactions").doc();
+    const effectiveGenType = generationTypeToStamp || (txType === "spend_direct_hit" ? "Direct Hit" : "Root Generation");
+    await adminTxRef.set({
+      id: adminTxRef.id,
+      uid: caller.uid,
+      type: txType,
+      delta: 0,
+      balanceAfter: 0,
+      isAdminBypass: true,
+      ...(projectId ? { projectId } : {}),
+      sceneId: params.targetSceneId || "scene-1",
+      curationSessionId: sessionId,
+      description: `${description} (Admin 0T Wallet Bypass)`,
+      generationType: effectiveGenType,
+      ...(params.seedArtist ? { seedArtist: params.seedArtist } : {}),
+      costUsd: typeof params.costUsd === "number" ? params.costUsd : (txType === "spend_direct_hit" ? 0.0000 : 0),
+      apiUsage: params.apiUsage || {},
+      anchorResolution: params.anchorResolution || (txType === "spend_direct_hit" ? { cacheHits: 1, cacheMisses: 0 } : {}),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
     return {
       tokensSpent: 0,
       creditablePreFlight: 0,
@@ -468,27 +491,26 @@ export async function settleCurationProjectTokens(params: {
       { merge: true }
     );
 
-    if (remainingSettlement > 0) {
-      tx.set(txRef, {
-        id: txRef.id,
-        uid: caller.uid,
-        type: txType,
-        delta: -remainingSettlement,
-        balanceAfter: newBalance,
-        ...(projectId ? { projectId } : {}),
-        curationSessionId: sessionId,
-        description:
-          creditablePreFlight > 0
-            ? `${description} (${remainingSettlement}T balance after 1T pre-flight)`
-            : `${description} (${remainingSettlement}T)`,
-        ...(generationTypeToStamp ? { generationType: generationTypeToStamp } : (txType === "spend_direct_hit" ? { generationType: "Direct Hit" } : {})),
-        ...(params.seedArtist ? { seedArtist: params.seedArtist } : {}),
-        ...(typeof params.costUsd === "number" ? { costUsd: params.costUsd } : (txType === "spend_direct_hit" ? { costUsd: 0.0000 } : {})),
-        ...(params.apiUsage ? { apiUsage: params.apiUsage } : (txType === "spend_direct_hit" ? { apiUsage: {} } : {})),
-        ...(params.anchorResolution ? { anchorResolution: params.anchorResolution } : (txType === "spend_direct_hit" ? { anchorResolution: { cacheHits: 1, cacheMisses: 0 } } : {})),
-        createdAt: FieldValue.serverTimestamp(),
-      });
-    }
+    tx.set(txRef, {
+      id: txRef.id,
+      uid: caller.uid,
+      type: txType,
+      delta: -remainingSettlement,
+      balanceAfter: newBalance,
+      ...(projectId ? { projectId } : {}),
+      sceneId: params.targetSceneId || "scene-1",
+      curationSessionId: sessionId,
+      description:
+        creditablePreFlight > 0
+          ? `${description} (${remainingSettlement}T balance after 1T pre-flight)`
+          : `${description} (${remainingSettlement}T)`,
+      ...(generationTypeToStamp ? { generationType: generationTypeToStamp } : (txType === "spend_direct_hit" ? { generationType: "Direct Hit" } : {})),
+      ...(params.seedArtist ? { seedArtist: params.seedArtist } : {}),
+      ...(typeof params.costUsd === "number" ? { costUsd: params.costUsd } : (txType === "spend_direct_hit" ? { costUsd: 0.0000 } : {})),
+      ...(params.apiUsage ? { apiUsage: params.apiUsage } : (txType === "spend_direct_hit" ? { apiUsage: {} } : {})),
+      ...(params.anchorResolution ? { anchorResolution: params.anchorResolution } : (txType === "spend_direct_hit" ? { anchorResolution: { cacheHits: 1, cacheMisses: 0 } } : {})),
+      createdAt: FieldValue.serverTimestamp(),
+    });
 
     if (projectRef) {
       tx.set(
@@ -626,6 +648,7 @@ export const authorizeDirectHitCallable = onCall(
       curationSessionId,
       totalProjectCost: TOKEN_PRICING.SINGLE_SEED,
       projectId: cleanProjectId,
+      targetSceneId: targetSceneId || "scene-1",
       txType: "spend_direct_hit",
       description: `Zcene Curation: ${label}`,
       generationTypeToStamp: "Direct Hit",

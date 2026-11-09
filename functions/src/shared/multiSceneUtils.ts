@@ -12,7 +12,9 @@ import { stripCountrySlug } from './isoCountries';
 
 export const SCENE_BASE_CENTER_X = 1000;
 export const SCENE_BASE_CENTER_Y = 1000;
-export const SCENE_HORIZONTAL_STRIDE = 1600;
+export const SCENE_HORIZONTAL_STRIDE = 950;
+/** Pre-V43.1 stride. Retained only to detect and migrate legacy Coordinate Memory. */
+export const LEGACY_SCENE_HORIZONTAL_STRIDE = 1600;
 
 export function getSceneCenterOffset(sceneIndex: number): SceneCenterOffset {
   const safeIndex = Number.isFinite(sceneIndex) && sceneIndex >= 0 ? Math.floor(sceneIndex) : 0;
@@ -20,6 +22,159 @@ export function getSceneCenterOffset(sceneIndex: number): SceneCenterOffset {
     x: SCENE_BASE_CENTER_X + safeIndex * SCENE_HORIZONTAL_STRIDE,
     y: SCENE_BASE_CENTER_Y,
   };
+}
+
+/**
+ * Coordinate Memory Migration (1600px → 950px stride).
+ * Given a scene index and a sample of saved X coordinates belonging to that scene, returns the
+ * horizontal delta (e.g. -650 for sceneIndex 1) required to move the cluster from its legacy
+ * center (1000 + k*1600) to its current center (1000 + k*950). Returns 0 when the coordinates
+ * already sit closer to the current center (idempotent) or when sceneIndex is 0.
+ */
+export function detectLegacyStrideShiftX(sceneIndex: number, sampleXs: Array<number | null | undefined>): number {
+  const k = Number.isFinite(sceneIndex) ? Math.floor(sceneIndex) : 0;
+  if (k < 1) return 0;
+  const xs = (sampleXs || []).filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
+  if (xs.length === 0) return 0;
+  const meanX = xs.reduce((sum, x) => sum + x, 0) / xs.length;
+  const legacyCenterX = SCENE_BASE_CENTER_X + k * LEGACY_SCENE_HORIZONTAL_STRIDE;
+  const currentCenterX = SCENE_BASE_CENTER_X + k * SCENE_HORIZONTAL_STRIDE;
+  return Math.abs(meanX - legacyCenterX) < Math.abs(meanX - currentCenterX)
+    ? currentCenterX - legacyCenterX
+    : 0;
+}
+
+function isLegacyCenterOffset(centerOffset: any, sceneIndex: number): boolean {
+  if (!centerOffset || typeof centerOffset.x !== 'number' || sceneIndex < 1) return false;
+  return Math.abs(centerOffset.x - (SCENE_BASE_CENTER_X + sceneIndex * LEGACY_SCENE_HORIZONTAL_STRIDE)) < 0.5;
+}
+
+function shiftNodeX<T extends Record<string, any>>(node: T, dx: number): T {
+  if (!dx || !node) return node;
+  const next: Record<string, any> = { ...node };
+  if (typeof next.x === 'number') next.x = next.x + dx;
+  if (typeof next.fx === 'number') next.fx = next.fx + dx;
+  return next as T;
+}
+
+function resolveSceneIndexForNodeId(
+  nodeId: string,
+  sceneIndexById: Map<string, number>,
+  explicitIndex?: unknown
+): number {
+  if (typeof explicitIndex === 'number' && Number.isFinite(explicitIndex)) return Math.floor(explicitIndex);
+  const sceneId = extractSceneIdFromNodeId(nodeId);
+  if (!sceneId) return 0;
+  if (sceneIndexById.has(sceneId)) return sceneIndexById.get(sceneId)!;
+  const match = sceneId.match(/^scene-(\d+)$/i);
+  return match ? Math.max(0, parseInt(match[1], 10) - 1) : 0;
+}
+
+function buildSceneIndexMap(scenes?: Array<Partial<ProjectScene>> | null): Map<string, number> {
+  const map = new Map<string, number>();
+  (scenes || []).forEach((s, idx) => {
+    const id = String(s?.sceneId || s?.id || '').toLowerCase();
+    if (id) map.set(id, typeof s?.sceneIndex === 'number' ? s.sceneIndex : idx);
+  });
+  return map;
+}
+
+/**
+ * Migrates a saved `canvasLayout` (CanvasNodeRef[]) written under the legacy 1600px stride.
+ * Each scene's refs are shifted as a group (x and fx) only when their mean X sits nearer the
+ * legacy center — idempotent and safe to call on every load.
+ */
+export function migrateLegacyCanvasLayout<T extends { id?: string; nodeId?: string; x?: number; fx?: number | null }>(
+  layout: T[] | null | undefined,
+  scenes?: Array<Partial<ProjectScene>> | null
+): T[] {
+  if (!Array.isArray(layout) || layout.length === 0) return Array.isArray(layout) ? layout : [];
+  const sceneIndexById = buildSceneIndexMap(scenes);
+  const groups = new Map<number, number[]>();
+  const refIndex: number[] = layout.map((ref) => {
+    const idx = resolveSceneIndexForNodeId(String(ref?.id || ref?.nodeId || ''), sceneIndexById);
+    if (!groups.has(idx)) groups.set(idx, []);
+    if (typeof ref?.x === 'number') groups.get(idx)!.push(ref.x);
+    return idx;
+  });
+  const shifts = new Map<number, number>();
+  groups.forEach((xs, idx) => shifts.set(idx, detectLegacyStrideShiftX(idx, xs)));
+  if (Array.from(shifts.values()).every((dx) => dx === 0)) return layout;
+  return layout.map((ref, i) => shiftNodeX(ref as any, shifts.get(refIndex[i]) || 0) as T);
+}
+
+/**
+ * Migrates a composite/project `GraphData` whose scene-namespaced nodes were settled under the
+ * legacy 1600px stride. Links are left untouched.
+ */
+export function migrateLegacyGraphDataCoords<G extends { nodes?: any[]; links?: any[] }>(
+  graph: G | null | undefined,
+  scenes?: Array<Partial<ProjectScene>> | null
+): G | null | undefined {
+  if (!graph || !Array.isArray(graph.nodes) || graph.nodes.length === 0) return graph;
+  const sceneIndexById = buildSceneIndexMap(scenes);
+  const groups = new Map<number, number[]>();
+  const nodeIdx = graph.nodes.map((n: any) => {
+    const idx = resolveSceneIndexForNodeId(String(n?.id || ''), sceneIndexById, n?.sceneIndex);
+    if (!groups.has(idx)) groups.set(idx, []);
+    if (typeof n?.x === 'number') groups.get(idx)!.push(n.x);
+    return idx;
+  });
+  const shifts = new Map<number, number>();
+  groups.forEach((xs, idx) => shifts.set(idx, detectLegacyStrideShiftX(idx, xs)));
+  if (Array.from(shifts.values()).every((dx) => dx === 0)) return graph;
+  return {
+    ...graph,
+    nodes: graph.nodes.map((n: any, i: number) => shiftNodeX(n, shifts.get(nodeIdx[i]) || 0)),
+  };
+}
+
+/**
+ * Strips D3-mutated object references and `undefined` properties from a GraphData so it is
+ * safe to serialize across HTTPS Callable boundaries (links carry plain string IDs).
+ */
+export function sanitizeGraphDataForTransport(graph: any): GraphData {
+  const nodes = Array.isArray(graph?.nodes) ? graph.nodes : [];
+  const links = Array.isArray(graph?.links) ? graph.links : [];
+  const stripUndefined = (obj: Record<string, any>) => {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(obj || {})) {
+      if (v !== undefined && typeof v !== 'function') out[k] = v;
+    }
+    return out;
+  };
+  const cleanNodes = nodes
+    .filter((n: any) => n && n.id)
+    .map((n: any) => {
+      const { vx, vy, index, ...rest } = n;
+      return stripUndefined(rest);
+    });
+  const cleanLinks = links
+    .map((l: any) => {
+      if (!l) return null;
+      const source = typeof l.source === 'object' && l.source !== null ? l.source.id : l.source;
+      const target = typeof l.target === 'object' && l.target !== null ? l.target.id : l.target;
+      if (typeof source !== 'string' || typeof target !== 'string' || !source || !target) return null;
+      const { index, ...rest } = l;
+      return stripUndefined({ ...rest, source, target });
+    })
+    .filter(Boolean);
+  const out: GraphData = { nodes: cleanNodes as Node[], links: cleanLinks as Link[] };
+  if (graph?.synthesisRationale) out.synthesisRationale = graph.synthesisRationale;
+  return out;
+}
+
+/** Applies `sanitizeGraphDataForTransport` to every scene's graphData and strips undefined fields. */
+export function sanitizeScenesForTransport(scenes: ProjectScene[]): ProjectScene[] {
+  if (!Array.isArray(scenes)) return [];
+  return scenes.map((s) => {
+    const out: Record<string, any> = {};
+    for (const [k, v] of Object.entries(s || {})) {
+      if (v !== undefined && typeof v !== 'function') out[k] = v;
+    }
+    out.graphData = sanitizeGraphDataForTransport(s?.graphData);
+    return out as ProjectScene;
+  });
 }
 
 export function namespaceSceneNodeId(sceneId: string, canonicalId: string): string {
@@ -178,6 +333,22 @@ export function normalizeProjectScene(
     s.status ||
     (graphData.nodes && graphData.nodes.length > 0 ? 'ready' : 'unmapped');
 
+  // Coordinate Memory Migration (1600px → 950px stride): rebase legacy centers and any
+  // settled node coordinates stored inside this scene's graphData.
+  let centerOffset: SceneCenterOffset = s.centerOffset || getSceneCenterOffset(sceneIndex);
+  if (isLegacyCenterOffset(centerOffset, sceneIndex)) {
+    centerOffset = { ...centerOffset, x: getSceneCenterOffset(sceneIndex).x };
+  }
+  if (sceneIndex >= 1 && graphData.nodes.length > 0) {
+    const nodeShift = detectLegacyStrideShiftX(
+      sceneIndex,
+      graphData.nodes.map((n: any) => n?.x)
+    );
+    if (nodeShift !== 0) {
+      graphData = { ...graphData, nodes: graphData.nodes.map((n: any) => shiftNodeX(n, nodeShift)) };
+    }
+  }
+
   return {
     id: sceneId,
     sceneId,
@@ -192,7 +363,7 @@ export function normalizeProjectScene(
     graphData,
     synthesisRationale: s.synthesisRationale || graphData.synthesisRationale || '',
     artistSnippets: s.artistSnippets && typeof s.artistSnippets === 'object' ? s.artistSnippets : {},
-    centerOffset: s.centerOffset || getSceneCenterOffset(sceneIndex),
+    centerOffset,
     status,
     ...(s.pathway ? { pathway: s.pathway } : {}),
     ...(s.generationType ? { generationType: s.generationType } : {}),
@@ -452,7 +623,10 @@ export function buildCompositeCanvasGraph(
   scenes.forEach((scene, idx) => {
     const sceneIndex = typeof scene.sceneIndex === 'number' ? scene.sceneIndex : idx;
     const sceneId = scene.sceneId || scene.id || `scene-${sceneIndex + 1}`;
-    const center = scene.centerOffset || getSceneCenterOffset(sceneIndex);
+    const center =
+      scene.centerOffset && !isLegacyCenterOffset(scene.centerOffset, sceneIndex)
+        ? scene.centerOffset
+        : getSceneCenterOffset(sceneIndex);
     const seedList = scene.seedIds?.length
       ? scene.seedIds
       : scene.seedArtistIds?.length
@@ -461,6 +635,23 @@ export function buildCompositeCanvasGraph(
 
     const rawNodes = scene.graphData?.nodes || [];
     const rawLinks = scene.graphData?.links || [];
+
+    // Coordinate Memory Migration: detect per-scene legacy (1600px stride) saved positions as a group.
+    const lookupSavedRef = (canonicalId: string, namespacedId: string) =>
+      layoutMap.get(namespacedId) ||
+      layoutMap.get(namespacedId.toLowerCase()) ||
+      (sceneIndex === 0 ? layoutMap.get(canonicalId) || layoutMap.get(canonicalId.toLowerCase()) : undefined);
+    const sceneSavedXs: number[] = [];
+    const sceneRawXs: number[] = [];
+    for (const rawNode of rawNodes) {
+      if (!rawNode || !rawNode.id) continue;
+      const canon = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
+      const ref = lookupSavedRef(canon, namespaceSceneNodeId(sceneId, canon));
+      if (ref && typeof ref.x === 'number') sceneSavedXs.push(ref.x);
+      if (typeof rawNode.x === 'number') sceneRawXs.push(rawNode.x);
+    }
+    const savedShiftX = detectLegacyStrideShiftX(sceneIndex, sceneSavedXs);
+    const rawShiftX = detectLegacyStrideShiftX(sceneIndex, sceneRawXs);
 
     for (const rawNode of rawNodes) {
       if (!rawNode || !rawNode.id) continue;
@@ -476,10 +667,7 @@ export function buildCompositeCanvasGraph(
           isCanonicalSeedMatch(canonicalId, seedList) ||
           (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false));
 
-      const savedRef =
-        layoutMap.get(namespacedId) ||
-        layoutMap.get(namespacedId.toLowerCase()) ||
-        (sceneIndex === 0 ? layoutMap.get(canonicalId) || layoutMap.get(canonicalId.toLowerCase()) : undefined);
+      const savedRef = lookupSavedRef(canonicalId, namespacedId);
 
       const hasSavedCoords =
         savedRef && typeof savedRef.x === 'number' && typeof savedRef.y === 'number';
@@ -501,19 +689,19 @@ export function buildCompositeCanvasGraph(
       };
 
       if (hasSavedCoords) {
-        nodeClone.x = savedRef!.x;
+        nodeClone.x = (savedRef!.x as number) + savedShiftX;
         nodeClone.y = savedRef!.y;
-        nodeClone.fx = savedRef!.x;
+        nodeClone.fx = (savedRef!.x as number) + savedShiftX;
         nodeClone.fy = savedRef!.y;
       } else if (typeof rawNode.x === 'number' && typeof rawNode.y === 'number') {
-        nodeClone.x = rawNode.x;
+        nodeClone.x = rawNode.x + rawShiftX;
         nodeClone.y = rawNode.y;
         if (typeof rawNode.fx === 'number' && typeof rawNode.fy === 'number') {
-          nodeClone.fx = rawNode.fx;
+          nodeClone.fx = rawNode.fx + rawShiftX;
           nodeClone.fy = rawNode.fy;
         }
       } else {
-        // Initialize near the deterministic Scene center so D3 blooms cleanly around (1000 + k*1600, 1000)
+        // Initialize near the deterministic Scene center so D3 blooms cleanly around (1000 + k*950, 1000)
         const angle = (compositeNodes.length * 137.5 * Math.PI) / 180;
         const radius = isSceneSeed ? 25 : 90 + (compositeNodes.length % 7) * 30;
         nodeClone.x = center.x + Math.cos(angle) * radius;
@@ -740,14 +928,23 @@ export function getAllProjectSeedIds(scenes: ProjectScene[]): string[] {
   return result;
 }
 
-export function getAllProjectSeedArtistsString(scenes: ProjectScene[]): string {
-  if (!Array.isArray(scenes) || scenes.length === 0) return '';
+/**
+ * Aggregates every unique Root Artist display name across all Scenes (scene order).
+ * Accepts parsed scenes or the raw Firestore JSON string. When no scene carries seeds,
+ * falls back to `fallbackSeedArtists` (legacy single-scene documents).
+ */
+export function getAllProjectSeedArtistsList(
+  scenes: ProjectScene[] | string | null | undefined,
+  fallbackSeedArtists?: unknown
+): string[] {
+  const parsedScenes: ProjectScene[] =
+    typeof scenes === 'string' ? parseProjectScenes(scenes) : Array.isArray(scenes) ? scenes : [];
   const seen = new Set<string>();
   const names: string[] = [];
+  const sorted = [...parsedScenes].sort((a, b) => (a?.sceneIndex ?? 0) - (b?.sceneIndex ?? 0));
 
-  for (const scene of scenes) {
-    const rawNames = toSeedArtistsArray(scene?.seedArtists);
-    for (const name of rawNames) {
+  for (const scene of sorted) {
+    for (const name of toSeedArtistsArray(scene?.seedArtists)) {
       const norm = normalizeCanonicalEntityId(name);
       if (norm && !seen.has(norm)) {
         seen.add(norm);
@@ -755,7 +952,116 @@ export function getAllProjectSeedArtistsString(scenes: ProjectScene[]): string {
       }
     }
   }
-  return names.join('::');
+
+  if (names.length === 0) {
+    for (const name of toSeedArtistsArray(fallbackSeedArtists)) {
+      const norm = normalizeCanonicalEntityId(name);
+      if (norm && !seen.has(norm)) {
+        seen.add(norm);
+        names.push(name);
+      }
+    }
+  }
+  return names;
+}
+
+export function getAllProjectSeedArtistsString(
+  scenes: ProjectScene[] | string | null | undefined,
+  fallbackSeedArtists?: unknown
+): string {
+  return getAllProjectSeedArtistsList(scenes, fallbackSeedArtists).join('::');
+}
+
+export interface ProjectCardMetrics {
+  sceneCount: number;
+  seedList: string[];
+  rootArtistsCount: number;
+  recommendedCount: number;
+  labelCount: number;
+  deepCutsCount: number;
+}
+
+/**
+ * Pure, scene-aware Dashboard card metrics. Strips `scene-k::` namespaces, deduplicates
+ * canonical entities across all Scenes, counts Root Artists across every Scene, and matches
+ * `activeNodes` (canonical IDs) against canonical node IDs so multi-scene Deep Cuts resolve.
+ */
+export function computeProjectCardMetrics(project: {
+  scenes?: string | ProjectScene[] | null;
+  graphData?: string | GraphData | null;
+  seedArtists?: unknown;
+  activeNodes?: string[] | null;
+} | null | undefined): ProjectCardMetrics {
+  const empty: ProjectCardMetrics = {
+    sceneCount: 0,
+    seedList: [],
+    rootArtistsCount: 0,
+    recommendedCount: 0,
+    labelCount: 0,
+    deepCutsCount: 0,
+  };
+  if (!project) return empty;
+
+  const scenes = parseProjectScenes(project.scenes as any);
+  const mappedScenes = scenes.filter((s) => (s.graphData?.nodes?.length || 0) > 0);
+  const seedList = getAllProjectSeedArtistsList(scenes, project.seedArtists);
+
+  // Prefer authoritative per-scene topology; fall back to the composite / legacy graphData.
+  let nodes: any[] = mappedScenes.flatMap((s) => s.graphData?.nodes || []);
+  if (nodes.length === 0 && project.graphData) {
+    try {
+      const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
+      if (pg && Array.isArray(pg.nodes)) nodes = pg.nodes;
+    } catch {
+      nodes = [];
+    }
+  }
+
+  const seedNorms = seedList.map((s) => normalizeCanonicalEntityId(s));
+  const artistCanon = new Map<string, any>();
+  const labelCanon = new Set<string>();
+  for (const n of nodes) {
+    if (!n || !n.id) continue;
+    const canon = normalizeCanonicalEntityId(stripSceneNamespace(n.canonicalId || n.id));
+    if (!canon) continue;
+    if (n.type === 'label') labelCanon.add(canon);
+    else if (n.type === 'artist' || !n.type) {
+      if (!artistCanon.has(canon)) artistCanon.set(canon, n);
+    }
+  }
+
+  let rootArtistsInGraph = 0;
+  let recommendedCount = 0;
+  artistCanon.forEach((n, canon) => {
+    const isRoot =
+      isCanonicalSeedMatch(canon, seedNorms) ||
+      (n.label ? isCanonicalSeedMatch(n.label, seedNorms) : false);
+    if (isRoot) rootArtistsInGraph++;
+    else recommendedCount++;
+  });
+
+  const rawActive = Array.isArray(project.activeNodes) ? project.activeNodes : [];
+  const activeCanon = new Set(
+    rawActive.map((id) => normalizeCanonicalEntityId(stripSceneNamespace(String(id)))).filter(Boolean)
+  );
+  let deepCutsCount: number;
+  if (artistCanon.size + labelCanon.size > 0) {
+    deepCutsCount = 0;
+    activeCanon.forEach((id) => {
+      if (artistCanon.has(id) || labelCanon.has(id)) deepCutsCount++;
+    });
+  } else {
+    deepCutsCount = activeCanon.size;
+  }
+
+  return {
+    sceneCount: Math.max(mappedScenes.length, scenes.length > 0 ? 1 : 0),
+    seedList,
+    rootArtistsCount: seedList.length > 0 ? seedList.length : rootArtistsInGraph,
+    recommendedCount,
+    labelCount: labelCanon.size,
+    deepCutsCount,
+  };
 }
 
 export function parseProjectScenes(

@@ -13,6 +13,7 @@ import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } fr
 import { DashboardProjectCard } from './DashboardProjectCard';
 import { CreateProjectCard } from './CreateProjectCard';
 import { PROFILE_COLORS } from './SharedModals';
+import { computeProjectCardMetrics } from '../shared/multiSceneUtils';
 
 
 interface DashboardProps {
@@ -637,45 +638,18 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </tr>
 
                       {groupedProjects[bucketKey].map((project, index) => {
-                        const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
+                        const {
+                          sceneCount,
+                          seedList,
+                          rootArtistsCount,
+                          recommendedCount,
+                          labelCount,
+                          deepCutsCount,
+                        } = computeProjectCardMetrics(project);
                         const displayTitle = getProjectDisplayTitle(project);
                         const formattedDate = formatSystemTimestamp(project.updatedAt);
                         const hasGraphNodes = !!project.graphData && !project.graphData.includes('"nodes":[]');
                         const isMapped = project.status === 'completed';
-                        
-                        // ARCHITECTURE: Dynamic Dashboard Integrity
-                        // Derive deep cuts count dynamically from actual rendered nodes, prohibiting static placeholders.
-                        let deepCutsCount = 0;
-                        const rawActiveNodes = project.activeNodes || [];
-                        if (project.graphData) {
-                          try {
-                            const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
-                            if (pg && Array.isArray(pg.nodes)) {
-                              deepCutsCount = pg.nodes.filter((n: any) => 
-                                rawActiveNodes.includes(n.id) && (n.type === 'artist' || n.type === 'label' || !n.type)
-                              ).length;
-                            } else {
-                              deepCutsCount = rawActiveNodes.length;
-                            }
-                          } catch (e) { deepCutsCount = rawActiveNodes.length; }
-                        } else {
-                          deepCutsCount = rawActiveNodes.length;
-                        }
-                        
-                        let recommendedCount = 0;
-                        let labelCount = 0;
-                        if (project.graphData) {
-                          try {
-                            const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
-                            if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
-                              const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-                              recommendedCount = artistNodes.filter((n: any) => !isNodeInSeedList(n.id || n.label || '', seedList)).length;
-                              labelCount = parsedGraph.nodes.filter((n: any) => n.type === 'label').length;
-                            }
-                          } catch (e) {
-                            console.warn(`Failed to parse graphData for project ${project.id}:`, e);
-                          }
-                        }
                         
                         const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
                         const tdClass = `transition-colors ${rowBg} group-hover:bg-white/5 ${index === 0 ? 'relative z-10' : ''}`;
@@ -702,7 +676,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                ROOT ARTISTS: {seedList.length}
+                                ROOT ARTISTS: {rootArtistsCount}
                               </span>
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>

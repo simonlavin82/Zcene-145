@@ -5,6 +5,7 @@ import { getProjectDisplayTitle, cleanArtistDisplayName, isNodeInSeedList } from
 import { formatSystemTimestamp, generateDeterministicGradient, extractInitials } from '../utils/formatters';
 import { useSeedImages } from '../hooks/useSeedImages';
 import { useDominantColor } from '../hooks/useDominantColor';
+import { computeProjectCardMetrics } from '../shared/multiSceneUtils';
 
 interface DashboardProjectCardProps {
   project: Project;
@@ -45,45 +46,21 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
     ? (project.trashedAt?.toMillis ? project.trashedAt.toMillis() : new Date(project.trashedAt).getTime()) + 30 * 24 * 60 * 60 * 1000
     : null;
   const daysLeft = purgeMs ? Math.max(0, Math.ceil((purgeMs - Date.now()) / (24 * 60 * 60 * 1000))) : 30;
-  const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
+  const {
+    sceneCount,
+    seedList,
+    rootArtistsCount,
+    recommendedCount,
+    labelCount,
+    deepCutsCount,
+  } = computeProjectCardMetrics(project);
   const displayTitle = getProjectDisplayTitle(project);
   const isUnmapped = project.status !== 'completed' && project.status !== 'trashed' && project.status !== 'curating' && project.status !== 'pending' && project.status !== 'failed' && !project.seedArtists;
   
-  const imageUrls = useSeedImages(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl, project.seedImageUrls);
+  const imageUrls = useSeedImages(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl, project.seedImageUrls, project.scenes);
   const hasArtwork = Boolean(imageUrls.length > 0 && imageUrls[0] && imageUrls[0] !== 'not-found' && !imgError);
   const dominantColor = useDominantColor(hasArtwork ? imageUrls[0] : undefined);
   const hasAccentColor = Boolean(hasArtwork && dominantColor && dominantColor !== 'transparent');
-
-  // Derive deep cuts count dynamically
-  let deepCutsCount = 0;
-  const rawActiveNodes = project.activeNodes || [];
-  if (project.graphData) {
-    try {
-      const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
-      if (pg && Array.isArray(pg.nodes)) {
-        deepCutsCount = pg.nodes.filter((n: any) => 
-          rawActiveNodes.includes(n.id) && (n.type === 'artist' || n.type === 'label' || !n.type)
-        ).length;
-      } else {
-        deepCutsCount = rawActiveNodes.length;
-      }
-    } catch (e) { deepCutsCount = rawActiveNodes.length; }
-  } else {
-    deepCutsCount = rawActiveNodes.length;
-  }
-
-  let recommendedCount = 0;
-  let labelCount = 0;
-  if (project.graphData) {
-    try {
-      const parsedGraph = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
-      if (parsedGraph && Array.isArray(parsedGraph.nodes)) {
-        const artistNodes = parsedGraph.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-        recommendedCount = artistNodes.filter((n: any) => !isNodeInSeedList(n.id || n.label || '', seedList)).length;
-        labelCount = parsedGraph.nodes.filter((n: any) => n.type === 'label').length;
-      }
-    } catch (e) { /* ignore */ }
-  }
 
   return (
     <motion.div
@@ -300,7 +277,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
           <div className="mt-3 flex items-center">
             <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
               <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                ROOT ARTISTS: {seedList.length}
+                ROOT ARTISTS: {rootArtistsCount}
               </span>
               {(project.status === 'completed' || isTrashed) && (
                 <>

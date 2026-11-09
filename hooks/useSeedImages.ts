@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
 import { normalizeArtistId } from '../services/artistCacheService';
+import { getAllProjectSeedArtistsList } from '../shared/multiSceneUtils';
 
 /**
  * Hook to resolve seed artwork for Dashboard Cards in accordance with Architecture V29 (Rule 29).
@@ -14,20 +15,20 @@ export const useSeedImages = (
   projectDetailsCache?: string,
   fallbackGraphData?: any,
   seedImageUrl?: string,
-  seedImageUrls?: (string | null)[]
+  seedImageUrls?: (string | null)[],
+  scenes?: any
 ): string[] => {
   return useMemo(() => {
-    if (!seedArtists) return [];
-
     // 1. Primary Pathway (Architecture V29): Frozen seedImageUrls snapshot
     if (seedImageUrls && Array.isArray(seedImageUrls)) {
-      return seedImageUrls
+      const valid = seedImageUrls
         .filter((url): url is string => typeof url === 'string' && url.trim().length > 0 && url !== 'not-found')
         .map(url => url.trim());
+      if (valid.length > 0) return valid;
     }
 
     // 2. Legacy In-Memory Fallback: Strictly scoped to the project's own snapshot
-    const list = seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+    const list = getAllProjectSeedArtistsList(scenes, seedArtists);
     if (list.length === 0) return [];
 
     const resolved: string[] = [];
@@ -97,5 +98,5 @@ export const useSeedImages = (
     }
 
     return resolved;
-  }, [seedArtists, projectDetailsCache, fallbackGraphData, seedImageUrl, seedImageUrls]);
+  }, [seedArtists, projectDetailsCache, fallbackGraphData, seedImageUrl, seedImageUrls, scenes]);
 };

@@ -16,6 +16,11 @@ import {
   toSeedArtistsString,
   normalizeProjectScene,
   normalizeCrossSceneLink,
+  computeProjectCardMetrics,
+  getAllProjectSeedArtistsString,
+  getAllProjectSeedArtistsList,
+  detectLegacyStrideShiftX,
+  migrateLegacyCanvasLayout,
 } from '../../shared/multiSceneUtils';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
 import { computeProjectHydrationFingerprint } from '../../utils/projectHydrationFingerprint';
@@ -23,10 +28,10 @@ import { applyShareBlacklistMutation } from '../../App';
 import { ProjectScene, CrossSceneLink, CanvasNodeRef } from '../../types';
 
 describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])', () => {
-  it('computes deterministic horizontal cluster center offsets (1000 + sceneIndex * 1600, 1000)', () => {
+  it('computes deterministic horizontal cluster center offsets (1000 + sceneIndex * 950, 1000)', () => {
     expect(getSceneCenterOffset(0)).toEqual({ x: 1000, y: 1000 });
-    expect(getSceneCenterOffset(1)).toEqual({ x: 2600, y: 1000 });
-    expect(getSceneCenterOffset(2)).toEqual({ x: 4200, y: 1000 });
+    expect(getSceneCenterOffset(1)).toEqual({ x: 1950, y: 1000 });
+    expect(getSceneCenterOffset(2)).toEqual({ x: 2900, y: 1000 });
   });
 
   it('namespaces canvas node IDs as scene-k::canonicalId and strips namespaces cleanly', () => {
@@ -121,9 +126,9 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     expect(jewScene1?.fx).toBe(1120);
     expect(jewScene1?.fy).toBe(920);
 
-    // Scene 2 nodes initialize near Scene 2 center (2600, 1000)
-    expect(jewScene2?.x).toBeGreaterThan(2400);
-    expect(jewScene2?.x).toBeLessThan(2800);
+    // Scene 2 nodes initialize near Scene 2 center (1950, 1000)
+    expect(jewScene2?.x).toBeGreaterThan(1750);
+    expect(jewScene2?.x).toBeLessThan(2150);
 
     // Deterministic identity bridges + AI sonic_lineage bridges are present as Cross-Scene Bridge links
     const crossLinks = composite.links.filter((l) => l.isCrossSceneBridge);
@@ -280,5 +285,64 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     expect(normLink.fromSceneId).toBe('scene-1');
     expect(normLink.toSceneId).toBe('scene-2');
     expect(parseCrossSceneLinks(JSON.stringify([normLink]))[0].sourceSceneId).toBe('scene-1');
+  });
+
+  it('accurately computes project card metrics across multi-scene projects', () => {
+    const mockScenes: ProjectScene[] = [
+      normalizeProjectScene({
+        sceneIndex: 0,
+        title: 'Scene 1',
+        seedArtists: 'Sense Field::Reason To Believe',
+        seedIds: ['sense-field-us', 'reason-to-believe-us'],
+        graphData: {
+          nodes: [
+            { id: 'scene-1::sense-field-us', label: 'Sense Field', type: 'artist', isSeed: true },
+            { id: 'scene-1::reason-to-believe-us', label: 'Reason To Believe', type: 'artist', isSeed: true },
+            { id: 'scene-1::texas-is-the-reason-us', label: 'Texas Is the Reason', type: 'artist' },
+            { id: 'scene-1::revelation-records', label: 'Revelation Records', type: 'label' }
+          ],
+          links: []
+        }
+      }, 0),
+      normalizeProjectScene({
+        sceneIndex: 1,
+        title: 'Scene 2',
+        seedArtists: 'Jimmy Eat World',
+        seedIds: ['jimmy-eat-world-us'],
+        graphData: {
+          nodes: [
+            { id: 'scene-2::jimmy-eat-world-us', label: 'Jimmy Eat World', type: 'artist', isSeed: true },
+            { id: 'scene-2::texas-is-the-reason-us', label: 'Texas Is the Reason', type: 'artist' },
+            { id: 'scene-2::revelation-records', label: 'Revelation Records', type: 'label' }
+          ],
+          links: []
+        }
+      }, 1)
+    ];
+
+    const metrics = computeProjectCardMetrics({
+      scenes: mockScenes,
+      seedArtists: 'Sense Field::Reason To Believe::Jimmy Eat World',
+      activeNodes: ['sense-field-us', 'reason-to-believe-us', 'jimmy-eat-world-us', 'texas-is-the-reason-us', 'revelation-records']
+    });
+
+    expect(metrics.rootArtistsCount).toBe(3);
+    expect(metrics.seedList).toEqual(['Sense Field', 'Reason To Believe', 'Jimmy Eat World']);
+    expect(metrics.recommendedCount).toBe(1); // Texas Is the Reason (deduplicated across scenes)
+    expect(metrics.labelCount).toBe(1); // Revelation Records (deduplicated)
+    expect(metrics.deepCutsCount).toBe(5);
+  });
+
+  it('detects legacy 1600px stride coordinates and shifts them to 950px stride', () => {
+    const shift = detectLegacyStrideShiftX(1, [2550, 2600, 2650]);
+    expect(shift).toBe(-650);
+
+    const migrated = migrateLegacyCanvasLayout([
+      { nodeId: 'scene-1::sense-field-us', x: 1000, y: 1000, fx: 1000, fy: 1000 },
+      { nodeId: 'scene-2::jimmy-eat-world-us', x: 2600, y: 1000, fx: 2600, fy: 1000 }
+    ]);
+    expect(migrated[0].x).toBe(1000);
+    expect(migrated[1].x).toBe(1950);
+    expect(migrated[1].fx).toBe(1950);
   });
 });

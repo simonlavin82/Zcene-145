@@ -214,6 +214,7 @@ export const executeCurationPipeline = onCall({
     curationSessionId: payload.curationSessionId,
     totalProjectCost,
     projectId: payload.projectId,
+    targetSceneId: payload.targetSceneId || payload.activeSceneId || "scene-1",
     txType: "spend_live_synthesis",
     description: `Zcene Synthesis: ${displaySeeds}`,
     generationTypeToStamp: hasActiveFilters ? "Filtered Live Synthesis" : "Root Generation",

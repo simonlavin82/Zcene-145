@@ -129,7 +129,7 @@ export interface CanvasNodeRef {
 }
 
 export interface SceneCenterOffset {
-  x: number; // Deterministic cluster center X: 1000 + sceneIndex * 1600
+  x: number; // Deterministic cluster center X: 1000 + sceneIndex * 950
   y: number; // Deterministic cluster center Y: 1000
 }
 
@@ -147,7 +147,7 @@ export interface ProjectScene {
   graphData: GraphData;               // Un-namespaced canonical scene topology
   synthesisRationale: string;         // Scene-specific Zine editorial markdown
   artistSnippets?: Record<string, string>; // Scene-specific 1-sentence epicenter hooks keyed by canonical ID
-  centerOffset: SceneCenterOffset;    // { x: 1000 + sceneIndex * 1600, y: 1000 }
+  centerOffset: SceneCenterOffset;    // { x: 1000 + sceneIndex * 950, y: 1000 }
   status: 'unmapped' | 'curating' | 'ready' | 'failed' | 'completed' | 'idle';
   pathway?: 'direct_hit' | 'root_generation' | 'complex_generation';
   generationType?: string;

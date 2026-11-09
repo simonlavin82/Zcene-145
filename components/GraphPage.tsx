@@ -1679,9 +1679,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
     [scenes, activeSceneId]
   );
   const isFirstGeneration = useMemo(() => data.nodes.length === 0 && !seedArtists, [data.nodes.length, seedArtists]);
-  const isActiveSceneEmpty = useMemo(
-    () => activeScene ? (activeScene.graphData?.nodes?.length || 0) === 0 : isFirstGeneration,
-    [activeScene, isFirstGeneration]
+  // V43.1: The Update gate is project-scoped. Once ANY scene is mapped, every subsequent
+  // generation (modifying a scene OR curating a newly added scene) routes through
+  // UpdateInterceptModal (Save as New Zcene [default] vs. Overwrite Existing).
+  const hasExistingProjectGraph = useMemo(
+    () => data.nodes.length > 0 || scenes.some(s => (s.graphData?.nodes?.length || 0) > 0),
+    [data.nodes.length, scenes]
   );
 
   const handleApplyChanges = () => {
@@ -1722,7 +1725,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     
     const newSeed = enabledArtists.join('::');
     
-    if (!isActiveSceneEmpty) {
+    if (hasExistingProjectGraph) {
       setPendingUpdateSeed(newSeed);
       setConfirmOverwrite(false);
       setIsUpdateModalOpen(true);
@@ -2000,10 +2003,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const createButtonLabel = useMemo(() => {
     const hasSearch = searchTerm.trim().length > 0;
     if (hasSearch) {
-        return isActiveSceneEmpty ? 'Add & Create Zcene' : 'Add & Update Zcene';
+        return hasExistingProjectGraph ? 'Add & Update Zcene' : 'Add & Create Zcene';
     }
-    return isActiveSceneEmpty ? 'Create Zcene' : 'Update Zcene';
-  }, [searchTerm, isActiveSceneEmpty]);
+    return hasExistingProjectGraph ? 'Update Zcene' : 'Create Zcene';
+  }, [searchTerm, hasExistingProjectGraph]);
 
   const ArtistsPanelContent = (
     <div className="flex flex-col flex-1 bg-zinc-900 overflow-hidden relative">

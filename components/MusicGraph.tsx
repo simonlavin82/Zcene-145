@@ -34,7 +34,7 @@ const computeBridgePathD = (d: any): string => {
   const mx = (x1 + x2) / 2;
   const my = (y1 + y2) / 2;
   const dx = Math.abs(x2 - x1);
-  const arcLift = Math.min(260, Math.max(90, dx * 0.16));
+  const arcLift = Math.min(200, Math.max(70, dx * 0.15));
   const cy = my - arcLift;
   return `M ${x1},${y1} Q ${mx},${cy} ${x2},${y2}`;
 };

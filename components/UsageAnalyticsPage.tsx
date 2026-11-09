@@ -509,9 +509,9 @@ export const buildUnifiedActivityRows = (
             }
 
             const hasPreFlightCredit = /after\s+1t\s+pre-flight/i.test(rawDescription) || Math.abs(delta) === 4 || Math.abs(delta) === 9;
-            const totalProjectTokens = matchedProj?.hasRecordedTokens && matchedProj.tokensSpent > 0
-                ? matchedProj.tokensSpent
-                : (hasPreFlightCredit ? Math.abs(delta) + 1 : Math.abs(delta));
+            const totalProjectTokens = Math.abs(delta) > 0
+                ? (hasPreFlightCredit ? Math.abs(delta) + 1 : Math.abs(delta))
+                : (matchedProj?.tokensSpent ?? 0);
 
             const resolvedStatus = matchedProj?.status || 'archived';
             const resolvedScope =
@@ -522,7 +522,7 @@ export const buildUnifiedActivityRows = (
                 matchedProj?.generationType ||
                 (txType === 'spend_direct_hit' ? 'Direct Hit' : 'Root Generation');
 
-            const displayTitle = matchedProj?.seedArtist || cleanSeed;
+            const displayTitle = (tx.seedArtist ? cleanArtistDisplayName(tx.seedArtist) : '') || matchedProj?.seedArtist || cleanSeed;
             const splitDebitNote = hasPreFlightCredit
                 ? `${Math.abs(delta)}T settlement after 1T pre-flight`
                 : undefined;

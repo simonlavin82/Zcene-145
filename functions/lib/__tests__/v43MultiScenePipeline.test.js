@@ -161,7 +161,8 @@ const tokenEconomy_1 = require("../shared/tokenEconomy");
         const s2Node = composite.nodes.find((n) => n.id === 'scene-2::jimmy-eat-world-us');
         (0, vitest_1.expect)(s1Node?.fx).toBe(950);
         (0, vitest_1.expect)(s1Node?.fy).toBe(1000);
-        (0, vitest_1.expect)(s2Node?.x).toBeGreaterThan(2400);
+        (0, vitest_1.expect)(s2Node?.x).toBeGreaterThan(1750);
+        (0, vitest_1.expect)(s2Node?.x).toBeLessThan(2150);
         (0, vitest_1.expect)((0, multiSceneUtils_1.computeDeduplicatedActiveNodes)([scene1, scene2])).toEqual([
             'sense-field-us',
             'reason-to-believe-us',

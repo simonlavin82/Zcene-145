@@ -2239,9 +2239,37 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 mergedApiUsage[model].candidates += usage.candidates;
                 mergedApiUsage[model].total += usage.total;
             }
+            // Accumulate apiUsage and tokensSpent across scenes on the parent project document
+            let accumulatedProjectApiUsage = { ...mergedApiUsage };
+            let accumulatedTokensSpent = typeof inputPayload?.tokensSpent === "number" ? inputPayload.tokensSpent : 0;
+            try {
+                const projectSnap = await db.collection("users").doc(jobData.userId).collection("projects").doc(inputPayload.projectId).get();
+                if (projectSnap.exists) {
+                    const pData = projectSnap.data() || {};
+                    if (pData.apiUsage && typeof pData.apiUsage === "object") {
+                        accumulatedProjectApiUsage = { ...pData.apiUsage };
+                        for (const [model, usage] of Object.entries(mergedApiUsage)) {
+                            const u = usage;
+                            if (!accumulatedProjectApiUsage[model]) {
+                                accumulatedProjectApiUsage[model] = { prompt: 0, candidates: 0, total: 0 };
+                            }
+                            accumulatedProjectApiUsage[model].prompt = (accumulatedProjectApiUsage[model].prompt || 0) + (u.prompt || 0);
+                            accumulatedProjectApiUsage[model].candidates = (accumulatedProjectApiUsage[model].candidates || 0) + (u.candidates || 0);
+                            accumulatedProjectApiUsage[model].total = (accumulatedProjectApiUsage[model].total || 0) + (u.total || 0);
+                        }
+                    }
+                    if (typeof pData.tokensSpent === "number") {
+                        accumulatedTokensSpent = pData.tokensSpent + accumulatedTokensSpent;
+                    }
+                }
+            }
+            catch (pErr) {
+                console.warn(`[Curation Backend] Non-fatal project telemetry fetch warning:`, pErr?.message || pErr);
+            }
             await updateProjectStatus(jobData.userId, inputPayload.projectId, {
                 status: "completed",
                 schemaVersion: 43,
+                seedArtists: (0, multiSceneUtils_1.getAllProjectSeedArtistsString)(finalProjectScenes, inputPayload.seedArtists || inputPayload.artists || ''),
                 graphData: JSON.stringify(result.graphData),
                 ...(finalProjectScenes.length > 0
                     ? {
@@ -2258,8 +2286,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 activeJobId: null,
                 detailsCache: result.detailsCache,
                 activeNodes: hoistedActiveNodes, // Phase 2B: canonical seed-first ordering
-                apiUsage: mergedApiUsage,
-                ...(typeof inputPayload?.tokensSpent === "number" ? { tokensSpent: inputPayload.tokensSpent } : {}),
+                apiUsage: accumulatedProjectApiUsage,
+                tokensSpent: accumulatedTokensSpent,
                 ...(inputPayload?.generationType ? { generationType: inputPayload.generationType } : {}),
                 ...(result.anchorResolution ? { anchorResolution: result.anchorResolution } : {}),
                 seedImageUrls: extractedSeedImageUrls,
@@ -2289,14 +2317,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             try {
                 const userTxCol = db.collection("users").doc(jobData.userId).collection("tokenTransactions");
                 let targetTxRef = null;
-                if (inputPayload?.projectId) {
-                    const q = await userTxCol.where("projectId", "==", inputPayload.projectId).limit(1).get();
+                if (inputPayload?.curationSessionId) {
+                    const q = await userTxCol.where("curationSessionId", "==", inputPayload.curationSessionId).limit(1).get();
                     if (!q.empty) {
                         targetTxRef = q.docs[0].ref;
                     }
                 }
-                if (!targetTxRef && inputPayload?.curationSessionId) {
-                    const q = await userTxCol.where("curationSessionId", "==", inputPayload.curationSessionId).limit(1).get();
+                if (!targetTxRef && inputPayload?.projectId) {
+                    const q = await userTxCol.where("projectId", "==", inputPayload.projectId).limit(1).get();
                     if (!q.empty) {
                         targetTxRef = q.docs[0].ref;
                     }
