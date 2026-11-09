@@ -56,8 +56,10 @@ export const applyCanonicalAlias = (rawName: string): string => {
   return CANONICAL_ALIASES[lookupKey] || rawName;
 };
 
-export const normalizeArtistId = (name: string): string =>
-  name
+export const normalizeArtistId = (name: string): string => {
+  if (!name || typeof name !== 'string') return '';
+  const clean = stripSceneNamespace(name);
+  return clean
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/['’]/g, "")
@@ -66,6 +68,7 @@ export const normalizeArtistId = (name: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .substring(0, 256);
+};
 
 export const normalizeLabelId = (name: string): string => {
   let id = normalizeArtistId(name);

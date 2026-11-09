@@ -18,6 +18,7 @@ import {
   stripCountrySlug,
   ISO_TO_COUNTRY_NAME,
 } from '../shared/isoCountries';
+import { stripSceneNamespace } from '../shared/multiSceneUtils';
 
 // ─── JIT ASSET HEALER DEDUPLICATION & COOLDOWN (V22) ──────────────────────────
 const healingInFlight = new Set<string>();
@@ -79,8 +80,10 @@ export const triggerAssetHealing = async (
  * Produces a stable, Firestore-safe document ID for a single artist name.
  * e.g. "End It" → "end-it", "blink-182" → "blink-182", "Radiohead" → "radiohead"
  */
-export const normalizeArtistId = (name: string): string =>
-  name
+export const normalizeArtistId = (name: string): string => {
+  if (!name || typeof name !== 'string') return '';
+  const clean = stripSceneNamespace(name);
+  return clean
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/['’]/g, "") // Strip straight and curly apostrophes
@@ -89,6 +92,7 @@ export const normalizeArtistId = (name: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .substring(0, 256);
+};
 
 export const normalizeLabelId = (name: string): string => {
   let id = normalizeArtistId(name);
@@ -389,17 +393,19 @@ export const cleanLabelDisplayName = (rawIdOrName?: string | null, graphNodes?: 
 export const isNodeInSeedList = (nodeIdOrLabel?: string | null, seedList?: string[] | null): boolean => {
   if (!nodeIdOrLabel || !seedList || !Array.isArray(seedList) || seedList.length === 0) return false;
   
-  const targetNorm = normalizeArtistId(nodeIdOrLabel);
+  const cleanNodeTarget = stripSceneNamespace(nodeIdOrLabel);
+  const targetNorm = normalizeArtistId(cleanNodeTarget);
   // Explicitly strip country routing suffixes via the global 249-country ISO registry
   const strippedTargetNorm = stripCountrySlug(targetNorm);
   
-  const targetClean = cleanArtistDisplayName(nodeIdOrLabel).toLowerCase();
+  const targetClean = cleanArtistDisplayName(cleanNodeTarget).toLowerCase();
 
   return seedList.some(seed => {
     if (!seed || typeof seed !== 'string') return false;
-    if (seed === nodeIdOrLabel) return true;
+    const cleanSeed = stripSceneNamespace(seed);
+    if (seed === nodeIdOrLabel || cleanSeed === cleanNodeTarget) return true;
     
-    const seedNorm = normalizeArtistId(seed);
+    const seedNorm = normalizeArtistId(cleanSeed);
     const strippedSeedNorm = stripCountrySlug(seedNorm);
 
     // Direct and alias comparisons
@@ -408,7 +414,7 @@ export const isNodeInSeedList = (nodeIdOrLabel?: string | null, seedList?: strin
     if (strippedSeedNorm === targetNorm) return true;
     if (seedNorm === strippedTargetNorm) return true;
     
-    if (seed.toLowerCase() === nodeIdOrLabel.toLowerCase() || cleanArtistDisplayName(seed).toLowerCase() === targetClean) return true;
+    if (cleanSeed.toLowerCase() === cleanNodeTarget.toLowerCase() || cleanArtistDisplayName(cleanSeed).toLowerCase() === targetClean) return true;
     
     // Legacy defensive checks
     if (seedNorm.startsWith(`${targetNorm}-`) || targetNorm.startsWith(`${seedNorm}-`)) return true;

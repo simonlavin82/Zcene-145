@@ -21,7 +21,9 @@ import {
   getAllProjectSeedArtistsList,
   detectLegacyStrideShiftX,
   migrateLegacyCanvasLayout,
+  generateProjectTitleFromScenes,
 } from '../../shared/multiSceneUtils';
+import { normalizeArtistId } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
 import { computeProjectHydrationFingerprint } from '../../utils/projectHydrationFingerprint';
 import { applyShareBlacklistMutation } from '../../App';
@@ -344,5 +346,57 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     expect(migrated[0].x).toBe(1000);
     expect(migrated[1].x).toBe(1950);
     expect(migrated[1].fx).toBe(1950);
+  });
+
+  it('resiliently strips both scene-k:: and legacy/corrupted scene-k- namespaces', () => {
+    expect(stripSceneNamespace('scene-1::sense-field-us')).toBe('sense-field-us');
+    expect(stripSceneNamespace('scene-2::jimmy-eat-world')).toBe('jimmy-eat-world');
+    expect(stripSceneNamespace('scene-1-sense-field-us')).toBe('sense-field-us');
+    expect(stripSceneNamespace('scene-3-sense-field')).toBe('sense-field');
+    expect(stripSceneNamespace('scene-1::scene-1-sense-field')).toBe('sense-field');
+  });
+
+  it('inoculates normalizeArtistId against namespaced canvas IDs', () => {
+    expect(normalizeArtistId('scene-1::sense-field-us')).toBe('sense-field-us');
+    expect(normalizeArtistId('scene-2::jimmy-eat-world-us')).toBe('jimmy-eat-world-us');
+    expect(normalizeArtistId('scene-1-sense-field-us')).toBe('sense-field-us');
+    expect(normalizeArtistId('scene-3-sense-field')).toBe('sense-field');
+    expect(normalizeArtistId('Sense Field')).toBe('sense-field');
+  });
+
+  it('generates clean, deduplicated, title-cased multi-scene project titles', () => {
+    const mockScenes = [
+      normalizeProjectScene({
+        sceneIndex: 0,
+        title: 'Scene 1',
+        seedArtists: 'Sense Field::Reason To Believe',
+        seedIds: ['sense-field-us', 'reason-to-believe-us']
+      }, 0),
+      normalizeProjectScene({
+        sceneIndex: 1,
+        title: 'Scene 2',
+        seedArtists: 'Jimmy Eat World',
+        seedIds: ['jimmy-eat-world-us']
+      }, 1),
+      normalizeProjectScene({
+        sceneIndex: 2,
+        title: 'Scene 3',
+        seedArtists: 'sense-field-us',
+        seedIds: ['sense-field-us']
+      }, 2)
+    ];
+
+    const mockDetailsCache = new Map<string, any>([
+      ['sense-field-us', { details: { artist: 'Sense Field' } }],
+      ['reason-to-believe-us', { details: { artist: 'Reason To Believe' } }],
+      ['jimmy-eat-world-us', { details: { artist: 'Jimmy Eat World' } }]
+    ]);
+
+    const title = generateProjectTitleFromScenes(mockScenes, mockDetailsCache);
+    expect(title).toBe('Sense Field + Reason To Believe + Jimmy Eat World');
+
+    // Without detailsCache, fallback formatting strips -us and Title Cases bare slugs
+    const fallbackTitle = generateProjectTitleFromScenes(mockScenes, null);
+    expect(fallbackTitle).toBe('Sense Field + Reason To Believe + Jimmy Eat World');
   });
 });

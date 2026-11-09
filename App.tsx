@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink } from './types';
-import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeterministicIdentityBridges, createEmptyScene, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString } from './shared/multiSceneUtils';
+import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
 import { qualifyCacheEntry, deriveRoutingDecision, isLocallyRenderable, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
@@ -3332,7 +3332,8 @@ const App: React.FC = () => {
     searchId: string, 
     data: any, 
     artistList: string[], 
-    artistsString: string
+    artistsString: string,
+    explicitProjectId?: string
   ) => {
     const searchIdLower = searchId.toLowerCase();
     const canonicalId = data?.cacheKey || data?.artistId || searchId;
@@ -3493,7 +3494,7 @@ const App: React.FC = () => {
     crossSceneLinksRef.current = nextBridges;
     setCrossSceneLinks(nextBridges);
 
-    let targetProjectId = currentProjectIdRef.current;
+    let targetProjectId = explicitProjectId || currentProjectIdRef.current || currentProjectId;
     let isNewProject = false;
     
     if (!targetProjectId && user && !isGuest) {
@@ -3541,7 +3542,11 @@ const App: React.FC = () => {
         projectSeedImageSnapshotRef.current = { names: projectSeedNames, urls: projectSeedImageUrls };
         const primaryProjectImageUrl = projectSeedImageUrls.find(u => !!u) || directHitImageUrl;
 
+        const multiSceneTitle = generateProjectTitleFromScenes(currentScenesList, detailsCacheRef.current as Map<string, any>);
+        setProjectName(multiSceneTitle);
+
         const payload: Record<string, any> = {
+          name: multiSceneTitle,
           schemaVersion: 43,
           scenes: JSON.stringify(currentScenesList),
           activeSceneId: targetSceneId,
@@ -3564,7 +3569,6 @@ const App: React.FC = () => {
         if (isNewProject) {
            await setDoc(doc(db, projectPath), {
               ...payload,
-              name: allSeedNames.join(' + ') || artistsString,
               authorId: user.uid,
               createdAt: serverTimestamp(),
               chatHistories: '[]',
@@ -3611,11 +3615,12 @@ const App: React.FC = () => {
     displaySeedLabel: string,
     isRegeneration: boolean = false,
     graphToEnhance?: GraphData | null,
-    directHitCacheDocData?: any
+    directHitCacheDocData?: any,
+    explicitProjectId?: string
   ): Promise<boolean> => {
     if (!user || isGuest) return true;
 
-    let targetProjectId = currentProjectIdRef.current || currentProjectId;
+    let targetProjectId = explicitProjectId || currentProjectIdRef.current || currentProjectId;
     const cleanDisplayName = formatSeed(displaySeedLabel || seedSlug);
     const targetSceneId = activeSceneIdRef.current || 'scene-1';
 
@@ -3760,10 +3765,16 @@ const App: React.FC = () => {
     bypassDisambiguation: boolean = false,
     disambiguationGenres?: Record<string, string>,
     originalQueries?: Record<string, string>,
-    seedNames?: Record<string, string>
+    seedNames?: Record<string, string>,
+    explicitProjectId?: string
   ) => {
     if (!bypassTokenConfirmation) {
       sessionTokenApprovedRef.current = false;
+    }
+
+    if (explicitProjectId) {
+      currentProjectIdRef.current = explicitProjectId;
+      setCurrentProjectId(explicitProjectId);
     }
 
     // Prevent Untitled Zcene string from leaking into backend generation
@@ -4182,7 +4193,7 @@ const App: React.FC = () => {
           cacheCandidatesPerSeed.every(s => s.isTopologyHit || (s.isAmbiguous && !!s.selectedCandidateId));
         const nextSkipCacheLookup = !canCheckCacheOnPass2;
         
-        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, true, overrideFilters, activeDisambiguationHints, true, activeDisambiguationGenres, activeOriginalQueries, activeSeedNames);
+        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, true, overrideFilters, activeDisambiguationHints, true, activeDisambiguationGenres, activeOriginalQueries, activeSeedNames, explicitProjectId);
         return;
       }
 
@@ -4201,13 +4212,14 @@ const App: React.FC = () => {
             displayLabel,
             isRegeneration,
             graphToEnhance,
-            singleCacheDocData
+            singleCacheDocData,
+            explicitProjectId
           );
           if (!authorized) {
             resetAbortedPreFlightState();
             return;
           }
-          await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists);
+          await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists, explicitProjectId);
           isHydratingSessionRef.current = false;
           isProjectLoadingRef.current = false;
           setIsLoading(false);
@@ -4722,7 +4734,7 @@ const App: React.FC = () => {
                     console.warn("Failed to parse detailsCache from silent cloud job:", e);
                   }
                 },
-                currentProjectIdRef.current || currentProjectId || undefined,
+                explicitProjectId || currentProjectIdRef.current || currentProjectId || undefined,
                 `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
                 activeDisambiguationHints,
                 activeDisambiguationGenres,
@@ -5077,7 +5089,7 @@ const App: React.FC = () => {
                 console.warn("Failed to parse detailsCache from cloud job:", e);
               }
             },
-            undefined,
+            explicitProjectId || currentProjectIdRef.current || currentProjectId || undefined,
             undefined,
             activeDisambiguationHints,
             activeDisambiguationGenres,
@@ -5394,11 +5406,7 @@ const App: React.FC = () => {
           // V43.1: top-level seedArtists is project-scoped (all scenes), never only the active scene.
           const projectScopedSeedArtists = allSceneSeedStrs.length > 0 ? allSceneSeedStrs.join('::') : artists;
           if (isNewOrUntitled || (isLiveSynthesisTemp && !isRegeneration) || scenesRef.current.length > 1) {
-            if (allSceneSeedStrs.length > 1) {
-              defaultName = allSceneSeedStrs.map(formatSeed).join(' + ');
-            } else if (allSceneSeedStrs.length === 1) {
-              defaultName = formatSeed(allSceneSeedStrs[0]);
-            }
+            defaultName = generateProjectTitleFromScenes(scenesRef.current, detailsCacheRef.current as Map<string, any>);
           }
 
           try {
@@ -5484,7 +5492,7 @@ const App: React.FC = () => {
               console.warn("Failed to parse detailsCache from cloud job:", e);
             }
           },
-          currentProjectIdRef.current || currentProjectId || undefined,
+          explicitProjectId || currentProjectIdRef.current || currentProjectId || undefined,
           jobId,
           activeDisambiguationHints,
           activeDisambiguationGenres,
@@ -7029,9 +7037,9 @@ const App: React.FC = () => {
               ? data.activeNodes[0]
               : null;
             const seedNode = primaryActiveId
-              ? hydratedNodes.find((n: any) => n.id === primaryActiveId || normalizeArtistId(n.id) === normalizeArtistId(primaryActiveId) || isArtistIdMatch(n.id, primaryActiveId))
+              ? hydratedNodes.find((n: any) => n.id === primaryActiveId || normalizeArtistId(stripSceneNamespace(n.canonicalId || n.id)) === normalizeArtistId(stripSceneNamespace(primaryActiveId)) || isArtistIdMatch(stripSceneNamespace(n.canonicalId || n.id), stripSceneNamespace(primaryActiveId)))
               : null;
-            const fallbackSeedNode = seedNode || hydratedNodes.find((n: any) => seedIds.includes(normalizeArtistId(n.id))) || hydratedNodes[0];
+            const fallbackSeedNode = seedNode || hydratedNodes.find((n: any) => seedIds.includes(normalizeArtistId(stripSceneNamespace(n.canonicalId || n.id)))) || hydratedNodes[0];
             if (fallbackSeedNode) {
               console.log(`[ProjectLoader] Auto-selecting primary seed node on initial load:`, fallbackSeedNode.id);
               hasAutoSelectedRef.current = currentProjectId;
@@ -7137,8 +7145,9 @@ const App: React.FC = () => {
           try {
             const userSnap = await getDoc(userProjectRef);
             if (!isMounted) return;
-            if (await handleSnap(userSnap)) {
-              console.log(`[ProjectLoader] Found in user projects, setting up real-time sync`);
+            if (userSnap.exists()) {
+              const snapHandled = await handleSnap(userSnap);
+              console.log(`[ProjectLoader] Found in user projects, setting up real-time sync (handled=${snapHandled})`);
               const unsub = onSnapshot(userProjectRef, (snap) => { handleSnap(snap); }, (err) => {
                 if (isMounted && err.code !== 'permission-denied') handleFirestoreError(err, OperationType.GET, `users/${user.uid}/projects/${currentProjectId}`);
               });
@@ -7284,7 +7293,7 @@ const App: React.FC = () => {
           hasAutoSelectedRef.current = currentProjectId;
           const seedList = (seedArtists || '').split('::').map(s => s.trim()).filter(Boolean);
           const firstSeedNode = graphData.nodes.find(n => 
-            (n.type === 'artist' || n.type === 'label') && isNodeInSeedList(n.id, seedList)
+            (n.type === 'artist' || n.type === 'label') && isNodeInSeedList(stripSceneNamespace(n.canonicalId || n.id), seedList)
           );
           const defaultNode = firstSeedNode || graphData.nodes.find(n => n.type === 'artist' || n.type === 'label');
           if (defaultNode) {
@@ -7499,6 +7508,11 @@ const App: React.FC = () => {
         if (user && !isFirebaseReady) return;
 
         if (isDashboardPath) {
+          // Guard against dashboard clearance during active curation hydration
+          if (isHydratingSessionRef.current || projectStatusRef.current === 'curating') {
+            console.log('[Routing] Guarding against dashboard project clearance during active curation hydration');
+            return;
+          }
           setPreviousWorkspace({ view: View.Dashboard, projectId: null });
           if (currentViewRef.current !== View.Dashboard) {
             if (currentViewRef.current === View.Home) {
@@ -8057,14 +8071,14 @@ const App: React.FC = () => {
       // ONLY process the actively selected node to prevent neighbor chain-fetching
       const candidateNodes = (graphData?.nodes || []).filter(n => 
         (n.type === 'artist' || n.type === 'label' || n.type === 'genre') && (
-          activeNodeIds.some(id => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(id) || (n.type === 'artist' && isArtistIdMatch(n.id, id))) ||
-          (selectedNode && (n.id.toLowerCase() === selectedNode.id.toLowerCase() || normalizeArtistId(n.id) === normalizeArtistId(selectedNode.id) || (n.type === 'artist' && selectedNode.type === 'artist' && isArtistIdMatch(n.id, selectedNode.id))))
+          activeNodeIds.some(id => n.id.toLowerCase() === id.toLowerCase() || normalizeArtistId(stripSceneNamespace(n.canonicalId || n.id)) === normalizeArtistId(stripSceneNamespace(id)) || (n.type === 'artist' && isArtistIdMatch(stripSceneNamespace(n.canonicalId || n.id), stripSceneNamespace(id)))) ||
+          (selectedNode && (n.id.toLowerCase() === selectedNode.id.toLowerCase() || normalizeArtistId(stripSceneNamespace(n.canonicalId || n.id)) === normalizeArtistId(stripSceneNamespace(selectedNode.id)) || (n.type === 'artist' && selectedNode.type === 'artist' && isArtistIdMatch(stripSceneNamespace(n.canonicalId || n.id), stripSceneNamespace(selectedNode.id)))))
         )
       );
 
       const nodes = candidateNodes.filter(n => {
-        const isSelected = selectedNode && (normalizeArtistId(selectedNode.id) === normalizeArtistId(n.id) || (selectedNode.type === 'artist' && n.type === 'artist' && isArtistIdMatch(n.id, selectedNode.id)));
-        const simpleId = normalizeArtistId(n.id);
+        const isSelected = selectedNode && (normalizeArtistId(stripSceneNamespace(selectedNode.canonicalId || selectedNode.id)) === normalizeArtistId(stripSceneNamespace(n.canonicalId || n.id)) || (selectedNode.type === 'artist' && n.type === 'artist' && isArtistIdMatch(stripSceneNamespace(n.canonicalId || n.id), stripSceneNamespace(selectedNode.id))));
+        const simpleId = normalizeArtistId(stripSceneNamespace(n.canonicalId || n.id));
         let disambiguatedCacheId = simpleId;
         let connectedCountries: string[] = [];
 
@@ -8149,7 +8163,7 @@ const App: React.FC = () => {
 
       try {
         for (const node of nodes) {
-          const simpleId = normalizeArtistId(node.id);
+          const simpleId = normalizeArtistId(stripSceneNamespace(node.canonicalId || node.id));
           
           // Find connected countries in the graph links
           const connectedCountries = graphData.links
@@ -8337,7 +8351,7 @@ const App: React.FC = () => {
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
                           artistName: artistDisplay,
-                          artistId: normalizeArtistId(node.id)
+                          artistId: normalizeArtistId(stripSceneNamespace(node.canonicalId || node.id))
                         })
                       });
                       if (scrapeRes.ok) {
@@ -8470,7 +8484,7 @@ const App: React.FC = () => {
                       return prev;
                     });
 
-                    const simpleArtistId = normalizeArtistId(node.id);
+                    const simpleArtistId = normalizeArtistId(stripSceneNamespace(node.canonicalId || node.id));
 
                     let targetDocId = cacheId;
                     let docExists = existingSnap.exists();
@@ -8966,7 +8980,7 @@ const App: React.FC = () => {
                       projectSeedImageSnapshotRef.current.names,
                       projectSeedImageSnapshotRef.current.urls
                     );
-                    const forkName = forkAllSeeds.length > 0 ? forkAllSeeds.map(formatSeed).join(' + ') : defaultName;
+                    const forkName = generateProjectTitleFromScenes(forkedScenes, detailsCacheRef.current as Map<string, any>);
                     const forkCanvasLayout = forkComposite.nodes
                       .filter((nd: any) => (nd.type === 'artist' || nd.type === 'label') && typeof nd.x === 'number')
                       .map((nd: any) => ({ nodeId: nd.id, x: nd.x, y: nd.y, fx: nd.fx ?? null, fy: nd.fy ?? null }));
@@ -9021,7 +9035,7 @@ const App: React.FC = () => {
                     setPeekedNode(null);
 
                     navigate(`/p/${newId}`);
-                    handleGenerateGraph(n, false, null);
+                    handleGenerateGraph(n, false, null, false, false, undefined, undefined, false, undefined, undefined, undefined, newId);
                     return;
                   }
 

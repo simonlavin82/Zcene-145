@@ -28,6 +28,7 @@ exports.getAllProjectSeedArtistsString = getAllProjectSeedArtistsString;
 exports.computeProjectCardMetrics = computeProjectCardMetrics;
 exports.parseProjectScenes = parseProjectScenes;
 exports.parseCrossSceneLinks = parseCrossSceneLinks;
+exports.generateProjectTitleFromScenes = generateProjectTitleFromScenes;
 const isoCountries_1 = require("./isoCountries");
 exports.SCENE_BASE_CENTER_X = 1000;
 exports.SCENE_BASE_CENTER_Y = 1000;
@@ -207,12 +208,12 @@ function namespaceSceneNodeId(sceneId, canonicalId) {
 function stripSceneNamespace(nodeId) {
     if (!nodeId || typeof nodeId !== 'string')
         return '';
-    return nodeId.replace(/^scene-\d+::/i, '').trim();
+    return nodeId.replace(/^(?:scene-\d+(?:::|-))+/i, '').trim();
 }
 function extractSceneIdFromNodeId(nodeId) {
     if (!nodeId || typeof nodeId !== 'string')
         return null;
-    const match = nodeId.match(/^(scene-\d+)::/i);
+    const match = nodeId.match(/^(scene-\d+)(?:::|-)/i);
     return match ? match[1].toLowerCase() : null;
 }
 function normalizeCanonicalEntityId(id) {
@@ -999,5 +1000,83 @@ function parseCrossSceneLinks(rawLinks) {
         console.warn('[parseCrossSceneLinks] Failed to parse crossSceneLinks:', e);
         return [];
     }
+}
+/**
+ * Universal multi-scene project title generator.
+ * Resolves each seed across scenes to clean display names (via detailsCache or title-casing),
+ * strips trailing ISO country slugs (-us, -gb, etc.), and deduplicates repeated artists case-insensitively.
+ */
+function generateProjectTitleFromScenes(scenes, detailsCache) {
+    if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
+        return 'Untitled Zcene';
+    }
+    let cacheMap = null;
+    if (detailsCache) {
+        if (typeof detailsCache.get === 'function') {
+            cacheMap = detailsCache;
+        }
+        else if (typeof detailsCache === 'string') {
+            try {
+                const parsed = JSON.parse(detailsCache);
+                if (Array.isArray(parsed)) {
+                    cacheMap = new Map(parsed);
+                }
+                else if (typeof parsed === 'object') {
+                    cacheMap = new Map(Object.entries(parsed));
+                }
+            }
+            catch { }
+        }
+        else if (typeof detailsCache === 'object') {
+            cacheMap = new Map(Object.entries(detailsCache));
+        }
+    }
+    const seenCanonicalIds = new Set();
+    const titleParts = [];
+    for (const scene of scenes) {
+        const rawSeeds = toSeedArtistsArray(scene.seedArtists);
+        for (const seed of rawSeeds) {
+            if (!seed || typeof seed !== 'string')
+                continue;
+            const strippedSeed = stripSceneNamespace(seed).trim();
+            if (!strippedSeed)
+                continue;
+            // Extract canonical slug and strip ISO country codes (-us, -gb, etc.)
+            const bareSlug = strippedSeed
+                .toLowerCase()
+                .replace(/-(?:us|gb|uk|de|fr|ca|au|jp|se|no|fi|nl|be|ch|at|es|it|br|mx|nz|ie|pl|za)$/i, '')
+                .trim();
+            const canonNorm = bareSlug.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+            if (!canonNorm || seenCanonicalIds.has(canonNorm))
+                continue;
+            seenCanonicalIds.add(canonNorm);
+            // Attempt to resolve display name from detailsCache
+            let displayName = null;
+            if (cacheMap) {
+                const entry = cacheMap.get(strippedSeed) ||
+                    cacheMap.get(canonNorm) ||
+                    cacheMap.get(strippedSeed.toLowerCase()) ||
+                    cacheMap.get(bareSlug);
+                if (entry) {
+                    displayName = entry.details?.artist || entry.artist || entry.name || entry.title || null;
+                }
+            }
+            if (!displayName) {
+                // If the seed was already formatted (e.g. "Sense Field" or "Jimmy Eat World")
+                if (strippedSeed.includes(' ') && !strippedSeed.includes('-')) {
+                    displayName = strippedSeed;
+                }
+                else {
+                    // Format slug into Title Case
+                    displayName = bareSlug
+                        .split(/[-_]+/)
+                        .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                        .join(' ');
+                }
+            }
+            titleParts.push(displayName);
+        }
+    }
+    return titleParts.length > 0 ? titleParts.join(' + ') : 'Untitled Zcene';
 }
 //# sourceMappingURL=multiSceneUtils.js.map

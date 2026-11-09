@@ -19,15 +19,20 @@ const applyCanonicalAlias = (rawName) => {
     return exports.CANONICAL_ALIASES[lookupKey] || rawName;
 };
 exports.applyCanonicalAlias = applyCanonicalAlias;
-const normalizeArtistId = (name) => name
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/['’]/g, "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/^-+|-+$/g, '')
-    .substring(0, 256);
+const normalizeArtistId = (name) => {
+    if (!name || typeof name !== 'string')
+        return '';
+    const clean = (0, multiSceneUtils_1.stripSceneNamespace)(name);
+    return clean
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/['’]/g, "")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .substring(0, 256);
+};
 exports.normalizeArtistId = normalizeArtistId;
 const normalizeLabelId = (name) => {
     let id = (0, exports.normalizeArtistId)(name);

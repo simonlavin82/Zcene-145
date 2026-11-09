@@ -2269,6 +2269,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             await updateProjectStatus(jobData.userId, inputPayload.projectId, {
                 status: "completed",
                 schemaVersion: 43,
+                name: (0, multiSceneUtils_1.generateProjectTitleFromScenes)(finalProjectScenes, result.detailsCache),
                 seedArtists: (0, multiSceneUtils_1.getAllProjectSeedArtistsString)(finalProjectScenes, inputPayload.seedArtists || inputPayload.artists || ''),
                 graphData: JSON.stringify(result.graphData),
                 ...(finalProjectScenes.length > 0

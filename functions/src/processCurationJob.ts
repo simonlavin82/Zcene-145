@@ -52,6 +52,7 @@ import {
   stripSceneNamespace,
   normalizeProjectScene,
   buildCompositeCanvasGraph,
+  generateProjectTitleFromScenes,
 } from "./shared/multiSceneUtils";
 import { refundProjectSettlementOnError } from "./tokenWallet";
 
@@ -2516,6 +2517,7 @@ export const processCurationJob = onDocumentCreated({
       await updateProjectStatus(jobData.userId, inputPayload.projectId, {
         status: "completed",
         schemaVersion: 43,
+        name: generateProjectTitleFromScenes(finalProjectScenes, result.detailsCache),
         seedArtists: getAllProjectSeedArtistsString(finalProjectScenes, inputPayload.seedArtists || inputPayload.artists || ''),
         graphData: JSON.stringify(result.graphData),
         ...(finalProjectScenes.length > 0

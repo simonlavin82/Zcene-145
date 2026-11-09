@@ -2,7 +2,7 @@
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import * as d3 from 'd3';
 import { Loader2 } from 'lucide-react';
-import { GraphData, Node, Link, GraphSettings, NodeDetails, CanvasNodeRef } from '../types';
+import { GraphData, Node, Link, GraphSettings, NodeDetails, CanvasNodeRef, ProjectScene } from '../types';
 import { LegendSymbol } from './Icons';
 import { CanvasControlStyles, InputSizes, Button } from './DesignSystem';
 import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
@@ -59,6 +59,7 @@ interface MusicGraphProps {
   isGuest?: boolean;
   detailsCache?: Map<string, NodeDetails>;
   isActive?: boolean;
+  scenes?: ProjectScene[];
   onSimulationComplete?: () => void;
   /** Phase A — Coordinate Memory: fired once when simulation settles, with the
    * final fx/fy positions of all artist and label nodes. Only artist/label nodes
@@ -141,7 +142,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   activeFilters, searchQuery, setSearchQuery, toggleFilter,
   legendConfig, legendOrder,
   legendRef, onInteraction, onLegendInteraction, isGuest,
-  detailsCache, isActive = false, onSimulationComplete, onCoordinatesSettled
+  detailsCache, isActive = false, scenes = [], onSimulationComplete, onCoordinatesSettled
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const onSimulationCompleteRef = useRef(onSimulationComplete);
@@ -524,8 +525,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       const scaleY = (height - padding * 2) / (contentHeight || 1);
       
       const maxScale = isSmallScreenRef.current ? 0.75 : 1;
-      const minScale = 0.22;
-      let k = Math.max(minScale, Math.min(scaleX, scaleY, maxScale));
+      const fitScale = Math.min(scaleX, scaleY);
+      const minScale = Math.min(0.22, Math.max(0.05, fitScale));
+      let k = Math.max(minScale, Math.min(fitScale, maxScale));
       
       if (typeof window !== 'undefined' && window.innerWidth < 768) {
           k = k * 1.5;
@@ -542,6 +544,23 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   }, [fitGraphToScreen]);
 
   const hasInitialCentered = useRef(false);
+  const detectedSceneCount = useMemo(() => {
+    if (scenes && scenes.length > 0) return scenes.length;
+    if (!data?.nodes || data.nodes.length === 0) return 1;
+    const indices = data.nodes.map(n => n.sceneIndex ?? 0);
+    return Math.max(1, Math.max(...indices) + 1);
+  }, [scenes, data?.nodes]);
+
+  const lastSceneCountRef = useRef(detectedSceneCount);
+
+  useEffect(() => {
+    if (lastSceneCountRef.current !== detectedSceneCount) {
+      lastSceneCountRef.current = detectedSceneCount;
+      if (fitGraphToScreenRef.current) {
+        fitGraphToScreenRef.current(750);
+      }
+    }
+  }, [detectedSceneCount]);
 
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
@@ -942,6 +961,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 // Disable auto-tracking if the user initiates a manual pan/zoom
                 if (event.sourceEvent) {
                     isTrackingRef.current = false;
+                    targetNodeIdRef.current = null;
                 }
             });
         svg.call(zoom).on("dblclick.zoom", null);
@@ -957,8 +977,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     svg.on("click", (event) => { 
         if (event.target === svgRef.current) {
+            isTrackingRef.current = false;
+            targetNodeIdRef.current = null;
             onNodeClickRef.current(null);
             clearNodeHover();
+            if (activeHoveredNodeRef.current || activeHoveredLinkRef.current) {
+                setHoveredLink(null);
+            }
         }
     });
 
@@ -1098,11 +1123,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     setTimeout(() => {
                         if (fitGraphToScreenRef.current) {
                             fitGraphToScreenRef.current(0);
-                            setTimeout(() => {
-                                if (svgRef.current && zoomRef.current) {
-                                    d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
-                                }
-                            }, 50);
+                            const sceneCount = detectedSceneCount;
+                            if (sceneCount <= 1) {
+                                setTimeout(() => {
+                                    if (svgRef.current && zoomRef.current) {
+                                        d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
+                                    }
+                                }, 50);
+                            }
                         }
                     }, 150);
                 }
@@ -1380,6 +1408,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 // If second tap on the same active node, proceed to navigation
             }
             
+            isTrackingRef.current = true;
+            targetNodeIdRef.current = d.id;
             onNodeClickRef.current(d);
             onInteractionRef.current?.();
         })
@@ -1674,9 +1704,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       const isSearchActive = searchQuery.trim().length > 0;
       if (isSearchActive) return;
       const activeNode = selectedNode || peekedNode;
+      const isMultiScene = detectedSceneCount > 1;
       if (activeNode) {
-          isTrackingRef.current = true;
-          targetNodeIdRef.current = activeNode.id;
+          // In multi-scene mode, do not auto-force camera tracking to Scene 1 on initial load/re-hydration
+          if (!isMultiScene) {
+              isTrackingRef.current = true;
+              targetNodeIdRef.current = activeNode.id;
+          }
       } else {
           isTrackingRef.current = false;
           targetNodeIdRef.current = null;
