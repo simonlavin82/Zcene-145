@@ -394,21 +394,26 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const activeInteractionNode = selectedNode || peekedNode;
     if (!activeInteractionNode) return null;
     const selectedIdStr = String(activeInteractionNode.id);
+    const hasSceneNs = selectedIdStr.includes('::');
     const canonSelected = stripSceneNamespace(activeInteractionNode.canonicalId || selectedIdStr);
+
     const highlighted = new Set<string>([
       selectedIdStr,
       selectedIdStr.toLowerCase(),
-      normalizeArtistId(selectedIdStr),
-      canonSelected,
-      canonSelected.toLowerCase(),
-      normalizeArtistId(canonSelected),
     ]);
-    visibleNodes.forEach(n => {
-      if (isSameNodeId(n.id, selectedIdStr)) {
-        highlighted.add(String(n.id));
-        highlighted.add(String(n.id).toLowerCase());
-      }
-    });
+
+    if (!hasSceneNs) {
+      highlighted.add(normalizeArtistId(selectedIdStr));
+      highlighted.add(canonSelected);
+      highlighted.add(canonSelected.toLowerCase());
+      highlighted.add(normalizeArtistId(canonSelected));
+      visibleNodes.forEach(n => {
+        if (isSameNodeId(n.id, selectedIdStr)) {
+          highlighted.add(String(n.id));
+          highlighted.add(String(n.id).toLowerCase());
+        }
+      });
+    }
     
     const primaryConnections = new Set<string>();
     visibleLinks.forEach(link => {
@@ -416,43 +421,69 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
         const canonSource = stripSceneNamespace(sourceId);
         const canonTarget = stripSceneNamespace(targetId);
-        
-        const isSourceSelected = highlighted.has(sourceId) || highlighted.has(sourceId.toLowerCase()) || highlighted.has(normalizeArtistId(canonSource));
-        const isTargetSelected = highlighted.has(targetId) || highlighted.has(targetId.toLowerCase()) || highlighted.has(normalizeArtistId(canonTarget));
+
+        let isSourceSelected = false;
+        let isTargetSelected = false;
+
+        if (hasSceneNs) {
+            isSourceSelected = sourceId.toLowerCase() === selectedIdStr.toLowerCase();
+            isTargetSelected = targetId.toLowerCase() === selectedIdStr.toLowerCase();
+        } else {
+            isSourceSelected = highlighted.has(sourceId) || highlighted.has(sourceId.toLowerCase()) || highlighted.has(normalizeArtistId(canonSource));
+            isTargetSelected = highlighted.has(targetId) || highlighted.has(targetId.toLowerCase()) || highlighted.has(normalizeArtistId(canonTarget));
+        }
 
         if (isSourceSelected) { 
             highlighted.add(targetId); 
             highlighted.add(targetId.toLowerCase());
-            highlighted.add(normalizeArtistId(canonTarget));
             primaryConnections.add(targetId); 
             primaryConnections.add(targetId.toLowerCase());
-            primaryConnections.add(normalizeArtistId(canonTarget));
+            if (!hasSceneNs) {
+                highlighted.add(normalizeArtistId(canonTarget));
+                primaryConnections.add(normalizeArtistId(canonTarget));
+            }
         }
         if (isTargetSelected) { 
             highlighted.add(sourceId); 
             highlighted.add(sourceId.toLowerCase());
-            highlighted.add(normalizeArtistId(canonSource));
             primaryConnections.add(sourceId); 
             primaryConnections.add(sourceId.toLowerCase());
-            primaryConnections.add(normalizeArtistId(canonSource));
+            if (!hasSceneNs) {
+                highlighted.add(normalizeArtistId(canonSource));
+                primaryConnections.add(normalizeArtistId(canonSource));
+            }
         }
     });
     if (activeInteractionNode.type !== 'artist') return highlighted;
     visibleLinks.forEach(link => {
+        // When scene-namespaced, do not expand 2nd-degree neighbors through cross-scene bridges
+        // so that the other scene's intra-scene constellation stays dimmed.
+        if (hasSceneNs && link.isCrossSceneBridge) return;
+
         const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id);
         const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
+
+        if (hasSceneNs) {
+            const activeSceneId = activeInteractionNode.sceneId;
+            const sourceNode = visibleNodes.find(n => n.id.toLowerCase() === sourceId.toLowerCase());
+            const targetNode = visibleNodes.find(n => n.id.toLowerCase() === targetId.toLowerCase());
+            if (activeSceneId && (sourceNode?.sceneId !== activeSceneId || targetNode?.sceneId !== activeSceneId)) {
+                return;
+            }
+        }
+
         const isSourcePrimary = primaryConnections.has(sourceId) || primaryConnections.has(sourceId.toLowerCase());
         const isTargetPrimary = primaryConnections.has(targetId) || primaryConnections.has(targetId.toLowerCase());
         
         if (isSourcePrimary) { 
             highlighted.add(targetId); 
             highlighted.add(targetId.toLowerCase());
-            highlighted.add(normalizeArtistId(stripSceneNamespace(targetId)));
+            if (!hasSceneNs) highlighted.add(normalizeArtistId(stripSceneNamespace(targetId)));
         }
         if (isTargetPrimary) { 
             highlighted.add(sourceId); 
             highlighted.add(sourceId.toLowerCase());
-            highlighted.add(normalizeArtistId(stripSceneNamespace(sourceId)));
+            if (!hasSceneNs) highlighted.add(normalizeArtistId(stripSceneNamespace(sourceId)));
         }
     });
     return highlighted;
@@ -753,23 +784,33 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         hoveredNodeIdRef.current = d.id;
         activeHoveredNodeRef.current = d;
 
-        const firstDegreeLinks = visibleLinks.filter(l => {
+        const hasSceneNs = String(d.id).includes('::');
+        const isFirstDegreeLink = (l: any) => {
             const sId = nodeId(l.source);
             const tId = nodeId(l.target);
+            if (hasSceneNs) {
+                return sId.toLowerCase() === d.id.toLowerCase() || tId.toLowerCase() === d.id.toLowerCase();
+            }
             return isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
-        });
+        };
+
+        const firstDegreeLinks = visibleLinks.filter(isFirstDegreeLink);
 
         const neighborNodeIds = new Set<string>();
         const dCanonId = stripSceneNamespace(d.canonicalId || d.id);
         neighborNodeIds.add(d.id.toLowerCase());
-        neighborNodeIds.add(normalizeArtistId(dCanonId));
+        if (!hasSceneNs) {
+            neighborNodeIds.add(normalizeArtistId(dCanonId));
+        }
         firstDegreeLinks.forEach(l => {
             const sId = nodeId(l.source);
             const tId = nodeId(l.target);
             neighborNodeIds.add(sId.toLowerCase());
-            neighborNodeIds.add(normalizeArtistId(stripSceneNamespace(sId)));
             neighborNodeIds.add(tId.toLowerCase());
-            neighborNodeIds.add(normalizeArtistId(stripSceneNamespace(tId)));
+            if (!hasSceneNs) {
+                neighborNodeIds.add(normalizeArtistId(stripSceneNamespace(sId)));
+                neighborNodeIds.add(normalizeArtistId(stripSceneNamespace(tId)));
+            }
         });
 
         if (svgRef.current) {
@@ -779,38 +820,28 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             svg.selectAll<SVGLineElement, Link>("line.visual-line")
                 .transition().duration(200)
                 .attr("stroke", (l: any) => {
-                    const sId = nodeId(l.source);
-                    const tId = nodeId(l.target);
-                    const isFirstDegreeLink = isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
-                    return isFirstDegreeLink ? "#F6E468" : "#e4e4e7";
+                    const isConnected = isFirstDegreeLink(l);
+                    return isConnected ? "#F6E468" : "#e4e4e7";
                 })
                 .attr("stroke-opacity", (l: any) => {
-                    const sId = nodeId(l.source);
-                    const tId = nodeId(l.target);
-                    const isFirstDegreeLink = isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
-                    return isFirstDegreeLink ? 0.9 : 0.05;
+                    const isConnected = isFirstDegreeLink(l);
+                    return isConnected ? 0.9 : 0.05;
                 });
 
             // Highlight connected Cross-Scene Bridge Lines on active node hover
             svg.selectAll<SVGPathElement, Link>("path.bridge-visual-line")
                 .transition().duration(200)
                 .attr("stroke", (l: any) => {
-                    const sId = nodeId(l.source);
-                    const tId = nodeId(l.target);
-                    const isFirstDegreeLink = isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
-                    return isFirstDegreeLink ? "#F6E468" : "#71717a";
+                    const isConnected = isFirstDegreeLink(l);
+                    return isConnected ? "#F6E468" : "#71717a";
                 })
                 .attr("stroke-opacity", (l: any) => {
-                    const sId = nodeId(l.source);
-                    const tId = nodeId(l.target);
-                    const isFirstDegreeLink = isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
-                    return isFirstDegreeLink ? 0.95 : 0.08;
+                    const isConnected = isFirstDegreeLink(l);
+                    return isConnected ? 0.95 : 0.08;
                 })
                 .attr("stroke-width", (l: any) => {
-                    const sId = nodeId(l.source);
-                    const tId = nodeId(l.target);
-                    const isFirstDegreeLink = isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
-                    return isFirstDegreeLink ? 2.0 : 1.2;
+                    const isConnected = isFirstDegreeLink(l);
+                    return isConnected ? 2.0 : 1.2;
                 });
 
             // Spotlight constellation nodes and dim others
@@ -823,7 +854,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                                           !activeFilters[nodeType];
                     if (isFilteredOut) return 0.1;
                     const nCanon = stripSceneNamespace(n.canonicalId || n.id);
-                    return neighborNodeIds.has(n.id.toLowerCase()) || neighborNodeIds.has(normalizeArtistId(nCanon)) ? 1 : 0.15;
+                    const isMatch = hasSceneNs 
+                        ? neighborNodeIds.has(n.id.toLowerCase())
+                        : (neighborNodeIds.has(n.id.toLowerCase()) || neighborNodeIds.has(normalizeArtistId(nCanon)));
+                    return isMatch ? 1 : 0.15;
                 });
 
             if (d.type === 'artist') {
@@ -1834,7 +1868,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
           if (dimensionsRef.current.width === 0) return;
 
           // visibleNodesRef.current always contains the live, mutated physics coordinates
-          const node = visibleNodesRef.current.find(n => isSameNodeId(n.id, targetNodeIdRef.current));
+          const node = visibleNodesRef.current.find(n => n.id === targetNodeIdRef.current) ||
+                       visibleNodesRef.current.find(n => isSameNodeId(n.id, targetNodeIdRef.current));
           if (!node || isNaN(node.x!) || isNaN(node.y!)) return;
 
           const { width, height } = dimensionsRef.current;
@@ -1898,14 +1933,20 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .transition().duration(300)
         .attr("stroke-width", d => {
             const activeNode = (!isSearchActive && !isPassiveSelection) ? (selectedNode || peekedNode) : null;
-            const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
+            const hasActiveNs = activeNode && String(activeNode.id).includes('::');
+            const isSelected = activeNode 
+                ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
+                : false;
             const isSeed = isNodeSeedInOwnScene(d, seedArtists);
             if (isSelected) return 4;
             return isSeed ? 3 : 2;
         })
         .attr("stroke", d => {
             const activeNode = (!isSearchActive && !isPassiveSelection) ? (selectedNode || peekedNode) : null;
-            const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
+            const hasActiveNs = activeNode && String(activeNode.id).includes('::');
+            const isSelected = activeNode 
+                ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
+                : false;
             const isSeed = isNodeSeedInOwnScene(d, seedArtists);
             if (isSelected) return '#F6E468';
             return isSeed ? '#F6E468' : 'transparent';
@@ -1925,7 +1966,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             if (!activeNode) return "#e4e4e7";
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
-            const isFirstDegree = isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id);
+            const hasActiveNs = String(activeNode.id).includes('::');
+            const isFirstDegree = hasActiveNs
+                ? (s.toLowerCase() === activeNode.id.toLowerCase() || t.toLowerCase() === activeNode.id.toLowerCase())
+                : (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id));
             return isFirstDegree ? "#F6E468" : "#e4e4e7";
         })
         .attr("stroke-opacity", (d: any) => {
@@ -1950,7 +1994,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
             const activeNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null)) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
             if (activeNode) {
-                const isFirstDegree = isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id);
+                const hasActiveNs = String(activeNode.id).includes('::');
+                const isFirstDegree = hasActiveNs
+                    ? (s.toLowerCase() === activeNode.id.toLowerCase() || t.toLowerCase() === activeNode.id.toLowerCase())
+                    : (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id));
                 if (isFirstDegree) return 0.9;
             }
 
@@ -1967,21 +2014,30 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             if (!activeHoverNode) return "#71717a";
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
-            const isConnected = isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id);
+            const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
+            const isConnected = hasActiveHoverNs
+                ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
+                : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
             return isConnected ? "#F6E468" : "#71717a";
         })
         .attr("stroke-opacity", (d: any) => {
             if (!activeHoverNode) return 0.22;
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
-            const isConnected = isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id);
+            const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
+            const isConnected = hasActiveHoverNs
+                ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
+                : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
             return isConnected ? 0.95 : 0.08;
         })
         .attr("stroke-width", (d: any) => {
             if (!activeHoverNode) return 1.2;
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
-            const isConnected = isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id);
+            const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
+            const isConnected = hasActiveHoverNs
+                ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
+                : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
             return isConnected ? 2.0 : 1.2;
         });
   }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes, selectedNode, peekedNode, searchQuery, seedArtists, isPassiveSelection]);

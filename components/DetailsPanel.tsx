@@ -2444,7 +2444,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
     useEffect(() => {
         if (selectedNode && filteredAndSortedNodes && filteredAndSortedNodes.length > 0) {
-            const idx = filteredAndSortedNodes.findIndex(n => n.id.toLowerCase() === selectedNode.id.toLowerCase());
+            const selectedCanon = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id).toLowerCase();
+            const idx = filteredAndSortedNodes.findIndex(n => {
+                const nCanon = stripSceneNamespace(n.canonicalId || n.id).toLowerCase();
+                return nCanon === selectedCanon || normalizeArtistId(nCanon) === normalizeArtistId(selectedCanon);
+            });
             if (idx !== -1) {
                 setViewedIndex(idx);
             }

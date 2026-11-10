@@ -1079,5 +1079,129 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       // Mid dot (offsetLeft: 200px, trackWidth: 240px, dotWidth: 16px)
       expect(computeScrollTarget(200, 240, 16)).toBe(200 - 120 + 8); // 88
     });
+
+    it('verifies scene-namespaced click preserves raw namespaced ID and stamps canonicalId', () => {
+      const rawNode = {
+        id: 'scene-3::further-seems-forever-us',
+        canonicalId: 'further-seems-forever-us',
+        type: 'artist',
+        label: 'Further Seems Forever',
+        sceneId: 'scene-3',
+        sceneIndex: 2,
+        x: 3120,
+        y: 920,
+      };
+
+      const canonicalNodeId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
+      expect(canonicalNodeId).toBe('further-seems-forever-us');
+
+      // Mimic handleNodeClick's preservation logic
+      const node = {
+        ...rawNode,
+        canonicalId: canonicalNodeId,
+      };
+
+      expect(node.id).toBe('scene-3::further-seems-forever-us');
+      expect(node.canonicalId).toBe('further-seems-forever-us');
+      expect(node.sceneId).toBe('scene-3');
+    });
+
+    it('verifies camera target resolver prioritizes exact ID match before canonical fallback', () => {
+      const visibleNodes = [
+        { id: 'scene-1::further-seems-forever-us', x: 1050, y: 880, sceneId: 'scene-1' },
+        { id: 'scene-3::further-seems-forever-us', x: 3120, y: 920, sceneId: 'scene-3' },
+      ];
+
+      const targetNodeId = 'scene-3::further-seems-forever-us';
+
+      // Old resolver (fell back to Scene 1)
+      const oldMatched = visibleNodes.find(n => stripSceneNamespace(n.id) === stripSceneNamespace(targetNodeId));
+      expect(oldMatched?.id).toBe('scene-1::further-seems-forever-us');
+      expect(oldMatched?.x).toBe(1050);
+
+      // New resolver (prioritizes exact ID first)
+      const newMatched = visibleNodes.find(n => n.id === targetNodeId) ||
+                         visibleNodes.find(n => stripSceneNamespace(n.id) === stripSceneNamespace(targetNodeId));
+      expect(newMatched?.id).toBe('scene-3::further-seems-forever-us');
+      expect(newMatched?.x).toBe(3120);
+    });
+
+    it('verifies scene-scoped selectionHighlightIds spotlights Scene 3 and cross-scene bridge endpoint while keeping Scene 1 intra-scene nodes dimmed', () => {
+      const activeInteractionNode = {
+        id: 'scene-3::further-seems-forever-us',
+        canonicalId: 'further-seems-forever-us',
+        type: 'artist',
+        sceneId: 'scene-3',
+      };
+
+      const visibleLinks = [
+        // Scene 3 intra-scene link
+        { source: 'scene-3::further-seems-forever-us', target: 'scene-3::sense-field-us', isCrossSceneBridge: false },
+        // Cross-scene bridge line
+        { source: 'scene-3::further-seems-forever-us', target: 'scene-1::further-seems-forever-us', isCrossSceneBridge: true },
+        // Scene 1 intra-scene links
+        { source: 'scene-1::further-seems-forever-us', target: 'scene-1::tooth-and-nail', isCrossSceneBridge: false },
+        { source: 'scene-1::further-seems-forever-us', target: 'scene-1::dischord', isCrossSceneBridge: false },
+      ];
+
+      const selectedIdStr = String(activeInteractionNode.id);
+      const hasSceneNs = selectedIdStr.includes('::');
+      const highlighted = new Set<string>([selectedIdStr, selectedIdStr.toLowerCase()]);
+      const primaryConnections = new Set<string>();
+
+      visibleLinks.forEach(link => {
+        const sourceId = link.source;
+        const targetId = link.target;
+        const isSourceSelected = hasSceneNs ? sourceId.toLowerCase() === selectedIdStr.toLowerCase() : false;
+        const isTargetSelected = hasSceneNs ? targetId.toLowerCase() === selectedIdStr.toLowerCase() : false;
+
+        if (isSourceSelected) {
+          highlighted.add(targetId);
+          primaryConnections.add(targetId);
+        }
+        if (isTargetSelected) {
+          highlighted.add(sourceId);
+          primaryConnections.add(sourceId);
+        }
+      });
+
+      // Target Scene 3 node is highlighted
+      expect(highlighted.has('scene-3::further-seems-forever-us')).toBe(true);
+      // Scene 3 local neighbor is highlighted
+      expect(highlighted.has('scene-3::sense-field-us')).toBe(true);
+      // Cross-scene bridge endpoint in Scene 1 is highlighted (visual safeguard)
+      expect(highlighted.has('scene-1::further-seems-forever-us')).toBe(true);
+
+      // Unrelated Scene 1 intra-scene neighbors are NOT highlighted
+      expect(highlighted.has('scene-1::tooth-and-nail')).toBe(false);
+      expect(highlighted.has('scene-1::dischord')).toBe(false);
+    });
+
+    it('verifies DetailsPanel canonical viewedIndex sync finds the correct card without mutating selectedNode.id', () => {
+      const selectedNode = {
+        id: 'scene-3::further-seems-forever-us',
+        canonicalId: 'further-seems-forever-us',
+        type: 'artist',
+      };
+
+      const filteredAndSortedNodes = [
+        { id: 'sense-field-us', canonicalId: 'sense-field-us', label: 'Sense Field' },
+        { id: 'further-seems-forever-us', canonicalId: 'further-seems-forever-us', label: 'Further Seems Forever' },
+        { id: 'jimmy-eat-world-us', canonicalId: 'jimmy-eat-world-us', label: 'Jimmy Eat World' },
+      ];
+
+      // Exact string match fails
+      const exactIdx = filteredAndSortedNodes.findIndex(n => n.id.toLowerCase() === selectedNode.id.toLowerCase());
+      expect(exactIdx).toBe(-1);
+
+      // Canonical match succeeds
+      const selectedCanon = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id).toLowerCase();
+      const canonicalIdx = filteredAndSortedNodes.findIndex(n => {
+        const nCanon = stripSceneNamespace(n.canonicalId || n.id).toLowerCase();
+        return nCanon === selectedCanon || normalizeArtistId(nCanon) === normalizeArtistId(selectedCanon);
+      });
+      expect(canonicalIdx).toBe(1);
+      expect(filteredAndSortedNodes[canonicalIdx].label).toBe('Further Seems Forever');
+    });
   });
 });

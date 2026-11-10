@@ -2622,24 +2622,31 @@ const App: React.FC = () => {
     }
     setIsPassiveSelection(false);
 
-    // V43 Multi-Scene Canonical Resolution: strip 'scene-k::' namespace so DetailsPanel & detailsCache
-    // always operate on canonical entity IDs while canvas preserves per-scene duplicates.
+    // V43 Multi-Scene Canonical Resolution: preserve exact scene-namespaced ID on node.id (e.g. scene-3::further-seems-forever-us)
+    // while ensuring canonicalId holds the stripped entity ID (e.g. further-seems-forever-us) for detailsCache & global lookups.
     const canonicalNodeId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
-    const node: Node = rawNode.id !== canonicalNodeId
-      ? { ...rawNode, id: canonicalNodeId, canonicalId: canonicalNodeId }
-      : rawNode;
+    let resolvedRawNode = rawNode;
+    if (!rawNode.id.includes('::') && graphData?.nodes) {
+      const sceneMatch = graphData.nodes.find(n => n.sceneId === activeSceneId && stripSceneNamespace(n.canonicalId || n.id) === canonicalNodeId);
+      if (sceneMatch) {
+        resolvedRawNode = sceneMatch;
+      } else {
+        const anyMatch = graphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === canonicalNodeId);
+        if (anyMatch) resolvedRawNode = anyMatch;
+      }
+    }
+    const node: Node = {
+      ...resolvedRawNode,
+      canonicalId: canonicalNodeId,
+    };
 
     const isTouchInteraction = isSmallScreen || (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
     const isAlreadySelected = selectedNode && (
-      selectedNode.id.toLowerCase() === node.id.toLowerCase() ||
-      normalizeArtistId(selectedNode.id) === normalizeArtistId(node.id) ||
-      (selectedNode.type === 'artist' && node.type === 'artist' && isArtistIdMatch(selectedNode.id, node.id))
+      selectedNode.id.toLowerCase() === node.id.toLowerCase()
     );
 
     const isAlreadyPeeked = peekedNode && (
-      peekedNode.id.toLowerCase() === node.id.toLowerCase() ||
-      normalizeArtistId(peekedNode.id) === normalizeArtistId(node.id) ||
-      (peekedNode.type === 'artist' && node.type === 'artist' && isArtistIdMatch(peekedNode.id, node.id))
+      peekedNode.id.toLowerCase() === node.id.toLowerCase()
     );
 
     const isEntityNode = node.type === 'artist' || node.type === 'label';
@@ -2648,7 +2655,7 @@ const App: React.FC = () => {
       setPeekedNode(null);
       setSelectedNode(node);
       if (node.type !== 'founded') {
-        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
+        setActiveNodeIds(prev => prev.some(id => stripSceneNamespace(id).toLowerCase() === canonicalNodeId.toLowerCase()) ? prev : [...prev, canonicalNodeId]);
       }
       return;
     }
@@ -2665,13 +2672,14 @@ const App: React.FC = () => {
                             fetchingNodeIdsRef.current.has(node.id) || 
                             loadingNodeIds.has(node.id.toLowerCase()) || 
                             fetchingNodeIdsRef.current.has(node.id.toLowerCase()) ||
-                            loadingNodeIds.has(normalizeArtistId(node.id)) || 
-                            fetchingNodeIdsRef.current.has(normalizeArtistId(node.id));
+                            loadingNodeIds.has(canonicalNodeId) ||
+                            loadingNodeIds.has(normalizeArtistId(canonicalNodeId)) || 
+                            fetchingNodeIdsRef.current.has(normalizeArtistId(canonicalNodeId));
     if (isTransitioning) {
        setPeekedNode(null);
        setSelectedNode(node);
        if (node.type !== 'founded') {
-         setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
+         setActiveNodeIds(prev => prev.some(id => stripSceneNamespace(id).toLowerCase() === canonicalNodeId.toLowerCase()) ? prev : [...prev, canonicalNodeId]);
        }
        return;
     }
@@ -2684,7 +2692,7 @@ const App: React.FC = () => {
     // the closure still holds the old empty Map and the lookup returns undefined — causing
     // the Token Quota modal to fire even though the data is already in memory.
     // detailsCacheRef.current is always synchronously up-to-date (synced via useEffect).
-    const simpleId = node.type === 'label' ? normalizeLabelId(node.label || node.id) : normalizeArtistId(node.id);
+    const simpleId = node.type === 'label' ? normalizeLabelId(node.label || canonicalNodeId) : normalizeArtistId(canonicalNodeId);
     let disambiguatedCacheId = simpleId;
     let connectedCountries: string[] = [];
     if (graphData) {
@@ -2692,12 +2700,12 @@ const App: React.FC = () => {
         .filter((l: any) => {
           const sId = stripSceneNamespace(typeof l.source === 'string' ? l.source : l.source.id);
           const tId = stripSceneNamespace(typeof l.target === 'string' ? l.target : l.target.id);
-          return sId.toLowerCase() === node.id.toLowerCase() || tId.toLowerCase() === node.id.toLowerCase();
+          return sId.toLowerCase() === canonicalNodeId.toLowerCase() || tId.toLowerCase() === canonicalNodeId.toLowerCase();
         })
         .map((l: any) => {
           const sId = stripSceneNamespace(typeof l.source === 'string' ? l.source : l.source.id);
           const tId = stripSceneNamespace(typeof l.target === 'string' ? l.target : l.target.id);
-          const otherId = sId.toLowerCase() === node.id.toLowerCase() ? tId : sId;
+          const otherId = sId.toLowerCase() === canonicalNodeId.toLowerCase() ? tId : sId;
           return graphData.nodes.find((no: any) => stripSceneNamespace(no.canonicalId || no.id).toLowerCase() === otherId.toLowerCase());
         })
         .filter((no: any) => no && no.type === 'country')
@@ -2715,11 +2723,11 @@ const App: React.FC = () => {
     if (!cachedDetails && disambiguatedCacheId !== simpleId) {
       // If we didn't find the disambiguated key, check the simple key, but run context verification
       const fallbackDetails = detailsCacheRef.current.get(simpleId) || 
-                              detailsCacheRef.current.get(node.id.toLowerCase()) ||
-                              detailsCacheRef.current.get(node.id) ||
+                              detailsCacheRef.current.get(canonicalNodeId.toLowerCase()) ||
+                              detailsCacheRef.current.get(canonicalNodeId) ||
                               healedDetailsCacheRef.current.get(simpleId) ||
-                              healedDetailsCacheRef.current.get(node.id.toLowerCase()) ||
-                              healedDetailsCacheRef.current.get(node.id);
+                              healedDetailsCacheRef.current.get(canonicalNodeId.toLowerCase()) ||
+                              healedDetailsCacheRef.current.get(canonicalNodeId);
       if (fallbackDetails) {
         const cachedOrigin = fallbackDetails?.details?.origin || (fallbackDetails as any)?.origin || '';
         const hasMismatch = connectedCountries.length > 0 && 
@@ -2735,11 +2743,11 @@ const App: React.FC = () => {
     } else if (!cachedDetails) {
       // If there is no country link/context, just check the simple key
       cachedDetails = detailsCacheRef.current.get(simpleId) || 
-                      detailsCacheRef.current.get(node.id.toLowerCase()) ||
-                      detailsCacheRef.current.get(node.id) ||
+                      detailsCacheRef.current.get(canonicalNodeId.toLowerCase()) ||
+                      detailsCacheRef.current.get(canonicalNodeId) ||
                       healedDetailsCacheRef.current.get(simpleId) ||
-                      healedDetailsCacheRef.current.get(node.id.toLowerCase()) ||
-                      healedDetailsCacheRef.current.get(node.id);
+                      healedDetailsCacheRef.current.get(canonicalNodeId.toLowerCase()) ||
+                      healedDetailsCacheRef.current.get(canonicalNodeId);
     }
     
     // 2. Load Locally and Block the Network
@@ -2796,7 +2804,7 @@ const App: React.FC = () => {
           genre: cachedDetails?.details?.genre || "",
           origin: cachedDetails?.details?.origin || "",
           founded: cachedDetails?.details?.founded || "",
-          name: cachedDetails?.details?.artist || node.id,
+          name: cachedDetails?.details?.artist || node.label || canonicalNodeId,
           imageUrl: cachedDetails?.imageUrl || (cachedDetails as any)?.image || (node as any).imageUrl || "",
           isLibrary: true
        };
@@ -2804,7 +2812,7 @@ const App: React.FC = () => {
        setPeekedNode(null);
        setSelectedNode(hydratedNode);
        if (node.type !== 'founded') {
-         setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
+         setActiveNodeIds(prev => prev.some(id => stripSceneNamespace(id).toLowerCase() === canonicalNodeId.toLowerCase()) ? prev : [...prev, canonicalNodeId]);
        }
        incrementDeepCutsOpenedCount();
        
@@ -2819,7 +2827,7 @@ const App: React.FC = () => {
     // Firestore stores detailsCache as a JSON string — parse it and unwrap any array wrapper layers.
     let globalDoc: any | null = null;
     try {
-        const standardizedId = node.type === 'label' ? simpleId : normalizeArtistId(node.id);
+        const standardizedId = node.type === 'label' ? simpleId : normalizeArtistId(canonicalNodeId);
         globalDoc = await getEntityDocWithRedirect(disambiguatedCacheId, node.type === 'label' ? 'label' : 'artist');
             
             if (globalDoc.data()?._isStub && disambiguatedCacheId !== standardizedId) {
@@ -2916,7 +2924,7 @@ const App: React.FC = () => {
                     setPeekedNode(null);
                     setSelectedNode(hydratedNode);
                     if (node.type !== 'founded') {
-                        setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
+                        setActiveNodeIds(prev => prev.some(id => stripSceneNamespace(id).toLowerCase() === canonicalNodeId.toLowerCase()) ? prev : [...prev, canonicalNodeId]);
                     }
                     incrementDeepCutsOpenedCount();
                     
@@ -8858,7 +8866,8 @@ const App: React.FC = () => {
   const formattedSelectedNode = useMemo(() => {
     if (!selectedNode || !formattedGraphData) return selectedNode;
     const selectedCanonicalId = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id);
-    const match = formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === selectedCanonicalId || n.id === selectedNode.id);
+    const match = formattedGraphData.nodes.find(n => n.id === selectedNode.id) ||
+                  formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === selectedCanonicalId);
     const isLoadingNode = loadingNodeIds.has(selectedCanonicalId) || 
                           loadingNodeIds.has(selectedCanonicalId.toLowerCase()) || 
                           loadingNodeIds.has(normalizeArtistId(selectedCanonicalId));
