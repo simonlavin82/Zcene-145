@@ -657,4 +657,68 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(Math.abs(angleC_after - angleC_before)).toBeLessThan(0.05);
     });
   });
+
+  describe('computeProjectCardMetrics Resilient Fallbacks', () => {
+    it('falls back to artistCanon + labelCanon entity count when activeNodes is empty ([Rule 44])', () => {
+      const mockScenes: ProjectScene[] = [
+        {
+          sceneId: 'scene-1',
+          sceneIndex: 0,
+          title: 'Sense Field + Reason To Believe',
+          seedArtists: 'Sense Field::Reason To Believe',
+          status: 'completed',
+          graphData: {
+            nodes: [
+              { id: 'scene-1::sense-field-us', canonicalId: 'sense-field-us', label: 'Sense Field', type: 'artist', isSeed: true },
+              { id: 'scene-1::reason-to-believe-us', canonicalId: 'reason-to-believe-us', label: 'Reason To Believe', type: 'artist', isSeed: true },
+              { id: 'scene-1::samiam-us', canonicalId: 'samiam-us', label: 'Samiam', type: 'artist' },
+              { id: 'scene-1::revelation', canonicalId: 'revelation', label: 'Revelation', type: 'label' },
+            ],
+            links: [],
+          },
+        },
+        {
+          sceneId: 'scene-2',
+          sceneIndex: 1,
+          title: 'Jimmy Eat World',
+          seedArtists: 'Sense Field::Reason To Believe::Jimmy Eat World',
+          status: 'completed',
+          graphData: {
+            nodes: [
+              { id: 'scene-2::jimmy-eat-world-us', canonicalId: 'jimmy-eat-world-us', label: 'Jimmy Eat World', type: 'artist', isSeed: true },
+              { id: 'scene-2::samiam-us', canonicalId: 'samiam-us', label: 'Samiam', type: 'artist' },
+              { id: 'scene-2::sub-pop', canonicalId: 'sub-pop', label: 'Sub Pop', type: 'label' },
+            ],
+            links: [],
+          },
+        },
+      ];
+
+      // Test 1: Stale / wiped project document with activeNodes: []
+      const projectWithEmptyActiveNodes: any = {
+        id: 'test-proj-empty-active',
+        scenes: mockScenes,
+        seedArtists: 'Sense Field::Reason To Believe::Jimmy Eat World',
+        activeNodes: [],
+      };
+
+      const metricsEmpty = computeProjectCardMetrics(projectWithEmptyActiveNodes);
+      // Canonical entities: sense-field-us, reason-to-believe-us, samiam-us, jimmy-eat-world-us (4 artists) + revelation, sub-pop (2 labels) = 6
+      expect(metricsEmpty.sceneCount).toBe(2);
+      expect(metricsEmpty.rootArtistsCount).toBe(3);
+      expect(metricsEmpty.labelCount).toBe(2);
+      expect(metricsEmpty.deepCutsCount).toBe(6); // Resilient fallback: does NOT drop to 0!
+
+      // Test 2: Populated activeNodes (with namespaced or canonical IDs)
+      const projectWithPopulatedActiveNodes: any = {
+        id: 'test-proj-populated-active',
+        scenes: mockScenes,
+        seedArtists: 'Sense Field::Reason To Believe::Jimmy Eat World',
+        activeNodes: ['scene-1::sense-field-us', 'reason-to-believe-us', 'revelation'],
+      };
+
+      const metricsPopulated = computeProjectCardMetrics(projectWithPopulatedActiveNodes);
+      expect(metricsPopulated.deepCutsCount).toBe(3);
+    });
+  });
 });

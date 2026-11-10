@@ -1226,12 +1226,15 @@ function computeProjectCardMetrics(project) {
     const rawActive = Array.isArray(project.activeNodes) ? project.activeNodes : [];
     const activeCanon = new Set(rawActive.map((id) => normalizeCanonicalEntityId(stripSceneNamespace(String(id)))).filter(Boolean));
     let deepCutsCount;
-    if (artistCanon.size + labelCanon.size > 0) {
+    if (activeCanon.size > 0 && artistCanon.size + labelCanon.size > 0) {
         deepCutsCount = 0;
         activeCanon.forEach((id) => {
             if (artistCanon.has(id) || labelCanon.has(id))
                 deepCutsCount++;
         });
+    }
+    else if (artistCanon.size + labelCanon.size > 0) {
+        deepCutsCount = artistCanon.size + labelCanon.size;
     }
     else {
         deepCutsCount = activeCanon.size;

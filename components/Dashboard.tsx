@@ -13,7 +13,7 @@ import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } fr
 import { DashboardProjectCard } from './DashboardProjectCard';
 import { CreateProjectCard } from './CreateProjectCard';
 import { PROFILE_COLORS } from './SharedModals';
-import { computeProjectCardMetrics } from '../shared/multiSceneUtils';
+import { computeProjectCardMetrics, parseProjectScenes } from '../shared/multiSceneUtils';
 
 
 interface DashboardProps {
@@ -155,22 +155,36 @@ const Dashboard: React.FC<DashboardProps> = ({
         return true;
       }
 
-      // 4. Check graphData.nodes for any artist node (node.label or node.id)
-      if (project.graphData) {
+      // 4. Check scenes or graphData.nodes for any artist node (node.label or node.id)
+      let artistNodes: any[] = [];
+      if (project.scenes) {
+        try {
+          const parsedScenes = parseProjectScenes(project.scenes);
+          for (const s of parsedScenes) {
+            if (s.graphData && Array.isArray(s.graphData.nodes)) {
+              artistNodes.push(...s.graphData.nodes);
+            }
+          }
+        } catch (e) {}
+      }
+      if (artistNodes.length === 0 && project.graphData) {
         try {
           const parsed = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
           if (parsed && Array.isArray(parsed.nodes)) {
-            const hasArtistMatch = parsed.nodes.some((node: any) => {
-              if (node.type && node.type !== 'artist') return false;
-              const label = (node.label || '').toLowerCase();
-              const id = (node.id || '').toLowerCase();
-              return label.includes(query) || id.includes(query);
-            });
-            if (hasArtistMatch) return true;
+            artistNodes = parsed.nodes;
           }
         } catch (e) {
           // Ignore parsing error
         }
+      }
+      if (artistNodes.length > 0) {
+        const hasArtistMatch = artistNodes.some((node: any) => {
+          if (node.type && node.type !== 'artist') return false;
+          const label = (node.label || '').toLowerCase();
+          const id = (node.id || '').toLowerCase();
+          return label.includes(query) || id.includes(query);
+        });
+        if (hasArtistMatch) return true;
       }
 
       return false;
@@ -181,18 +195,87 @@ const Dashboard: React.FC<DashboardProps> = ({
     const groups: Record<string, Project[]> = {};
 
     filteredProjects.forEach((project) => {
-      let genresList: string[] = [];
-      if (project.graphData) {
+      const genresList: string[] = [];
+
+      // Tier 1: Multi-Scene Check (project.scenes)
+      if (project.scenes) {
+        try {
+          const parsedScenes = parseProjectScenes(project.scenes);
+          for (const s of parsedScenes) {
+            if (s.graphData && Array.isArray(s.graphData.nodes)) {
+              const genreNodes = s.graphData.nodes.filter((n: any) => n.type === 'genre');
+              for (const gn of genreNodes) {
+                const gName = (gn.label || gn.id || '').trim();
+                if (gName && !genresList.includes(gName)) {
+                  genresList.push(gName);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[Dashboard] Failed to parse project scenes for genres:", e);
+        }
+      }
+
+      // Tier 2: Root GraphData (project.graphData, string or object)
+      if (genresList.length === 0 && project.graphData) {
         try {
           const parsed = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
           if (parsed && Array.isArray(parsed.nodes)) {
             const genreNodes = parsed.nodes.filter((n: any) => n.type === 'genre');
-            genresList = genreNodes
-              .map((n: any) => (n.label || n.id || '').trim())
-              .filter(Boolean);
+            for (const gn of genreNodes) {
+              const gName = (gn.label || gn.id || '').trim();
+              if (gName && !genresList.includes(gName)) {
+                genresList.push(gName);
+              }
+            }
           }
         } catch (e) {
-          console.warn("Failed to parse project graphData for genres:", e);
+          console.warn("[Dashboard] Failed to parse project graphData for genres:", e);
+        }
+      }
+
+      // Tier 3: detailsCache (authoritative entity metadata)
+      if (genresList.length === 0 && project.detailsCache) {
+        try {
+          let cacheObj: any = project.detailsCache;
+          if (typeof cacheObj === 'string') {
+            cacheObj = JSON.parse(cacheObj);
+          }
+          if (cacheObj) {
+            const entries = Array.isArray(cacheObj) ? cacheObj : (typeof cacheObj === 'object' ? Object.entries(cacheObj) : []);
+            for (const item of entries) {
+              const val = Array.isArray(item) ? item[1] : item;
+              if (val?.details?.genre && typeof val.details.genre === 'string' && val.details.genre.trim()) {
+                const gName = val.details.genre.trim();
+                if (!genresList.includes(gName)) {
+                  genresList.push(gName);
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("[Dashboard] Failed to parse project detailsCache for genres:", e);
+        }
+      }
+
+      // Tier 4: discoveryFilters (fallback filter criteria)
+      if (genresList.length === 0 && project.discoveryFilters) {
+        try {
+          let filters: any = project.discoveryFilters;
+          if (typeof filters === 'string') {
+            filters = JSON.parse(filters);
+          }
+          if (filters?.genre && typeof filters.genre === 'string' && filters.genre.trim()) {
+            genresList.push(filters.genre.trim());
+          } else if (Array.isArray(filters?.includeGenres) && filters.includeGenres.length > 0) {
+            const firstG = String(filters.includeGenres[0]).trim();
+            if (firstG && !genresList.includes(firstG)) {
+              genresList.push(firstG);
+            }
+          }
+        } catch (e) {
+          console.warn("[Dashboard] Failed to parse project discoveryFilters for genres:", e);
         }
       }
 

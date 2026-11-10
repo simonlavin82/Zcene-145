@@ -6686,118 +6686,143 @@ const App: React.FC = () => {
         const curatingWithSettledScenes =
           incomingStatus === 'curating' &&
           (scenesRef.current || []).some(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+
+        const populatedScenesFromDoc = (scenesRef.current || []).filter(
+          s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+        );
+
+        let parsedGraphData: any = null;
+        if (typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
+          try {
+            parsedGraphData = JSON.parse(data.graphData);
+          } catch (e) {
+            console.warn('[ProjectLoader] Failed to parse graphData string:', e);
+          }
+        } else if (typeof data.graphData === 'object' && data.graphData !== null) {
+          parsedGraphData = data.graphData;
+        }
+
+        const hasGraphDataNodes = parsedGraphData && Array.isArray(parsedGraphData.nodes) && parsedGraphData.nodes.length > 0;
+        const hasPopulatedScenes = populatedScenesFromDoc.length > 0;
+
         if (curatingWithSettledScenes && localGraphPopulated) {
           loadedFromGraphData = true;
-        } else if ((incomingStatus !== 'curating' || curatingWithSettledScenes) && data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20) {
+        } else if ((incomingStatus !== 'curating' || curatingWithSettledScenes) && (hasGraphDataNodes || hasPopulatedScenes)) {
           try {
-            const parsed = JSON.parse(data.graphData);
-            const populatedScenesFromDoc = (scenesRef.current || []).filter(
-              s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
-            );
-            if ((parsed && parsed.nodes && parsed.nodes.length > 0) || populatedScenesFromDoc.length > 0) {
-              console.log('[ProjectLoader] Hydrating directly from project graphData');
-              let savedPositions: CanvasNodeRef[] = [];
-              if (data.canvasLayout) {
-                try {
-                  savedPositions = migrateLegacyCanvasLayout(JSON.parse(data.canvasLayout), scenesRef.current);
-                } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
-              }
-
-              let g: GraphData;
-              if (populatedScenesFromDoc.length >= 2) {
-                g = buildCompositeCanvasGraph(populatedScenesFromDoc, crossSceneLinksRef.current || [], savedPositions);
-              } else if (parsed && parsed.nodes && parsed.nodes.length > 0) {
-                g = normalizeGraphData(parsed);
-                g.links = g.links.map((l: any) => ({
-                  ...l,
-                  source: typeof l.source === 'object' ? l.source.id : l.source,
-                  target: typeof l.target === 'object' ? l.target.id : l.target,
-                }));
-                if (savedPositions.length > 0) {
-                  savedPositions.forEach(ref => {
-                    const node = g.nodes.find((n: any) => n.id === ref.nodeId);
-                    if (node) { node.x = ref.x; node.y = ref.y; node.fx = ref.fx ?? null; node.fy = ref.fy ?? null; }
-                  });
-                }
-              } else {
-                g = buildCompositeCanvasGraph(populatedScenesFromDoc, crossSceneLinksRef.current || [], savedPositions);
-              }
-
-              if (data.detailsCache) {
-                try {
-                  const newCacheMap = expandDetailsCacheMap(data.detailsCache);
-                  newCacheMap.forEach((v, k) => {
-                    detailsCacheRef.current.set(k, v);
-                  });
-                  setDetailsCache((prev) => {
-                    let changed = false;
-                    const merged = new Map(prev);
-                    newCacheMap.forEach((v, k) => {
-                      if (prev.get(k) !== v) changed = true;
-                      merged.set(k, v);
-                    });
-                    return changed ? merged : prev;
-                  });
-
-                  // Self-heal node labels with canonical stylized casing from authoritative detailsCache
-                  g.nodes.forEach((node: Node) => {
-                    if (node.type === 'artist' || !node.type) {
-                      const rawId = stripSceneNamespace(node.canonicalId || node.id);
-                      const cached = newCacheMap.get(rawId) || newCacheMap.get(normalizeArtistId(rawId)) || newCacheMap.get(node.id);
-                      if (cached?.details?.artist && typeof cached.details.artist === 'string' && cached.details.artist.trim()) {
-                        node.label = cached.details.artist.trim();
-                      }
-                    }
-                  });
-                } catch (e) {
-                  console.error("[ProjectLoader] Details cache parse fail", e);
-                }
-              }
-
-              g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
-              syncGraphDataState(g);
-
-              // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
-              const isInitialHydration = isProjectLoadingRef.current;
-              if (isInitialHydration) setIsLoading(true);
+            console.log('[ProjectLoader] Hydrating directly from project graphData / scenes');
+            let savedPositions: CanvasNodeRef[] = [];
+            if (data.canvasLayout) {
               try {
-                await batchHydrateDetailsCache(g.nodes, g.links);
-              } finally {
-                // Keep the mapping loader up while another scene is still curating.
-                if (isInitialHydration && incomingStatus !== 'curating') setIsLoading(false);
-              }
-              hydratedNodes = g.nodes;
-
-              // Restore active nodes — with seed-fallback for stale documents where activeNodes was never
-              // written by the backend (legacy projects have activeNodes: [] from creation).
-              if (data.activeNodes && Array.isArray(data.activeNodes)) {
-                let resolvedActiveNodes = data.activeNodes.map((id: string) => stripSceneNamespace(id));
-                const availableEntities = Array.from(new Set(g.nodes.map((n: any) => stripSceneNamespace(n.canonicalId || n.id))));
-                if (availableEntities.length > resolvedActiveNodes.length) {
-                  const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
-                  resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
+                const rawLayout = typeof data.canvasLayout === 'string' ? JSON.parse(data.canvasLayout) : data.canvasLayout;
+                if (Array.isArray(rawLayout)) {
+                  savedPositions = migrateLegacyCanvasLayout(rawLayout, scenesRef.current);
                 }
-                setActiveNodeIdsIfChanged(resolvedActiveNodes);
-                
-              }
+              } catch (e) { console.warn('[ProjectLoader] canvasLayout parse failed:', e); }
+            }
 
-              loadedFromGraphData = true;
+            let g: GraphData;
+            if (populatedScenesFromDoc.length >= 2) {
+              g = buildCompositeCanvasGraph(populatedScenesFromDoc, crossSceneLinksRef.current || [], savedPositions);
+            } else if (hasGraphDataNodes) {
+              g = normalizeGraphData(parsedGraphData);
+              g.links = g.links.map((l: any) => ({
+                ...l,
+                source: typeof l.source === 'object' ? l.source.id : l.source,
+                target: typeof l.target === 'object' ? l.target.id : l.target,
+              }));
+              if (savedPositions.length > 0) {
+                savedPositions.forEach(ref => {
+                  const node = g.nodes.find((n: any) => n.id === ref.nodeId);
+                  if (node) { node.x = ref.x; node.y = ref.y; node.fx = ref.fx ?? null; node.fy = ref.fy ?? null; }
+                });
+              }
+            } else if (populatedScenesFromDoc.length > 0) {
+              g = buildCompositeCanvasGraph(populatedScenesFromDoc, crossSceneLinksRef.current || [], savedPositions);
             } else {
-              const hasLegacyLookupKeys =
-                (Array.isArray(data.artistIds) && data.artistIds.length > 0) ||
-                (Array.isArray(data.labelIds) && data.labelIds.length > 0) ||
-                Boolean(data.cacheKey);
-              if (isHydratingSessionRef.current || !hasLegacyLookupKeys) {
-                loadedFromGraphData = true;
-                if (!isHydratingSessionRef.current) {
-                  syncGraphDataState({ nodes: [], links: [] });
-                }
-              } else {
-                console.warn('[ProjectLoader] Project document contains empty graph. Falling back to Phase 1 cache lookup.');
+              g = { nodes: [], links: [] };
+            }
+
+            if (data.detailsCache) {
+              try {
+                const newCacheMap = expandDetailsCacheMap(data.detailsCache);
+                newCacheMap.forEach((v, k) => {
+                  detailsCacheRef.current.set(k, v);
+                });
+                setDetailsCache((prev) => {
+                  let changed = false;
+                  const merged = new Map(prev);
+                  newCacheMap.forEach((v, k) => {
+                    if (prev.get(k) !== v) changed = true;
+                    merged.set(k, v);
+                  });
+                  return changed ? merged : prev;
+                });
+
+                // Self-heal node labels with canonical stylized casing from authoritative detailsCache
+                g.nodes.forEach((node: Node) => {
+                  if (node.type === 'artist' || !node.type) {
+                    const rawId = stripSceneNamespace(node.canonicalId || node.id);
+                    const cached = newCacheMap.get(rawId) || newCacheMap.get(normalizeArtistId(rawId)) || newCacheMap.get(node.id);
+                    if (cached?.details?.artist && typeof cached.details.artist === 'string' && cached.details.artist.trim()) {
+                      node.label = cached.details.artist.trim();
+                    }
+                  }
+                });
+              } catch (e) {
+                console.error("[ProjectLoader] Details cache parse fail", e);
               }
             }
+
+            g.nodes.forEach((n: any) => { n.fx = n.fx ?? null; n.fy = n.fy ?? null; });
+            syncGraphDataState(g);
+
+            // ── FIRESTORE-FIRST: batch-load all node biographies before marking load complete
+            const isInitialHydration = isProjectLoadingRef.current;
+            if (isInitialHydration) setIsLoading(true);
+            try {
+              await batchHydrateDetailsCache(g.nodes, g.links);
+            } finally {
+              // Keep the mapping loader up while another scene is still curating.
+              if (isInitialHydration && incomingStatus !== 'curating') setIsLoading(false);
+            }
+            hydratedNodes = g.nodes;
+
+            // Restore active nodes — with fallback for stale documents where activeNodes was empty
+            if (data.activeNodes && Array.isArray(data.activeNodes) && data.activeNodes.length > 0) {
+              let resolvedActiveNodes = data.activeNodes.map((id: string) => stripSceneNamespace(id));
+              const availableEntities = Array.from(new Set(g.nodes.map((n: any) => stripSceneNamespace(n.canonicalId || n.id))));
+              if (availableEntities.length > resolvedActiveNodes.length) {
+                const missingEntities = availableEntities.filter((id: string) => !resolvedActiveNodes.includes(id));
+                resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
+              }
+              setActiveNodeIdsIfChanged(resolvedActiveNodes);
+            } else if (g.nodes.length > 0) {
+              const entityIds = Array.from(
+                new Set(
+                  g.nodes
+                    .filter((n: any) => n.type === 'artist' || n.type === 'label' || !n.type)
+                    .map((n: any) => stripSceneNamespace(n.canonicalId || n.id))
+                )
+              );
+              setActiveNodeIdsIfChanged(entityIds);
+            }
+
+            loadedFromGraphData = true;
           } catch (e) {
-            console.error('[ProjectLoader] Failed to hydrate directly from graphData:', e);
+            console.error('[ProjectLoader] Failed to hydrate directly from graphData / scenes:', e);
+          }
+        } else {
+          const hasLegacyLookupKeys =
+            (Array.isArray(data.artistIds) && data.artistIds.length > 0) ||
+            (Array.isArray(data.labelIds) && data.labelIds.length > 0) ||
+            Boolean(data.cacheKey);
+          if (isHydratingSessionRef.current || !hasLegacyLookupKeys) {
+            loadedFromGraphData = true;
+            if (!isHydratingSessionRef.current) {
+              syncGraphDataState({ nodes: [], links: [] });
+            }
+          } else {
+            console.warn('[ProjectLoader] Project document contains empty graph. Falling back to Phase 1 cache lookup.');
           }
         }
 
@@ -6805,7 +6830,7 @@ const App: React.FC = () => {
           loadedFromGraphData = true;
         }
 
-        if (!loadedFromGraphData) {
+        if (!loadedFromGraphData && incomingStatus !== 'completed' && populatedScenesFromDoc.length === 0) {
           const hasEntityIds = (data.artistIds && Array.isArray(data.artistIds) && data.artistIds.length > 0) ||
                                (data.labelIds && Array.isArray(data.labelIds) && data.labelIds.length > 0);
           if (hasEntityIds) {
@@ -7654,11 +7679,23 @@ const App: React.FC = () => {
                   s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
                 );
 
+                let parsedGraphData: any = null;
+                if (typeof data.graphData === 'string' && data.graphData.trim().length > 0) {
+                  try {
+                    parsedGraphData = JSON.parse(data.graphData);
+                  } catch (e) {
+                    console.warn('[SharedLoader] graphData parse failed:', e);
+                  }
+                } else if (typeof data.graphData === 'object' && data.graphData !== null) {
+                  parsedGraphData = data.graphData;
+                }
+
                 let g: GraphData;
                 if (populatedScenes.length >= 2) {
                   g = buildCompositeCanvasGraph(populatedScenes, parsedCross, savedPositions);
+                } else if (populatedScenes.length === 1 && (!parsedGraphData || !Array.isArray(parsedGraphData.nodes) || parsedGraphData.nodes.length === 0)) {
+                  g = buildCompositeCanvasGraph(populatedScenes, parsedCross, savedPositions);
                 } else {
-                  const parsedGraphData = typeof data.graphData === 'string' ? JSON.parse(data.graphData) : data.graphData;
                   const isMultiScene = parsedScenes.length >= 2 || (data.sceneCount && data.sceneCount >= 2);
                   
                   if (parsedGraphData && Array.isArray(parsedGraphData.nodes)) {
@@ -7680,7 +7717,7 @@ const App: React.FC = () => {
                     }));
                   }
 
-                  g = normalizeGraphData(parsedGraphData);
+                  g = normalizeGraphData(parsedGraphData || { nodes: [], links: [] });
 
                   if (savedPositions.length > 0) {
                     const posMap = new Map(savedPositions.map(p => [p.nodeId, p]));
@@ -7728,7 +7765,7 @@ const App: React.FC = () => {
                   console.warn("Guest batch hydration failed:", err);
                 }
                 
-                if (data.activeNodes && Array.isArray(data.activeNodes)) {
+                if (data.activeNodes && Array.isArray(data.activeNodes) && data.activeNodes.length > 0) {
                   let resolvedActiveNodes = data.activeNodes.map((id: string) => stripSceneNamespace(id));
                   const availableEntities = Array.from(new Set(g.nodes.map((n: any) => stripSceneNamespace(n.canonicalId || n.id))));
                   if (availableEntities.length > resolvedActiveNodes.length) {
@@ -7736,7 +7773,15 @@ const App: React.FC = () => {
                     resolvedActiveNodes = [...resolvedActiveNodes, ...missingEntities];
                   }
                   setActiveNodeIds(resolvedActiveNodes);
-                  
+                } else if (g.nodes.length > 0) {
+                  const entityIds = Array.from(
+                    new Set(
+                      g.nodes
+                        .filter((n: any) => n.type === 'artist' || n.type === 'label' || !n.type)
+                        .map((n: any) => stripSceneNamespace(n.canonicalId || n.id))
+                    )
+                  );
+                  setActiveNodeIds(entityIds);
                 }
 
               } else {
