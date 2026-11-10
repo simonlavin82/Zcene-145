@@ -748,6 +748,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     };
 
     const triggerNodeHover = (d: Node, isProgrammatic = false) => {
+        if (isProgrammatic && isPassiveSelectionRef.current) return;
         setHoveredNodeId(d.id);
         hoveredNodeIdRef.current = d.id;
         activeHoveredNodeRef.current = d;
@@ -939,7 +940,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     };
 
     const clearNodeHover = () => {
-        const activeNode = selectedNodeRef.current || peekedNodeRef.current;
+        const activeNode = !isPassiveSelectionRef.current ? (selectedNodeRef.current || peekedNodeRef.current) : null;
         if (activeNode) {
             triggerNodeHover(activeNode, true);
             setHoveredLink(null);
@@ -1984,7 +1985,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 const isMatchT = highlightedNodes.has(t) || highlightedNodes.has(String(t).toLowerCase());
                 return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
             }
-            const activeNode = (!isPassiveSelection ? (selectedNode || peekedNode) : null) || activeHoveredNodeRef.current;
+            const activeNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null)) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
             if (!activeNode) return "#e4e4e7";
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
@@ -2011,7 +2012,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 return (isMatchS && isMatchT) ? 0.6 : 0.05;
             }
 
-            const activeNode = (!isPassiveSelection ? (selectedNode || peekedNode) : null) || activeHoveredNodeRef.current;
+            const activeNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null)) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
             if (activeNode) {
                 const isFirstDegree = isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id);
                 if (isFirstDegree) return 0.9;
@@ -2023,7 +2024,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     // Cross-Scene Bridge Lines: Default rest (grey #71717a, opacity 0.22, width 1.2)
     // Only active hover (peekedNode or activeHoveredNodeRef) illuminates connected bridges in yellow #F6E468
-    const activeHoverNode = peekedNode || activeHoveredNodeRef.current;
+    const activeHoverNode = peekedNode || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
     container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
         .transition().duration(300)
         .attr("stroke", (d: any) => {

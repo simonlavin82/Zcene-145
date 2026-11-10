@@ -137,7 +137,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 21, 
         title: "Locked Topology & Coordinate Memory", 
-        desc: "Node positions are strictly derived from AI-evaluated link weights around deterministic per-scene centers (1000 + sceneIndex * 1050, 1000). Direct D3 node dragging is permanently disabled. resolveSceneNodeOverlaps enforces AABB collision boxes (W = 7.2px/char + 22px + padding, H = 24px) with seed mass = ∞, artist mass = 6.7, outward arc sprouting, and 1-degree metadata satellites tethered to parent artist orbits (r ∈ [62px, 85px]) via tangential arc rotation. Settled (fx, fy) coordinates (keyed by namespaced ID scene-k::canonicalId) are persisted to the owned project's canvasLayout (5s debounce) so existing scenes remain frozen when new scenes are added." 
+        desc: "Node positions are strictly derived from AI-evaluated link weights around deterministic per-scene centers (1000 + sceneIndex * 1050, 1000). Direct D3 node dragging is permanently disabled. resolveSceneNodeOverlaps enforces AABB collision boxes (W = 7.2px/char + 22px + padding, H = 24px) with seed mass = ∞, artist mass = 6.7, outward-arc petal sprouting (r ∈ [65px, 75px], charges -100 to -120), and 1-degree metadata satellites tethered to parent artist orbits (r ∈ [62px, 85px]) via tangential arc rotation. Settled (fx, fy) coordinates (keyed by namespaced ID scene-k::canonicalId) are persisted to the owned project's canvasLayout (5s debounce) so existing scenes remain frozen when new scenes are added." 
     },
     { 
         id: 22, 
@@ -157,7 +157,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 25, 
         title: "Selective Coordinate Amnesia", 
-        desc: "When generating a shared link, fixed coordinates (fx, fy) are intentionally stripped from both composite graphData and per-scene graphData so guests experience a fresh, organic D3 layout around each scene's deterministic centerOffset. This is a post-serialization mutation strictly applied to ephemeral guest links." 
+        desc: "When generating a shared link, single-scene projects (scenes.length < 2) apply Selective Coordinate Amnesia, stripping fixed coordinates (fx, fy) so guests experience a fresh, organic D3 layout. Multi-scene shared projects (scenes.length >= 2) strictly preserve canvasLayout and settled coordinates so the recipient experiences exact 1:1 multi-cluster spatial parity on /z/:id without collisions." 
     },
     { 
         id: 26, 
@@ -172,7 +172,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 28, 
         title: "Canonical Persistence Mandate", 
-        desc: "Global asset persistence (artists, labels, genres) must exclusively use the pure, canonical ID (e.g., 'spaced-us', normalizeLabelId). Ephemeral 3-Tier query constraints (after, before, inc_origins, exc_origins, inc_genres, inc_labels) belong exclusively to the live Project lifecycle and must never be appended to global cache document keys or DB paths to prevent cache fracturing." 
+        desc: "Global asset persistence (artists, labels, genres) must exclusively use the pure, canonical ID (e.g., 'spaced-us', normalizeLabelId). Ephemeral 3-Tier query constraints belong exclusively to the live Project lifecycle and must never pollute global cache keys. compactDetailsCacheToCanonical strips transient scene-k namespaces upon project persistence to maintain a single canonical record per entity across all scenes." 
     },
     { 
         id: 29, 
@@ -552,7 +552,7 @@ const SharingFlowDiagram: React.FC = () => (
                     <span className="text-[9px] uppercase tracking-wider font-bold text-amber-500">Read Only</span>
                     <div className="text-xs text-white">Interactive Graph Preview</div>
                 </div>
-                <div className="text-zinc-500 text-[10px] text-center italic">Coordinate Amnesia applied</div>
+                <div className="text-zinc-500 text-[10px] text-center italic">Multi-Scene: canvasLayout &amp; settled coords preserved; Single-Scene: Coordinate Amnesia applied</div>
             </div>
 
             <div><span className="material-symbols-outlined text-zinc-700 text-sm">arrow_forward</span></div>
@@ -802,17 +802,21 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             title="D3 Force Simulation & Physics Constants" 
                             content={`STABILITY & MOMENTUM CONSTANTS (MusicGraph.tsx):
 - Velocity Decay: 0.7 (High friction for rapid settling and zero canvas jitter)
-- Charge (ManyBody): -500 (Organic Mode) to -1200 (Cluster Mode)
+- Charge (ManyBody): -500 (Organic Mode) to -1200 (Cluster Mode); Petal Satellites: -100 to -120
 - Collision Radius: 80 * sizeMult (Prevents overlap while preserving semantic density)
 - Alpha Targets: 0.15 (Initialization) / 0.2 (Selection Wake) / 1.0 (Structural Topology Change)
 - Alpha Cooling: alphaDecay(0.1) and alphaMin(0.01) halt simulation rapidly
+- Horizontal Scene Stride: SCENE_HORIZONTAL_STRIDE = 1050px
 
-LINK DISTANCES (Organic Mode):
-- Artist <-> Artist: 450px * distMult
-- Artist <-> Founded: 100px * distMult (Tight satellite relationship)
-- Genre Hubs: 280px * distMult
-- Label Hubs: 140px * distMult
-- Origin Hubs: 320px * distMult
+LINK DISTANCES & STIFFNESS:
+- Artist <-> Artist: 450px * distMult (derived from 3.6 Flash semantic weight 0.1 - 1.0)
+- Outward-Arc Petals: Satellites at r ∈ [65px, 75px] radiating away from scene centroid
+- Petal Link Distances: 65px (Genre) / 70px (Origin) / 75px (Founded) at 0.35 spring stiffness
+- Cross-Scene Bridge Lines: Non-physics quadratic Bézier curves with 70–200px upward arc lift; rest at knocked-back grey #71717a (0.22 opacity), active hover at yellow #F6E468
+
+COLLISION RESOLUTION (resolveSceneNodeOverlaps):
+- Deterministic post-physics AABB bounding box collision resolution (W = 7.2px/char + 22px + padding, H = 24px)
+- Mass Hierarchy: Root Seeds (mass = ∞, immovable), Artists (mass = 6.7), Satellites (1° iterative tethered arc rotation preserving radial distance r ∈ [62px, 85px])
 
 LOCKED SEMANTIC TOPOLOGY (Rule 21):
 - D3 node drag gestures are permanently disabled (.drag() removed).
@@ -837,7 +841,7 @@ LOCKED SEMANTIC TOPOLOGY (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V42 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V44 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

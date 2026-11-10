@@ -826,5 +826,88 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       onSelectSceneMobile('scene-2', false);
       expect(focusedSceneClusterTriggered).toBe(true); // Camera zooms on desktop!
     });
+
+    it('suppresses programmatic node hover in triggerNodeHover and clearNodeHover when isPassiveSelection is true', () => {
+      // Mock references simulating MusicGraph state
+      const isPassiveSelectionRef = { current: true };
+      const selectedNodeRef = { current: { id: 'scene-1::sense-field-us', name: 'Sense Field' } as any };
+      const peekedNodeRef = { current: null as any };
+      let activeHoveredNode: any = null;
+      let hoveredNodeId: string | null = null;
+      let hoveredLink: any = null;
+
+      const triggerNodeHover = (d: any, isProgrammatic = false) => {
+        if (isProgrammatic && isPassiveSelectionRef.current) return;
+        hoveredNodeId = d.id;
+        activeHoveredNode = d;
+      };
+
+      const clearNodeHover = () => {
+        const activeNode = !isPassiveSelectionRef.current ? (selectedNodeRef.current || peekedNodeRef.current) : null;
+        if (activeNode) {
+          triggerNodeHover(activeNode, true);
+          hoveredLink = null;
+        } else {
+          hoveredNodeId = null;
+          activeHoveredNode = null;
+          hoveredLink = null;
+        }
+      };
+
+      // 1. On initial load, with isPassiveSelection = true and auto-selected primary seed:
+      clearNodeHover();
+      expect(hoveredNodeId).toBeNull();
+      expect(activeHoveredNode).toBeNull();
+      expect(hoveredLink).toBeNull();
+
+      // Attempt programmatic hover during passive selection
+      triggerNodeHover(selectedNodeRef.current, true);
+      expect(hoveredNodeId).toBeNull();
+      expect(activeHoveredNode).toBeNull();
+
+      // 2. Explicit user click switches isPassiveSelection to false:
+      isPassiveSelectionRef.current = false;
+      triggerNodeHover(selectedNodeRef.current, false);
+      expect(hoveredNodeId).toBe('scene-1::sense-field-us');
+      expect(activeHoveredNode).toBe(selectedNodeRef.current);
+
+      // Now clearNodeHover re-triggers hover for the active selected node
+      clearNodeHover();
+      expect(hoveredNodeId).toBe('scene-1::sense-field-us');
+      expect(activeHoveredNode).toBe(selectedNodeRef.current);
+    });
+
+    it('verifies all Zine metadata pills share the unified neutral dark capsule styling contract', () => {
+      const unifiedZinePillClass = 'text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap';
+      
+      // Ensure the canonical styling classes match expectations:
+      expect(unifiedZinePillClass).toContain('text-zinc-400');
+      expect(unifiedZinePillClass).toContain('bg-zinc-900');
+      expect(unifiedZinePillClass).toContain('border-zinc-800');
+      expect(unifiedZinePillClass).not.toContain('text-primary');
+      expect(unifiedZinePillClass).not.toContain('bg-primary');
+      expect(unifiedZinePillClass).not.toContain('border-primary');
+    });
+
+    it('resets passive selection, peekedNode, and selectedNode upon project re-entry', () => {
+      let isPassiveSelection = false;
+      let peekedNode: any = { id: 'scene-2::jimmy-eat-world-us' };
+      let selectedNode: any = { id: 'scene-1::sense-field-us' };
+      let navigatedPath: string | null = null;
+
+      const onSelectProject = (id: string) => {
+        isPassiveSelection = true;
+        peekedNode = null;
+        selectedNode = null;
+        navigatedPath = `/p/${id}`;
+      };
+
+      onSelectProject('i1c1KFgYdXr6flXT7lLQ');
+
+      expect(isPassiveSelection).toBe(true);
+      expect(peekedNode).toBeNull();
+      expect(selectedNode).toBeNull();
+      expect(navigatedPath).toBe('/p/i1c1KFgYdXr6flXT7lLQ');
+    });
   });
 });

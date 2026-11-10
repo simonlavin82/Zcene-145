@@ -7555,6 +7555,8 @@ const App: React.FC = () => {
             setCurrentProjectId(null);
             setCurrentProjectOwnerId(null);
             setSelectedNode(null);
+            setPeekedNode(null);
+            setIsPassiveSelection(true);
             hasAutoSelectedRef.current = null;
           }
         } else if (isProjectPath || projectIdFromQuery) {
@@ -7578,6 +7580,8 @@ const App: React.FC = () => {
                 setChatHistories(new Map());
                 setCurrentCacheKey(null);
                 setSelectedNode(null);
+                setPeekedNode(null);
+                setIsPassiveSelection(true);
                 hasAutoSelectedRef.current = null;
                 
                 const localProj = projects.find(p => p.id === projectId);
@@ -8966,7 +8970,12 @@ const App: React.FC = () => {
             projects={projects}
             stack={stack}
             isStackNew={stack.length > lastViewedStackCount}
-            onSelectProject={(id) => navigate(`/p/${id}`)}
+            onSelectProject={(id) => {
+              setIsPassiveSelection(true);
+              setPeekedNode(null);
+              setSelectedNode(null);
+              navigate(`/p/${id}`);
+            }}
             onCreateProject={handleCreateProject}
             isCreatingProject={isCreatingProject}
             onDeleteProject={handleDeleteProject}
@@ -9389,7 +9398,12 @@ const App: React.FC = () => {
             isActive={currentView === View.Trash}
             user={user}
             projects={projects}
-            onSelectProject={(id) => navigate(`/p/${id}`)}
+            onSelectProject={(id) => {
+              setIsPassiveSelection(true);
+              setPeekedNode(null);
+              setSelectedNode(null);
+              navigate(`/p/${id}`);
+            }}
             onRestoreProject={handleRestoreProject}
             onPermanentDeleteProject={handlePermanentDeleteProject}
             onLogoClick={handleLogoClick}

@@ -2749,21 +2749,21 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 {/* 1) TOP LAYER: OVERARCHING ZINE H1 */}
                                 <div className="pb-12 mb-12 border-b border-zinc-800/60" data-testid="overarching-zine-section">
                                     <div className="flex items-center flex-wrap gap-2 gap-y-2 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                                        <span className="text-[10px] uppercase tracking-widest text-primary font-bold px-2.5 py-0.5 bg-primary/15 rounded-full border border-primary/30 font-mono whitespace-nowrap">
+                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
                                             OVERARCHING ZINE • {scenes.length} SCENES
                                         </span>
-                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
                                             ROOT ARTISTS: {seedCount}
                                         </span>
-                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
                                             ARTISTS: {aiArtistsCount}
                                         </span>
                                         {labelsCount > 0 && (
-                                            <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                            <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
                                                 LABELS: {labelsCount}
                                             </span>
                                         )}
-                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
                                             DEEP CUTS: {deepCutsCount}
                                         </span>
                                     </div>
@@ -2809,7 +2809,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 className="pb-10 last:pb-2 border-b last:border-b-0 border-zinc-800/50"
                                             >
                                                 <div className="flex items-center flex-wrap gap-2 mb-4">
-                                                    <span className="text-[10px] uppercase tracking-widest text-zinc-300 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-zinc-700 font-mono whitespace-nowrap">
+                                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
                                                         SCENE {idx + 1}
                                                     </span>
                                                     {sceneSeeds.length > 0 && (
@@ -2844,18 +2844,18 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         {isMagazineViewOpen && scenes.length < 2 && sanitizedRationaleText && (
                             <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-12 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0">
                                 <div className="flex items-center flex-wrap gap-2 gap-y-2 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
-                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
                                         ROOT ARTISTS: {seedCount}
                                     </span>
-                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
                                         ARTISTS: {aiArtistsCount}
                                     </span>
                                     {labelsCount > 0 && (
-                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
                                             LABELS: {labelsCount}
                                         </span>
                                     )}
-                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                    <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
                                         DEEP CUTS: {deepCutsCount}
                                     </span>
                                 </div>
