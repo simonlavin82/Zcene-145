@@ -8,7 +8,7 @@ import { CanvasControlStyles, InputSizes, Button } from './DesignSystem';
 import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
 import { normalizeArtistId, isNodeInSeedList, cleanLabelDisplayName } from '../services/artistCacheService';
 import { sanitizeDirectionalLinkContext, resolveFallbackRelationContext } from '../shared/linkContext';
-import { getSceneCenterOffset, stripSceneNamespace } from '../shared/multiSceneUtils';
+import { getSceneCenterOffset, stripSceneNamespace, resolveSceneNodeOverlaps } from '../shared/multiSceneUtils';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 
@@ -1187,8 +1187,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     });
             })
             .on("end", () => {
-                // Pin all nodes once the simulation settles to maintain absolute coordinate stability
                 const nodes = simulation.nodes();
+                const currentLinks = (simulation.force("link") as d3.ForceLink<Node, Link>)?.links() || [];
+
+                // Resolve any remaining node and text-label collisions across clusters before pinning coordinates ([Rule 21])
+                resolveSceneNodeOverlaps(nodes, currentLinks);
+
+                // Pin all nodes once the simulation settles to maintain absolute coordinate stability
                 nodes.forEach(n => {
                     if (n.x !== undefined && n.y !== undefined) {
                         n.fx = n.x;
@@ -1291,8 +1296,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 if (connectedArtists.length > 0) {
                     const avgX = connectedArtists.reduce((sum, p) => sum + p.x, 0) / connectedArtists.length;
                     const avgY = connectedArtists.reduce((sum, p) => sum + p.y, 0) / connectedArtists.length;
-                    n.x = avgX + (Math.random() - 0.5) * 10;
-                    n.y = avgY + (Math.random() - 0.5) * 10;
+                    const sceneCenter = getSceneCenterOffset(n.sceneIndex ?? 0);
+                    // Sprout metadata petals along an outward arc from scene center through parent artist
+                    const outwardAngle = Math.atan2(avgY - sceneCenter.y, avgX - sceneCenter.x);
+                    const typeOffset = n.type === 'founded' ? -0.45 : (n.type === 'genre' ? 0 : 0.45);
+                    const hashOffset = ((String(n.id).charCodeAt(0) % 5) - 2) * 0.08;
+                    const sproutAngle = outwardAngle + typeOffset + hashOffset;
+                    const sproutRadius = n.type === 'founded' ? 65 : (n.type === 'genre' ? 75 : 70);
+                    n.x = avgX + sproutRadius * Math.cos(sproutAngle);
+                    n.y = avgY + sproutRadius * Math.sin(sproutAngle);
                     n.vx = 0;
                     n.vy = 0;
                     return;
@@ -1371,13 +1383,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return -60; // Moderated repulsion for shared metadata nodes
         }
         
-        // Private petals stay close
+        // Private petals stay close but have sufficient repulsion to avoid text collisions
         switch (d.type) {
-            case 'founded': return -15;
-            case 'label': return -20;
-            case 'genre': return -25;
-            case 'country': return -25;
-            default: return -20;
+            case 'founded': return -100;
+            case 'label': return -110;
+            case 'genre': return -120;
+            case 'country': return -100;
+            default: return -100;
         }
     });
 
@@ -1412,11 +1424,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             
             // Private petal: keep tight and category-specific
             switch (metaNode.type) {
-                case 'founded': return 40;
-                case 'label': return 50;
-                case 'genre': return 60;
-                case 'country': return 70;
-                default: return 55;
+                case 'founded': return 65;
+                case 'label': return 70;
+                case 'genre': return 75;
+                case 'country': return 75;
+                default: return 70;
             }
         }
 
@@ -1438,7 +1450,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             if (deg > 1) {
                 return 0.08; // Holds shared metadata in place without collapsing artists
             }
-            return 0.85; // Private petals stay locked tight to their artist
+            return 0.35; // Elastic tether lets petals separate from labels without collapsing into artist
         }
         
         const weight = d.weight ?? 0.5;

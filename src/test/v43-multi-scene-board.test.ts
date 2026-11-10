@@ -23,6 +23,7 @@ import {
   migrateLegacyCanvasLayout,
   generateProjectTitleFromScenes,
   compactDetailsCacheToCanonical,
+  resolveSceneNodeOverlaps,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
@@ -31,10 +32,10 @@ import { applyShareBlacklistMutation } from '../../App';
 import { ProjectScene, CrossSceneLink, CanvasNodeRef } from '../../types';
 
 describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])', () => {
-  it('computes deterministic horizontal cluster center offsets (1000 + sceneIndex * 950, 1000)', () => {
+  it('computes deterministic horizontal cluster center offsets (1000 + sceneIndex * 1050, 1000)', () => {
     expect(getSceneCenterOffset(0)).toEqual({ x: 1000, y: 1000 });
-    expect(getSceneCenterOffset(1)).toEqual({ x: 1950, y: 1000 });
-    expect(getSceneCenterOffset(2)).toEqual({ x: 2900, y: 1000 });
+    expect(getSceneCenterOffset(1)).toEqual({ x: 2050, y: 1000 });
+    expect(getSceneCenterOffset(2)).toEqual({ x: 3100, y: 1000 });
   });
 
   it('namespaces canvas node IDs as scene-k::canonicalId and strips namespaces cleanly', () => {
@@ -129,9 +130,9 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     expect(jewScene1?.fx).toBe(1120);
     expect(jewScene1?.fy).toBe(920);
 
-    // Scene 2 nodes initialize near Scene 2 center (1950, 1000)
-    expect(jewScene2?.x).toBeGreaterThan(1750);
-    expect(jewScene2?.x).toBeLessThan(2150);
+    // Scene 2 nodes initialize near Scene 2 center (2050, 1000)
+    expect(jewScene2?.x).toBeGreaterThan(1850);
+    expect(jewScene2?.x).toBeLessThan(2250);
 
     // Deterministic identity bridges + AI sonic_lineage bridges are present as Cross-Scene Bridge links
     const crossLinks = composite.links.filter((l) => l.isCrossSceneBridge);
@@ -336,17 +337,20 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     expect(metrics.deepCutsCount).toBe(5);
   });
 
-  it('detects legacy 1600px stride coordinates and shifts them to 950px stride', () => {
-    const shift = detectLegacyStrideShiftX(1, [2550, 2600, 2650]);
-    expect(shift).toBe(-650);
+  it('detects legacy 1600px stride coordinates and shifts them to 1050px stride', () => {
+    const shift1600 = detectLegacyStrideShiftX(1, [2550, 2600, 2650]);
+    expect(shift1600).toBe(-550);
+
+    const shift950 = detectLegacyStrideShiftX(1, [1900, 1950, 2000]);
+    expect(shift950).toBe(100);
 
     const migrated = migrateLegacyCanvasLayout([
       { nodeId: 'scene-1::sense-field-us', x: 1000, y: 1000, fx: 1000, fy: 1000 },
       { nodeId: 'scene-2::jimmy-eat-world-us', x: 2600, y: 1000, fx: 2600, fy: 1000 }
     ]);
     expect(migrated[0].x).toBe(1000);
-    expect(migrated[1].x).toBe(1950);
-    expect(migrated[1].fx).toBe(1950);
+    expect(migrated[1].x).toBe(2050);
+    expect(migrated[1].fx).toBe(2050);
   });
 
   it('resiliently strips both scene-k:: and legacy/corrupted scene-k- namespaces', () => {
@@ -455,5 +459,202 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     const recompacted = compactDetailsCacheToCanonical(compacted, mockNodes);
     expect(recompacted.length).toBe(2);
     expect(recompacted.map(([k]) => k)).toEqual(keys);
+  });
+
+  describe('resolveSceneNodeOverlaps ([Rule 21] Box 5 Semantic Weighting & Tether Preservation)', () => {
+    it('separates identical-coordinate metadata petal and seed artist into an outward arc tether without moving the seed', () => {
+      const seed: any = {
+        id: 'scene-1::sense-field-us',
+        label: 'Sense Field',
+        type: 'artist',
+        isSeed: true,
+        sceneIndex: 0,
+        x: 1086.0,
+        y: 1006.4,
+        fx: 1086.0,
+        fy: 1006.4,
+      };
+      const year1982: any = {
+        id: 'scene-1::1982',
+        label: '1982',
+        type: 'founded',
+        sceneIndex: 0,
+        x: 1086.0,
+        y: 1006.4,
+      };
+      const links: any = [
+        { source: 'scene-1::sense-field-us', target: 'scene-1::1982', weight: 0.4 }
+      ];
+
+      const resolved = resolveSceneNodeOverlaps([seed, year1982], links);
+      const resSeed = resolved.find(n => n.id === 'scene-1::sense-field-us')!;
+      const res1982 = resolved.find(n => n.id === 'scene-1::1982')!;
+
+      // Root artist seed must stay completely anchored
+      expect(resSeed.x).toBe(1086.0);
+      expect(resSeed.y).toBe(1006.4);
+
+      // Metadata petal must be placed on an orbital tether (r between 60px and 85px)
+      const dist = Math.hypot(res1982.x! - resSeed.x!, res1982.y! - resSeed.y!);
+      expect(dist).toBeGreaterThanOrEqual(60);
+      expect(dist).toBeLessThanOrEqual(85);
+    });
+
+    it('clears wide horizontal label collision ("Alternative Rock", 16 chars) against adjacent nodes without moving root', () => {
+      const root: any = {
+        id: 'scene-2::jimmy-eat-world-us',
+        label: 'Jimmy Eat World',
+        type: 'artist',
+        isSeed: true,
+        sceneIndex: 1,
+        x: 2050,
+        y: 1000,
+        fx: 2050,
+        fy: 1000,
+      };
+      const genreNode: any = {
+        id: 'scene-2::alternative-rock',
+        label: 'Alternative Rock',
+        type: 'genre',
+        sceneIndex: 1,
+        x: 2000,
+        y: 920,
+      };
+      const year1999: any = {
+        id: 'scene-2::1999',
+        label: '1999',
+        type: 'founded',
+        sceneIndex: 1,
+        x: 2010,
+        y: 918, // 10px delta, completely overlapping Alternative Rock 115px wide label
+      };
+      const links: any = [
+        { source: 'scene-2::jimmy-eat-world-us', target: 'scene-2::alternative-rock', weight: 0.85 },
+        { source: 'scene-2::jimmy-eat-world-us', target: 'scene-2::1999', weight: 0.3 }
+      ];
+
+      const resolved = resolveSceneNodeOverlaps([root, genreNode, year1999], links);
+      const resGenre = resolved.find(n => n.id === 'scene-2::alternative-rock')!;
+      const res1999 = resolved.find(n => n.id === 'scene-2::1999')!;
+
+      // Separation must be sufficient so their AABB bounding boxes do not clash
+      const dx = Math.abs(resGenre.x! - res1999.x!);
+      const dy = Math.abs(resGenre.y! - res1999.y!);
+      // Either horizontal separation >= 50px or vertical separation >= 25px
+      expect(dx >= 50 || dy >= 25).toBe(true);
+    });
+
+    it('clears vertical stack collision (Tooth & Nail and 1991) guaranteeing vertical label clearance', () => {
+      const parentArtist: any = {
+        id: 'scene-3::further-seems-forever-us',
+        label: 'Further Seems Forever',
+        type: 'artist',
+        sceneIndex: 2,
+        x: 2900,
+        y: 750,
+      };
+      const labelNode: any = {
+        id: 'scene-3::tooth-nail',
+        label: 'Tooth & Nail',
+        type: 'label',
+        sceneIndex: 2,
+        x: 2750,
+        y: 745,
+      };
+      const yearNode: any = {
+        id: 'scene-3::1991',
+        label: '1991',
+        type: 'founded',
+        sceneIndex: 2,
+        x: 2752,
+        y: 780, // Stacked vertically right under Tooth & Nail label
+      };
+      const links: any = [
+        { source: 'scene-3::further-seems-forever-us', target: 'scene-3::tooth-nail', weight: 0.85 },
+        { source: 'scene-3::further-seems-forever-us', target: 'scene-3::1991', weight: 0.3 }
+      ];
+
+      const resolved = resolveSceneNodeOverlaps([parentArtist, labelNode, yearNode], links);
+      const resLabel = resolved.find(n => n.id === 'scene-3::tooth-nail')!;
+      const resYear = resolved.find(n => n.id === 'scene-3::1991')!;
+
+      const dx = Math.abs(resLabel.x! - resYear.x!);
+      const dy = Math.abs(resLabel.y! - resYear.y!);
+      expect(dx >= 30 || dy >= 30).toBe(true);
+    });
+
+    it('preserves Box 5 relative radial hierarchy and angular bearings under cluster expansion', () => {
+      const center = { x: 1000, y: 1000 };
+      const rootSeed: any = {
+        id: 'scene-1::root',
+        label: 'Root Artist',
+        type: 'artist',
+        isSeed: true,
+        sceneIndex: 0,
+        x: center.x,
+        y: center.y,
+        fx: center.x,
+        fy: center.y,
+      };
+      // Peer A (weight 0.95): closest at angle 0 deg
+      const peerA: any = {
+        id: 'scene-1::peer-a',
+        label: 'Lineage Peer',
+        type: 'artist',
+        sceneIndex: 0,
+        x: center.x + 120,
+        y: center.y,
+      };
+      // Peer B (weight 0.75): intermediate at angle 60 deg
+      const peerB: any = {
+        id: 'scene-1::peer-b',
+        label: 'Label Peer',
+        type: 'artist',
+        sceneIndex: 0,
+        x: center.x + 90,
+        y: center.y + 155,
+      };
+      // Peer C (weight 0.55): distant at angle 150 deg
+      const peerC: any = {
+        id: 'scene-1::peer-c',
+        label: 'Second Degree Peer',
+        type: 'artist',
+        sceneIndex: 0,
+        x: center.x - 200,
+        y: center.y + 115,
+      };
+
+      const angleA_before = Math.atan2(peerA.y - center.y, peerA.x - center.x);
+      const angleB_before = Math.atan2(peerB.y - center.y, peerB.x - center.x);
+      const angleC_before = Math.atan2(peerC.y - center.y, peerC.x - center.x);
+
+      const resolved = resolveSceneNodeOverlaps([rootSeed, peerA, peerB, peerC], [], {
+        clusterExpansionFactor: 1.18,
+      });
+
+      const resSeed = resolved.find(n => n.id === 'scene-1::root')!;
+      const resA = resolved.find(n => n.id === 'scene-1::peer-a')!;
+      const resB = resolved.find(n => n.id === 'scene-1::peer-b')!;
+      const resC = resolved.find(n => n.id === 'scene-1::peer-c')!;
+
+      // Seed must remain centered
+      expect(resSeed.x).toBe(center.x);
+      expect(resSeed.y).toBe(center.y);
+
+      // Radial hierarchy dist(Root, A) < dist(Root, B) < dist(Root, C) must be preserved
+      const distA = Math.hypot(resA.x! - center.x, resA.y! - center.y);
+      const distB = Math.hypot(resB.x! - center.x, resB.y! - center.y);
+      const distC = Math.hypot(resC.x! - center.x, resC.y! - center.y);
+      expect(distA).toBeLessThan(distB);
+      expect(distB).toBeLessThan(distC);
+
+      // Angular bearings must be preserved (within 0.05 radians)
+      const angleA_after = Math.atan2(resA.y! - center.y, resA.x! - center.x);
+      const angleB_after = Math.atan2(resB.y! - center.y, resB.x! - center.x);
+      const angleC_after = Math.atan2(resC.y! - center.y, resC.x! - center.x);
+      expect(Math.abs(angleA_after - angleA_before)).toBeLessThan(0.05);
+      expect(Math.abs(angleB_after - angleB_before)).toBeLessThan(0.05);
+      expect(Math.abs(angleC_after - angleC_before)).toBeLessThan(0.05);
+    });
   });
 });

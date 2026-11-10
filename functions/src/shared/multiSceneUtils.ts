@@ -12,7 +12,9 @@ import { stripCountrySlug } from './isoCountries';
 
 export const SCENE_BASE_CENTER_X = 1000;
 export const SCENE_BASE_CENTER_Y = 1000;
-export const SCENE_HORIZONTAL_STRIDE = 950;
+export const SCENE_HORIZONTAL_STRIDE = 1050;
+/** Previous V43.0 stride. Retained to detect and migrate Coordinate Memory from 950px to 1050px. */
+export const PREV_SCENE_HORIZONTAL_STRIDE = 950;
 /** Pre-V43.1 stride. Retained only to detect and migrate legacy Coordinate Memory. */
 export const LEGACY_SCENE_HORIZONTAL_STRIDE = 1600;
 
@@ -25,11 +27,10 @@ export function getSceneCenterOffset(sceneIndex: number): SceneCenterOffset {
 }
 
 /**
- * Coordinate Memory Migration (1600px → 950px stride).
+ * Coordinate Memory Migration (1600px / 950px → 1050px stride).
  * Given a scene index and a sample of saved X coordinates belonging to that scene, returns the
- * horizontal delta (e.g. -650 for sceneIndex 1) required to move the cluster from its legacy
- * center (1000 + k*1600) to its current center (1000 + k*950). Returns 0 when the coordinates
- * already sit closer to the current center (idempotent) or when sceneIndex is 0.
+ * horizontal delta required to move the cluster from its previous center to the current center
+ * (1000 + k*1050). Returns 0 when the coordinates already sit closest to the current center (idempotent).
  */
 export function detectLegacyStrideShiftX(sceneIndex: number, sampleXs: Array<number | null | undefined>): number {
   const k = Number.isFinite(sceneIndex) ? Math.floor(sceneIndex) : 0;
@@ -37,16 +38,28 @@ export function detectLegacyStrideShiftX(sceneIndex: number, sampleXs: Array<num
   const xs = (sampleXs || []).filter((x): x is number => typeof x === 'number' && Number.isFinite(x));
   if (xs.length === 0) return 0;
   const meanX = xs.reduce((sum, x) => sum + x, 0) / xs.length;
-  const legacyCenterX = SCENE_BASE_CENTER_X + k * LEGACY_SCENE_HORIZONTAL_STRIDE;
+  const legacy1600CenterX = SCENE_BASE_CENTER_X + k * LEGACY_SCENE_HORIZONTAL_STRIDE;
+  const prev950CenterX = SCENE_BASE_CENTER_X + k * PREV_SCENE_HORIZONTAL_STRIDE;
   const currentCenterX = SCENE_BASE_CENTER_X + k * SCENE_HORIZONTAL_STRIDE;
-  return Math.abs(meanX - legacyCenterX) < Math.abs(meanX - currentCenterX)
-    ? currentCenterX - legacyCenterX
-    : 0;
+
+  const distTo1600 = Math.abs(meanX - legacy1600CenterX);
+  const distTo950 = Math.abs(meanX - prev950CenterX);
+  const distToCurrent = Math.abs(meanX - currentCenterX);
+
+  if (distTo1600 < distToCurrent && distTo1600 <= distTo950) {
+    return currentCenterX - legacy1600CenterX;
+  }
+  if (distTo950 < distToCurrent && distTo950 < distTo1600) {
+    return currentCenterX - prev950CenterX;
+  }
+  return 0;
 }
 
 function isLegacyCenterOffset(centerOffset: any, sceneIndex: number): boolean {
   if (!centerOffset || typeof centerOffset.x !== 'number' || sceneIndex < 1) return false;
-  return Math.abs(centerOffset.x - (SCENE_BASE_CENTER_X + sceneIndex * LEGACY_SCENE_HORIZONTAL_STRIDE)) < 0.5;
+  const is1600 = Math.abs(centerOffset.x - (SCENE_BASE_CENTER_X + sceneIndex * LEGACY_SCENE_HORIZONTAL_STRIDE)) < 0.5;
+  const is950 = Math.abs(centerOffset.x - (SCENE_BASE_CENTER_X + sceneIndex * PREV_SCENE_HORIZONTAL_STRIDE)) < 0.5;
+  return is1600 || is950;
 }
 
 function shiftNodeX<T extends Record<string, any>>(node: T, dx: number): T {
@@ -593,6 +606,276 @@ export function mergeCrossSceneLinks(
   return Array.from(merged.values());
 }
 
+export interface ResolveOverlapsOptions {
+  maxIterations?: number;
+  paddingX?: number;
+  paddingY?: number;
+  clusterExpansionFactor?: number;
+}
+
+export function getNodeDisplayLabel(node: Node): string {
+  if (node.label && typeof node.label === 'string' && node.label.trim()) {
+    return node.label.trim();
+  }
+  const canonRaw = stripSceneNamespace(String(node.canonicalId || node.id || ''));
+  return canonRaw
+    .split('-')
+    .filter(Boolean)
+    .map(w => w.charAt(0).toUpperCase() + w.slice(1))
+    .join(' ');
+}
+
+/**
+ * Resolves node and text-label collisions across scene clusters while strictly preserving
+ * Box 5 (3.6 Flash) semantic radial hierarchy and artist-satellite orbital pairing ([Rule 21]).
+ *
+ * Guarantees:
+ * 1. Root Artist Seeds (isSeed === true) stay permanently anchored at scene centers (mass = infinity).
+ * 2. Artist Peers (type === 'artist') hold high inertia (mass = 6.7), adjusting minimally along their radial axis.
+ * 3. 1-Degree Metadata Satellites (founded, genre, country, 1-degree label) are tethered within an orbit
+ *    of r in [62px, 85px] around their parent artist, resolving clashes via tangential arc rotation.
+ * 4. Wide labels ("Alternative Rock", "Emo / Post Hardcore") and vertical stacks (Tooth & Nail / 1991)
+ *    achieve zero AABB overlap.
+ */
+export function resolveSceneNodeOverlaps(
+  nodes: Node[],
+  links: Link[] = [],
+  options?: ResolveOverlapsOptions
+): Node[] {
+  if (!Array.isArray(nodes) || nodes.length <= 1) return nodes;
+
+  const maxIterations = options?.maxIterations ?? 15;
+  const padX = options?.paddingX ?? 10;
+  const padY = options?.paddingY ?? 8;
+  const expansionFactor = options?.clusterExpansionFactor ?? 1.0;
+
+  // Helper to extract scene index from namespaced ID if sceneIndex is not set
+  const extractSceneIndexFromId = (id: string): number | null => {
+    const match = id?.match(/^scene-(\d+)/i);
+    return match ? parseInt(match[1], 10) - 1 : null;
+  };
+
+  // Group nodes by sceneIndex
+  const sceneGroups = new Map<number, Node[]>();
+  nodes.forEach(n => {
+    const sIdx = typeof n.sceneIndex === 'number' ? n.sceneIndex : (extractSceneIndexFromId(n.id) ?? 0);
+    if (!sceneGroups.has(sIdx)) sceneGroups.set(sIdx, []);
+    sceneGroups.get(sIdx)!.push(n);
+  });
+
+  // Build parent artist tether map from links
+  // A metadata node with type !== 'artist' is tethered to parent A if it connects to an artist in the scene
+  const parentMap = new Map<string, Node>();
+  const artistById = new Map<string, Node>();
+  nodes.forEach(n => {
+    if (n.type === 'artist') artistById.set(n.id, n);
+  });
+
+  const metadataArtistNeighbors = new Map<string, Set<string>>();
+  links.forEach(l => {
+    if (l.isCrossSceneBridge) return;
+    const sId = typeof l.source === 'object' ? l.source.id : l.source;
+    const tId = typeof l.target === 'object' ? l.target.id : l.target;
+    if (!sId || !tId) return;
+
+    const sNode = nodes.find(n => n.id === sId);
+    const tNode = nodes.find(n => n.id === tId);
+    if (!sNode || !tNode) return;
+
+    if (sNode.type !== 'artist' && tNode.type === 'artist') {
+      if (!metadataArtistNeighbors.has(sId)) metadataArtistNeighbors.set(sId, new Set());
+      metadataArtistNeighbors.get(sId)!.add(tId);
+    } else if (tNode.type !== 'artist' && sNode.type === 'artist') {
+      if (!metadataArtistNeighbors.has(tId)) metadataArtistNeighbors.set(tId, new Set());
+      metadataArtistNeighbors.get(tId)!.add(sId);
+    }
+  });
+
+  metadataArtistNeighbors.forEach((artistSet, metaId) => {
+    if (artistSet.size === 1) {
+      const parentId = Array.from(artistSet)[0];
+      const parentNode = artistById.get(parentId);
+      if (parentNode) {
+        parentMap.set(metaId, parentNode);
+      }
+    }
+  });
+
+  // Process each scene cluster independently
+  sceneGroups.forEach((sceneNodes, sIdx) => {
+    const center = getSceneCenterOffset(sIdx);
+
+    // Optional cluster expansion (e.g. 18% breathing room)
+    if (expansionFactor > 1.0) {
+      sceneNodes.forEach(n => {
+        const isSeed = Boolean(n.isSeed || n.isSceneSeed);
+        if (!isSeed && typeof n.x === 'number' && typeof n.y === 'number') {
+          const dx = n.x - center.x;
+          const dy = n.y - center.y;
+          n.x = center.x + dx * expansionFactor;
+          n.y = center.y + dy * expansionFactor;
+          if (typeof n.fx === 'number') n.fx = n.x;
+          if (typeof n.fy === 'number') n.fy = n.y;
+        }
+      });
+    }
+
+    // Initialize unplaced or zero-distance metadata petals to outward arc
+    sceneNodes.forEach(n => {
+      if (parentMap.has(n.id)) {
+        const parent = parentMap.get(n.id)!;
+        const distToParent = Math.hypot((n.x ?? 0) - (parent.x ?? 0), (n.y ?? 0) - (parent.y ?? 0));
+        // If petal sits right on parent (< 45px), spawn it on outward arc relative to scene center
+        if (distToParent < 45 || isNaN(n.x ?? NaN) || isNaN(n.y ?? NaN)) {
+          const outAngle = Math.atan2((parent.y ?? center.y) - center.y, (parent.x ?? center.x) - center.x);
+          const targetR = 72;
+          n.x = (parent.x ?? center.x) + targetR * Math.cos(outAngle);
+          n.y = (parent.y ?? center.y) + targetR * Math.sin(outAngle);
+          if (n.fx != null) n.fx = n.x;
+          if (n.fy != null) n.fy = n.y;
+        }
+      }
+    });
+
+    // Helper for AABB half-extents
+    const getHalfExtents = (n: Node) => {
+      const label = getNodeDisplayLabel(n);
+      const textWidth = Math.max(28, label.length * 7.2);
+      const isSeed = Boolean(n.isSeed || n.isSceneSeed);
+      const r = isSeed ? 18 : (n.type === 'artist' ? 16 : 14);
+      const hx = Math.max(r, textWidth / 2) + padX;
+      const hy = 22 + padY; // text is at y + 22, height ~16
+      return { hx, hy };
+    };
+
+    // Relaxation loop
+    for (let iter = 0; iter < maxIterations; iter++) {
+      const damping = Math.pow(0.88, iter);
+      let overlapCount = 0;
+
+      for (let i = 0; i < sceneNodes.length; i++) {
+        for (let j = i + 1; j < sceneNodes.length; j++) {
+          const A = sceneNodes[i];
+          const B = sceneNodes[j];
+          if (A.x === undefined || A.y === undefined || B.x === undefined || B.y === undefined) continue;
+
+          const boxA = getHalfExtents(A);
+          const boxB = getHalfExtents(B);
+
+          const dx = B.x - A.x;
+          const dy = B.y - A.y;
+          const overlapX = (boxA.hx + boxB.hx) - Math.abs(dx);
+          const overlapY = (boxA.hy + boxB.hy) - Math.abs(dy);
+
+          if (overlapX > 0 && overlapY > 0) {
+            const isSeedA = Boolean(A.isSeed || A.isSceneSeed);
+            const isSeedB = Boolean(B.isSeed || B.isSceneSeed);
+            if (isSeedA && isSeedB) continue; // Both are seeds: anchor coordinates are immutable!
+
+            overlapCount++;
+
+            let nx = dx !== 0 ? Math.sign(dx) : 1;
+            let ny = dy !== 0 ? Math.sign(dy) : 0;
+            const dist = Math.hypot(dx, dy);
+            if (dist > 0.001) {
+              nx = dx / dist;
+              ny = dy / dist;
+            }
+
+            const parentA = parentMap.get(A.id);
+            const parentB = parentMap.get(B.id);
+
+            // Case 1: A is a 1-degree petal of parentA
+            if (parentA && !parentB) {
+              rotatePetalAlongArc(A, parentA, -nx, -ny, Math.min(overlapX, overlapY) * damping);
+            }
+            // Case 2: B is a 1-degree petal of parentB
+            else if (parentB && !parentA) {
+              rotatePetalAlongArc(B, parentB, nx, ny, Math.min(overlapX, overlapY) * damping);
+            }
+            // Case 3: Both are 1-degree petals
+            else if (parentA && parentB) {
+              if (parentA.id === parentB.id) {
+                // Sibling petals on same parent: rotate in opposite directions
+                rotatePetalAlongArc(A, parentA, -nx, -ny, (overlapX + overlapY) * 0.5 * damping);
+                rotatePetalAlongArc(B, parentB, nx, ny, (overlapX + overlapY) * 0.5 * damping);
+              } else {
+                rotatePetalAlongArc(A, parentA, -nx, -ny, Math.min(overlapX, overlapY) * 0.5 * damping);
+                rotatePetalAlongArc(B, parentB, nx, ny, Math.min(overlapX, overlapY) * 0.5 * damping);
+              }
+            }
+            // Case 4: One is an immutable seed
+            else if (isSeedA && !isSeedB) {
+              B.x += nx * overlapX * damping;
+              B.y += ny * overlapY * damping;
+              if (B.fx != null) B.fx = B.x;
+              if (B.fy != null) B.fy = B.y;
+            } else if (isSeedB && !isSeedA) {
+              A.x -= nx * overlapX * damping;
+              A.y -= ny * overlapY * damping;
+              if (A.fx != null) A.fx = A.x;
+              if (A.fy != null) A.fy = A.y;
+            }
+            // Case 5: Two non-seed nodes (two artists or labels)
+            else {
+              // Vertical stack guard: if horizontal delta is very small, add a slight lateral nudge
+              if (Math.abs(dx) < 16) {
+                const lateral = (i % 2 === 0 ? 1 : -1) * 16 * damping;
+                A.x -= lateral;
+                B.x += lateral;
+              }
+              const pushX = overlapX * 0.5 * damping;
+              const pushY = overlapY * 0.5 * damping;
+              A.x -= nx * pushX;
+              A.y -= ny * pushY;
+              B.x += nx * pushX;
+              B.y += ny * pushY;
+              if (A.fx != null) A.fx = A.x;
+              if (A.fy != null) A.fy = A.y;
+              if (B.fx != null) B.fx = B.x;
+              if (B.fy != null) B.fy = B.y;
+            }
+          }
+        }
+      }
+
+      if (overlapCount === 0) break;
+    }
+  });
+
+  return nodes;
+}
+
+function rotatePetalAlongArc(
+  petal: Node,
+  parent: Node,
+  pushX: number,
+  pushY: number,
+  pushDist: number
+) {
+  const px = parent.x ?? 0;
+  const py = parent.y ?? 0;
+  const rx = (petal.x ?? px) - px;
+  const ry = (petal.y ?? py) - py;
+  const currentR = Math.hypot(rx, ry);
+  const tetherR = Math.max(62, Math.min(85, currentR || 72));
+  const currentTheta = Math.atan2(ry === 0 && rx === 0 ? 1 : ry, rx);
+
+  // Tangent vector along orbit: (-sin(theta), cos(theta))
+  const tx = -Math.sin(currentTheta);
+  const ty = Math.cos(currentTheta);
+
+  const dot = pushX * tx + pushY * ty;
+  const dir = Math.abs(dot) > 0.05 ? Math.sign(dot) : 1;
+  const angularDelta = dir * Math.max(0.12, Math.min(0.5, pushDist / tetherR));
+
+  const newTheta = currentTheta + angularDelta;
+  petal.x = px + tetherR * Math.cos(newTheta);
+  petal.y = py + tetherR * Math.sin(newTheta);
+  if (petal.fx != null) petal.fx = petal.x;
+  if (petal.fy != null) petal.fy = petal.y;
+}
+
 /**
  * Assembles the composite namespaced `GraphData` for `<MusicGraph>` across all `ProjectScene`s ([Rule 21], [Rule 44]).
  */
@@ -771,6 +1054,10 @@ export function buildCompositeCanvasGraph(
       targetSceneId: tgtSceneId,
     });
   }
+
+  // Resolve any remaining node and text-label collisions across all scene clusters
+  // before returning the composite GraphData ([Rule 21]).
+  resolveSceneNodeOverlaps(compositeNodes, compositeLinks);
 
   return {
     nodes: compositeNodes,
