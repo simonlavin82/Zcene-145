@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink } from './types';
-import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString } from './shared/multiSceneUtils';
+import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
 import { qualifyCacheEntry, deriveRoutingDecision, isLocallyRenderable, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
@@ -1753,6 +1753,7 @@ const App: React.FC = () => {
     sessionTokenApprovedRef.current = false;
 
     let baseScenes: ProjectScene[] = scenesRef.current;
+    if (baseScenes.length >= MAX_SCENES_PER_PROJECT) return;
     if (baseScenes.length === 0) {
       const currentGraph = graphDataRef.current || { nodes: [], links: [] };
       const unnamespacedGraph: GraphData = {

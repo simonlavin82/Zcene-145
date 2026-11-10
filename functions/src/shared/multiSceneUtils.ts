@@ -12,6 +12,7 @@ import { stripCountrySlug } from './isoCountries';
 
 export const SCENE_BASE_CENTER_X = 1000;
 export const SCENE_BASE_CENTER_Y = 1000;
+export const MAX_SCENES_PER_PROJECT = 5;
 export const SCENE_HORIZONTAL_STRIDE = 1050;
 /** Previous V43.0 stride. Retained to detect and migrate Coordinate Memory from 950px to 1050px. */
 export const PREV_SCENE_HORIZONTAL_STRIDE = 950;
@@ -1365,7 +1366,7 @@ export function parseProjectScenes(
   try {
     const parsed = typeof rawScenes === 'string' ? JSON.parse(rawScenes) : rawScenes;
     if (!Array.isArray(parsed)) return [];
-    return parsed.map((s: any, idx: number) => normalizeProjectScene(s, idx));
+    return parsed.slice(0, MAX_SCENES_PER_PROJECT).map((s: any, idx: number) => normalizeProjectScene(s, idx));
   } catch (e) {
     console.warn('[parseProjectScenes] Failed to parse scenes:', e);
     return [];

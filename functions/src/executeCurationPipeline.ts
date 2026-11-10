@@ -31,6 +31,7 @@ import {
   getAllProjectSeedIds,
   normalizeProjectScene,
   buildCompositeCanvasGraph,
+  MAX_SCENES_PER_PROJECT,
 } from "./shared/multiSceneUtils";
 import {
   requireAuthenticatedCaller,
@@ -640,6 +641,10 @@ export const executeCurationPipeline = onCall({
       : Number.isFinite(parsedSceneIdx) && parsedSceneIdx >= 1
         ? parsedSceneIdx - 1
         : 0;
+
+  if (targetSceneIndex >= MAX_SCENES_PER_PROJECT) {
+    throw new HttpsError("invalid-argument", "Maximum of 5 scenes per project reached.");
+  }
 
   let updatedScenes: ProjectScene[] = parseProjectScenes(payload.scenes);
 

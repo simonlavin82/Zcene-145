@@ -5,7 +5,7 @@ import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName } from '../services/artistCacheService';
 import { hasActiveDiscoveryFilters, sanitizeAnchorLabelInput } from '../services/cacheQualification';
-import { toSeedArtistsArray } from '../shared/multiSceneUtils';
+import { toSeedArtistsArray, MAX_SCENES_PER_PROJECT } from '../shared/multiSceneUtils';
 import HelpPage from './HelpPage';
 import Header from './Header';
 import MusicGraph from './MusicGraph';
@@ -843,22 +843,26 @@ const DiscoveryFiltersPanel: React.FC<{
 const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNavigate }) => (
   <div className="max-w-md w-full pointer-events-auto">
     <div className="flex items-center justify-center mb-2 gap-1">
-        <div className="w-10 shrink-0 invisible" aria-hidden="true" />
-        <h3 className="text-xs font-medium text-white text-center">Create Your Zcene</h3>
-        <button onClick={() => onNavigate(View.Help)} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors pointer-events-auto shrink-0 leading-none" title="Help">
-            <HelpIcon className="!text-[18px]" />
-        </button>
+      <div className="w-10 shrink-0 invisible" aria-hidden="true" />
+      <h3 className="text-xs font-medium text-white text-center">Create Your Zcene</h3>
+      <button
+        onClick={() => onNavigate(View.Help)}
+        className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors pointer-events-auto shrink-0 leading-none"
+        title="View Zcene guide, keyboard shortcuts & rules"
+      >
+        <HelpIcon className="!text-[18px]" />
+      </button>
     </div>
     <div className="mt-3 text-zinc-400 text-xs space-y-4">
-        <p className="text-center px-4">Start with a few of your favorite roots, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
-        <div className="text-left bg-zinc-800/30 p-5 rounded-xl border border-zinc-700/50 mx-4 text-xs">
-            <p className="font-medium text-zinc-200 mb-2">How it works</p>
-            <ol className="list-decimal list-inside space-y-1 text-zinc-400">
-                <li>Add 1–5 roots (or import your library).</li>
-                <li>Create your Zcene.</li>
-                <li>Drag, filter, and explore connections.</li>
-            </ol>
-        </div>
+      <p className="text-center px-4 leading-relaxed">Start with 1–5 root artists, and Zcene will map how their scenes connect across genres, labels, origins, and eras.</p>
+      <div className="text-left bg-zinc-800/30 p-5 rounded-xl border border-zinc-700/50 mx-4 text-xs">
+        <p className="font-medium text-zinc-200 mb-2">How it works</p>
+        <ol className="list-decimal list-inside space-y-1.5 text-zinc-400 leading-normal">
+          <li>Add 1–5 roots to build your first Scene (or import your library).</li>
+          <li>Create your Zcene to map the musical constellation.</li>
+          <li>Add up to 5 scenes to bridge connections and read the multi-scene Zine.</li>
+        </ol>
+      </div>
     </div>
   </div>
 );
@@ -2020,12 +2024,22 @@ const GraphPage: React.FC<GraphPageProps> = ({
                       type="button"
                       data-testid="add-scene-button"
                       onClick={onAddScene}
-                      disabled={isLoading || Boolean(isHydrating)}
-                      className="flex items-center gap-1 px-2.5 py-1 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white text-[11px] font-medium transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
-                      title="Add a new Scene cluster to this Zcene board"
+                      disabled={isLoading || Boolean(isHydrating) || scenes.length >= MAX_SCENES_PER_PROJECT}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border text-[11px] font-medium transition-all ${
+                        scenes.length >= MAX_SCENES_PER_PROJECT
+                          ? 'border-zinc-800 bg-zinc-900/40 text-zinc-600 cursor-not-allowed opacity-60'
+                          : 'border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed'
+                      }`}
+                      title={
+                        scenes.length >= MAX_SCENES_PER_PROJECT
+                          ? "Maximum of 5 scenes reached for this Zcene"
+                          : "Add a new Scene cluster to this Zcene board"
+                      }
                     >
-                      <span className="material-symbols-outlined !text-[14px]">add</span>
-                      <span>Add Scene</span>
+                      <span className="material-symbols-outlined !text-[14px]">
+                        {scenes.length >= MAX_SCENES_PER_PROJECT ? 'check' : 'add'}
+                      </span>
+                      <span>{scenes.length >= MAX_SCENES_PER_PROJECT ? 'Max Scenes (5/5)' : 'Add Scene'}</span>
                     </button>
                   )}
                 </div>
@@ -2428,7 +2442,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     >
         <OnboardingTooltip isVisible={visibleTooltips.step1} content="Add your roots to start your Zcene. These are your starting points, you can type them or select from your library." position="bottom" anchorRef={artistInputRef} onDismiss={() => updateOnboarding('step1')} />
         <OnboardingTooltip isVisible={visibleTooltips.step2} content="Click here to create your Zcene from your selected artists and see the connections visually." position="top" anchorRef={createZceneBtnRef} onDismiss={() => updateOnboarding('step2')} />
-        <OnboardingTooltip isVisible={visibleTooltips.step3} content="Drag, zoom and toggle node types to focus on what matters most: Roots, Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
+        <OnboardingTooltip isVisible={visibleTooltips.step3} content="Pan, zoom and toggle node types to focus on what matters most: Roots, Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
         <OnboardingTooltip isVisible={visibleTooltips.step5} content="This is the Deep Cut, explore bios, connections, and insights." position={isSmallScreen ? "bottom" : "left"} anchorRef={isSmallScreen ? deepCutTabRef : detailsCollapseBtnRef} onDismiss={() => updateOnboarding('step5')} />
 
         <input type="file" accept=".csv,.txt,.xml" ref={fileInputRef} onChange={handleFileChange} className="hidden" />

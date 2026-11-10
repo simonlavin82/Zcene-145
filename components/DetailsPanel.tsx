@@ -48,26 +48,30 @@ declare global {
 
 // --- Sub-component: Shared Empty State ---
 const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNavigate }) => (
-    <div className="max-w-md w-full pointer-events-auto">
-        <div className="flex items-center justify-center mb-2 gap-1">
-            <div className="w-10 shrink-0 invisible" aria-hidden="true" />
-            <h3 className="text-xs font-medium text-white text-center">Create Your Zcene</h3>
-            <button onClick={() => onNavigate(View.Help)} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors pointer-events-auto shrink-0 leading-none" title="Help">
-                <HelpIcon className="!text-[18px]" />
-            </button>
-        </div>
-        <div className="mt-3 text-zinc-400 text-sm space-y-4">
-            <p className="text-center px-4">Start with a few of your favorite artists, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
-            <div className="text-left bg-zinc-800/30 p-5 rounded-xl border border-zinc-700/50 mx-4 text-sm">
-                <p className="font-medium text-zinc-200 mb-2">How it works</p>
-                <ol className="list-decimal list-inside space-y-1 text-zinc-400">
-                    <li>Add 1–5 artists (or import your library).</li>
-                    <li>Create your Zcene.</li>
-                    <li>Drag, filter, and explore connections.</li>
-                </ol>
-            </div>
-        </div>
+  <div className="max-w-md w-full pointer-events-auto">
+    <div className="flex items-center justify-center mb-2 gap-1">
+      <div className="w-10 shrink-0 invisible" aria-hidden="true" />
+      <h3 className="text-xs font-medium text-white text-center">Create Your Zcene</h3>
+      <button
+        onClick={() => onNavigate(View.Help)}
+        className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors pointer-events-auto shrink-0 leading-none"
+        title="View Zcene guide, keyboard shortcuts & rules"
+      >
+        <HelpIcon className="!text-[18px]" />
+      </button>
     </div>
+    <div className="mt-3 text-zinc-400 text-xs space-y-4">
+      <p className="text-center px-4 leading-relaxed">Start with 1–5 root artists, and Zcene will map how their scenes connect across genres, labels, origins, and eras.</p>
+      <div className="text-left bg-zinc-800/30 p-5 rounded-xl border border-zinc-700/50 mx-4 text-xs">
+        <p className="font-medium text-zinc-200 mb-2">How it works</p>
+        <ol className="list-decimal list-inside space-y-1.5 text-zinc-400 leading-normal">
+          <li>Add 1–5 roots to build your first Scene (or import your library).</li>
+          <li>Create your Zcene to map the musical constellation.</li>
+          <li>Add up to 5 scenes to bridge connections and read the multi-scene Zine.</li>
+        </ol>
+      </div>
+    </div>
+  </div>
 );
 
 // --- Sub-component: Safe YouTube Player with Error Detection ---

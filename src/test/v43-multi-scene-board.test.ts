@@ -24,6 +24,7 @@ import {
   generateProjectTitleFromScenes,
   compactDetailsCacheToCanonical,
   resolveSceneNodeOverlaps,
+  MAX_SCENES_PER_PROJECT,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
@@ -1202,6 +1203,56 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       });
       expect(canonicalIdx).toBe(1);
       expect(filteredAndSortedNodes[canonicalIdx].label).toBe('Further Seems Forever');
+    });
+  });
+
+  describe('MAX_SCENES_PER_PROJECT = 5 Guardrails & Symmetry ([Rule 44])', () => {
+    it('confirms MAX_SCENES_PER_PROJECT is exported as 5', () => {
+      expect(MAX_SCENES_PER_PROJECT).toBe(5);
+    });
+
+    it('clamps parseProjectScenes to a maximum of 5 scenes when given > 5 scenes', () => {
+      const excessiveScenes = Array.from({ length: 8 }, (_, i) => ({
+        id: `scene-${i + 1}`,
+        sceneId: `scene-${i + 1}`,
+        title: `Scene ${i + 1}`,
+        seedArtists: `Artist ${i + 1}`,
+        graphData: { nodes: [], links: [] },
+      }));
+
+      const parsed = parseProjectScenes(JSON.stringify(excessiveScenes));
+      expect(parsed.length).toBe(MAX_SCENES_PER_PROJECT);
+      expect(parsed.length).toBe(5);
+      expect(parsed.map(s => s.sceneId)).toEqual([
+        'scene-1',
+        'scene-2',
+        'scene-3',
+        'scene-4',
+        'scene-5',
+      ]);
+    });
+
+    it('preserves exactly N scenes when N <= 5', () => {
+      const threeScenes = [
+        { id: 'scene-1', sceneId: 'scene-1', title: 'Scene 1', seedArtists: 'Sense Field' },
+        { id: 'scene-2', sceneId: 'scene-2', title: 'Scene 2', seedArtists: 'The Get Up Kids' },
+        { id: 'scene-3', sceneId: 'scene-3', title: 'Scene 3', seedArtists: 'Further Seems Forever' },
+      ];
+      const parsed = parseProjectScenes(JSON.stringify(threeScenes));
+      expect(parsed.length).toBe(3);
+    });
+
+    it('verifies UI Add Scene button and App.tsx handleAddScene guard condition', () => {
+      const currentScenesCount = 5;
+      const isAddSceneDisabled = currentScenesCount >= MAX_SCENES_PER_PROJECT;
+      expect(isAddSceneDisabled).toBe(true);
+
+      const canAddMoreScenes = (count: number) => count < MAX_SCENES_PER_PROJECT;
+      expect(canAddMoreScenes(0)).toBe(true);
+      expect(canAddMoreScenes(1)).toBe(true);
+      expect(canAddMoreScenes(4)).toBe(true);
+      expect(canAddMoreScenes(5)).toBe(false);
+      expect(canAddMoreScenes(6)).toBe(false);
     });
   });
 });

@@ -563,6 +563,9 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             : Number.isFinite(parsedSceneIdx) && parsedSceneIdx >= 1
                 ? parsedSceneIdx - 1
                 : 0;
+        if (targetSceneIndex >= multiSceneUtils_1.MAX_SCENES_PER_PROJECT) {
+            throw new https_1.HttpsError("invalid-argument", "Maximum of 5 scenes per project reached.");
+        }
         let updatedScenes = (0, multiSceneUtils_1.parseProjectScenes)(payload.scenes);
         if (payload.userId && payload.projectId) {
             try {

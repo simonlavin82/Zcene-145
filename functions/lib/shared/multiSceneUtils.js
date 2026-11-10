@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.createEmptyScene = exports.LEGACY_SCENE_HORIZONTAL_STRIDE = exports.PREV_SCENE_HORIZONTAL_STRIDE = exports.SCENE_HORIZONTAL_STRIDE = exports.SCENE_BASE_CENTER_Y = exports.SCENE_BASE_CENTER_X = void 0;
+exports.createEmptyScene = exports.LEGACY_SCENE_HORIZONTAL_STRIDE = exports.PREV_SCENE_HORIZONTAL_STRIDE = exports.SCENE_HORIZONTAL_STRIDE = exports.MAX_SCENES_PER_PROJECT = exports.SCENE_BASE_CENTER_Y = exports.SCENE_BASE_CENTER_X = void 0;
 exports.getSceneCenterOffset = getSceneCenterOffset;
 exports.detectLegacyStrideShiftX = detectLegacyStrideShiftX;
 exports.migrateLegacyCanvasLayout = migrateLegacyCanvasLayout;
@@ -35,6 +35,7 @@ exports.compactDetailsCacheToCanonical = compactDetailsCacheToCanonical;
 const isoCountries_1 = require("./isoCountries");
 exports.SCENE_BASE_CENTER_X = 1000;
 exports.SCENE_BASE_CENTER_Y = 1000;
+exports.MAX_SCENES_PER_PROJECT = 5;
 exports.SCENE_HORIZONTAL_STRIDE = 1050;
 /** Previous V43.0 stride. Retained to detect and migrate Coordinate Memory from 950px to 1050px. */
 exports.PREV_SCENE_HORIZONTAL_STRIDE = 950;
@@ -1255,7 +1256,7 @@ function parseProjectScenes(rawScenes) {
         const parsed = typeof rawScenes === 'string' ? JSON.parse(rawScenes) : rawScenes;
         if (!Array.isArray(parsed))
             return [];
-        return parsed.map((s, idx) => normalizeProjectScene(s, idx));
+        return parsed.slice(0, exports.MAX_SCENES_PER_PROJECT).map((s, idx) => normalizeProjectScene(s, idx));
     }
     catch (e) {
         console.warn('[parseProjectScenes] Failed to parse scenes:', e);
