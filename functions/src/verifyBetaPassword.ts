@@ -1,4 +1,5 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
+import * as crypto from "crypto";
 
 /**
  * verifyBetaPassword
@@ -8,7 +9,7 @@ import { onCall, HttpsError } from "firebase-functions/v2/https";
  *
  * The password is NEVER exposed to the frontend bundle — the client sends
  * a plaintext attempt; this function compares it server-side and returns
- * a boolean result only.
+ * a cryptographic verification token.
  *
  * Secret setup (one-time, before first deploy):
  *   echo -n "YOUR_BETA_PASSWORD" | gcloud secrets create BETA_WALL_PASSWORD --data-file=-
@@ -44,6 +45,12 @@ export const verifyBetaPassword = onCall(
       throw new HttpsError("unauthenticated", "Invalid password.");
     }
 
-    return { success: true };
+    // Deterministic cryptographic HMAC verification token bound to the secret
+    const token = crypto
+      .createHmac("sha256", expected)
+      .update("zcene_private_beta_access_authorized")
+      .digest("hex");
+
+    return { success: true, token };
   }
 );

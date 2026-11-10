@@ -31,7 +31,7 @@ import { ShareModal } from './components/ShareModal';
 import { analyticsService } from './services/analyticsService';
 import { ZceneLogo, Spinner } from './components/Icons';
 import CookieConsent from './components/CookieConsent';
-import GlobalWall from './components/GlobalWall';
+import { isBetaUnlocked } from './components/GlobalWall';
 
 const checkVideoPlayabilityOnServer = async (videoId: string): Promise<boolean> => {
   if (!videoId || videoId.length !== 11) return false;
@@ -1263,7 +1263,7 @@ const App: React.FC = () => {
   const isAdmin = useMemo(() => {
     if (!user || !user.email) return false;
     const email = user.email.toLowerCase();
-    return email === 'zcene.online@gmail.com';
+    return email === 'zcene.online@gmail.com' && user.uid === '9FBuWDALnNfUAjxV0pRe3RnKwJy1';
   }, [user]);
   const [pendingAuthAction, setPendingAuthAction] = useState<{ type: string; payload: any } | null>(null);
   const [tokenConfirmation, setTokenConfirmation] = useState<{
@@ -5966,7 +5966,12 @@ const App: React.FC = () => {
           setLibraryArtists([]);
         }
       } else {
-        // Automatically initialize profile record on signup
+        // Automatically initialize profile record on signup ONLY if beta gate is unlocked
+        if (!isBetaUnlocked()) {
+          console.warn("[Profile Listener] Suppressed profile creation: beta gate is locked.");
+          setLibraryArtists([]);
+          return;
+        }
         const initialProfile = {
           email: user.email || '',
           displayName: user.displayName || '',
@@ -8902,7 +8907,6 @@ const App: React.FC = () => {
   const showSplashScreen = !isAuthInitialized || !isSplashMinTimerDone || isNavigatingToDashboard || (!!user && currentView === View.Dashboard && !isProjectsSynced);
 
   return (
-    <GlobalWall>
     <div className="h-[100dvh] flex flex-col overflow-hidden" key={refreshKey}>
       <AnimatePresence>
         {showSplashScreen && <SplashScreen key="zcene-splash-screen" />}
@@ -9606,7 +9610,6 @@ const App: React.FC = () => {
       </AnimatePresence>
       <CookieConsent />
     </div>
-  </GlobalWall>
   );
 };
 

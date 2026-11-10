@@ -2,7 +2,7 @@ import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import {
-  isAdminEmail,
+  isAdminUser,
   TOKEN_PRICING,
   TOP_UP_TIERS,
   TokenTopUpTierId,
@@ -36,7 +36,7 @@ export function requireAuthenticatedCaller(request: CallableRequest<any>): Calle
   return {
     uid,
     email,
-    isAdmin: isAdminEmail(email),
+    isAdmin: isAdminUser(uid, email),
   };
 }
 

@@ -1,7 +1,8 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TOKEN_UNIT_USD = exports.GBP_TO_USD_RATE = exports.TOKEN_UNIT_GBP = exports.TOP_UP_TIER_LIST = exports.TOP_UP_TIERS = exports.TOKEN_PRICING = exports.ADMIN_EMAIL = exports.ZCENE_BUYMEACOFFEE_URL = exports.ZCENE_INSTAGRAM_HANDLE = exports.ZCENE_INSTAGRAM_URL = exports.ZCENE_TSHIRT_MAILTO = exports.ZCENE_SUPPORT_MAILTO = exports.ZCENE_SUPPORT_EMAIL = void 0;
+exports.TOKEN_UNIT_USD = exports.GBP_TO_USD_RATE = exports.TOKEN_UNIT_GBP = exports.TOP_UP_TIER_LIST = exports.TOP_UP_TIERS = exports.TOKEN_PRICING = exports.ADMIN_UID = exports.ADMIN_EMAIL = exports.ZCENE_BUYMEACOFFEE_URL = exports.ZCENE_INSTAGRAM_HANDLE = exports.ZCENE_INSTAGRAM_URL = exports.ZCENE_TSHIRT_MAILTO = exports.ZCENE_SUPPORT_MAILTO = exports.ZCENE_SUPPORT_EMAIL = void 0;
 exports.isAdminEmail = isAdminEmail;
+exports.isAdminUser = isAdminUser;
 exports.tokensToGbp = tokensToGbp;
 exports.tokensToUsd = tokensToUsd;
 exports.usdToGbp = usdToGbp;
@@ -14,11 +15,19 @@ exports.ZCENE_TSHIRT_MAILTO = `mailto:${exports.ZCENE_SUPPORT_EMAIL}?subject=Zce
 exports.ZCENE_INSTAGRAM_URL = 'https://www.instagram.com/zcene.online/';
 exports.ZCENE_INSTAGRAM_HANDLE = '@zcene.online';
 exports.ZCENE_BUYMEACOFFEE_URL = 'https://buymeacoffee.com/zcene';
-exports.ADMIN_EMAIL = exports.ZCENE_SUPPORT_EMAIL;
+exports.ADMIN_EMAIL = 'zcene.online@gmail.com';
+exports.ADMIN_UID = '9FBuWDALnNfUAjxV0pRe3RnKwJy1';
 function isAdminEmail(email) {
     if (!email || typeof email !== 'string')
         return false;
     return email.trim().toLowerCase() === exports.ADMIN_EMAIL;
+}
+function isAdminUser(uid, email) {
+    if (!uid || typeof uid !== 'string')
+        return false;
+    if (!email || typeof email !== 'string')
+        return false;
+    return uid.trim() === exports.ADMIN_UID && email.trim().toLowerCase() === exports.ADMIN_EMAIL;
 }
 exports.TOKEN_PRICING = {
     SINGLE_SEED: 5,

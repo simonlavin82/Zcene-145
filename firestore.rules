@@ -33,7 +33,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'zcene.online@gmail.com' ||
+        (request.auth.token.email == 'zcene.online@gmail.com' && request.auth.uid == '9FBuWDALnNfUAjxV0pRe3RnKwJy1') ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }

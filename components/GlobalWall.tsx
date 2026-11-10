@@ -6,8 +6,25 @@ import { Input, Button } from './DesignSystem';
 import SplashScreen from './SplashScreen';
 import { AnimatePresence } from 'motion/react';
 
-// sessionStorage key — intentionally non-descriptive to avoid easy guessing.
-const SESSION_KEY = 'zcene_beta_unlocked';
+// sessionStorage key for the cryptographic beta access token.
+export const BETA_SESSION_KEY = 'zcene_beta_unlocked';
+
+/**
+ * Validates whether the current session has an authentic beta unlock token.
+ * Returns true if the beta wall is disabled at build time, OR if a valid
+ * 64-character hex HMAC verification token is present in sessionStorage.
+ */
+export const isBetaUnlocked = (): boolean => {
+  if (import.meta.env.VITE_ENABLE_GLOBAL_WALL !== 'true') {
+    return true;
+  }
+  try {
+    const token = sessionStorage.getItem(BETA_SESSION_KEY);
+    return typeof token === 'string' && token.length === 64 && /^[0-9a-f]{64}$/i.test(token);
+  } catch {
+    return false;
+  }
+};
 
 interface GlobalWallProps {
   children: React.ReactNode;
@@ -24,9 +41,12 @@ interface GlobalWallProps {
  * Security model:
  * - Password is never stored in the frontend bundle.
  * - The client submits the user's attempt to the `verifyBetaPassword`
- *   Cloud Function, which compares it against a Cloud Secret Manager secret.
- * - On success, a flag is written to sessionStorage (NOT localStorage) so
+ *   Cloud Function, which compares it against a Cloud Secret Manager secret
+ *   and returns a 64-character SHA-256 HMAC verification token.
+ * - On success, the token is written to sessionStorage (NOT localStorage) so
  *   access is automatically revoked when the browser tab is closed.
+ * - Bare 'true' string bypass attempts via DevTools are rejected.
+ * - Shared Zcene guest links (/z/:id) are permitted for read-only preview.
  *
  * Design System compliance:
  * - Input: uses the official <Input autoComplete="off" data-1p-ignore="true" data-lpignore="true"> component from DesignSystem.tsx.
@@ -41,19 +61,18 @@ const GlobalWall: React.FC<GlobalWallProps> = ({ children }) => {
     return <>{children}</>;
   }
 
+  // Preserve intentional public /z/:id shared Zcene guest preview behavior
+  const isSharedZceneRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/z/');
+  if (isSharedZceneRoute) {
+    return <>{children}</>;
+  }
+
   return <GlobalWallGate>{children}</GlobalWallGate>;
 };
 
 // Separated into its own component so hooks only run when the wall is active.
 const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
-  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
-    try {
-      return sessionStorage.getItem(SESSION_KEY) === 'true';
-    } catch {
-      // sessionStorage may be unavailable in certain browser configs.
-      return false;
-    }
-  });
+  const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isBetaUnlocked());
 
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -77,11 +96,16 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
 
     try {
       const verify = httpsCallable(functions, 'verifyBetaPassword');
-      await verify({ password: password.trim() });
+      const response = await verify({ password: password.trim() });
+      const data = response.data as { success?: boolean; token?: string };
 
-      // Success — persist to sessionStorage and unlock.
+      if (!data?.success || !data?.token || typeof data.token !== 'string' || data.token.length !== 64) {
+        throw new Error('Invalid verification response from server.');
+      }
+
+      // Success — persist cryptographic token to sessionStorage and unlock.
       try {
-        sessionStorage.setItem(SESSION_KEY, 'true');
+        sessionStorage.setItem(BETA_SESSION_KEY, data.token);
       } catch {
         // Continue even if sessionStorage write fails (e.g. private browsing
         // storage quota exceeded). The user will just need to re-enter on

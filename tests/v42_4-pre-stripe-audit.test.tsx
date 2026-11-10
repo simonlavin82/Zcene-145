@@ -122,7 +122,7 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     expect(footerSrc).toContain('ZCENE_SUPPORT_EMAIL');
     expect(footerSrc).toContain('ZCENE_SUPPORT_MAILTO');
     expect(footerSrc).toContain('ZCENE_INSTAGRAM_URL');
-    expect(footerSrc).toContain('v42.8');
+    expect(footerSrc).toContain('v44.0');
     expect(footerSrc).toContain('© 2026 Zcene. All Rights Reserved.');
     expect(homeSrc).toContain('GlobalFooter');
     expect(helpSrc).toContain('GlobalFooter');

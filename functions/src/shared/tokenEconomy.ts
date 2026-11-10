@@ -8,11 +8,18 @@ export const ZCENE_INSTAGRAM_URL = 'https://www.instagram.com/zcene.online/';
 export const ZCENE_INSTAGRAM_HANDLE = '@zcene.online';
 export const ZCENE_BUYMEACOFFEE_URL = 'https://buymeacoffee.com/zcene';
 
-export const ADMIN_EMAIL = ZCENE_SUPPORT_EMAIL;
+export const ADMIN_EMAIL = 'zcene.online@gmail.com';
+export const ADMIN_UID = '9FBuWDALnNfUAjxV0pRe3RnKwJy1';
 
 export function isAdminEmail(email?: string | null): boolean {
   if (!email || typeof email !== 'string') return false;
   return email.trim().toLowerCase() === ADMIN_EMAIL;
+}
+
+export function isAdminUser(uid?: string | null, email?: string | null): boolean {
+  if (!uid || typeof uid !== 'string') return false;
+  if (!email || typeof email !== 'string') return false;
+  return uid.trim() === ADMIN_UID && email.trim().toLowerCase() === ADMIN_EMAIL;
 }
 
 export const TOKEN_PRICING = {

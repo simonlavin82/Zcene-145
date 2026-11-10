@@ -4,6 +4,7 @@ import ReactDOM from 'react-dom/client';
 import App from './App';
 import './index.css';
 import ErrorBoundary from './components/ErrorBoundary';
+import GlobalWall from './components/GlobalWall';
 
 // Auto-heal chunk load errors (SPA version mismatch) via Vite
 window.addEventListener('vite:preloadError', () => {
@@ -24,7 +25,9 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <App />
+      <GlobalWall>
+        <App />
+      </GlobalWall>
     </ErrorBoundary>
   </React.StrictMode>
 );

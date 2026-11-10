@@ -30,7 +30,7 @@ function requireAuthenticatedCaller(request) {
     return {
         uid,
         email,
-        isAdmin: (0, tokenEconomy_1.isAdminEmail)(email),
+        isAdmin: (0, tokenEconomy_1.isAdminUser)(uid, email),
     };
 }
 function getSessionExpiry() {
