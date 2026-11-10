@@ -252,13 +252,14 @@ export const ARCHITECTURE_RULES = [
     { 
         id: 44, 
         title: "Multi-Scene Infinite Board, Scene Namespacing & Layered Zine Hierarchy", 
-        desc: "Projects (schemaVersion: 43) support multiple independent ProjectScenes (scene-1..scene-N) on a single infinite CONNECTIONS canvas. Each Scene renders at its deterministic cluster center (1000 + sceneIndex * 1050, 1000) with namespaced canvas IDs (scene-k::canonicalId) so duplicate nodes remain in their respective Scene clusters while sharing canonical Deep Cut profiles. Settled scenes remain frozen in Coordinate Memory ([Rule 21]) when new scenes are added. resolveSceneNodeOverlaps guarantees 100% collision-free node and label placement. Initial canvas state defaults to a neutral rest state (isPassiveSelection = true: 100% node opacity, neutral resting grey links, no auto-hover tooltips until active interaction). Scene removal of mapped scenes is guarded by a confirmation modal. Mobile Scene-pill taps retain the ROOTS tab without disorienting camera snapping. Shared entities (identity, gold #F6E468) and AI sonic bridges (sonic_lineage, purple #a855f7) render as non-physics quadratic Bézier Cross-Scene Bridge Lines—subtle knocked-back grey at rest, highlighted on active hover. The Zine view renders a stacked hierarchy when scenes.length >= 2: H1 OVERARCHING ZINE at top → sequential H2 SCENE k editorials → canonical-deduplicated DEEP CUTS grid (elevating Root badges if an artist is a Root in any Scene)." 
+        desc: "Projects (schemaVersion: 43) support multiple independent ProjectScenes (scene-1..scene-N) on a single infinite CONNECTIONS canvas. Each Scene renders at its deterministic cluster center (1000 + sceneIndex * 1050, 1000) with namespaced canvas IDs (scene-k::canonicalId) so duplicate nodes remain in their respective Scene clusters while sharing canonical Deep Cut profiles. Settled scenes remain frozen in Coordinate Memory ([Rule 21]) when new scenes are added. resolveSceneNodeOverlaps guarantees 100% collision-free node and label placement. Initial canvas state defaults to a neutral rest state (isPassiveSelection = true: 100% node opacity, neutral resting grey links, no auto-hover tooltips until active interaction). Scene removal of mapped scenes is guarded by a confirmation modal. Mobile Scene-pill taps retain the ROOTS tab without disorienting camera snapping. Shared entities (identity, gold #F6E468) and AI sonic bridges (sonic_lineage, purple #a855f7) render as non-physics quadratic Bézier Cross-Scene Bridge Lines—subtle knocked-back grey at rest, highlighted in gold (#F6E468) on endpoint node hover/selection with pointer-events: none line hitboxes, presenting directional narrative snippets ([Rule 26]) prioritized at the top of the node hover tooltip rather than on standalone line hover. The Zine view renders a stacked hierarchy when scenes.length >= 2: H1 OVERARCHING ZINE at top → sequential H2 SCENE k editorials → canonical-deduplicated DEEP CUTS grid (elevating Root badges if an artist is a Root in any Scene)." 
     }
 ];
 
 const DiscoveryFlowDiagram: React.FC = () => (
     <div className="w-full py-6 px-4 bg-zinc-950/50 rounded-xl border border-zinc-800 mb-8">
-        <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr_auto_1fr_auto_minmax(240px,300px)] items-stretch justify-center gap-3 px-1">
+        {/* Tier 1: 3-Column Core Pipeline */}
+        <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr_auto_1fr] items-stretch justify-center gap-3 px-1 mb-6">
             
             {/* Column 1: React UI */}
             <div className="flex flex-col flex-1 min-w-0">
@@ -284,7 +285,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Multi-Scene Zcene ([Rules 29, 44]):</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering Multi-Scene Infinite Board D3 Canvas (scenes at <code>(1000 + sceneIndex * 1050, 1000)</code> with namespaced IDs <code>scene-k::canonicalId</code>, <code>resolveSceneNodeOverlaps</code> collision protection &amp; knocked-back grey quadratic Bézier Cross-Scene Bridge Lines), stacked <strong>Zine</strong> View (<code>OVERARCHING ZINE</code> H1 &rarr; <code>SCENE k</code> H2s &rarr; canonical-deduplicated <code>DEEP CUTS</code> grid), and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>). Enforces <strong>Canonical Presentation Sort (Audio Flow)</strong> with One-SVG Concentric Artwork Watermark on artist artwork for on-demand 30s audio previews.
+                                <span className="text-primary font-medium">5 & 7. Active Loader Gate → Render Multi-Scene Zcene ([Rules 29, 44]):</span> Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering Multi-Scene Infinite Board D3 Canvas (scenes at <code>(1000 + sceneIndex * 1050, 1000)</code> with namespaced IDs <code>scene-k::canonicalId</code>, <code>resolveSceneNodeOverlaps</code> collision protection &amp; knocked-back grey quadratic Bézier Cross-Scene Bridge Lines illuminating in gold <code>#F6E468</code> on endpoint node hover/selection with top-prioritized bridge snippets in node hover tooltips), stacked <strong>Zine</strong> View (<code>OVERARCHING ZINE</code> H1 &rarr; <code>SCENE k</code> H2s &rarr; canonical-deduplicated <code>DEEP CUTS</code> grid), and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>). Enforces <strong>Canonical Presentation Sort (Audio Flow)</strong> with One-SVG Concentric Artwork Watermark on artist artwork for on-demand 30s audio previews.
                             </li>
                         </ul>
                     </div>
@@ -406,27 +407,25 @@ const DiscoveryFlowDiagram: React.FC = () => (
                 </div>
             </div>
 
-            {/* Divider */}
-            <div className="w-px bg-zinc-800/50 justify-self-center hidden xl:block" />
+        </div>
 
-            {/* Rules Ledger */}
-            <div className="flex flex-col flex-1 min-w-0">
-                <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 flex flex-col">
-                    <div className="text-white font-medium text-sm mb-2 sticky top-0 bg-zinc-900 py-1 border-b border-zinc-800 z-10 flex items-center justify-between">
-                        <span>Rules Ledger</span>
-                        <span className="text-[10px] font-mono text-primary uppercase">44 Laws</span>
-                    </div>
-                    <div className="space-y-2 pt-2">
-                        {ARCHITECTURE_RULES.map(rule => (
-                            <div key={rule.id} className="p-2.5 bg-yellow-500/5 border border-yellow-500/15 rounded-lg">
-                                <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-tighter mb-0.5">[Rule {rule.id}] {rule.title}</div>
-                                <div className="text-[10px] text-zinc-400 leading-relaxed">{rule.desc}</div>
-                            </div>
-                        ))}
-                    </div>
+        {/* Tier 2: Rules Ledger (Bottom Row, 2 Columns) */}
+        <div className="p-4 sm:p-5 rounded-xl border border-zinc-700 bg-zinc-900/80">
+            <div className="text-white font-medium text-sm mb-4 pb-2 border-b border-zinc-800 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary text-base">gavel</span>
+                    <span>Rules Ledger</span>
                 </div>
+                <span className="text-[10px] font-mono text-primary uppercase font-bold tracking-wider">44 Laws</span>
             </div>
-
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+                {ARCHITECTURE_RULES.map(rule => (
+                    <div key={rule.id} className="p-2.5 bg-yellow-500/5 border border-yellow-500/15 rounded-lg flex flex-col justify-start">
+                        <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-tighter mb-0.5">[Rule {rule.id}] {rule.title}</div>
+                        <div className="text-[10px] text-zinc-400 leading-relaxed">{rule.desc}</div>
+                    </div>
+                ))}
+            </div>
         </div>
     </div>
 );

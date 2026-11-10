@@ -2057,26 +2057,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const trackRef = useRef<HTMLDivElement>(null);
     const activeDotRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (!trackRef.current || !activeDotRef.current) return;
-
-        const centerDot = () => {
-            const track = trackRef.current;
-            const dot = activeDotRef.current;
-            if (track && dot && typeof track.scrollTo === 'function') {
-                const scrollTarget = dot.offsetLeft - (track.clientWidth / 2) + (dot.clientWidth / 2);
-                track.scrollTo({ left: scrollTarget, behavior: 'smooth' });
-            }
-        };
-
-        centerDot();
-
-        const resizeObserver = new ResizeObserver(() => centerDot());
-        resizeObserver.observe(trackRef.current);
-        
-        return () => resizeObserver.disconnect();
-    }, [viewedIndex, activeNodes.length]);
-
     const isSelectedNodeHydrating = useMemo(() => {
         if (!selectedNode) return false;
         const normId = normalizeArtistId(selectedNode.id);
@@ -2393,6 +2373,26 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         return result;
     }, [activeNodes, isMagazineViewOpen, magazineSortBy, magazineSearchQuery, detailsCache, pinnedNodes]);
 
+    useEffect(() => {
+        if (!trackRef.current || !activeDotRef.current) return;
+
+        const centerDot = () => {
+            const track = trackRef.current;
+            const dot = activeDotRef.current;
+            if (track && dot && typeof track.scrollTo === 'function') {
+                const scrollTarget = Math.max(0, dot.offsetLeft - (track.clientWidth / 2) + (dot.clientWidth / 2));
+                track.scrollTo({ left: scrollTarget, behavior: 'smooth' });
+            }
+        };
+
+        centerDot();
+
+        const resizeObserver = new ResizeObserver(() => centerDot());
+        resizeObserver.observe(trackRef.current);
+        
+        return () => resizeObserver.disconnect();
+    }, [viewedIndex, filteredAndSortedNodes.length]);
+
     const handleNext = useCallback(() => {
         if (filteredAndSortedNodes && viewedIndex < filteredAndSortedNodes.length - 1) {
             const nextIdx = viewedIndex + 1;
@@ -2690,7 +2690,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         <div className="relative flex items-center overflow-hidden w-full h-6 max-w-[240px] lg:max-w-[280px]">
                                             <div 
                                                 ref={trackRef}
-                                                className="flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1 justify-center"
+                                                className={`flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1 ${
+                                                    filteredAndSortedNodes.length > 18 ? 'justify-start' : 'justify-center'
+                                                }`}
                                             >
                                                 {filteredAndSortedNodes.map((node, i) => {
                                                     const isLoading = loadingNodeIds.has(node.id) || jitLoadingIds.has(normalizeArtistId(node.id));

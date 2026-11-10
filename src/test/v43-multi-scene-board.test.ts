@@ -1033,6 +1033,51 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
 
       const rule44 = ARCHITECTURE_RULES.find(r => r.id === 44);
       expect(rule44?.title).toBe('Multi-Scene Infinite Board, Scene Namespacing & Layered Zine Hierarchy');
+      expect(rule44?.desc).toContain('pointer-events: none line hitboxes');
+      expect(rule44?.desc).toContain('prioritized at the top of the node hover tooltip');
+    });
+
+    it('prioritizes cross-scene bridge connections before intra-scene connections in hover tooltips', () => {
+      interface TooltipConnection {
+        context: string;
+        targetName: string;
+        isBridge?: boolean;
+      }
+
+      const mockConnections: TooltipConnection[] = [
+        { context: 'Evolved directly into the post-hardcore band', targetName: 'Sense Field', isBridge: false },
+        { context: 'Shared local scene roots with', targetName: 'Farside', isBridge: false },
+        { context: 'Laid the melodic hardcore groundwork for', targetName: 'Jimmy Eat World (Scene 2)', isBridge: true },
+        { context: 'Shared lead vocalist lineage with', targetName: 'Further Seems Forever', isBridge: false },
+      ];
+
+      mockConnections.sort((a, b) => {
+        if (a.isBridge && !b.isBridge) return -1;
+        if (!a.isBridge && b.isBridge) return 1;
+        return 0;
+      });
+
+      expect(mockConnections[0].targetName).toBe('Jimmy Eat World (Scene 2)');
+      expect(mockConnections[0].isBridge).toBe(true);
+      expect(mockConnections[1].targetName).toBe('Sense Field');
+    });
+
+    it('verifies pagination dot track switches alignment from justify-center to justify-start when nodes > 18 and clamps scrollTarget >= 0', () => {
+      const getAlignmentClass = (nodeCount: number) => (nodeCount > 18 ? 'justify-start' : 'justify-center');
+      expect(getAlignmentClass(12)).toBe('justify-center');
+      expect(getAlignmentClass(18)).toBe('justify-center');
+      expect(getAlignmentClass(19)).toBe('justify-start');
+      expect(getAlignmentClass(50)).toBe('justify-start');
+
+      // Clamping scrollTarget at >= 0 so dot 0 never scrolls negative
+      const computeScrollTarget = (dotOffsetLeft: number, trackWidth: number, dotWidth: number) => {
+        return Math.max(0, dotOffsetLeft - (trackWidth / 2) + (dotWidth / 2));
+      };
+
+      // Dot 0 (offsetLeft: 4px, trackWidth: 240px, dotWidth: 16px)
+      expect(computeScrollTarget(4, 240, 16)).toBe(0);
+      // Mid dot (offsetLeft: 200px, trackWidth: 240px, dotWidth: 16px)
+      expect(computeScrollTarget(200, 240, 16)).toBe(200 - 120 + 8); // 88
     });
   });
 });

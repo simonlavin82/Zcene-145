@@ -847,7 +847,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 }));
                 const fullLinksForFallback = data?.links || visibleLinks;
 
-                const connectionsByArtist = new Map<string, { node: Node; contexts: string[]; legacyContext?: string }>();
+                const connectionsByArtist = new Map<string, { node: Node; contexts: string[]; legacyContext?: string; isBridge?: boolean }>();
                 directArtistLinks.forEach(l => {
                     const sId = nodeId(l.source);
                     const tId = nodeId(l.target);
@@ -857,10 +857,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     if (!otherNode) return;
                     
                     const normOtherId = otherNode.id;
+                    const isBridgeLink = Boolean(l.isCrossSceneBridge) || Boolean(d.sceneId && otherNode.sceneId && d.sceneId !== otherNode.sceneId);
                     if (!connectionsByArtist.has(normOtherId)) {
-                        connectionsByArtist.set(normOtherId, { node: otherNode, contexts: [] });
+                        connectionsByArtist.set(normOtherId, { node: otherNode, contexts: [], isBridge: isBridgeLink });
                     }
                     const entry = connectionsByArtist.get(normOtherId)!;
+                    if (isBridgeLink) {
+                        entry.isBridge = true;
+                    }
                     const rawContextStr = isSource ? l.forwardContext : l.inverseContext;
                     const sanitizedContext = sanitizeDirectionalLinkContext(
                         rawContextStr,
@@ -874,7 +878,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     }
                 });
 
-                const connections = Array.from(connectionsByArtist.values()).map(({ node, contexts, legacyContext }) => {
+                const connections = Array.from(connectionsByArtist.values()).map(({ node, contexts, legacyContext, isBridge }) => {
                     const resolvedContexts = contexts.length > 0
                         ? contexts
                         : [
@@ -889,14 +893,22 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                           ];
                     const rawContext = formatRelationContext(resolvedContexts);
                     const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
-                    const isCrossScenePeer = d.sceneId && node.sceneId && d.sceneId !== node.sceneId;
+                    const isCrossScenePeer = isBridge || Boolean(d.sceneId && node.sceneId && d.sceneId !== node.sceneId);
                     const targetName = isCrossScenePeer
                         ? `${toDisplayLabel(node)} (Scene ${(node.sceneIndex ?? 0) + 1})`
                         : toDisplayLabel(node);
                     return {
                         context: capitalizedContext,
-                        targetName
+                        targetName,
+                        isBridge: Boolean(isCrossScenePeer)
                     };
+                });
+
+                // Prioritize cross-scene bridge relationships first so they are never clipped below the fold
+                connections.sort((a, b) => {
+                    if (a.isBridge && !b.isBridge) return -1;
+                    if (!a.isBridge && b.isBridge) return 1;
+                    return 0;
                 });
 
                 // Fetch DNA/Recommendation Reason using canonical ID
@@ -1150,10 +1162,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     });
 
                  currentContainer.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
-                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
-                    .attr("d", (d: any) => computeBridgePathD(d, visibleNodesRef.current));
-
-                 currentContainer.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-interactive-link")
                     .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
                     .attr("d", (d: any) => computeBridgePathD(d, visibleNodesRef.current));
 
@@ -1724,78 +1732,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("d", (d: any) => computeBridgePathD(d, visibleNodes))
         .style("pointer-events", "none");
 
-    container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-interactive-link")
-        .data(bridgeLinks, (d: any) => `bridge:${nodeId(d.source)}-${nodeId(d.target)}`)
-        .join("path")
-        .attr("class", "bridge-interactive-link")
-        .attr("fill", "none")
-        .attr("stroke", "transparent")
-        .attr("stroke-width", 18)
-        .attr("d", (d: any) => computeBridgePathD(d, visibleNodes))
-        .style("cursor", "pointer")
-        .on("mouseenter", (event, d: any) => {
-            if (isSmallScreen) return;
-            const sNode = typeof d.source === 'object' ? d.source : visibleNodes.find(n => n.id === d.source);
-            const tNode = typeof d.target === 'object' ? d.target : visibleNodes.find(n => n.id === d.target);
-            if (!sNode || !tNode || !svgRef.current) return;
-
-            // Highlight this bridge in yellow #F6E468, opacity 0.95, width 2.0; dim others
-            const currentBridgeKey = `bridge:${nodeId(d.source)}-${nodeId(d.target)}`;
-            d3.select(svgRef.current).selectAll<SVGPathElement, Link>("path.bridge-visual-line")
-                .transition().duration(150)
-                .attr("stroke", (b: any) => `bridge:${nodeId(b.source)}-${nodeId(b.target)}` === currentBridgeKey ? "#F6E468" : "#71717a")
-                .attr("stroke-opacity", (b: any) => `bridge:${nodeId(b.source)}-${nodeId(b.target)}` === currentBridgeKey ? 0.95 : 0.08)
-                .attr("stroke-width", (b: any) => `bridge:${nodeId(b.source)}-${nodeId(b.target)}` === currentBridgeKey ? 2.0 : 1.2);
-
-            const sLabel = toDisplayLabel(sNode);
-            const tLabel = toDisplayLabel(tNode);
-            const rawContext = sanitizeDirectionalLinkContext(d.forwardContext || d.context, sLabel, tLabel) || "bridges cross-scene sonic lineage with";
-            const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
-            const transform = d3.zoomTransform(svgRef.current);
-            const midX = ((sNode.x ?? 0) + (tNode.x ?? 0)) / 2;
-            const midY = ((sNode.y ?? 0) + (tNode.y ?? 0)) / 2;
-            setHoveredLink({
-                sourceId: `${sLabel} (Scene ${(sNode.sceneIndex ?? 0) + 1})`,
-                connections: [{
-                    context: capitalizedContext,
-                    targetName: `${tLabel} (Scene ${(tNode.sceneIndex ?? 0) + 1})`
-                }],
-                x: transform.applyX(midX),
-                y: transform.applyY(midY)
-            });
-        })
-        .on("mouseleave", () => {
-            if (!isSmallScreen) {
-                if (svgRef.current) {
-                    const activeHoverNode = activeHoveredNodeRef.current || peekedNodeRef.current;
-                    d3.select(svgRef.current).selectAll<SVGPathElement, Link>("path.bridge-visual-line")
-                        .transition().duration(200)
-                        .attr("stroke", (b: any) => {
-                            if (!activeHoverNode) return "#71717a";
-                            const sId = nodeId(b.source);
-                            const tId = nodeId(b.target);
-                            return (isSameNodeId(sId, activeHoverNode.id) || isSameNodeId(tId, activeHoverNode.id)) ? "#F6E468" : "#71717a";
-                        })
-                        .attr("stroke-opacity", (b: any) => {
-                            if (!activeHoverNode) return 0.22;
-                            const sId = nodeId(b.source);
-                            const tId = nodeId(b.target);
-                            return (isSameNodeId(sId, activeHoverNode.id) || isSameNodeId(tId, activeHoverNode.id)) ? 0.95 : 0.08;
-                        })
-                        .attr("stroke-width", (b: any) => {
-                            if (!activeHoverNode) return 1.2;
-                            const sId = nodeId(b.source);
-                            const tId = nodeId(b.target);
-                            return (isSameNodeId(sId, activeHoverNode.id) || isSameNodeId(tId, activeHoverNode.id)) ? 2.0 : 1.2;
-                        });
-                }
-                const activeNode = selectedNodeRef.current || peekedNodeRef.current;
-                if (!activeNode) {
-                    setHoveredLink(null);
-                }
-            }
-        });
-
     // Check if the set of artists has structurally changed
     const currentArtists = visibleNodes.filter(n => n.type === 'artist');
     const currentArtistIds = new Set(currentArtists.map(n => n.id));
@@ -2023,8 +1959,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         });
 
     // Cross-Scene Bridge Lines: Default rest (grey #71717a, opacity 0.22, width 1.2)
-    // Only active hover (peekedNode or activeHoveredNodeRef) illuminates connected bridges in yellow #F6E468
-    const activeHoverNode = peekedNode || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
+    // Active hover or selection (peekedNode, selectedNode, or activeHoveredNodeRef when !isPassiveSelection) illuminates connected bridges in yellow #F6E468
+    const activeHoverNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null)) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
     container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
         .transition().duration(300)
         .attr("stroke", (d: any) => {
@@ -2081,7 +2017,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 className={
                     typeof window !== 'undefined' && window.innerWidth >= 1024
                         /* Desktop visual tokens + quadrant class positioning */
-                        ? `bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px] max-h-[400px] overflow-hidden absolute ${
+                        ? `bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px] max-h-[520px] overflow-hidden absolute ${
                             hoverQuadrant === 'top-left' ? 'top-6 left-6' :
                             hoverQuadrant === 'top-right' ? 'top-6 right-6' :
                             hoverQuadrant === 'bottom-left' ? 'bottom-6 left-24' :
