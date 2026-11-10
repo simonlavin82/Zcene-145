@@ -9,8 +9,8 @@ import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } fro
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
 import { qualifyCacheEntry, deriveRoutingDecision, isLocallyRenderable, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
 import { normalizeCountry } from './utils/normalization';
-import { computeProjectHydrationFingerprint } from './utils/projectHydrationFingerprint';
-export { computeProjectHydrationFingerprint };
+import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from './utils/projectHydrationFingerprint';
+export { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature };
 import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, functions, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit, Timestamp } from 'firebase/firestore';
@@ -3140,7 +3140,7 @@ const App: React.FC = () => {
     const resolvedSeedImageUrl: string | null = extractedSeedImageUrls.find(u => !!u) || null;
 
     const canvasLayout = graphData.nodes
-      .filter((n: any) => n.type === 'artist' || n.type === 'label')
+      .filter((n: any) => (n.x !== undefined && n.x !== null) || (n.fx !== undefined && n.fx !== null))
       .map((n: any) => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
 
     const artistEntityIds = Array.from(new Set(
@@ -6655,18 +6655,7 @@ const App: React.FC = () => {
       });
 
       const updateLastSyncedSnapshot = () => {
-        const snapPayload = {
-          seedArtists: data.seedArtists || '',
-          discoveryFilters: typeof data.discoveryFilters === 'string' ? data.discoveryFilters : JSON.stringify(data.discoveryFilters || {}),
-          lastViewedStackCount: data.lastViewedStackCount || 0,
-          activeNodes: data.activeNodes || [],
-          pinnedNodes: data.pinnedNodes || [],
-          isMagazineViewOpen: false, // Don't rely on saved state for initial mount
-          chatHistories: typeof data.chatHistories === 'string' ? data.chatHistories : JSON.stringify(data.chatHistories || []),
-          canvasLayout: data.canvasLayout || '[]',
-          graphData: data.graphData || '{}'
-        };
-        lastSyncedDocRef.current = JSON.stringify(snapPayload);
+        lastSyncedDocRef.current = computeAutosaveDocSnapshot(data);
       };
 
       const incomingFingerprint = computeProjectHydrationFingerprint(currentProjectId, data);
@@ -7362,19 +7351,10 @@ const App: React.FC = () => {
     const basePayload = buildBaseProjectPayload();
     if (!basePayload) return;
 
-    const currentPayload = {
-      seedArtists: basePayload.seedArtists,
-      discoveryFilters: basePayload.discoveryFilters,
-      lastViewedStackCount: basePayload.lastViewedStackCount,
-      activeNodes: basePayload.activeNodes,
-      pinnedNodes: basePayload.pinnedNodes,
-      isMagazineViewOpen: basePayload.isMagazineViewOpen,
-      chatHistories: basePayload.chatHistories,
-      canvasLayout: basePayload.canvasLayout,
-      graphData: basePayload.graphData
-    };
+    const currentSnapshot = computeAutosaveDocSnapshot(basePayload);
+    if (!currentSnapshot) return;
 
-    if (lastSyncedDocRef.current && JSON.stringify(currentPayload) === lastSyncedDocRef.current) {
+    if (lastSyncedDocRef.current && currentSnapshot === lastSyncedDocRef.current) {
       console.log('[Autosave] Skipping write: local state is identical to last synced Firestore state');
       return;
     }
@@ -7408,21 +7388,7 @@ const App: React.FC = () => {
         console.log(`[Database Reporter] SUCCESS: Project synced.`);
 
         // Update the last synced payload ref
-        let updatedPayload = currentPayload;
-        try {
-          if (lastSyncedDocRef.current) {
-            const parsed = JSON.parse(lastSyncedDocRef.current);
-            updatedPayload = {
-              ...parsed,
-              ...currentPayload
-            };
-            if (!docPayload.graphData) {
-              updatedPayload.graphData = parsed.graphData;
-              updatedPayload.canvasLayout = parsed.canvasLayout;
-            }
-          }
-        } catch (e) {}
-        lastSyncedDocRef.current = JSON.stringify(updatedPayload);
+        lastSyncedDocRef.current = currentSnapshot;
 
         setTimeout(() => { isHydratingSessionRef.current = false; }, 1000);
       } catch (err) {

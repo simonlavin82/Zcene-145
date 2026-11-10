@@ -7,7 +7,7 @@ const fnv1aHash = (input: string): string => {
   return (hash >>> 0).toString(36);
 };
 
-const extractCanonicalGraphSignature = (rawGraphData: any): { hasNodes: boolean; signature: string } => {
+export const extractCanonicalGraphSignature = (rawGraphData: any): { hasNodes: boolean; signature: string } => {
   if (!rawGraphData) return { hasNodes: false, signature: '' };
   try {
     const parsed = typeof rawGraphData === 'string' ? JSON.parse(rawGraphData) : rawGraphData;
@@ -77,4 +77,39 @@ export const computeProjectHydrationFingerprint = (
     ...(multiSceneSig ? [multiSceneSig] : []),
   ].join('::');
   return `${projectId}:${fnv1aHash(canonicalPayload)}`;
+};
+
+export const computeAutosaveDocSnapshot = (data: any): string => {
+  if (!data) return '';
+  const { signature: graphSig } = extractCanonicalGraphSignature(data.graphData);
+
+  const normalizeJson = (val: any, fallback: string = '') => {
+    if (val === undefined || val === null) return fallback;
+    if (typeof val === 'string') {
+      try {
+        return JSON.stringify(JSON.parse(val));
+      } catch {
+        return val;
+      }
+    }
+    return JSON.stringify(val);
+  };
+
+  const activeNodes = Array.isArray(data.activeNodes) ? [...data.activeNodes].map(String).sort() : [];
+  const pinnedNodes = Array.isArray(data.pinnedNodes) ? [...data.pinnedNodes].map(String).sort() : [];
+
+  return JSON.stringify({
+    name: data.name || '',
+    seedArtists: data.seedArtists || '',
+    scenes: normalizeJson(data.scenes, '[]'),
+    activeSceneId: data.activeSceneId || 'scene-1',
+    overarchingRationale: data.overarchingRationale || '',
+    crossSceneLinks: normalizeJson(data.crossSceneLinks, '[]'),
+    discoveryFilters: normalizeJson(data.discoveryFilters, '{}'),
+    activeNodes,
+    pinnedNodes,
+    chatHistories: normalizeJson(data.chatHistories, '[]'),
+    lastViewedStackCount: data.lastViewedStackCount || 0,
+    graphSig,
+  });
 };

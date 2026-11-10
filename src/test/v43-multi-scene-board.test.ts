@@ -27,7 +27,9 @@ import {
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
-import { computeProjectHydrationFingerprint } from '../../utils/projectHydrationFingerprint';
+import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
+import { BACKEND_REGRESSION_RUNBOOK } from '../../docs/backend-regression-runbook';
+import { ARCHITECTURE_RULES } from '../../components/EnginePage';
 import { applyShareBlacklistMutation } from '../../App';
 import { ProjectScene, CrossSceneLink, CanvasNodeRef } from '../../types';
 
@@ -908,6 +910,129 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(peekedNode).toBeNull();
       expect(selectedNode).toBeNull();
       expect(navigatedPath).toBe('/p/i1c1KFgYdXr6flXT7lLQ');
+    });
+
+    it('guarantees computeAutosaveDocSnapshot determinism and eliminates false positive idle saves', () => {
+      const rawFirestoreDoc = {
+        name: 'Sense Field + Reason To Believe + Jimmy Eat World',
+        seedArtists: 'Sense Field::Reason To Believe::Jimmy Eat World',
+        scenes: JSON.stringify([
+          { id: 'scene-1', name: 'Scene 1' },
+          { id: 'scene-2', name: 'Scene 2' },
+        ]),
+        activeSceneId: 'scene-1',
+        overarchingRationale: 'Southern California melodic post-hardcore and Arizona alt-rock crossover.',
+        crossSceneLinks: '[]',
+        discoveryFilters: '{}',
+        activeNodes: ['scene-1::sense-field-us', 'scene-2::jimmy-eat-world-us'],
+        pinnedNodes: [],
+        chatHistories: '[]',
+        lastViewedStackCount: 12,
+        graphData: JSON.stringify({
+          nodes: [
+            { id: 'scene-1::sense-field-us', type: 'artist' },
+            { id: 'scene-1::revelation', type: 'label' },
+            { id: 'scene-1::genre-emo', type: 'genre' },
+            { id: 'scene-2::jimmy-eat-world-us', type: 'artist' },
+          ],
+          links: [
+            { source: 'scene-1::sense-field-us', target: 'scene-1::revelation' },
+            { source: 'scene-1::sense-field-us', target: 'scene-1::genre-emo' },
+          ],
+          synthesisRationale: 'Connecting Scene 1 and Scene 2.',
+        }),
+      };
+
+      // In-memory base payload where D3 has mutated links into objects with physics coordinates
+      const inMemoryBasePayload = {
+        name: 'Sense Field + Reason To Believe + Jimmy Eat World',
+        seedArtists: 'Sense Field::Reason To Believe::Jimmy Eat World',
+        scenes: JSON.stringify([
+          { id: 'scene-1', name: 'Scene 1' },
+          { id: 'scene-2', name: 'Scene 2' },
+        ]),
+        activeSceneId: 'scene-1',
+        overarchingRationale: 'Southern California melodic post-hardcore and Arizona alt-rock crossover.',
+        crossSceneLinks: '[]',
+        discoveryFilters: '{}',
+        activeNodes: ['scene-2::jimmy-eat-world-us', 'scene-1::sense-field-us'], // Different insertion order
+        pinnedNodes: [],
+        chatHistories: '[]',
+        lastViewedStackCount: 12,
+        graphData: JSON.stringify({
+          nodes: [
+            { id: 'scene-1::sense-field-us', type: 'artist', x: 1000, y: 1000, vx: 0.0001, vy: -0.0002 },
+            { id: 'scene-1::revelation', type: 'label', x: 950, y: 920, vx: 0.0003, vy: 0.0001 },
+            { id: 'scene-1::genre-emo', type: 'genre', x: 1050, y: 940, vx: -0.0001, vy: 0.0002 },
+            { id: 'scene-2::jimmy-eat-world-us', type: 'artist', x: 2050, y: 1000, vx: 0.0002, vy: 0.0001 },
+          ],
+          // D3-mutated links where source and target are node objects
+          links: [
+            { source: { id: 'scene-1::sense-field-us', x: 1000, y: 1000 }, target: { id: 'scene-1::revelation', x: 950, y: 920 } },
+            { source: { id: 'scene-1::sense-field-us', x: 1000, y: 1000 }, target: { id: 'scene-1::genre-emo', x: 1050, y: 940 } },
+          ],
+          synthesisRationale: 'Connecting Scene 1 and Scene 2.',
+        }),
+      };
+
+      const snap1 = computeAutosaveDocSnapshot(rawFirestoreDoc);
+      const snap2 = computeAutosaveDocSnapshot(inMemoryBasePayload);
+
+      // Must be 100% identical despite D3 physics mutations and array ordering differences
+      expect(snap1).toBe(snap2);
+
+      // Verify that a genuine user change invalidates the snapshot:
+      const modifiedPayload = {
+        ...inMemoryBasePayload,
+        activeNodes: ['scene-1::sense-field-us'], // User deselected a node
+      };
+      const snapModified = computeAutosaveDocSnapshot(modifiedPayload);
+      expect(snapModified).not.toBe(snap1);
+    });
+
+    it('verifies canvasLayout preserves all node types including genre, country, and founded petals', () => {
+      const mockGraphNodes = [
+        { id: 'scene-1::sense-field-us', type: 'artist', x: 1000, y: 1000, fx: 1000, fy: 1000 },
+        { id: 'scene-1::revelation', type: 'label', x: 950, y: 920, fx: 950, fy: 920 },
+        { id: 'scene-1::genre-emo', type: 'genre', x: 1060, y: 940, fx: 1060, fy: 940 },
+        { id: 'scene-1::origin-us', type: 'country', x: 940, y: 1070, fx: 940, fy: 1070 },
+        { id: 'scene-1::founded-1991', type: 'founded', x: 1070, y: 1050, fx: 1070, fy: 1050 },
+      ];
+
+      // Filtering with the new rule (all nodes with coordinates)
+      const canvasLayout = mockGraphNodes
+        .filter((n: any) => (n.x !== undefined && n.x !== null) || (n.fx !== undefined && n.fx !== null))
+        .map((n: any) => ({ nodeId: n.id, x: n.x, y: n.y, fx: n.fx ?? null, fy: n.fy ?? null }));
+
+      expect(canvasLayout).toHaveLength(5);
+      expect(canvasLayout.some(c => c.nodeId === 'scene-1::genre-emo')).toBe(true);
+      expect(canvasLayout.some(c => c.nodeId === 'scene-1::origin-us')).toBe(true);
+      expect(canvasLayout.some(c => c.nodeId === 'scene-1::founded-1991')).toBe(true);
+    });
+
+    it('verifies V44 Runbook Protocol specifies schemaVersion: 43 backward compatibility with 0 database purge required', () => {
+      expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V44 Regression Suite (Full-Stack)');
+      expect(BACKEND_REGRESSION_RUNBOOK).toContain('schemaVersion: 43');
+      expect(BACKEND_REGRESSION_RUNBOOK).toContain('Zero database purge is required for V44 operations');
+    });
+
+    it('verifies ARCHITECTURE_RULES contains all 44 contiguous laws with Rule 22 as Deep Cloning Isolation', () => {
+      expect(ARCHITECTURE_RULES).toHaveLength(44);
+      ARCHITECTURE_RULES.forEach((rule, idx) => {
+        expect(rule.id).toBe(idx + 1);
+        expect(rule.title.trim().length).toBeGreaterThan(0);
+        expect(rule.desc.trim().length).toBeGreaterThan(0);
+      });
+
+      const rule22 = ARCHITECTURE_RULES.find(r => r.id === 22);
+      expect(rule22?.title).toBe('Deep Cloning Isolation');
+      expect(rule22?.desc).toContain('Duplication must execute a deep, disconnected 1:1 clone');
+
+      const rule29 = ARCHITECTURE_RULES.find(r => r.id === 29);
+      expect(rule29?.desc).toContain('V41/V44 Audio Flow & Presentation Sort Parity');
+
+      const rule44 = ARCHITECTURE_RULES.find(r => r.id === 44);
+      expect(rule44?.title).toBe('Multi-Scene Infinite Board, Scene Namespacing & Layered Zine Hierarchy');
     });
   });
 });

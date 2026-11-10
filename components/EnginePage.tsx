@@ -33,7 +33,7 @@ interface SourcePageProps {
     tokenBalance?: number;
 }
 
-const ARCHITECTURE_RULES = [
+export const ARCHITECTURE_RULES = [
     { 
         id: 1, 
         title: "Client-Side ISO Fallback", 
@@ -177,7 +177,7 @@ const ARCHITECTURE_RULES = [
     { 
         id: 29, 
         title: "Universal Payload Serializer", 
-        desc: "Project saving, autosave, and share generation derive from a single source of truth (schemaVersion: 43, including scenes, activeSceneId, overarchingRationale, and crossSceneLinks) to guarantee 1:1 data parity. Share links apply a post-serialization blacklist for ephemeral constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, tokensSpent, and anchorResolution during frontend autosave (merge: true) to prevent clobbering server-stamped token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot across all scenes. V41/V43 Audio Flow & Presentation Sort Parity: Client hydration and autosave pipelines preserve itunesArtistId, previewUrl, and previewTrackName across project saving, cloning, and reconciliation while strictly keeping LLM schemas free of audio fields. The UI enforces the Canonical Presentation Sort (Audio Flow) across canonical-deduplicated Deep Cuts (elevating isSeed: true if an artist is a Root in any Scene), grouping Artists before Record Labels in Deep Cuts and Zine View while preserving graph traversal order, overlaid with the One-SVG Concentric Artwork Watermark." 
+        desc: "Project saving, autosave, and share generation derive from a single source of truth (schemaVersion: 43, including scenes, activeSceneId, overarchingRationale, and crossSceneLinks) to guarantee 1:1 data parity. Share links apply a post-serialization blacklist for ephemeral constraints without risking data omission. Strict Ledger Parity: buildBaseProjectPayload defensively omits generationType, apiUsage, tokensSpent, and anchorResolution during frontend autosave (merge: true) to prevent clobbering server-stamped token costs, labeling, and 3-Tier telemetry. Frontend payload MUST pass a seedNames map as the absolute source of truth for display names to prevent backend hallucination. Dashboard cards & UI consumers must rely solely on the frozen seedImageUrls snapshot across all scenes. V41/V44 Audio Flow & Presentation Sort Parity: Client hydration and autosave pipelines preserve itunesArtistId, previewUrl, and previewTrackName across project saving, cloning, and reconciliation while strictly keeping LLM schemas free of audio fields. The UI enforces the Canonical Presentation Sort (Audio Flow) across canonical-deduplicated Deep Cuts (elevating isSeed: true if an artist is a Root in any Scene), grouping Artists before Record Labels in Deep Cuts and Zine View while preserving graph traversal order, overlaid with the One-SVG Concentric Artwork Watermark." 
     },
     { 
         id: 30, 
@@ -410,13 +410,13 @@ const DiscoveryFlowDiagram: React.FC = () => (
             <div className="w-px bg-zinc-800/50 justify-self-center hidden xl:block" />
 
             {/* Rules Ledger */}
-            <div className="flex flex-col flex-1 min-w-0 lg:relative">
-                <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 h-[560px] xl:h-auto xl:absolute xl:inset-0 flex flex-col">
+            <div className="flex flex-col flex-1 min-w-0">
+                <div className="p-4 rounded-xl border border-zinc-700 bg-zinc-900/80 flex flex-col">
                     <div className="text-white font-medium text-sm mb-2 sticky top-0 bg-zinc-900 py-1 border-b border-zinc-800 z-10 flex items-center justify-between">
                         <span>Rules Ledger</span>
                         <span className="text-[10px] font-mono text-primary uppercase">44 Laws</span>
                     </div>
-                    <div className="space-y-2 pt-2 overflow-y-auto pr-1 flex-1">
+                    <div className="space-y-2 pt-2">
                         {ARCHITECTURE_RULES.map(rule => (
                             <div key={rule.id} className="p-2.5 bg-yellow-500/5 border border-yellow-500/15 rounded-lg">
                                 <div className="text-[10px] font-bold text-yellow-500 uppercase tracking-tighter mb-0.5">[Rule {rule.id}] {rule.title}</div>
@@ -589,7 +589,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V43 Full-Stack Regression Runbook
+                    V44 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -745,7 +745,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         ))}
                     </nav>
                     <div className="mt-8 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono pl-2">
-                        Zcene V43 Blueprint<br/>
+                        Zcene V44 Blueprint<br/>
                         100% Anti-Regression
                     </div>
                 </aside>
@@ -759,7 +759,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V43 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V44 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
