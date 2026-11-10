@@ -1150,6 +1150,7 @@ const App: React.FC = () => {
   const [libraryArtists, setLibraryArtists] = useState<ParsedArtist[]>([]);
   const [seedArtists, setSeedArtists] = useState<string>('');
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
+  const [isPassiveSelection, setIsPassiveSelection] = useState<boolean>(true);
   const [peekedNode, setPeekedNode] = useState<Node | null>(null);
   const [activeNodeIds, setActiveNodeIds] = useState<string[]>([]);
   const [pinnedNodes, setPinnedNodes] = useState<Set<string>>(new Set());
@@ -2616,8 +2617,10 @@ const App: React.FC = () => {
     if (!rawNode) {
        setSelectedNode(null);
        setPeekedNode(null);
+       setIsPassiveSelection(true);
        return;
     }
+    setIsPassiveSelection(false);
 
     // V43 Multi-Scene Canonical Resolution: strip 'scene-k::' namespace so DetailsPanel & detailsCache
     // always operate on canonical entity IDs while canvas preserves per-scene duplicates.
@@ -6566,6 +6569,7 @@ const App: React.FC = () => {
             const targetScene = parsedScenes.find(s => (s.sceneId || s.id) === resolvedActiveSceneId) || parsedScenes[0];
             if (targetScene?.seedArtists !== undefined) {
               const targetSeedsStr = toSeedArtistsString(targetScene.seedArtists);
+              seedArtistsRef.current = targetSeedsStr;
               setSeedArtists((prev: any) => prev === targetSeedsStr ? prev : targetSeedsStr);
             }
             if (targetScene?.discoveryFilters) {
@@ -7072,6 +7076,7 @@ const App: React.FC = () => {
               console.log(`[ProjectLoader] Auto-selecting primary seed node on initial load:`, fallbackSeedNode.id);
               hasAutoSelectedRef.current = currentProjectId;
               setSelectedNode(fallbackSeedNode);
+              setIsPassiveSelection(true);
             }
           }
         }
@@ -9009,6 +9014,7 @@ const App: React.FC = () => {
               onRemoveScene={handleRemoveScene}
               overarchingRationale={overarchingRationale}
               crossSceneLinks={crossSceneLinks}
+              isPassiveSelection={isPassiveSelection}
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} 
               onFork={async (n) => {
                 if (user && !isGuest) {

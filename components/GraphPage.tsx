@@ -130,6 +130,7 @@ interface GraphPageProps {
   onRemoveScene?: (sceneId: string) => void;
   overarchingRationale?: string;
   crossSceneLinks?: CrossSceneLink[];
+  isPassiveSelection?: boolean;
 }
 
 const DEFAULT_LEFT_PANEL_WIDTH = 320;
@@ -1180,6 +1181,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onRemoveScene,
   overarchingRationale,
   crossSceneLinks,
+  isPassiveSelection = false,
 }) => {
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
   const [focusedSceneCluster, setFocusedSceneCluster] = useState<{ sceneId: string; timestamp: number } | undefined>(undefined);
@@ -1278,6 +1280,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [scenePendingRemoval, setScenePendingRemoval] = useState<{ sceneId: string; title: string; index: number } | null>(null);
   const [pendingUpdateSeed, setPendingUpdateSeed] = useState('');
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [isExpectingUpload, setIsExpectingUpload] = useState(false);
@@ -1347,14 +1350,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isLoading, requestWakeLock]);
 
-  useEffect(() => {
-    if (isSmallScreen && seedArtists) {
-      const seeds = seedArtists.split('::').map(a => a.trim()).filter(Boolean);
-      if (seeds.length > 0) {
-        setActiveTab('spiderweb');
-      }
-    }
-  }, [seedArtists, isSmallScreen]);
+  // V44: Retain ROOTS tab on mobile when switching Scene pills (do not flip to spiderweb).
 
   useEffect(() => {
     if (isSmallScreen && mobileTabContainerRef.current) mobileTabContainerRef.current.scrollLeft = 0;
@@ -2048,7 +2044,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
                           data-testid={`scene-pill-${sceneKey}`}
                           onClick={() => {
                             onSelectScene?.(sceneKey);
-                            setFocusedSceneCluster({ sceneId: sceneKey, timestamp: Date.now() });
+                            if (!isSmallScreen) {
+                              setFocusedSceneCluster({ sceneId: sceneKey, timestamp: Date.now() });
+                            }
                           }}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none ${
                             isCurrent
@@ -2068,7 +2066,17 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               data-testid={`remove-scene-${sceneKey}`}
                               onClick={(e) => {
                                 e.stopPropagation();
-                                onRemoveScene(sceneKey);
+                                const targetScene = scenes.find(s => (s.sceneId || s.id) === sceneKey);
+                                const isMapped = (targetScene?.graphData?.nodes?.length || 0) > 0;
+                                if (isMapped) {
+                                  setScenePendingRemoval({
+                                    sceneId: sceneKey,
+                                    title: targetScene?.title || targetScene?.name || `Scene ${idx + 1}`,
+                                    index: idx + 1
+                                  });
+                                } else {
+                                  onRemoveScene(sceneKey);
+                                }
                               }}
                               className="ml-0.5 text-zinc-500 hover:text-red-400 transition-colors leading-none"
                               title={`Remove Scene ${idx + 1}`}
@@ -2445,6 +2453,50 @@ const GraphPage: React.FC<GraphPageProps> = ({
             }}
         />
         {showConfirmDelete && <ConfirmDeleteModal />}
+        {scenePendingRemoval && (
+          <ModalBackdrop className="z-[110]" onClick={() => setScenePendingRemoval(null)}>
+            <ModalContainer className="text-left sm:max-w-md">
+              <ModalHeader>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-red-400 !text-[18px]">delete</span>
+                  <h3 className="text-base font-medium text-white">Remove Scene?</h3>
+                </div>
+                <button 
+                  onClick={() => setScenePendingRemoval(null)} 
+                  className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+                  aria-label="Close"
+                >
+                  <span className="material-symbols-outlined !text-[18px]">close</span>
+                </button>
+              </ModalHeader>
+
+              <div className="p-5 space-y-4 text-sm text-zinc-400">
+                <p className="leading-relaxed">
+                  Are you sure you want to remove Scene {scenePendingRemoval.index} ({scenePendingRemoval.title}) from this Zcene? Its mapped connections and editorial narrative will be permanently removed.
+                </p>
+              </div>
+
+              <ModalFooter>
+                <button 
+                  onClick={() => setScenePendingRemoval(null)} 
+                  className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    const sid = scenePendingRemoval.sceneId;
+                    setScenePendingRemoval(null);
+                    onRemoveScene?.(sid);
+                  }} 
+                  className="px-4 py-1.5 bg-red-500 text-white rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
+                >
+                  Remove Scene
+                </button>
+              </ModalFooter>
+            </ModalContainer>
+          </ModalBackdrop>
+        )}
         
         <Header
             user={user}
@@ -2489,7 +2541,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">
                                 <div className="h-full flex flex-col overflow-hidden">
 
-                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
+                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
                                 </div>
                             </div>
                             <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative`}>
@@ -2553,7 +2605,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden rounded-2xl">
                         <div className={`${LayoutSizes.headerBar} px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden`}><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Connections</h2></div>
-                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
+                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
                     </div>
                 </div>
                 

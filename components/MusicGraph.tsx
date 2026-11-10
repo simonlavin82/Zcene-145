@@ -71,6 +71,7 @@ interface MusicGraphProps {
   selectedNode: Node | null;
   peekedNode?: Node | null;
   isSmallScreen: boolean;
+  isPassiveSelection?: boolean;
   activeFilters: Record<FilterKeys, boolean>;
   searchQuery: string;
   setSearchQuery: (query: string) => void;
@@ -165,11 +166,16 @@ const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistsOrSet: Set<s
 
 const MusicGraph: React.FC<MusicGraphProps> = ({
   data, libraryArtists, seedArtists, onNodeClick, selectedNode, peekedNode, isSmallScreen,
+  isPassiveSelection = false,
   activeFilters, searchQuery, setSearchQuery, toggleFilter,
   legendConfig, legendOrder,
   legendRef, onInteraction, onLegendInteraction, isGuest,
   detailsCache, isActive = false, scenes = [], activeSceneId, focusedSceneCluster, onSimulationComplete, onCoordinatesSettled
 }) => {
+  const isPassiveSelectionRef = useRef(isPassiveSelection);
+  useEffect(() => {
+    isPassiveSelectionRef.current = isPassiveSelection;
+  }, [isPassiveSelection]);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const onSimulationCompleteRef = useRef(onSimulationComplete);
   useEffect(() => {
@@ -384,6 +390,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   }, [visibleNodes, selectedNode, peekedNode]);
 
   const selectionHighlightIds = useMemo(() => {
+    if (isPassiveSelection) return null;
     const activeInteractionNode = selectedNode || peekedNode;
     if (!activeInteractionNode) return null;
     const selectedIdStr = String(activeInteractionNode.id);
@@ -449,7 +456,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         }
     });
     return highlighted;
-  }, [selectedNode, peekedNode, visibleLinks, visibleNodes]);
+  }, [selectedNode, peekedNode, visibleLinks, visibleNodes, isPassiveSelection]);
 
   const selectionHighlightIdsRef = useRef<Set<string> | null>(null);
   useEffect(() => {
@@ -1554,8 +1561,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
         .on("mouseleave", (event, d) => {
             if (!isSmallScreen) {
-                const isPinned = (selectedNodeRef.current && isSameNodeId(selectedNodeRef.current.id, d.id)) ||
-                                 (peekedNodeRef.current && isSameNodeId(peekedNodeRef.current.id, d.id));
+                const isPinned = !isPassiveSelectionRef.current && (
+                                 (selectedNodeRef.current && isSameNodeId(selectedNodeRef.current.id, d.id)) ||
+                                 (peekedNodeRef.current && isSameNodeId(peekedNodeRef.current.id, d.id))
+                                );
                 if (!isPinned) {
                     clearNodeHoverRef.current();
                 }
@@ -1866,13 +1875,18 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
   // Pin Hover Box and highlight connections when selectedNode or peekedNode changes
   useEffect(() => {
+    if (isPassiveSelection) {
+      if (clearNodeHoverRef.current) clearNodeHoverRef.current();
+      setHoveredLink(null);
+      return;
+    }
     const activeNode = selectedNode || peekedNode;
     if (activeNode && triggerNodeHoverRef.current) {
         triggerNodeHoverRef.current(activeNode, true);
     } else if (!activeNode && clearNodeHoverRef.current) {
         clearNodeHoverRef.current();
     }
-  }, [selectedNode, peekedNode]);
+  }, [selectedNode, peekedNode, isPassiveSelection]);
 
   // Unified D3 Timer Lerp Camera
   // Fluidly interpolates the camera to track the active node (physics bouncing or CSS resizing)
@@ -1946,14 +1960,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     nodeElements.select("path")
         .transition().duration(300)
         .attr("stroke-width", d => {
-            const activeNode = !isSearchActive ? (selectedNode || peekedNode) : null;
+            const activeNode = (!isSearchActive && !isPassiveSelection) ? (selectedNode || peekedNode) : null;
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
             const isSeed = isNodeSeedInOwnScene(d, seedArtists);
             if (isSelected) return 4;
             return isSeed ? 3 : 2;
         })
         .attr("stroke", d => {
-            const activeNode = !isSearchActive ? (selectedNode || peekedNode) : null;
+            const activeNode = (!isSearchActive && !isPassiveSelection) ? (selectedNode || peekedNode) : null;
             const isSelected = activeNode ? isSameNodeId(activeNode.id, d.id) : false;
             const isSeed = isNodeSeedInOwnScene(d, seedArtists);
             if (isSelected) return '#F6E468';
@@ -1970,7 +1984,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 const isMatchT = highlightedNodes.has(t) || highlightedNodes.has(String(t).toLowerCase());
                 return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
             }
-            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
+            const activeNode = (!isPassiveSelection ? (selectedNode || peekedNode) : null) || activeHoveredNodeRef.current;
             if (!activeNode) return "#e4e4e7";
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
@@ -1997,7 +2011,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 return (isMatchS && isMatchT) ? 0.6 : 0.05;
             }
 
-            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
+            const activeNode = (!isPassiveSelection ? (selectedNode || peekedNode) : null) || activeHoveredNodeRef.current;
             if (activeNode) {
                 const isFirstDegree = isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id);
                 if (isFirstDegree) return 0.9;
@@ -2033,7 +2047,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const isConnected = isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id);
             return isConnected ? 2.0 : 1.2;
         });
-  }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes, selectedNode, peekedNode, searchQuery, seedArtists]);
+  }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes, selectedNode, peekedNode, searchQuery, seedArtists, isPassiveSelection]);
 
   return (
     <div 
