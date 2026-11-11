@@ -2021,7 +2021,7 @@ export const ARTIST_NODE_DETAILS_SCHEMA = {
     members: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: "List of members and their roles."
+      description: "List of authentic, verified members and their roles. Grounding guard: Only include verified members of this specific artist. NEVER include guest musicians, touring package mates, or members of other bands. If uncertain, return []."
     },
     details: {
       type: Type.OBJECT,
@@ -2040,7 +2040,8 @@ export const ARTIST_NODE_DETAILS_SCHEMA = {
         founded: { type: Type.STRING },
         notableArtists: {
           type: Type.ARRAY,
-          items: { type: Type.STRING }
+          items: { type: Type.STRING },
+          description: "Array of 2 to 6 authentic peer or contemporary band/artist names (e.g. ['Jesus Piece', 'Code Orange']). NEVER output explanatory sentences, scene summaries, or generic phrases. If no peer bands are verified, return []."
         }
       },
       required: ["genre", "style", "origin", "founded", "notableArtists"]
@@ -2106,7 +2107,7 @@ export const LABEL_NODE_DETAILS_SCHEMA = {
     members: {
       type: Type.ARRAY,
       items: { type: Type.STRING },
-      description: "Key founders, executives, or notable personnel."
+      description: "Key founders, executives, or notable personnel of this label. Grounding guard: Only include verified personnel. If uncertain, return []."
     },
     details: {
       type: Type.OBJECT,
@@ -2120,7 +2121,8 @@ export const LABEL_NODE_DETAILS_SCHEMA = {
         founded: { type: Type.STRING },
         notableArtists: {
           type: Type.ARRAY,
-          items: { type: Type.STRING }
+          items: { type: Type.STRING },
+          description: "Array of 2 to 6 authentic artist names signed to or released by this label. NEVER output sentences or phrases. If uncertain, return []."
         }
       },
       required: ["genre", "origin", "founded", "notableArtists"]
@@ -2210,7 +2212,7 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
 
     Your task is to generate a JSON object matching this structure precisely:
     {
-      "summary": "A scannable bio using Markdown. MUST follow strict Bio Scannability rules: 1. Chunking/Text Segmentation (Max 2-3 short sentences per paragraph). 2. Semantic Splitting (Group by meaning). 3. Formatting (MUST use a bulleted list for stylistic traits/key elements, and bold key terms).",
+      "summary": "A scannable bio using Markdown following /design Bio Scannability: 1. Paragraph 1: 1-2 concise sentences on identity, era, and core sound. 2. Capitalized lead-in line (e.g. 'Key stylistic traits include:' or 'Key elements of their sound include:'). 3. Adaptive bullet list: 2 to 4 distinct bullet items (* **Trait**: context) based strictly on verified ground truth; NEVER hallucinate filler for obscure acts. ANTI-CLUMPING: Each trait MUST have its own individual bullet line (NEVER combine multiple traits into a single comma-separated bullet). 4. Optional closing paragraph: 1-2 sentences on defining releases or cultural legacy ONLY if verified.",
       "members": ["Name (Role)", ...],
       "details": {
         "artist": "Canonical professional display name of the artist or record label (e.g. 'Turnstile', 'Drug Church'). NEVER append geographic acronyms or country tags (NOT 'Turnstile US', NOT 'Drug Church US').",
@@ -2239,11 +2241,22 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     - NEGATIVE SHORTS CONSTRAINT: DO NOT parse or return video hashes derived from search queries matching vertical formats or the '/shorts/' route structure. Prioritize landscape video IDs with durations longer than 2 minutes.
     - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your EXTERNAL SEARCH CONTEXT. If you do not see the exact URL or video ID in the context, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
 
+    MEMBERS GROUNDING & ZERO-HALLUCINATION RULE (CRITICAL):
+    - Only include authentic, verified current or historical members of THIS specific entity.
+    - ABSOLUTELY FORBIDDEN: NEVER include guest contributors, touring package mates, festival peers, or members of other bands (e.g. do NOT associate musicians from touring peers like '68 with Vein.fm).
+    - If you do not possess high-confidence historical knowledge of the artist's lineup, you MUST return an empty array: "members": [].
+    - An empty array [] is 100% compliant, fully valid, and strictly preferred over any unverified, approximate, or hallucinated members.
+
     DISCOGRAPHY GROUNDING & ZERO-HALLUCINATION RULE (CRITICAL):
     - Only include real, officially released studio albums, EPs, or qualifying demos that exist in authoritative discographies.
     - If you do not possess verified, exact historical knowledge of the artist's releases, you MUST return an empty array: "discography": [].
     - ABSOLUTELY FORBIDDEN: NEVER invent, fabricate, guess, or extrapolate plausible album titles based on the band's location, lyrics, song titles, or genre clichés (e.g. NEVER invent regional titles like 'To Live and Die in New England' for a Massachusetts hardcore band).
     - An empty array [] is 100% compliant, fully valid, and strictly preferred over any unverified, approximate, or hallucinated titles.
+
+    NOTABLE ARTISTS GROUNDING RULE:
+    - Array of 2 to 6 authentic peer or contemporary band/artist names (e.g. ["Jesus Piece", "Code Orange", "Fleshwater"]).
+    - ABSOLUTELY FORBIDDEN: NEVER output explanatory sentences, scene summaries, or generic phrases (e.g. DO NOT return "Inclusive of modern metallic hardcore...").
+    - If no specific peer bands are verified, return [].
 
     WIKIPEDIA ORDERING RULE (MANDATORY):
     If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.`;
@@ -2325,6 +2338,108 @@ export const buildHydrationIdentityLockBlock = (
   return lines.join('\n    ');
 };
 
+/**
+ * Deterministically sanitizes `details.notableArtists`:
+ * - Ensures all items are strings and trims whitespace
+ * - Strips trailing punctuation
+ * - Strips sentence-length or explanatory category phrases (> 4 words, > 35 chars,
+ *   or matching prefixes like "inclusive of", "acts", "bands", etc.)
+ * - Returns only clean, verified artist/band names
+ */
+export const sanitizeNotableArtists = (artists: any): string[] => {
+  if (!Array.isArray(artists)) return [];
+  const SENTENCE_PREFIX_REGEX = /^(?:inclusive of|associated with|related to|peers in|features|bands like|including|various|such as|influence of|consisting of|pioneers of|spanning|known for)\b/i;
+  const GENERIC_CATEGORY_REGEX = /\b(?:acts|bands|artists|musicians|scene|subgenres?|influences)\b/i;
+
+  return artists
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map(s => s.trim().replace(/[.;!?]+$/, ''))
+    .filter(name => {
+      if (name.length < 2 || name.length > 35) return false;
+      if (name.split(/\s+/).length > 4) return false;
+      if (SENTENCE_PREFIX_REGEX.test(name)) return false;
+      if (GENERIC_CATEGORY_REGEX.test(name) && !/^(the|a)\s/i.test(name)) return false;
+      return true;
+    });
+};
+
+/**
+ * Sanitizes Deep Cut biography and summary text:
+ * - Strips raw codeblock wrappers (```json ... ```)
+ * - Extracts summary text if wrapped in unparsed JSON ({ "summary": "..." })
+ * - Filters out Chain-of-Thought search reasoning preambles
+ * - Converts raw escaped newlines (\n) to actual newlines
+ * - Strips citation brackets and footnote markers ([1], (1), [cite: 20]) while consuming trailing space
+ * - Unpacks clumped single-bullet trait lists into individual bullet lines with capitalized bullet items
+ * - Fixes leading space and enforces proper capitalization on bullet lead-in lines (e.g. "Key stylistic traits include:")
+ */
+export const sanitizeBioText = (rawText?: string): string => {
+  if (!rawText || typeof rawText !== 'string') return '';
+  let text = rawText.trim();
+  const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (match && match[1]) {
+    text = match[1].trim();
+  } else {
+    text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
+  }
+  if (text.startsWith('{') || text.startsWith('[')) {
+    const summaryMatch = text.match(/["'](?:summary|bio|description|text)["']\s*:\s*["']([\s\S]*?)(?=["']\s*(?:,\s*["'](?:imageUrl|members|details|discography|tourInfo|recommendationReason|nodes|links|group|id|type)["']|\s*\}|\s*$))/i);
+    if (summaryMatch && summaryMatch[1]) {
+      text = summaryMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim();
+    }
+  }
+  let prevText;
+  do {
+    prevText = text;
+    text = text.replace(/^(?:I have confirmed|I will manually check|I will check|I need to check|I need to get|To answer your request|For the YouTube video|Here is the JSON|Here are the details|Here is the information|Note: Some details|Based on the search)[^.\n]*[.\n]+\s*/ig, '').trim();
+  } while (text !== prevText && text.length > 0);
+
+  text = text.replace(/\\n/g, '\n');
+
+  // Strip citations while consuming trailing whitespace so "[1] word" becomes "word" instead of " word"
+  text = text.replace(/\[\s*\d+(?:\s*,\s*\d+)*\s*\][ \t]*/g, '')
+             .replace(/\(\s*\d+(?:\s*,\s*\d+)*\s*\)[ \t]*/g, '')
+             .replace(/\[\s*(?:cite|citation)[^\]]*\][ \t]*/gi, '')
+             .replace(/""/g, '');
+
+  // 1. Capitalize list lead-in lines and clean leading spaces on internal lines
+  // Fixes lines starting with " key stylistic elements include:", " key elements of their sound include:", etc.
+  text = text.replace(/(^|\n)[ \t]*(key (?:stylistic|elements|traits|sonic|characteristics|attributes|achievements|label attributes)\b[^\n]*:)/gi, (m, prefix, leadIn) => {
+    const capitalized = leadIn.charAt(0).toUpperCase() + leadIn.slice(1);
+    return `${prefix}${capitalized}`;
+  });
+
+  // Clean any remaining leading spaces on lines before non-bullet prose
+  text = text.replace(/(^|\n)[ \t]+([^•*\-\s])/g, '$1$2');
+
+  // 2. Clumped Single-Bullet Unpacker:
+  // Detects: * **Key Characteristics**: Blistering breakdowns, sample-heavy glitch textures, erratic mathcore tempo shifts, and oppressive atmosphere.
+  // Unpacks into individual capitalized bullets
+  text = text.replace(
+    /(?:^|\n)[ \t]*[•*-][ \t]*(?:\*\*)?(?:Key Characteristics|Key Traits|Key Elements|Stylistic Traits)(?:\*\*)?:?[ \t]*([^\n]+)/i,
+    (m, rawTraits) => {
+      const cleanTraits = rawTraits
+        .replace(/\band\s+/gi, '')
+        .split(/[,;]/)
+        .map((t: string) => t.trim().replace(/\.$/, ''))
+        .filter((t: string) => t.length > 2);
+
+      if (cleanTraits.length >= 2) {
+        const formattedBullets = cleanTraits
+          .map((t: string) => {
+            const capitalized = t.charAt(0).toUpperCase() + t.slice(1);
+            return `* ${capitalized}`;
+          })
+          .join('\n');
+        return `\n\nKey stylistic traits include:\n${formattedBullets}`;
+      }
+      return m;
+    }
+  );
+
+  return text.trim();
+};
+
 export const fetchNodeDetailsBackend = async (
   node: Node,
   graphData: GraphData,
@@ -2392,41 +2507,10 @@ export const fetchNodeDetailsBackend = async (
 
   let prompt = basePrompt;
 
-
-
   let details: any = null;
   let attempts = 0;
   const MAX_ATTEMPTS = 3;
   let lastResponse: any = null;
-
-  const sanitizeBioText = (rawText?: string): string => {
-    if (!rawText || typeof rawText !== 'string') return '';
-    let text = rawText.trim();
-    const match = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-    if (match && match[1]) {
-      text = match[1].trim();
-    } else {
-      text = text.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim();
-    }
-    if (text.startsWith('{') || text.startsWith('[')) {
-      const summaryMatch = text.match(/["'](?:summary|bio|description|text)["']\s*:\s*["']([\s\S]*?)(?=["']\s*(?:,\s*["'](?:imageUrl|members|details|discography|tourInfo|recommendationReason|nodes|links|group|id|type)["']|\s*\}|\s*$))/i);
-      if (summaryMatch && summaryMatch[1]) {
-        text = summaryMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim();
-      }
-    }
-    let prevText;
-    do {
-      prevText = text;
-      text = text.replace(/^(?:I have confirmed|I will manually check|I will check|I need to check|I need to get|To answer your request|For the YouTube video|Here is the JSON|Here are the details|Here is the information|Note: Some details|Based on the search)[^.\n]*[.\n]+\s*/ig, '').trim();
-    } while (text !== prevText && text.length > 0);
-    text = text.replace(/\\n/g, '\n');
-    text = text.replace(/\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g, '')
-               .replace(/\(\s*\d+(?:\s*,\s*\d+)*\s*\)/g, '')
-               .replace(/\[\s*(?:cite|citation)[^\]]*\]/gi, '')
-               .replace(/""/g, '')
-               .trim();
-    return text;
-  };
 
   while (attempts < MAX_ATTEMPTS && !details) {
     try {
@@ -2547,7 +2631,7 @@ export const fetchNodeDetailsBackend = async (
         genre: sanitizeMetaField(d.genre),
         origin: sanitizeMetaField(d.origin),
         founded: sanitizeString(d.founded),
-        notableArtists: (d.notableArtists || []).map(sanitizeString)
+        notableArtists: sanitizeNotableArtists(d.notableArtists)
       };
       if (isLabelNode) {
         delete cleanedDetails.style;

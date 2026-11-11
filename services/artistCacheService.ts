@@ -19,6 +19,7 @@ import {
   ISO_TO_COUNTRY_NAME,
 } from '../shared/isoCountries';
 import { stripSceneNamespace } from '../shared/multiSceneUtils';
+import { sanitizeNotableArtists } from './geminiService';
 
 // ─── JIT ASSET HEALER DEDUPLICATION & COOLDOWN (V22) ──────────────────────────
 const healingInFlight = new Set<string>();
@@ -1588,8 +1589,11 @@ export const enforceArtistCacheSchema = (payload: any): void => {
       if (founded === undefined || founded === null || typeof founded !== 'string' || !founded.trim()) {
         throw new Error("[Schema Enforcement] detailsCache.details is missing founded year.");
       }
-      if (notableArtists && !Array.isArray(notableArtists)) {
-        throw new Error("[Schema Enforcement] detailsCache.details has invalid notableArtists array.");
+      if (notableArtists) {
+        if (!Array.isArray(notableArtists)) {
+          throw new Error("[Schema Enforcement] detailsCache.details has invalid notableArtists array.");
+        }
+        parsed.details.notableArtists = sanitizeNotableArtists(notableArtists);
       }
 
       // Check for discography array (Rule 40: must be non-empty for artists)

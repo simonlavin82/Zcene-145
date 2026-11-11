@@ -4,7 +4,6 @@ exports.healOrphanedAsset = void 0;
 const https_1 = require("firebase-functions/v2/https");
 const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
-const genai_1 = require("@google/genai");
 const curatorService_1 = require("./services/curatorService");
 const isoCountries_1 = require("./shared/isoCountries");
 const cacheQualification_1 = require("./services/cacheQualification");
@@ -106,44 +105,38 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
             throw new https_1.HttpsError("resource-exhausted", "JIT Circuit Breaker tripped: Global limit reached.");
         }
         console.log(`[JIT Healer] Initiating full-parity synthesis for ${entityType}: "${canonicalId}" (raw: "${entityId}") using ${curatorService_1.GEMINI_FLASH_MODEL}...`);
-        // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.LOW) with exact Column 3 prompt and schema parity
-        const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 60000 } });
+        // 2. Synthesize missing entity via fetchNodeDetailsBackend with exact prompt, schema, and sanitization parity
         const cleanSearchName = (0, isoCountries_1.stripCountrySlug)(displayName || '') || (0, curatorService_1.titleCaseArtistId)((0, isoCountries_1.stripCountrySlug)(canonicalId));
-        const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
         const originHint = resolvedCountryIso
             ? isoCountries_1.ISO_TO_COUNTRY_NAME[resolvedCountryIso]
             : (countrySlug ? String(countrySlug).toUpperCase() : null);
-        let prompt = curatorService_1.FETCH_NODE_DETAILS_PROMPT_TEMPLATE
-            .replace('{{nodeIdentifier}}', cleanSearchName)
-            .replace('{{nodeType}}', entityType)
-            .replace('{{contextNodes}}', '')
-            .replace(/{{currentDate}}/g, currentDate);
-        const identityLockBlock = (0, curatorService_1.buildHydrationIdentityLockBlock)(cleanSearchName, entityType, {
+        const tempNode = {
+            id: canonicalId,
+            label: cleanSearchName,
+            type: entityType,
+            group: 1,
+        };
+        const tempGraph = {
+            nodes: [tempNode],
+            links: [],
+        };
+        let promptTokens = 0;
+        let candidatesTokens = 0;
+        let totalTokens = 0;
+        const usageCollector = {
+            push: (_model, usage) => {
+                promptTokens += usage.promptTokenCount || 0;
+                candidatesTokens += usage.candidatesTokenCount || 0;
+                totalTokens += usage.totalTokenCount || 0;
+            }
+        };
+        const synthesizedDetails = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, tempGraph, cleanSearchName, {
             originHint,
             countryIso: resolvedCountryIso,
-        });
-        if (identityLockBlock) {
-            prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, identityLockBlock);
+        }, usageCollector);
+        if (!synthesizedDetails) {
+            throw new Error(`fetchNodeDetailsBackend returned null for ${canonicalId}`);
         }
-        else {
-            prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
-        }
-        const response = await ai.models.generateContent({
-            model: curatorService_1.GEMINI_FLASH_MODEL,
-            contents: prompt,
-            config: {
-                systemInstruction: "You are a late-night record curator — the kind of person who pulls an obscure 7\" from a crate at 2am and traces exactly why it matters. Your tone is knowledgeable, vivid, and deeply immersed in musical history and counterculture scenes. Return detailed, factual, and scene-accurate profile information for the given musical entity matching the schema. No markdown formatting outside strings. NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation.",
-                thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.LOW },
-                responseMimeType: "application/json",
-                responseSchema: (0, curatorService_1.getNodeDetailsSchema)(entityType)
-            }
-        });
-        const jsonText = response.text?.trim() || "";
-        if (!jsonText) {
-            throw new Error("Empty response returned from Gemini synthesis");
-        }
-        const cleanedJsonText = (0, curatorService_1.extractCleanJsonString)(jsonText);
-        const synthesizedDetails = JSON.parse(cleanedJsonText);
         if (!synthesizedDetails.details) {
             synthesizedDetails.details = {};
         }
@@ -152,24 +145,14 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         synthesizedDetails.details.artist = cleanTitle;
         if (isLabel) {
             delete synthesizedDetails.details.style;
-        }
-        else {
-            synthesizedDetails.details.style = (synthesizedDetails.details.style || '').trim();
-        }
-        // Guarantee youtubeSearchQuery meets schema enforcement requirements
-        if (!synthesizedDetails.youtubeSearchQuery || typeof synthesizedDetails.youtubeSearchQuery !== 'string' || !synthesizedDetails.youtubeSearchQuery.trim()) {
-            const genre = synthesizedDetails.details?.genre || "";
-            synthesizedDetails.youtubeSearchQuery = `${cleanTitle} ${genre} official music video`.trim();
-        }
-        else {
-            synthesizedDetails.youtubeSearchQuery = synthesizedDetails.youtubeSearchQuery.trim();
-        }
-        if (isLabel) {
             const synthesizedLabelId = (0, curatorService_1.normalizeLabelId)(cleanTitle);
             if (synthesizedLabelId && (canonicalId === 'century' || synthesizedLabelId === 'century-media' || synthesizedLabelId.startsWith(canonicalId + '-'))) {
                 canonicalId = synthesizedLabelId;
                 docRef = db.collection(collectionName).doc(canonicalId);
             }
+        }
+        else {
+            synthesizedDetails.details.style = (synthesizedDetails.details.style || '').trim();
         }
         // 3. [Rule 8, 35, 37 & 38] Rich Media Scraping Integration & Regional iTunes Storefront Routing
         if (!isLabel) {
@@ -237,9 +220,7 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
         await docRef.set(canonicalPayload, { merge: true });
         console.log(`[JIT Healer] Successfully healed and persisted complete Tier 1 asset with schema parity: ${collectionName}/${canonicalId} (image: ${synthesizedDetails.imageUrl})`);
         // 4. Record Telemetry Receipt in Admin Ledger (Phase 3)
-        const promptTokens = response.usageMetadata?.promptTokenCount || 0;
-        const candidatesTokens = response.usageMetadata?.candidatesTokenCount || 0;
-        const totalTokens = response.usageMetadata?.totalTokenCount || (promptTokens + candidatesTokens);
+        const effectiveTotal = totalTokens || (promptTokens + candidatesTokens);
         const INPUT_RATE_PER_MILLION = 0.10;
         const OUTPUT_RATE_PER_MILLION = 0.40;
         const costUsd = Number(((promptTokens * (INPUT_RATE_PER_MILLION / 1_000_000)) +
@@ -258,7 +239,7 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
                 model: curatorService_1.GEMINI_FLASH_MODEL,
                 promptTokens,
                 candidatesTokens,
-                totalTokens,
+                totalTokens: effectiveTotal,
                 costUsd,
                 healedAtMs: Date.now()
             };

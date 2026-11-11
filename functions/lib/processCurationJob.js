@@ -155,7 +155,7 @@ function sanitizeLabelProfile(details) {
         genre: parsed.details?.genre || null,
         origin: parsed.details?.origin || null,
         founded: parsed.details?.founded || null,
-        notableArtists: parsed.details?.notableArtists || [],
+        notableArtists: (0, curatorService_1.sanitizeNotableArtists)(parsed.details?.notableArtists),
     };
     return {
         summary: parsed.summary || parsed.bio || parsed.description || "",

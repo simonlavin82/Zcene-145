@@ -17,7 +17,8 @@ import {
   extractCountrySlug,
   generateSemanticLinkWeights,
   cleanArtistDisplayName,
-  cleanLabelDisplayName
+  cleanLabelDisplayName,
+  sanitizeNotableArtists
 } from "./services/curatorService";
 import {
   hasActiveDiscoveryFilters,
@@ -204,7 +205,7 @@ function sanitizeLabelProfile(details: any): any {
     genre: parsed.details?.genre || null,
     origin: parsed.details?.origin || null,
     founded: parsed.details?.founded || null,
-    notableArtists: parsed.details?.notableArtists || [],
+    notableArtists: sanitizeNotableArtists(parsed.details?.notableArtists),
   };
   return {
     summary: parsed.summary || parsed.bio || parsed.description || "",

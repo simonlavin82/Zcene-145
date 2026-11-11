@@ -1,18 +1,16 @@
 import { onCall, HttpsError } from "firebase-functions/v2/https";
 import { getApps, initializeApp } from "firebase-admin/app";
 import { getFirestore, FieldValue } from "firebase-admin/firestore";
-import { GoogleGenAI, ThinkingLevel } from "@google/genai";
 import { 
   GEMINI_FLASH_MODEL, 
   normalizeArtistId, 
   normalizeLabelId, 
   titleCaseArtistId,
-  extractCleanJsonString,
   scrapeImageUrlBackend,
-  getNodeDetailsSchema,
-  FETCH_NODE_DETAILS_PROMPT_TEMPLATE,
-  buildHydrationIdentityLockBlock
+  fetchNodeDetailsBackend,
+  UsageCollector
 } from "./services/curatorService";
+import { Node, GraphData } from "./types";
 import {
   stripCountrySlug,
   extractTrailingCountryIso,
@@ -132,48 +130,48 @@ export const healOrphanedAsset = onCall({
 
     console.log(`[JIT Healer] Initiating full-parity synthesis for ${entityType}: "${canonicalId}" (raw: "${entityId}") using ${GEMINI_FLASH_MODEL}...`);
 
-    // 2. Synthesize missing entity via Gemini 3.6 Flash (ThinkingLevel.LOW) with exact Column 3 prompt and schema parity
-    const ai = new GoogleGenAI({ apiKey, httpOptions: { timeout: 60000 } });
+    // 2. Synthesize missing entity via fetchNodeDetailsBackend with exact prompt, schema, and sanitization parity
     const cleanSearchName = stripCountrySlug(displayName || '') || titleCaseArtistId(stripCountrySlug(canonicalId));
-    const currentDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
     const originHint = resolvedCountryIso
       ? ISO_TO_COUNTRY_NAME[resolvedCountryIso]
       : (countrySlug ? String(countrySlug).toUpperCase() : null);
 
-    let prompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
-      .replace('{{nodeIdentifier}}', cleanSearchName)
-      .replace('{{nodeType}}', entityType)
-      .replace('{{contextNodes}}', '')
-      .replace(/{{currentDate}}/g, currentDate);
+    const tempNode: Node = {
+      id: canonicalId,
+      label: cleanSearchName,
+      type: entityType as any,
+      group: 1,
+    };
+    const tempGraph: GraphData = {
+      nodes: [tempNode],
+      links: [],
+    };
 
-    const identityLockBlock = buildHydrationIdentityLockBlock(cleanSearchName, entityType, {
-      originHint,
-      countryIso: resolvedCountryIso,
-    });
-    if (identityLockBlock) {
-      prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, identityLockBlock);
-    } else {
-      prompt = prompt.replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, '');
-    }
-
-    const response = await ai.models.generateContent({
-      model: GEMINI_FLASH_MODEL,
-      contents: prompt,
-      config: {
-        systemInstruction: "You are a late-night record curator — the kind of person who pulls an obscure 7\" from a crate at 2am and traces exactly why it matters. Your tone is knowledgeable, vivid, and deeply immersed in musical history and counterculture scenes. Return detailed, factual, and scene-accurate profile information for the given musical entity matching the schema. No markdown formatting outside strings. NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation.",
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
-        responseMimeType: "application/json",
-        responseSchema: getNodeDetailsSchema(entityType)
+    let promptTokens = 0;
+    let candidatesTokens = 0;
+    let totalTokens = 0;
+    const usageCollector: UsageCollector = {
+      push: (_model, usage) => {
+        promptTokens += usage.promptTokenCount || 0;
+        candidatesTokens += usage.candidatesTokenCount || 0;
+        totalTokens += usage.totalTokenCount || 0;
       }
-    });
+    };
 
-    const jsonText = response.text?.trim() || "";
-    if (!jsonText) {
-      throw new Error("Empty response returned from Gemini synthesis");
+    const synthesizedDetails = await fetchNodeDetailsBackend(
+      tempNode,
+      tempGraph,
+      cleanSearchName,
+      {
+        originHint,
+        countryIso: resolvedCountryIso,
+      },
+      usageCollector
+    );
+
+    if (!synthesizedDetails) {
+      throw new Error(`fetchNodeDetailsBackend returned null for ${canonicalId}`);
     }
-
-    const cleanedJsonText = extractCleanJsonString(jsonText);
-    const synthesizedDetails = JSON.parse(cleanedJsonText);
 
     if (!synthesizedDetails.details) {
       synthesizedDetails.details = {};
@@ -185,24 +183,13 @@ export const healOrphanedAsset = onCall({
 
     if (isLabel) {
       delete synthesizedDetails.details.style;
-    } else {
-      synthesizedDetails.details.style = (synthesizedDetails.details.style || '').trim();
-    }
-
-    // Guarantee youtubeSearchQuery meets schema enforcement requirements
-    if (!synthesizedDetails.youtubeSearchQuery || typeof synthesizedDetails.youtubeSearchQuery !== 'string' || !synthesizedDetails.youtubeSearchQuery.trim()) {
-      const genre = synthesizedDetails.details?.genre || "";
-      synthesizedDetails.youtubeSearchQuery = `${cleanTitle} ${genre} official music video`.trim();
-    } else {
-      synthesizedDetails.youtubeSearchQuery = synthesizedDetails.youtubeSearchQuery.trim();
-    }
-
-    if (isLabel) {
       const synthesizedLabelId = normalizeLabelId(cleanTitle);
       if (synthesizedLabelId && (canonicalId === 'century' || synthesizedLabelId === 'century-media' || synthesizedLabelId.startsWith(canonicalId + '-'))) {
         canonicalId = synthesizedLabelId;
         docRef = db.collection(collectionName).doc(canonicalId);
       }
+    } else {
+      synthesizedDetails.details.style = (synthesizedDetails.details.style || '').trim();
     }
 
     // 3. [Rule 8, 35, 37 & 38] Rich Media Scraping Integration & Regional iTunes Storefront Routing
@@ -281,9 +268,7 @@ export const healOrphanedAsset = onCall({
     console.log(`[JIT Healer] Successfully healed and persisted complete Tier 1 asset with schema parity: ${collectionName}/${canonicalId} (image: ${synthesizedDetails.imageUrl})`);
 
     // 4. Record Telemetry Receipt in Admin Ledger (Phase 3)
-    const promptTokens = response.usageMetadata?.promptTokenCount || 0;
-    const candidatesTokens = response.usageMetadata?.candidatesTokenCount || 0;
-    const totalTokens = response.usageMetadata?.totalTokenCount || (promptTokens + candidatesTokens);
+    const effectiveTotal = totalTokens || (promptTokens + candidatesTokens);
 
     const INPUT_RATE_PER_MILLION = 0.10;
     const OUTPUT_RATE_PER_MILLION = 0.40;
@@ -308,7 +293,7 @@ export const healOrphanedAsset = onCall({
         model: GEMINI_FLASH_MODEL,
         promptTokens,
         candidatesTokens,
-        totalTokens,
+        totalTokens: effectiveTotal,
         costUsd,
         healedAtMs: Date.now()
       };
