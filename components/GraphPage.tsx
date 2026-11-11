@@ -56,6 +56,7 @@ interface GraphPageProps {
   baseGraph: GraphData | null;
   libraryArtists: ParsedArtist[];
   seedArtists: string;
+  onUpdateSeedArtists?: (newSeeds: string) => void;
   onRegenerate: (newArtists: string) => void;
   onFork?: (newArtists: string) => void;
   isLoading: boolean;
@@ -1154,7 +1155,7 @@ const LibraryDialog: React.FC<{
 };
 
 const GraphPage: React.FC<GraphPageProps> = ({
-  data, baseGraph, libraryArtists, seedArtists, onRegenerate, onFork, isLoading,
+  data, baseGraph, libraryArtists, seedArtists, onUpdateSeedArtists, onRegenerate, onFork, isLoading,
   onCancelGeneration, onFileUpload, onNodeClick, selectedNode, peekedNode,
   activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onTogglePinNode, pinnedNodes, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
   chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, onAddToStack,
@@ -1209,14 +1210,44 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const [selectedSeedArtists, setSelectedSeedArtists] = useState<SelectedArtist[]>(() =>
     seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }))
   );
+
+  const lastEmittedSeedsRef = useRef<string>(seedArtists);
+  const prevActiveSceneIdRef = useRef<string | undefined>(activeSceneId);
+
+  const notifySeedArtistsChange = useCallback((artists: SelectedArtist[]) => {
+    const seedString = artists.filter(a => a.enabled).map(a => a.name.trim()).filter(Boolean).join('::');
+    lastEmittedSeedsRef.current = seedString;
+    onUpdateSeedArtists?.(seedString);
+  }, [onUpdateSeedArtists]);
+
   useEffect(() => {
-    setSelectedSeedArtists(seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true })));
-  }, [seedArtists]);
+    const sceneChanged = activeSceneId !== prevActiveSceneIdRef.current;
+    prevActiveSceneIdRef.current = activeSceneId;
+
+    if (sceneChanged) {
+      lastEmittedSeedsRef.current = seedArtists;
+      setSelectedSeedArtists(
+        seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }))
+      );
+      return;
+    }
+
+    if (seedArtists !== lastEmittedSeedsRef.current) {
+      lastEmittedSeedsRef.current = seedArtists;
+      setSelectedSeedArtists(
+        seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }))
+      );
+    }
+  }, [seedArtists, activeSceneId]);
   
   const handleToggleArtist = (artistName: string) => {
-    setSelectedSeedArtists(prev => prev.map(a => 
-      a.name === artistName ? { ...a, enabled: !a.enabled } : a
-    ));
+    setSelectedSeedArtists(prev => {
+      const next = prev.map(a => 
+        a.name === artistName ? { ...a, enabled: !a.enabled } : a
+      );
+      notifySeedArtistsChange(next);
+      return next;
+    });
   };
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -1729,6 +1760,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
         
         // Update state so UI reflects addition
         setSelectedSeedArtists(currentArtists);
+        notifySeedArtistsChange(currentArtists);
         setSearchTerm('');
         if (!onboardingProgress.step1) updateOnboarding('step1');
       }
@@ -1762,7 +1794,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
             const libraryMatch = libraryArtists.find(a => normalizeArtistId(a.name) === normalizeArtistId(artistName));
             return libraryMatch ? libraryMatch.name : artistName;
           }).filter(name => !existingNorms.has(normalizeArtistId(name)));
-        return [...prev, ...artistsToAdd.map(name => ({ name, enabled: true }))];
+        const next = [...prev, ...artistsToAdd.map(name => ({ name, enabled: true }))];
+        notifySeedArtistsChange(next);
+        return next;
       });
       setSearchTerm('');
       setIsSeedDropdownOpen(false);
@@ -1812,7 +1846,11 @@ const GraphPage: React.FC<GraphPageProps> = ({
       setShowLimitDialog(true);
       return;
     }
-    setSelectedSeedArtists(prev => [...prev, { name: artistName, enabled: true }]);
+    setSelectedSeedArtists(prev => {
+      const next = [...prev, { name: artistName, enabled: true }];
+      notifySeedArtistsChange(next);
+      return next;
+    });
     setSearchTerm('');
     setIsSeedDropdownOpen(false);
     setHighlightedSeedIndex(-1);
@@ -1851,7 +1889,11 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const handleRemoveArtist = (artistToRemove: string) => {
     if (selectedNode && selectedNode.id === artistToRemove) onNodeClick(null);
-    setSelectedSeedArtists(prev => prev.filter(a => a.name !== artistToRemove));
+    setSelectedSeedArtists(prev => {
+      const next = prev.filter(a => a.name !== artistToRemove);
+      notifySeedArtistsChange(next);
+      return next;
+    });
   };
   
   const handleLibraryArtistToggle = (artistName: string) => {
@@ -1860,8 +1902,11 @@ const GraphPage: React.FC<GraphPageProps> = ({
     if (!isAlreadySelected && selectedSeedArtists.length >= MAX_SEED_ARTISTS) { setShowLimitDialog(true); return; }
     setSelectedSeedArtists(prev => {
         const isSelected = prev.some(a => normalizeArtistId(a.name) === normName);
-        if (isSelected) return prev.filter(a => normalizeArtistId(a.name) !== normName);
-        else return [...prev, { name: artistName, enabled: true }];
+        const next = isSelected 
+          ? prev.filter(a => normalizeArtistId(a.name) !== normName)
+          : [...prev, { name: artistName, enabled: true }];
+        notifySeedArtistsChange(next);
+        return next;
     });
     if (!onboardingProgress.step1) updateOnboarding('step1');
   };
@@ -1987,6 +2032,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
             onClick={() => {
               onClearLibrary();
               setSelectedSeedArtists([]);
+              notifySeedArtistsChange([]);
               setShowConfirmDelete(false);
               setIsLibraryDialogOpen(false);
             }} 
@@ -2072,7 +2118,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
                           data-testid={`scene-pill-${sceneKey}`}
                           onClick={() => {
                             onSelectScene?.(sceneKey);
-                            if (!isSmallScreen) {
+                            const isMapped = (scene.graphData?.nodes?.length ?? 0) > 0;
+                            if (!isSmallScreen && isMapped) {
                               setFocusedSceneCluster({ sceneId: sceneKey, timestamp: Date.now() });
                             }
                           }}
@@ -2411,9 +2458,17 @@ const GraphPage: React.FC<GraphPageProps> = ({
               const normalizedArtist = normalizeArtistId(artist);
               const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
               if (isAlreadySeed) {
-                  setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
+                  setSelectedSeedArtists(prev => {
+                    const next = prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist);
+                    notifySeedArtistsChange(next);
+                    return next;
+                  });
               } else {
-                  setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
+                  setSelectedSeedArtists(prev => {
+                    const next = [...prev, { name: artist, enabled: true }];
+                    notifySeedArtistsChange(next);
+                    return next;
+                  });
               }
           }}
           isCollapsed={isSmallScreen ? false : isDetailsPanelCollapsed} 

@@ -648,6 +648,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       contentWidth = Math.max(300, maxX - minX);
       contentHeight = Math.max(300, maxY - minY);
     } else {
+      // V44 / Rule 44: When target scene has 0 nodes (uncurated / idle) and settled nodes exist,
+      // fit the existing settled scenes to screen so the constellation remains visible.
+      const settledNodes = visibleNodesRef.current.filter(n => n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y));
+      if (settledNodes.length > 0) {
+        fitGraphToScreen(duration);
+        return;
+      }
       const fallbackIdx = targetIndex >= 0 ? targetIndex : 0;
       const center = getSceneCenterOffset(fallbackIdx);
       cx = center.x;
@@ -668,7 +675,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const ty = height / 2 - cy * k;
 
     d3.select(svgRef.current).transition().duration(duration).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
-  }, [scenes]);
+  }, [scenes, fitGraphToScreen]);
 
   const lastFocusedClusterTimestampRef = useRef<number>(0);
   useEffect(() => {

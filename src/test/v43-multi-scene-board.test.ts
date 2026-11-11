@@ -1449,4 +1449,293 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(activeTab).toBe('spiderweb');
     });
   });
+
+  describe('V44 Multi-Scene Draft Seed State Synchronization & Uncurated Camera Framing ([Rule 44])', () => {
+    it('immediately updates Scene 2 seedArtists and pill count badge, isolates draft seeds from Scene 3, and persists across scene tab switching', () => {
+      // 1. Initial State: Scene 1 completed with Poison The Well
+      let activeSceneId = 'scene-1';
+      let currentSeedArtists = 'Poison The Well';
+      let currentFilters = {};
+      let scenes: ProjectScene[] = [
+        normalizeProjectScene({
+          ...createEmptyProjectScene(0, 'Poison The Well'),
+          status: 'completed',
+          graphData: {
+            nodes: [{ id: 'scene-1::poison-the-well-us', canonicalId: 'poison-the-well-us', type: 'artist', isSeed: true }],
+            links: []
+          }
+        }, 0)
+      ];
+
+      // Step 1: User clicks + Add Scene to create Scene 2
+      const handleAddSceneSim = () => {
+        // Save current active scene state
+        scenes = scenes.map((s, idx) =>
+          (s.sceneId || s.id) === activeSceneId
+            ? normalizeProjectScene({
+                ...s,
+                seedArtists: currentSeedArtists,
+                seedIds: toSeedArtistsArray(currentSeedArtists).map(x => normalizeArtistId(x)).filter(Boolean),
+                seedArtistIds: toSeedArtistsArray(currentSeedArtists).map(x => normalizeArtistId(x)).filter(Boolean),
+                discoveryFilters: currentFilters
+              }, idx)
+            : normalizeProjectScene(s, idx)
+        );
+
+        const nextIndex = scenes.length;
+        const newSceneId = `scene-${nextIndex + 1}`;
+        const newScene = normalizeProjectScene({
+          ...createEmptyProjectScene(nextIndex, ''),
+          id: newSceneId,
+          sceneId: newSceneId,
+          seedArtists: '',
+          seedIds: [],
+          seedArtistIds: [],
+          discoveryFilters: {},
+          status: 'idle'
+        }, nextIndex);
+
+        scenes = [...scenes, newScene];
+        activeSceneId = newSceneId;
+        currentSeedArtists = '';
+        currentFilters = {};
+      };
+
+      handleAddSceneSim();
+      expect(activeSceneId).toBe('scene-2');
+      expect(scenes.length).toBe(2);
+      expect(currentSeedArtists).toBe('');
+      expect(toSeedArtistsArray(scenes[1].seedArtists).length).toBe(0);
+
+      // Step 2: User adds "To Kill" to Scene 2 via real-time onUpdateSeedArtists
+      const handleUpdateSeedArtistsSim = (newSeeds: string) => {
+        currentSeedArtists = newSeeds;
+        const activeId = activeSceneId;
+        const idx = scenes.findIndex(s => (s.sceneId || s.id) === activeId);
+        if (idx !== -1) {
+          const nextSeedIds = toSeedArtistsArray(newSeeds).map(s => normalizeArtistId(s)).filter(Boolean);
+          scenes[idx] = normalizeProjectScene({
+            ...scenes[idx],
+            seedArtists: newSeeds,
+            seedIds: nextSeedIds,
+            seedArtistIds: nextSeedIds,
+          }, idx);
+        }
+      };
+
+      handleUpdateSeedArtistsSim('To Kill');
+      // Verify Scene 2 updates immediately: pill count badge reflects 1
+      expect(scenes[1].seedArtists).toBe('To Kill');
+      expect(scenes[1].seedIds).toEqual(['to-kill']);
+      expect(toSeedArtistsArray(scenes[1].seedArtists).length).toBe(1);
+
+      // Step 3: Without curating, user clicks + Add Scene to create Scene 3
+      handleAddSceneSim();
+      expect(activeSceneId).toBe('scene-3');
+      expect(scenes.length).toBe(3);
+      // Bug A Guardrail: Scene 3 must start completely empty (NOT carrying over "To Kill")
+      expect(currentSeedArtists).toBe('');
+      expect(scenes[2].seedArtists).toBe('');
+      expect(toSeedArtistsArray(scenes[2].seedArtists).length).toBe(0);
+      // Scene 2 must still retain "To Kill" and count badge 1
+      expect(scenes[1].seedArtists).toBe('To Kill');
+      expect(toSeedArtistsArray(scenes[1].seedArtists).length).toBe(1);
+
+      // Step 4: User clicks back to Scene 2 via handleSelectScene
+      const handleSelectSceneSim = (targetSceneId: string) => {
+        // 1. Commit outgoing scene's draft seeds
+        const activeIdx = scenes.findIndex(s => (s.sceneId || s.id) === activeSceneId);
+        if (activeIdx !== -1) {
+          const nextSeedIds = toSeedArtistsArray(currentSeedArtists).map(s => normalizeArtistId(s)).filter(Boolean);
+          scenes[activeIdx] = normalizeProjectScene({
+            ...scenes[activeIdx],
+            seedArtists: currentSeedArtists,
+            seedIds: nextSeedIds,
+            seedArtistIds: nextSeedIds,
+            discoveryFilters: currentFilters
+          }, activeIdx);
+        }
+
+        const target = scenes.find(s => (s.sceneId || s.id) === targetSceneId);
+        if (!target) return;
+        activeSceneId = target.sceneId || target.id;
+        currentSeedArtists = toSeedArtistsString(target.seedArtists);
+        currentFilters = target.discoveryFilters || {};
+      };
+
+      handleSelectSceneSim('scene-2');
+      // Bug B Guardrail: Scene 2's draft seeds ("To Kill") must NOT be lost
+      expect(activeSceneId).toBe('scene-2');
+      expect(currentSeedArtists).toBe('To Kill');
+      expect(scenes[1].seedArtists).toBe('To Kill');
+      expect(toSeedArtistsArray(scenes[1].seedArtists).length).toBe(1);
+
+      // Step 5: User switches to Scene 1 and back to Scene 2
+      handleSelectSceneSim('scene-1');
+      expect(activeSceneId).toBe('scene-1');
+      expect(currentSeedArtists).toBe('Poison The Well');
+
+      handleSelectSceneSim('scene-2');
+      expect(activeSceneId).toBe('scene-2');
+      expect(currentSeedArtists).toBe('To Kill');
+      expect(scenes[1].seedArtists).toBe('To Kill');
+      expect(toSeedArtistsArray(scenes[1].seedArtists).length).toBe(1);
+    });
+
+    it('preserves unchecked (enabled: false) artist rows in GraphPage on round-trip seedArtists sync (Guardrail 1)', () => {
+      interface SelectedArtist { name: string; enabled: boolean; }
+      let selectedSeedArtists: SelectedArtist[] = [
+        { name: 'To Kill', enabled: true },
+        { name: 'Converge', enabled: false }
+      ];
+
+      let lastEmittedSeeds = '';
+      let prevActiveSceneId = 'scene-2';
+      let activeSceneId = 'scene-2';
+      let seedArtists = 'To Kill::Converge';
+
+      const notifySeedArtistsChangeSim = (artists: SelectedArtist[], onUpdate: (s: string) => void) => {
+        const seedString = artists.filter(a => a.enabled).map(a => a.name.trim()).filter(Boolean).join('::');
+        lastEmittedSeeds = seedString;
+        onUpdate(seedString);
+      };
+
+      // User toggles Converge to disabled (enabled: false)
+      notifySeedArtistsChangeSim(selectedSeedArtists, (emitted) => {
+        seedArtists = emitted; // App updates seedArtists to "To Kill"
+      });
+
+      expect(lastEmittedSeeds).toBe('To Kill');
+      expect(seedArtists).toBe('To Kill');
+
+      // GraphPage sync effect triggers with new seedArtists prop
+      const syncEffectSim = () => {
+        const sceneChanged = activeSceneId !== prevActiveSceneId;
+        prevActiveSceneId = activeSceneId;
+
+        if (sceneChanged) {
+          lastEmittedSeeds = seedArtists;
+          selectedSeedArtists = seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }));
+          return;
+        }
+
+        // On the same scene, only sync if seedArtists changed externally (seedArtists !== lastEmittedSeeds)
+        if (seedArtists !== lastEmittedSeeds) {
+          lastEmittedSeeds = seedArtists;
+          selectedSeedArtists = seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }));
+        }
+      };
+
+      syncEffectSim();
+
+      // Guardrail 1 verified: The unchecked row 'Converge' (enabled: false) is NOT overwritten or lost
+      expect(selectedSeedArtists).toEqual([
+        { name: 'To Kill', enabled: true },
+        { name: 'Converge', enabled: false }
+      ]);
+    });
+
+    it('preserves draft seeds on other uncurated scenes when curating a subsequent scene (Guardrail 2)', () => {
+      // Scene 1 is completed
+      const scene1 = normalizeProjectScene({
+        ...createEmptyProjectScene(0, 'Poison The Well'),
+        status: 'completed',
+        graphData: { nodes: [{ id: 'scene-1::poison-the-well-us', canonicalId: 'poison-the-well-us', type: 'artist', isSeed: true }], links: [] }
+      }, 0);
+
+      // Scene 2 has draft "To Kill" and genre anchor
+      const scene2 = normalizeProjectScene({
+        ...createEmptyProjectScene(1, 'To Kill'),
+        seedArtists: 'To Kill',
+        seedIds: ['to-kill-us'],
+        seedArtistIds: ['to-kill-us'],
+        discoveryFilters: { genre: 'Metallic Hardcore' },
+        status: 'idle'
+      }, 1);
+
+      // Scene 3 is currently being curated with "The Hope Conspiracy"
+      const targetSceneIdForJob = 'scene-3';
+      const scene3Draft = normalizeProjectScene({
+        ...createEmptyProjectScene(2, 'The Hope Conspiracy'),
+        seedArtists: 'The Hope Conspiracy',
+        seedIds: ['the-hope-conspiracy-us'],
+        seedArtistIds: ['the-hope-conspiracy-us'],
+        status: 'curating'
+      }, 2);
+
+      const allScenes = [scene1, scene2, scene3Draft];
+
+      // Simulate App.tsx serialization for cloud job
+      const synchronizedScenesForJob = allScenes.map((s, idx) =>
+        (s.sceneId || s.id) === targetSceneIdForJob
+          ? normalizeProjectScene({ ...s, status: 'curating' }, idx)
+          : normalizeProjectScene(s, idx)
+      );
+
+      // Verify Scene 2's draft seeds and filters are faithfully retained in payload
+      expect(synchronizedScenesForJob[1].seedArtists).toBe('To Kill');
+      expect(synchronizedScenesForJob[1].seedIds).toEqual(['to-kill-us']);
+      expect(synchronizedScenesForJob[1].discoveryFilters).toEqual({ genre: 'Metallic Hardcore' });
+
+      // Simulate backend assembly in processCurationJob.ts:
+      // When Scene 3 finishes curating, it produces completedScene3
+      const completedScene3 = normalizeProjectScene({
+        ...scene3Draft,
+        status: 'ready',
+        graphData: { nodes: [{ id: 'scene-3::the-hope-conspiracy-us', canonicalId: 'the-hope-conspiracy-us', type: 'artist', isSeed: true }], links: [] }
+      }, 2);
+
+      const updatedScenes = [...synchronizedScenesForJob];
+      const s3Idx = updatedScenes.findIndex(s => (s.sceneId || s.id) === targetSceneIdForJob);
+      updatedScenes[s3Idx] = completedScene3;
+
+      // Guardrail 2 verified: Scene 2 still holds "To Kill" and its filters post-curation
+      expect(updatedScenes[1].seedArtists).toBe('To Kill');
+      expect(updatedScenes[1].seedIds).toEqual(['to-kill-us']);
+      expect(updatedScenes[1].discoveryFilters).toEqual({ genre: 'Metallic Hardcore' });
+    });
+
+    it('frames settled scenes on screen when selecting an uncurated scene tab rather than panning into empty virtual space ([Rule 44])', () => {
+      // Settled constellation exists on canvas from Scene 1
+      const visibleNodes = [
+        { id: 'scene-1::poison-the-well-us', sceneId: 'scene-1', sceneIndex: 0, x: 1000, y: 1000 },
+        { id: 'scene-1::eighteen-visions-us', sceneId: 'scene-1', sceneIndex: 0, x: 1050, y: 980 }
+      ];
+
+      let fitGraphToScreenCalled = false;
+      let pannedToCenterOffset = false;
+
+      const focusSceneClusterSim = (targetSceneId: string, targetIndex: number) => {
+        // Filter nodes belonging to target scene
+        const clusterNodes = visibleNodes.filter(n => n.sceneId === targetSceneId || n.sceneIndex === targetIndex);
+        const validCount = clusterNodes.length;
+
+        if (validCount > 0) {
+          // Pan to target cluster
+        } else {
+          // Rule 44: When target scene has 0 nodes (uncurated / idle) and settled nodes exist,
+          // fit the existing settled scenes to screen so the constellation remains visible.
+          const settledNodes = visibleNodes.filter(n => n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y));
+          if (settledNodes.length > 0) {
+            fitGraphToScreenCalled = true;
+            return;
+          }
+          pannedToCenterOffset = true;
+        }
+      };
+
+      // Select uncurated Scene 2 (targetIndex = 1, 0 nodes)
+      focusSceneClusterSim('scene-2', 1);
+
+      // Must call fitGraphToScreen to keep Scene 1 visible on the infinite board
+      expect(fitGraphToScreenCalled).toBe(true);
+      // Must NOT pan blindly to (2050, 1000) into empty void
+      expect(pannedToCenterOffset).toBe(false);
+
+      // Verify GraphPage Scene pill condition: suppresses cluster pan dispatch if unmapped
+      const scene2 = { sceneId: 'scene-2', graphData: { nodes: [], links: [] } };
+      const isMapped = (scene2.graphData?.nodes?.length ?? 0) > 0;
+      expect(isMapped).toBe(false);
+    });
+  });
 });

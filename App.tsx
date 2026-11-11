@@ -1730,10 +1730,55 @@ const App: React.FC = () => {
   }, [seedArtists, discoveryFilters, activeSceneId]);
 
   // V43 Multi-Scene Handlers (Rule 44)
+  const handleUpdateSeedArtists = useCallback((newSeeds: string) => {
+    setSeedArtists(newSeeds);
+    seedArtistsRef.current = newSeeds;
+
+    const activeId = activeSceneIdRef.current;
+    if (!activeId || scenesRef.current.length === 0) return;
+
+    setScenes(prev => {
+      const idx = prev.findIndex(s => (s.sceneId || s.id) === activeId);
+      if (idx === -1) return prev;
+      const current = prev[idx];
+      if (current.seedArtists === newSeeds) return prev;
+
+      const updated = [...prev];
+      const nextSeedIds = toSeedArtistsArray(newSeeds).map(s => normalizeArtistId(s)).filter(Boolean);
+      updated[idx] = normalizeProjectScene({
+        ...current,
+        seedArtists: newSeeds,
+        seedIds: nextSeedIds,
+        seedArtistIds: nextSeedIds,
+      }, idx);
+      scenesRef.current = updated;
+      return updated;
+    });
+  }, []);
+
   const handleSelectScene = useCallback((targetSceneId: string) => {
     if (targetSceneId === activeSceneIdRef.current) return;
     curationSessionIdRef.current = null;
     sessionTokenApprovedRef.current = false;
+
+    // 1. Commit departing scene's current draft seeds & filters
+    const currentActiveId = activeSceneIdRef.current;
+    if (currentActiveId && scenesRef.current.length > 0) {
+      const activeIdx = scenesRef.current.findIndex(s => (s.sceneId || s.id) === currentActiveId);
+      if (activeIdx !== -1) {
+        const activeScene = scenesRef.current[activeIdx];
+        const nextSeedIds = toSeedArtistsArray(seedArtistsRef.current).map(s => normalizeArtistId(s)).filter(Boolean);
+        const updatedActiveScene = normalizeProjectScene({
+          ...activeScene,
+          seedArtists: seedArtistsRef.current,
+          seedIds: nextSeedIds,
+          seedArtistIds: nextSeedIds,
+          discoveryFilters: discoveryFiltersRef.current || {},
+        }, activeIdx);
+        scenesRef.current[activeIdx] = updatedActiveScene;
+        setScenes([...scenesRef.current]);
+      }
+    }
 
     const currentScenes = scenesRef.current;
     const targetScene = currentScenes.find(s => (s.sceneId || s.id) === targetSceneId);
@@ -1793,10 +1838,10 @@ const App: React.FC = () => {
         (s.sceneId || s.id) === activeSceneIdRef.current
           ? normalizeProjectScene({
               ...s,
-              seedArtists: seedArtistsRef.current || s.seedArtists,
-              seedIds: toSeedArtistsArray(seedArtistsRef.current || s.seedArtists).map(x => normalizeArtistId(x)).filter(Boolean),
-              seedArtistIds: toSeedArtistsArray(seedArtistsRef.current || s.seedArtists).map(x => normalizeArtistId(x)).filter(Boolean),
-              discoveryFilters: discoveryFiltersRef.current || s.discoveryFilters
+              seedArtists: seedArtistsRef.current,
+              seedIds: toSeedArtistsArray(seedArtistsRef.current).map(x => normalizeArtistId(x)).filter(Boolean),
+              seedArtistIds: toSeedArtistsArray(seedArtistsRef.current).map(x => normalizeArtistId(x)).filter(Boolean),
+              discoveryFilters: discoveryFiltersRef.current || {}
             }, idx)
           : normalizeProjectScene(s, idx)
       );
@@ -1812,7 +1857,12 @@ const App: React.FC = () => {
     const newScene: ProjectScene = normalizeProjectScene({
       ...createEmptyScene(nextIndex),
       id: candidateId,
-      sceneId: candidateId
+      sceneId: candidateId,
+      seedArtists: '',
+      seedIds: [],
+      seedArtistIds: [],
+      discoveryFilters: {},
+      status: 'idle'
     }, nextIndex);
 
     const nextScenes = [...baseScenes, newScene];
@@ -9024,6 +9074,7 @@ const App: React.FC = () => {
               activeDeepWebSession={activeDeepWebSession}
               areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
+              onUpdateSeedArtists={handleUpdateSeedArtists}
               scenes={scenes}
               activeSceneId={activeSceneId}
               onSelectScene={handleSelectScene}
