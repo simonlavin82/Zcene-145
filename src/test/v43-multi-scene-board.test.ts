@@ -193,6 +193,88 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     expect(jewCanonical?.isSeed).toBe(true);
   });
 
+  it('Ordering A: strictly orders 3-scene artists in Scene 1 -> Scene 2 -> Scene 3 sequence with root anchors, followed by labels ([Rule 29], [Rule 44])', () => {
+    const scene1: ProjectScene = {
+      ...createEmptyProjectScene(0, 'Poison The Well'),
+      seedArtists: 'Poison The Well',
+      curatedSeedArtists: 'Poison The Well',
+      seedIds: ['poison-the-well-us'],
+      status: 'ready',
+      graphData: {
+        nodes: [
+          { id: 'poison-the-well', label: 'Poison The Well', type: 'artist', isSeed: true, group: 1 },
+          { id: 'shai-hulud', label: 'Shai Hulud', type: 'artist', group: 1 },
+          { id: 'trustkill', label: 'Trustkill', type: 'label', group: 3 },
+        ],
+        links: [],
+      },
+    };
+
+    const scene2: ProjectScene = {
+      ...createEmptyProjectScene(1, "Harm's Way"),
+      seedArtists: "Harm's Way",
+      curatedSeedArtists: "Harm's Way",
+      seedIds: ['harms-way-us'],
+      status: 'ready',
+      graphData: {
+        nodes: [
+          { id: 'harms-way', label: "Harm's Way", type: 'artist', isSeed: true, group: 1 },
+          { id: 'nails', label: 'Nails', type: 'artist', group: 1 },
+          { id: 'closed-casket', label: 'Closed Casket Activities', type: 'label', group: 3 },
+        ],
+        links: [],
+      },
+    };
+
+    const scene3: ProjectScene = {
+      ...createEmptyProjectScene(2, 'To Kill'),
+      seedArtists: 'To Kill',
+      curatedSeedArtists: 'To Kill',
+      seedIds: ['to-kill-it'],
+      status: 'ready',
+      graphData: {
+        nodes: [
+          { id: 'to-kill', label: 'To Kill', type: 'artist', isSeed: true, group: 1 },
+          { id: 'reprisal', label: 'Reprisal', type: 'artist', group: 1 },
+          { id: 'gsr-music', label: 'GSR Music', type: 'label', group: 3 },
+        ],
+        links: [],
+      },
+    };
+
+    const activeIds = computeDeduplicatedActiveNodes([scene1, scene2, scene3]);
+    expect(activeIds).toEqual([
+      'poison-the-well',
+      'shai-hulud',
+      'harms-way',
+      'nails',
+      'to-kill',
+      'reprisal',
+      'trustkill',
+      'closed-casket',
+      'gsr-music',
+    ]);
+
+    const canonicalNodes = buildCanonicalDeduplicatedNodesFromScenes([scene1, scene2, scene3]);
+    expect(canonicalNodes.map((n) => n.id)).toEqual([
+      'poison-the-well',
+      'shai-hulud',
+      'harms-way',
+      'nails',
+      'to-kill',
+      'reprisal',
+      'trustkill',
+      'closed-casket',
+      'gsr-music',
+    ]);
+
+    // All roots anchored in their scenes have isSeed: true
+    expect(canonicalNodes.find((n) => n.id === 'poison-the-well')?.isSeed).toBe(true);
+    expect(canonicalNodes.find((n) => n.id === 'harms-way')?.isSeed).toBe(true);
+    expect(canonicalNodes.find((n) => n.id === 'to-kill')?.isSeed).toBe(true);
+    expect(canonicalNodes.find((n) => n.id === 'shai-hulud')?.isSeed).toBe(false);
+  });
+
   it('strips coordinates from both composite graphData and per-scene graphData during Share Blacklist Mutation ([Rule 25])', () => {
     const sharePayload: any = {
       canvasLayout: JSON.stringify([{ nodeId: 'scene-1::sense-field-us', x: 1000, y: 1000, fx: 1000, fy: 1000 }]),

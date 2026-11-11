@@ -936,7 +936,7 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
             ? scene.seedIds
             : scene.seedArtistIds?.length
                 ? scene.seedArtistIds
-                : toSeedArtistsArray(scene.seedArtists);
+                : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
         const rawNodes = scene.graphData?.nodes || [];
         const rawLinks = scene.graphData?.links || [];
         // Coordinate Memory Migration: detect per-scene legacy (1600px stride) saved positions as a group.
@@ -1088,7 +1088,7 @@ function computeDeduplicatedActiveNodes(scenes) {
             ? scene.seedIds
             : scene.seedArtistIds?.length
                 ? scene.seedArtistIds
-                : toSeedArtistsArray(scene.seedArtists);
+                : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
         // 1. Scene Seed Artists first
         for (const node of nodes) {
             if (node.type !== 'artist')
@@ -1141,55 +1141,89 @@ function buildCanonicalDeduplicatedNodesFromScenes(scenes) {
         return [];
     const allProjectSeeds = getAllProjectSeedIds(scenes);
     const canonicalNodeMap = new Map();
-    const orderedKeys = [];
+    const orderedArtistKeys = [];
+    const orderedLabelKeys = [];
     const sortedScenes = [...scenes].sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
-    for (const scene of sortedScenes) {
-        const nodes = scene?.graphData?.nodes || [];
-        for (const rawNode of nodes) {
-            if (!rawNode || !rawNode.id)
-                continue;
-            const canonId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
-            const norm = normalizeCanonicalEntityId(canonId);
-            if (!norm)
-                continue;
-            const isRootInAnyScene = rawNode.type === 'artist' &&
-                (Boolean(rawNode.isSceneSeed) ||
-                    Boolean(rawNode.isSeed) ||
-                    isCanonicalSeedMatch(canonId, allProjectSeeds) ||
-                    (rawNode.label ? isCanonicalSeedMatch(rawNode.label, allProjectSeeds) : false));
-            const snippet = scene.artistSnippets?.[canonId] ||
-                scene.artistSnippets?.[norm] ||
-                rawNode.narrativeSnippet;
-            if (!canonicalNodeMap.has(norm)) {
-                orderedKeys.push(norm);
-                canonicalNodeMap.set(norm, {
-                    ...rawNode,
-                    id: canonId,
-                    canonicalId: canonId,
-                    sceneId: scene.sceneId || scene.id,
-                    sceneIndex: scene.sceneIndex,
-                    isSeed: isRootInAnyScene,
-                    isSceneSeed: isRootInAnyScene,
-                    ...(snippet ? { narrativeSnippet: snippet } : {}),
-                });
+    const registerNode = (rawNode, scene, isArtist, isLabel) => {
+        if (!rawNode || !rawNode.id)
+            return;
+        const canonId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
+        const norm = normalizeCanonicalEntityId(canonId);
+        if (!norm)
+            return;
+        const isRootInAnyScene = isArtist &&
+            (Boolean(rawNode.isSceneSeed) ||
+                Boolean(rawNode.isSeed) ||
+                isCanonicalSeedMatch(canonId, allProjectSeeds) ||
+                (rawNode.label ? isCanonicalSeedMatch(rawNode.label, allProjectSeeds) : false));
+        const snippet = scene.artistSnippets?.[canonId] ||
+            scene.artistSnippets?.[norm] ||
+            rawNode.narrativeSnippet;
+        if (!canonicalNodeMap.has(norm)) {
+            if (isLabel) {
+                orderedLabelKeys.push(norm);
             }
             else {
-                const existing = canonicalNodeMap.get(norm);
-                if (isRootInAnyScene && !existing.isSeed) {
-                    existing.isSeed = true;
-                    existing.isSceneSeed = true;
-                }
-                if (snippet && !existing.narrativeSnippet) {
-                    existing.narrativeSnippet = snippet;
-                }
+                orderedArtistKeys.push(norm);
+            }
+            canonicalNodeMap.set(norm, {
+                ...rawNode,
+                id: canonId,
+                canonicalId: canonId,
+                sceneId: scene.sceneId || scene.id,
+                sceneIndex: scene.sceneIndex,
+                isSeed: isRootInAnyScene,
+                isSceneSeed: isRootInAnyScene,
+                ...(snippet ? { narrativeSnippet: snippet } : {}),
+            });
+        }
+        else {
+            const existing = canonicalNodeMap.get(norm);
+            if (isRootInAnyScene && !existing.isSeed) {
+                existing.isSeed = true;
+                existing.isSceneSeed = true;
+            }
+            if (snippet && !existing.narrativeSnippet) {
+                existing.narrativeSnippet = snippet;
             }
         }
+    };
+    for (const scene of sortedScenes) {
+        const nodes = scene?.graphData?.nodes || [];
+        const seedList = scene.seedIds?.length
+            ? scene.seedIds
+            : scene.seedArtistIds?.length
+                ? scene.seedArtistIds
+                : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+        // 1. Scene Seed Artists first
+        for (const rawNode of nodes) {
+            if (rawNode.type !== 'artist' && rawNode.type)
+                continue;
+            const canonId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
+            const isSeed = Boolean(rawNode.isSceneSeed) ||
+                Boolean(rawNode.isSeed) ||
+                isCanonicalSeedMatch(canonId, seedList) ||
+                (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false);
+            if (!isSeed)
+                continue;
+            registerNode(rawNode, scene, true, false);
+        }
+        // 2. Scene Peer Artists second
+        for (const rawNode of nodes) {
+            if (rawNode.type !== 'artist' && rawNode.type)
+                continue;
+            registerNode(rawNode, scene, true, false);
+        }
+        // 3. Scene Record Labels third
+        for (const rawNode of nodes) {
+            if (rawNode.type !== 'label')
+                continue;
+            registerNode(rawNode, scene, false, true);
+        }
     }
-    const allNodes = orderedKeys.map((k) => canonicalNodeMap.get(k));
-    const artistNodes = allNodes.filter((n) => n.type === 'artist' || !n.type);
-    const labelNodes = allNodes.filter((n) => n.type === 'label');
-    const otherNodes = allNodes.filter((n) => n.type && n.type !== 'artist' && n.type !== 'label');
-    return [...artistNodes, ...labelNodes, ...otherNodes];
+    const artistNodes = orderedArtistKeys.map((k) => canonicalNodeMap.get(k));
+    const labelNodes = orderedLabelKeys.map((k) => canonicalNodeMap.get(k));
+    return [...artistNodes, ...labelNodes];
 }
 function getAllProjectSeedIds(scenes) {
     if (!Array.isArray(scenes))

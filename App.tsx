@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink } from './types';
-import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT } from './shared/multiSceneUtils';
+import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeduplicatedActiveNodes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing, stripCountrySlug } from './services/artistCacheService';
 import { qualifyCacheEntry, deriveRoutingDecision, isLocallyRenderable, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
@@ -3196,20 +3196,27 @@ const App: React.FC = () => {
   const buildBaseProjectPayload = useCallback(() => {
     if (!graphData) return null;
 
+    // Step 3 & Guardrail 1: Strictly aggregate top-level seeds from CURATED scenes ((s.graphData?.nodes?.length || 0) > 0)
+    // so uncurated draft scenes (Scene 2, Scene 3 with 0 nodes) never pollute top-level seedArtists or project title.
+    const curatedScenes = (scenesRef.current || []).filter(s => (s.graphData?.nodes?.length || 0) > 0);
+
     const seedList = seedArtists.split('::').map((a: string) => a.trim()).filter(Boolean);
     const saveSeedNorms = seedList.map((s: string) => normalizeArtistId(s));
     
-    // Phase 2A — Canonical Seed Pinning (Seed Hoisting)
-    const hoistedSaveActiveNodes: string[] = [];
-    activeNodeIds.forEach(id => { if (isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
-    activeNodeIds.forEach(id => { if (!isNodeInSeedList(id, saveSeedNorms)) hoistedSaveActiveNodes.push(id); });
+    // Phase 2A / Ordering A — Canonical Multi-Scene Active Node Sequencing ([Rule 29], [Rule 44])
+    // Preserves strict Scene 1 -> Scene 2 -> Scene 3 order with roots anchored at the head of each scene.
+    const hoistedSaveActiveNodes: string[] = curatedScenes.length > 0
+      ? computeDeduplicatedActiveNodes(curatedScenes)
+      : (() => {
+          const list: string[] = [];
+          activeNodeIds.forEach(id => { if (isNodeInSeedList(id, saveSeedNorms)) list.push(id); });
+          activeNodeIds.forEach(id => { if (!isNodeInSeedList(id, saveSeedNorms)) list.push(id); });
+          return list;
+        })();
 
     // Architecture V29 + V43.1: Seed Image URLs Resolution across ALL scenes' Root Artists.
     // Top-level `seedArtists` / `seedImageUrls` are project-scoped (every scene), while each
     // ProjectScene.seedArtists stores only that scene's seeds.
-    // Step 3 & Guardrail 1: Strictly aggregate top-level seeds from CURATED scenes ((s.graphData?.nodes?.length || 0) > 0)
-    // so uncurated draft scenes (Scene 2, Scene 3 with 0 nodes) never pollute top-level seedArtists or project title.
-    const curatedScenes = (scenesRef.current || []).filter(s => (s.graphData?.nodes?.length || 0) > 0);
     const allProjectSeedList: string[] = (() => {
       const byNorm = new Map<string, string>();
       if (curatedScenes.length > 0) {
@@ -3649,12 +3656,9 @@ const App: React.FC = () => {
       const projectPath = `users/${user.uid}/projects/${targetProjectId}`;
       try {
         const dedupedCanonicalNodes = buildCanonicalDeduplicatedNodesFromScenes(populatedScenes);
-        const hoistedActiveNodes: string[] = [];
-        if (primaryNode) hoistedActiveNodes.push(stripSceneNamespace(primaryNode.canonicalId || primaryNode.id));
-        dedupedCanonicalNodes.forEach((n: any) => {
-          const cid = stripSceneNamespace(n.canonicalId || n.id);
-          if (!hoistedActiveNodes.includes(cid)) hoistedActiveNodes.push(cid);
-        });
+        const hoistedActiveNodes = populatedScenes.length > 0
+          ? computeDeduplicatedActiveNodes(populatedScenes)
+          : dedupedCanonicalNodes.map(n => stripSceneNamespace(n.canonicalId || n.id));
 
         const primaryMatchedNode = primaryNode 
           ? normalizedGraph.nodes.find((n: any) => n.id === primaryNode.id) 
@@ -7038,8 +7042,11 @@ const App: React.FC = () => {
             }
             hydratedNodes = incomingStatus === 'completed' ? g.nodes : [];
 
-            // Restore active nodes — with fallback for stale documents where activeNodes was empty
-            if (data.activeNodes && Array.isArray(data.activeNodes) && data.activeNodes.length > 0) {
+            // Restore active nodes — with fallback for stale documents where activeNodes was empty or inverted
+            if (populatedScenesFromDoc.length >= 2) {
+              const canonicalMultiSceneActive = computeDeduplicatedActiveNodes(populatedScenesFromDoc);
+              setActiveNodeIdsIfChanged(canonicalMultiSceneActive);
+            } else if (data.activeNodes && Array.isArray(data.activeNodes) && data.activeNodes.length > 0) {
               let resolvedActiveNodes = data.activeNodes.map((id: string) => stripSceneNamespace(id));
               const availableEntities = Array.from(new Set(g.nodes.map((n: any) => stripSceneNamespace(n.canonicalId || n.id))));
               if (availableEntities.length > resolvedActiveNodes.length) {
@@ -7312,9 +7319,11 @@ const App: React.FC = () => {
             const seedIds = (data.seedArtists ? data.seedArtists.split('::') : [...(data.artistIds || []), ...(data.labelIds || [])])
               .map((s: string) => normalizeArtistId(s.trim()))
               .filter(Boolean);
-            const primaryActiveId = (data.activeNodes && Array.isArray(data.activeNodes) && data.activeNodes.length > 0)
-              ? data.activeNodes[0]
-              : null;
+            const primaryActiveId = populatedScenesFromDoc.length >= 2
+              ? computeDeduplicatedActiveNodes(populatedScenesFromDoc)[0]
+              : ((data.activeNodes && Array.isArray(data.activeNodes) && data.activeNodes.length > 0)
+                  ? data.activeNodes[0]
+                  : null);
             const seedNode = primaryActiveId
               ? hydratedNodes.find((n: any) => n.id === primaryActiveId || normalizeArtistId(stripSceneNamespace(n.canonicalId || n.id)) === normalizeArtistId(stripSceneNamespace(primaryActiveId)) || isArtistIdMatch(stripSceneNamespace(n.canonicalId || n.id), stripSceneNamespace(primaryActiveId)))
               : null;
@@ -8011,7 +8020,10 @@ const App: React.FC = () => {
                   console.warn("Guest batch hydration failed:", err);
                 }
                 
-                if (data.activeNodes && Array.isArray(data.activeNodes) && data.activeNodes.length > 0) {
+                if (populatedScenes.length >= 2) {
+                  const canonicalMultiSceneActive = computeDeduplicatedActiveNodes(populatedScenes);
+                  setActiveNodeIds(canonicalMultiSceneActive);
+                } else if (data.activeNodes && Array.isArray(data.activeNodes) && data.activeNodes.length > 0) {
                   let resolvedActiveNodes = data.activeNodes.map((id: string) => stripSceneNamespace(id));
                   const availableEntities = Array.from(new Set(g.nodes.map((n: any) => stripSceneNamespace(n.canonicalId || n.id))));
                   if (availableEntities.length > resolvedActiveNodes.length) {

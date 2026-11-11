@@ -926,6 +926,116 @@ describe('DetailsPanel', () => {
             expect(screen.getByRole('heading', { name: 'Sense Field + Reason To Believe', level: 2 })).toBeInTheDocument();
             expect(screen.getByRole('heading', { name: 'Jimmy Eat World', level: 2 })).toBeInTheDocument();
         });
+
+        describe('Multi-Scene Scene Membership & ROOT Badge Parity ([Rule 29], [Rule 44])', () => {
+            const ptw: any = { id: 'poison-the-well-us', label: 'Poison The Well', type: 'artist', isSeed: true };
+            const shai: any = { id: 'shai-hulud-us', label: 'Shai Hulud', type: 'artist' };
+            const harms: any = { id: 'harms-way-us', label: "Harm's Way", type: 'artist', isSeed: true };
+            const toKill: any = { id: 'to-kill-it', label: 'To Kill', type: 'artist', isSeed: true };
+            const bridgeLabel: any = { id: 'closed-casket', label: 'Closed Casket Activities', type: 'label' };
+
+            const multiScenes: any[] = [
+                {
+                    id: 'scene-1',
+                    sceneId: 'scene-1',
+                    sceneIndex: 0,
+                    title: 'Poison The Well',
+                    seedArtists: 'Poison The Well',
+                    curatedSeedArtists: 'Poison The Well',
+                    seedIds: ['poison-the-well-us'],
+                    graphData: {
+                        nodes: [ptw, shai, bridgeLabel],
+                        links: [],
+                    },
+                },
+                {
+                    id: 'scene-2',
+                    sceneId: 'scene-2',
+                    sceneIndex: 1,
+                    title: "Harm's Way",
+                    seedArtists: "Harm's Way",
+                    curatedSeedArtists: "Harm's Way",
+                    seedIds: ['harms-way-us'],
+                    graphData: {
+                        nodes: [harms, bridgeLabel],
+                        links: [],
+                    },
+                },
+                {
+                    id: 'scene-3',
+                    sceneId: 'scene-3',
+                    sceneIndex: 2,
+                    title: 'To Kill',
+                    seedArtists: 'To Kill',
+                    curatedSeedArtists: 'To Kill',
+                    seedIds: ['to-kill-it'],
+                    graphData: {
+                        nodes: [toKill],
+                        links: [],
+                    },
+                },
+            ];
+
+            const detailsCache = new Map<string, any>([
+                ['poison-the-well-us', { summary: 'PTW summary with enough characters for rich data display test', imageUrl: 'https://example.com/ptw.jpg', details: { artist: 'Poison The Well' } }],
+                ['shai-hulud-us', { summary: 'Shai summary with enough characters for rich data display test', imageUrl: 'https://example.com/shai.jpg', details: { artist: 'Shai Hulud' } }],
+                ['harms-way-us', { summary: 'Harms summary with enough characters for rich data display test', imageUrl: 'https://example.com/harms.jpg', details: { artist: "Harm's Way" } }],
+                ['to-kill-it', { summary: 'To Kill summary with enough characters for rich data display test', imageUrl: 'https://example.com/tokill.jpg', details: { artist: 'To Kill' } }],
+                ['closed-casket', { summary: 'CCA summary with enough characters for rich data display test', details: { name: 'Closed Casket Activities' } }],
+            ]);
+
+            it('renders SCENE 1, SCENE 2, and shared SCENE 1 & 2 badges in multi-scene project', () => {
+                render(
+                    <DetailsPanel
+                        {...defaultProps}
+                        selectedNode={ptw}
+                        activeNodes={[ptw, shai, harms, toKill, bridgeLabel]}
+                        detailsCache={detailsCache}
+                        seedArtists={['Poison The Well']}
+                        scenes={multiScenes}
+                        isMagazineViewOpen={true}
+                    />
+                );
+
+                expect(screen.getAllByText('SCENE 1').length).toBeGreaterThan(0);
+                expect(screen.getAllByText('SCENE 2').length).toBeGreaterThan(0);
+                expect(screen.getAllByText('SCENE 3').length).toBeGreaterThan(0);
+                expect(screen.getByText('SCENE 1 & 2')).toBeInTheDocument();
+            });
+
+            it('renders ROOT badge for seed artists across all scenes (multi-scene ROOT badge parity)', () => {
+                render(
+                    <DetailsPanel
+                        {...defaultProps}
+                        selectedNode={ptw}
+                        activeNodes={[ptw, shai, harms, toKill]}
+                        detailsCache={detailsCache}
+                        seedArtists={['Poison The Well']}
+                        scenes={multiScenes}
+                        isMagazineViewOpen={true}
+                    />
+                );
+
+                const rootBadges = screen.getAllByText('ROOT');
+                expect(rootBadges.length).toBe(3);
+            });
+
+            it('suppresses SCENE badge when project has only 1 populated scene', () => {
+                render(
+                    <DetailsPanel
+                        {...defaultProps}
+                        selectedNode={ptw}
+                        activeNodes={[ptw, shai]}
+                        detailsCache={detailsCache}
+                        seedArtists={['Poison The Well']}
+                        scenes={[multiScenes[0]]}
+                        isMagazineViewOpen={true}
+                    />
+                );
+
+                expect(screen.queryByText(/^SCENE/)).not.toBeInTheDocument();
+            });
+        });
     });
 });
 

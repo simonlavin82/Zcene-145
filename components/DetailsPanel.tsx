@@ -2,9 +2,9 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, ProjectScene, COST_PER_AI_CALL } from '../types';
-import { stripSceneNamespace, toSeedArtistsArray } from '../shared/multiSceneUtils';
+import { stripSceneNamespace, toSeedArtistsArray, normalizeCanonicalEntityId } from '../shared/multiSceneUtils';
 import { streamNodeChat, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
-import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch, stripCountrySlug } from '../services/artistCacheService';
+import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch, stripCountrySlug } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon, BandcampIcon } from './Icons';
 import { TokenConfirmationDialog, PROFILE_COLORS, MODAL_PROFILE_COLORS } from './SharedModals';
@@ -287,6 +287,7 @@ interface NodeDetailsCardProps {
   onStashArtist?: (artistName: string) => void;
   onOpenStackDrawer?: () => void;
   isStaticMockup?: boolean;
+  scenes?: ProjectScene[];
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -450,7 +451,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
   onTogglePin, isPinned, pinSequence, onNodeClick, onNavigate, 
   chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, hasActiveDeepWebSession = false, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, onAddToStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer,
-  isStaticMockup = false
+  isStaticMockup = false, scenes
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
         if (!user) {
@@ -796,10 +797,71 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const normalizedArtistNodeId = isArtistNode ? normalizeArtistId(resolvedArtistName) : '';
 
     const isLibraryArtist = isArtistNode && libraryArtistSet.has(normalizedArtistNodeId);
-    const isSeedArtist = isArtistNode && (
-        Boolean(node.isSceneSeed) ||
-        isNodeInSeedList(stripSceneNamespace(node.canonicalId || node.id || node.label || ''), seedArtists)
-    );
+    
+    // Guardrail 2: Multi-Scene ROOT Badge Parity
+    // Ensure that in a multi-scene project, any artist that is a seed of ANY populated scene
+    // (s.seedIds, s.curatedSeedArtists, s.seedArtists, or n.isSceneSeed || n.isSeed) receives isSeedArtist = true.
+    const isSeedArtist = useMemo(() => {
+        if (!isArtistNode) return false;
+        if (Boolean(node.isSceneSeed) || Boolean(node.isSeed)) return true;
+        const canon = stripSceneNamespace(node.canonicalId || node.id || node.label || '');
+        if (isNodeInSeedList(canon, seedArtists)) return true;
+        if (scenes && Array.isArray(scenes)) {
+            return scenes.some(s => {
+                const sSeeds = s.seedIds?.length
+                    ? s.seedIds
+                    : s.seedArtistIds?.length
+                        ? s.seedArtistIds
+                        : toSeedArtistsArray(s.curatedSeedArtists || s.seedArtists);
+                return isNodeInSeedList(canon, sSeeds);
+            });
+        }
+        return false;
+    }, [isArtistNode, node, seedArtists, scenes]);
+
+    // Ordering A / Multi-Scene Membership Indicator ([Rule 29], [Rule 44])
+    // Emits SCENE 1, SCENE 2, SCENE 1 & 2, SCENE 1, 2 & 3 based on presence in scenes[i].graphData.nodes.
+    // Suppressed on single-scene projects (populatedScenes.length < 2) to eliminate visual noise.
+    const sceneMembershipLabel = useMemo(() => {
+        if (!scenes || !Array.isArray(scenes)) return null;
+        const populatedScenes = scenes.filter(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+        if (populatedScenes.length < 2) return null;
+
+        const targetCanon = stripSceneNamespace(node.canonicalId || node.id).toLowerCase();
+        const targetNorm = normalizeCanonicalEntityId(targetCanon);
+        const targetLabel = (node.label || '').toLowerCase().trim();
+        const isLabel = node.type === 'label';
+
+        const memberIndices: number[] = [];
+
+        populatedScenes.forEach((scene, idx) => {
+            const sceneNodes = scene?.graphData?.nodes || [];
+            const isPresent = sceneNodes.some(sn => {
+                const snCanon = stripSceneNamespace(sn.canonicalId || sn.id).toLowerCase();
+                const snNorm = normalizeCanonicalEntityId(snCanon);
+                const snLabel = (sn.label || '').toLowerCase().trim();
+
+                if (snCanon === targetCanon || (targetNorm && snNorm === targetNorm)) return true;
+                if (targetLabel && snLabel && targetLabel === snLabel) return true;
+                if (isLabel && sn.type === 'label') {
+                    return normalizeLabelId(sn.label || snCanon) === normalizeLabelId(node.label || targetCanon);
+                }
+                return false;
+            });
+
+            if (isPresent) {
+                const displayNum = typeof scene.sceneIndex === 'number' ? scene.sceneIndex + 1 : idx + 1;
+                if (!memberIndices.includes(displayNum)) memberIndices.push(displayNum);
+            }
+        });
+
+        if (memberIndices.length === 0) return null;
+        memberIndices.sort((a, b) => a - b);
+
+        if (memberIndices.length === 1) return `SCENE ${memberIndices[0]}`;
+        if (memberIndices.length === 2) return `SCENE ${memberIndices[0]} & ${memberIndices[1]}`;
+        return `SCENE ${memberIndices.slice(0, -1).join(', ')} & ${memberIndices[memberIndices.length - 1]}`;
+    }, [node, scenes]);
 
     const activeTasteProfilesData = useMemo(() => {
         if (!userTaste || !Array.isArray(userTaste) || !details) return [];
@@ -1149,6 +1211,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl">{node.type}</span>
                                 {isSeedArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-xl">ROOT</span>}
                                 {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl">LIBRARY</span>}
+                                {sceneMembershipLabel && (
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/60 border border-zinc-700/50 px-2 py-0.5 rounded-xl">
+                                        {sceneMembershipLabel}
+                                    </span>
+                                )}
                             </div>
                         </div>
                     </div>
@@ -2988,6 +3055,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 isActive={node.id === viewedNode?.id}
                                                 onStashArtist={onStashArtist}
                                                 onOpenStackDrawer={onOpenStackDrawer}
+                                                scenes={scenes}
                                                 isStaticMockup={isStaticMockup}
                                             />
                                         </div>

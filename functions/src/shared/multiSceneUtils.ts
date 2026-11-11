@@ -998,7 +998,7 @@ export function buildCompositeCanvasGraph(
       ? scene.seedIds
       : scene.seedArtistIds?.length
         ? scene.seedArtistIds
-        : toSeedArtistsArray(scene.seedArtists);
+        : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
 
     const rawNodes = scene.graphData?.nodes || [];
     const rawLinks = scene.graphData?.links || [];
@@ -1169,7 +1169,7 @@ export function computeDeduplicatedActiveNodes(scenes: ProjectScene[]): string[]
       ? scene.seedIds
       : scene.seedArtistIds?.length
         ? scene.seedArtistIds
-        : toSeedArtistsArray(scene.seedArtists);
+        : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
 
     // 1. Scene Seed Artists first
     for (const node of nodes) {
@@ -1225,60 +1225,94 @@ export function buildCanonicalDeduplicatedNodesFromScenes(scenes: ProjectScene[]
 
   const allProjectSeeds = getAllProjectSeedIds(scenes);
   const canonicalNodeMap = new Map<string, Node>();
-  const orderedKeys: string[] = [];
+  const orderedArtistKeys: string[] = [];
+  const orderedLabelKeys: string[] = [];
 
   const sortedScenes = [...scenes].sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
 
+  const registerNode = (rawNode: any, scene: ProjectScene, isArtist: boolean, isLabel: boolean) => {
+    if (!rawNode || !rawNode.id) return;
+    const canonId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
+    const norm = normalizeCanonicalEntityId(canonId);
+    if (!norm) return;
+
+    const isRootInAnyScene =
+      isArtist &&
+      (Boolean(rawNode.isSceneSeed) ||
+        Boolean(rawNode.isSeed) ||
+        isCanonicalSeedMatch(canonId, allProjectSeeds) ||
+        (rawNode.label ? isCanonicalSeedMatch(rawNode.label, allProjectSeeds) : false));
+
+    const snippet =
+      scene.artistSnippets?.[canonId] ||
+      scene.artistSnippets?.[norm] ||
+      rawNode.narrativeSnippet;
+
+    if (!canonicalNodeMap.has(norm)) {
+      if (isLabel) {
+        orderedLabelKeys.push(norm);
+      } else {
+        orderedArtistKeys.push(norm);
+      }
+      canonicalNodeMap.set(norm, {
+        ...rawNode,
+        id: canonId,
+        canonicalId: canonId,
+        sceneId: scene.sceneId || scene.id,
+        sceneIndex: scene.sceneIndex,
+        isSeed: isRootInAnyScene,
+        isSceneSeed: isRootInAnyScene,
+        ...(snippet ? { narrativeSnippet: snippet } : {}),
+      });
+    } else {
+      const existing = canonicalNodeMap.get(norm)!;
+      if (isRootInAnyScene && !existing.isSeed) {
+        existing.isSeed = true;
+        existing.isSceneSeed = true;
+      }
+      if (snippet && !existing.narrativeSnippet) {
+        existing.narrativeSnippet = snippet;
+      }
+    }
+  };
+
   for (const scene of sortedScenes) {
     const nodes = scene?.graphData?.nodes || [];
+    const seedList = scene.seedIds?.length
+      ? scene.seedIds
+      : scene.seedArtistIds?.length
+        ? scene.seedArtistIds
+        : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+
+    // 1. Scene Seed Artists first
     for (const rawNode of nodes) {
-      if (!rawNode || !rawNode.id) continue;
+      if (rawNode.type !== 'artist' && rawNode.type) continue;
       const canonId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
-      const norm = normalizeCanonicalEntityId(canonId);
-      if (!norm) continue;
+      const isSeed =
+        Boolean(rawNode.isSceneSeed) ||
+        Boolean(rawNode.isSeed) ||
+        isCanonicalSeedMatch(canonId, seedList) ||
+        (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false);
+      if (!isSeed) continue;
+      registerNode(rawNode, scene, true, false);
+    }
 
-      const isRootInAnyScene =
-        rawNode.type === 'artist' &&
-        (Boolean(rawNode.isSceneSeed) ||
-          Boolean(rawNode.isSeed) ||
-          isCanonicalSeedMatch(canonId, allProjectSeeds) ||
-          (rawNode.label ? isCanonicalSeedMatch(rawNode.label, allProjectSeeds) : false));
+    // 2. Scene Peer Artists second
+    for (const rawNode of nodes) {
+      if (rawNode.type !== 'artist' && rawNode.type) continue;
+      registerNode(rawNode, scene, true, false);
+    }
 
-      const snippet =
-        scene.artistSnippets?.[canonId] ||
-        scene.artistSnippets?.[norm] ||
-        rawNode.narrativeSnippet;
-
-      if (!canonicalNodeMap.has(norm)) {
-        orderedKeys.push(norm);
-        canonicalNodeMap.set(norm, {
-          ...rawNode,
-          id: canonId,
-          canonicalId: canonId,
-          sceneId: scene.sceneId || scene.id,
-          sceneIndex: scene.sceneIndex,
-          isSeed: isRootInAnyScene,
-          isSceneSeed: isRootInAnyScene,
-          ...(snippet ? { narrativeSnippet: snippet } : {}),
-        });
-      } else {
-        const existing = canonicalNodeMap.get(norm)!;
-        if (isRootInAnyScene && !existing.isSeed) {
-          existing.isSeed = true;
-          existing.isSceneSeed = true;
-        }
-        if (snippet && !existing.narrativeSnippet) {
-          existing.narrativeSnippet = snippet;
-        }
-      }
+    // 3. Scene Record Labels third
+    for (const rawNode of nodes) {
+      if (rawNode.type !== 'label') continue;
+      registerNode(rawNode, scene, false, true);
     }
   }
 
-  const allNodes = orderedKeys.map((k) => canonicalNodeMap.get(k)!);
-  const artistNodes = allNodes.filter((n) => n.type === 'artist' || !n.type);
-  const labelNodes = allNodes.filter((n) => n.type === 'label');
-  const otherNodes = allNodes.filter((n) => n.type && n.type !== 'artist' && n.type !== 'label');
-  return [...artistNodes, ...labelNodes, ...otherNodes];
+  const artistNodes = orderedArtistKeys.map((k) => canonicalNodeMap.get(k)!);
+  const labelNodes = orderedLabelKeys.map((k) => canonicalNodeMap.get(k)!);
+  return [...artistNodes, ...labelNodes];
 }
 
 export function getAllProjectSeedIds(scenes: ProjectScene[]): string[] {
