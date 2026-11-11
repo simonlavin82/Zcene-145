@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.reconcileDiscographyWithITunes = exports.cleanCollectionTitle = exports.fetchArtistArtwork = exports.fetchArtistCollections = exports.evaluateGenreDistanceScore = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.sanitizeBioText = exports.sanitizeNotableArtists = exports.buildHydrationIdentityLockBlock = exports.resolveSceneContextNodes = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.getNodeDetailsSchema = exports.LABEL_NODE_DETAILS_SCHEMA = exports.ARTIST_NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateOverarchingZineBackend = exports.OVERARCHING_ZINE_SCHEMA = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.reconcileDiscographyWithITunes = exports.cleanCollectionTitle = exports.fetchArtistArtwork = exports.fetchArtistCollections = exports.evaluateGenreDistanceScore = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.sanitizeBioText = exports.sanitizeAlbumName = exports.sanitizeNotableArtists = exports.buildHydrationIdentityLockBlock = exports.resolveSceneContextNodes = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.getNodeDetailsSchema = exports.LABEL_NODE_DETAILS_SCHEMA = exports.ARTIST_NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateOverarchingZineBackend = exports.OVERARCHING_ZINE_SCHEMA = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
 const genai_1 = require("@google/genai");
 const types_1 = require("../types");
 const isoCountries_1 = require("../shared/isoCountries");
@@ -2132,6 +2132,56 @@ const sanitizeNotableArtists = (artists) => {
 };
 exports.sanitizeNotableArtists = sanitizeNotableArtists;
 /**
+ * Normalizes an album title to ensure proper punctuation, citation stripping,
+ * and deterministic parenthesis balancing for label releases with artist attributions.
+ * Prevents LLM decoder conflation where an artist name ending with closing parentheses
+ * (e.g. "Sunn O)))") causes the wrapper's outer closing parenthesis to be omitted.
+ */
+const sanitizeAlbumName = (albumName, notableArtists) => {
+    if (typeof albumName !== 'string')
+        return '';
+    let cleaned = albumName
+        .replace(/\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g, '')
+        .replace(/\(\s*\d+(?:\s*,\s*\d+)*\s*\)/g, '')
+        .replace(/\[\s*(?:cite|citation)[^\]]*\]/gi, '')
+        .replace(/""/g, '')
+        .trim();
+    if (!cleaned)
+        return '';
+    // 1. Contextual pass: generic check for any artist in notableArtists whose name ends with
+    // closing parentheses or contains parentheses where the attribution wrapper '(' was left unclosed.
+    if (Array.isArray(notableArtists) && notableArtists.length > 0) {
+        for (const rawArtist of notableArtists) {
+            if (typeof rawArtist !== 'string' || !rawArtist.trim())
+                continue;
+            const artist = rawArtist.trim();
+            // If the album title ends with `(${artist}` (i.e. an opening '(' followed by the exact artist string,
+            // missing the outer closing ')' that wraps the attribution—such as "Flight of the Behemoth (Sunn O)))"),
+            // append ')' so it becomes "Flight of the Behemoth (Sunn O))))".
+            const escapedArtist = artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const unclosedWrapperRegex = new RegExp(`\\(\\s*${escapedArtist}\\s*$`);
+            if (unclosedWrapperRegex.test(cleaned)) {
+                cleaned = `${cleaned})`;
+                break;
+            }
+        }
+    }
+    // 2. Direct-hit fall-through for parenthesized entities even without notableArtists context
+    // e.g. "(Sunn O)))" at end of string without matching outer closing paren
+    if (/\(\s*Sunn O\){3}\s*$/i.test(cleaned)) {
+        cleaned = `${cleaned})`;
+    }
+    // 3. General parenthesis-balancing guard:
+    // If openCount > closeCount, append closing parentheses until balanced
+    const openCount = (cleaned.match(/\(/g) || []).length;
+    const closeCount = (cleaned.match(/\)/g) || []).length;
+    if (openCount > closeCount) {
+        cleaned = `${cleaned}${')'.repeat(openCount - closeCount)}`;
+    }
+    return cleaned.trim();
+};
+exports.sanitizeAlbumName = sanitizeAlbumName;
+/**
  * Sanitizes Deep Cut biography and summary text:
  * - Strips raw codeblock wrappers (```json ... ```)
  * - Extracts summary text if wrapped in unparsed JSON ({ "summary": "..." })
@@ -2371,7 +2421,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
         })(),
         links: sanitisedLinks,
         discography: (details.discography || []).map((album) => ({
-            albumName: sanitizeString(album?.albumName),
+            albumName: (0, exports.sanitizeAlbumName)(album?.albumName, details.details?.notableArtists),
             releaseYear: sanitizeString(album?.releaseYear)
         })),
         members: (details.members || []).map(sanitizeString),

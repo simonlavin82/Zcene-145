@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest';
 import {
   sanitizeBioText as backendSanitizeBioText,
   sanitizeNotableArtists as backendSanitizeNotableArtists,
+  sanitizeAlbumName as backendSanitizeAlbumName,
 } from '../src/services/curatorService';
 import {
   sanitizeBioText as frontendSanitizeBioText,
   sanitizeNotableArtists as frontendSanitizeNotableArtists,
+  sanitizeAlbumName as frontendSanitizeAlbumName,
 } from '../../services/geminiService';
+import { enforceArtistCacheSchema } from '../../services/artistCacheService';
 
 describe('Bio Scannability & Grounding Sanitization (curatorService & geminiService)', () => {
   describe('1. sanitizeBioText Lead-In Capitalization & Citation Trailing Space Removal', () => {
@@ -140,6 +143,107 @@ Key stylistic traits include:
       expect(backendSanitizeNotableArtists(undefined)).toEqual([]);
       expect(backendSanitizeNotableArtists([])).toEqual([]);
       expect(backendSanitizeNotableArtists('Not an array' as any)).toEqual([]);
+    });
+  });
+
+  describe('4. sanitizeAlbumName Algorithmic Parenthesis Balancing & Normalization', () => {
+    it('normalizes Southern Lord Sunn O))) release to 4 closing parentheses with notableArtists context', () => {
+      const rawTitle = 'Flight of the Behemoth (Sunn O)))';
+      const notable = ['Sunn O)))', 'Earth', 'Boris', 'Power Trip'];
+
+      const cleanedBackend = backendSanitizeAlbumName(rawTitle, notable);
+      const cleanedFrontend = frontendSanitizeAlbumName(rawTitle, notable);
+
+      expect(cleanedBackend).toBe('Flight of the Behemoth (Sunn O))))');
+      expect(cleanedFrontend).toBe('Flight of the Behemoth (Sunn O))))');
+    });
+
+    it('normalizes Southern Lord Sunn O))) release even without notableArtists context', () => {
+      const rawTitle = 'Flight of the Behemoth (Sunn O)))';
+
+      const cleanedBackend = backendSanitizeAlbumName(rawTitle);
+      const cleanedFrontend = frontendSanitizeAlbumName(rawTitle);
+
+      expect(cleanedBackend).toBe('Flight of the Behemoth (Sunn O))))');
+      expect(cleanedFrontend).toBe('Flight of the Behemoth (Sunn O))))');
+    });
+
+    it('leaves already properly balanced 4-parentheses Sunn O)))) releases untouched', () => {
+      const balancedTitle = 'Flight of the Behemoth (Sunn O))))';
+      const notable = ['Sunn O)))'];
+
+      expect(backendSanitizeAlbumName(balancedTitle, notable)).toBe('Flight of the Behemoth (Sunn O))))');
+      expect(frontendSanitizeAlbumName(balancedTitle, notable)).toBe('Flight of the Behemoth (Sunn O))))');
+    });
+
+    it('leaves standard balanced releases completely untouched', () => {
+      const release1 = 'HEX; Or Printing in the Infernal Method (Earth)';
+      const release2 = 'Manifest Decimation (Power Trip)';
+
+      expect(backendSanitizeAlbumName(release1, ['Earth'])).toBe(release1);
+      expect(backendSanitizeAlbumName(release2, ['Power Trip'])).toBe(release2);
+      expect(frontendSanitizeAlbumName(release1, ['Earth'])).toBe(release1);
+      expect(frontendSanitizeAlbumName(release2, ['Power Trip'])).toBe(release2);
+    });
+
+    it('balances generic unclosed parentheses when openCount > closeCount', () => {
+      const unclosedTitle = 'Live at the Roadburn Festival (Special Edition';
+      expect(backendSanitizeAlbumName(unclosedTitle)).toBe('Live at the Roadburn Festival (Special Edition)');
+      expect(frontendSanitizeAlbumName(unclosedTitle)).toBe('Live at the Roadburn Festival (Special Edition)');
+    });
+
+    it('balances parenthetical attributions for artists with parentheses like (hed) p.e.', () => {
+      const rawTitle = 'Broke ((hed) p.e.';
+      const notable = ['(hed) p.e.'];
+      expect(backendSanitizeAlbumName(rawTitle, notable)).toBe('Broke ((hed) p.e.)');
+      expect(frontendSanitizeAlbumName(rawTitle, notable)).toBe('Broke ((hed) p.e.)');
+    });
+  });
+
+  describe('5. Systemic Label imageUrl: null Enforcement in Schema Enforcement', () => {
+    it('forces imageUrl to null for label payload in enforceArtistCacheSchema', () => {
+      const labelPayload = {
+        type: 'label',
+        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/2/23/Roadrunner_Records_logo.svg',
+        detailsCache: {
+          summary: 'Roadrunner Records bio...',
+          imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/2/23/Roadrunner_Records_logo.svg',
+          details: {
+            genre: 'Heavy Metal',
+            origin: 'New York',
+            founded: '1980',
+            notableArtists: ['Slipknot', 'Sepultura']
+          }
+        }
+      };
+
+      enforceArtistCacheSchema(labelPayload);
+
+      expect(labelPayload.imageUrl).toBeNull();
+      expect(labelPayload.detailsCache.imageUrl).toBeNull();
+    });
+
+    it('forces imageUrl to null for labelId payload in enforceArtistCacheSchema', () => {
+      const labelPayload = {
+        labelId: 'pure-noise',
+        imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Pure_Noise_Records_logo.svg/1200px-Pure_Noise_Records_logo.svg.png',
+        detailsCache: JSON.stringify({
+          summary: 'Pure Noise Records bio...',
+          imageUrl: 'https://upload.wikimedia.org/wikipedia/commons/thumb/d/d9/Pure_Noise_Records_logo.svg/1200px-Pure_Noise_Records_logo.svg.png',
+          details: {
+            genre: 'Punk',
+            origin: 'Berkeley, CA',
+            founded: '2009',
+            notableArtists: ['Knocked Loose']
+          }
+        })
+      };
+
+      enforceArtistCacheSchema(labelPayload);
+
+      expect(labelPayload.imageUrl).toBeNull();
+      const parsed = JSON.parse(labelPayload.detailsCache as string);
+      expect(parsed.imageUrl).toBeNull();
     });
   });
 });

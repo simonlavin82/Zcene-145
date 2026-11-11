@@ -18,7 +18,8 @@ import {
   generateSemanticLinkWeights,
   cleanArtistDisplayName,
   cleanLabelDisplayName,
-  sanitizeNotableArtists
+  sanitizeNotableArtists,
+  sanitizeAlbumName
 } from "./services/curatorService";
 import {
   hasActiveDiscoveryFilters,
@@ -211,7 +212,12 @@ function sanitizeLabelProfile(details: any): any {
     summary: parsed.summary || parsed.bio || parsed.description || "",
     imageUrl: null,
     details: cleanDetails,
-    discography: Array.isArray(parsed.discography) ? parsed.discography : [],
+    discography: Array.isArray(parsed.discography)
+      ? parsed.discography.map((album: any) => ({
+          albumName: sanitizeAlbumName(album?.albumName, cleanDetails.notableArtists),
+          releaseYear: typeof album?.releaseYear === 'string' ? album.releaseYear.trim() : String(album?.releaseYear || '')
+        }))
+      : [],
     links: Array.isArray(parsed.links) ? parsed.links : [],
     recommendationReason: parsed.recommendationReason || "",
   };

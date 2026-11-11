@@ -827,6 +827,7 @@ LOCKED SEMANTIC TOPOLOGY (Rule 21):
                             title="JIT Asset Telemetry & Circuit Breaker Contract (Rule 37)" 
                             content={`EMERGENCY PARACHUTE SPECIFICATION (healOrphanedAsset.ts):
 - Trigger: Inspected node suffering a true 404 miss during live canvas exploration or eager hydration.
+- Direct Delegation Parity: healOrphanedAsset delegates directly to fetchNodeDetailsBackend (curatorService.ts), guaranteeing 100% prompt, schema, bio scannability, anti-clumping, and zero-hallucination sanitizer parity with Column 3 batch hydration while recording granular token usage via usageCollector.
 - Anti-Sweep Law: Automated background cron sweeps, scheduled cloud tasks, or janitorial scanners are strictly prohibited. Stale data (>365d) never triggers JIT healing.
 - In-Flight Memory Lock: Concurrent requests for identical slugs are deduplicated via inFlightHealsRef.
 - Circuit Breaker: Hard kill switch trips if > 100 heals occur within a rolling 24-hour window.

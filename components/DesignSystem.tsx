@@ -944,11 +944,31 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
-                            <div className="p-8 border border-primary/20 bg-primary/5 rounded-xl">
-                                <h4 className="text-sm font-semibold text-primary uppercase tracking-widest mb-4">Architecture Rule: Markdown Preservation</h4>
+                            <div className="p-8 border border-primary/20 bg-primary/5 rounded-xl space-y-4">
+                                <h4 className="text-sm font-semibold text-primary uppercase tracking-widest">Architecture Rule: Markdown Preservation &amp; Bio Scannability</h4>
                                 <p className="text-sm text-zinc-300 leading-relaxed">
                                     To achieve this native formatting, the backend sanitization pipeline (<code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">sanitizeBioText</code>) MUST preserve standard Markdown elements (such as <code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">**</code> for bolding and literal newlines for paragraph/list breaks) within the payload before saving to Firestore. Stripping these markers at the data layer will permanently break the frontend's ability to render structural chunking via the <code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">&lt;Markdown&gt;</code> component and the <code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">.markdown-bio</code> CSS class.
                                 </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                                    <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-1.5">
+                                        <h5 className="text-xs font-semibold text-white">Adaptive Bullet Unpacking</h5>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            Adaptive depth (2–4 bullets based strictly on verified ground truth; never padded with filler). Clumped single bullets are deterministically unpacked into separate capitalized bullet points.
+                                        </p>
+                                    </div>
+                                    <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-1.5">
+                                        <h5 className="text-xs font-semibold text-white">Lead-In Capitalization</h5>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            Citation brackets are stripped cleanly while consuming trailing spaces, and bullet lead-in lines (<code className="text-[10px] font-mono text-primary">Key stylistic traits include:</code>) deterministically retain initial capitalization.
+                                        </p>
+                                    </div>
+                                    <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-1.5">
+                                        <h5 className="text-xs font-semibold text-white">Zero-Hallucination Grounding</h5>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            Strict deterministic filters (<code className="text-[10px] font-mono text-zinc-300">sanitizeNotableArtists</code>) strip sentence pills and category descriptors, while <code className="text-[10px] font-mono text-zinc-300">members</code> enforcement bans guest musicians and touring mates.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </section>

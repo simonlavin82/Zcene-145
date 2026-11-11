@@ -78,7 +78,44 @@ function cleanSummaryText(summary) {
   return text.trim();
 }
 
-function cleanProfile(key, profile) {
+function sanitizeAlbumName(albumName, notableArtists) {
+  if (typeof albumName !== 'string') return '';
+  let cleaned = albumName
+    .replace(/\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g, '')
+    .replace(/\(\s*\d+(?:\s*,\s*\d+)*\s*\)/g, '')
+    .replace(/\[\s*(?:cite|citation)[^\]]*\]/gi, '')
+    .replace(/""/g, '')
+    .trim();
+
+  if (!cleaned) return '';
+
+  if (Array.isArray(notableArtists) && notableArtists.length > 0) {
+    for (const rawArtist of notableArtists) {
+      if (typeof rawArtist !== 'string' || !rawArtist.trim()) continue;
+      const artist = rawArtist.trim();
+      const escapedArtist = artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const unclosedWrapperRegex = new RegExp(`\\(\\s*${escapedArtist}\\s*$`);
+      if (unclosedWrapperRegex.test(cleaned)) {
+        cleaned = `${cleaned})`;
+        break;
+      }
+    }
+  }
+
+  if (/\(\s*Sunn O\){3}\s*$/i.test(cleaned)) {
+    cleaned = `${cleaned})`;
+  }
+
+  const openCount = (cleaned.match(/\(/g) || []).length;
+  const closeCount = (cleaned.match(/\)/g) || []).length;
+  if (openCount > closeCount) {
+    cleaned = `${cleaned}${')'.repeat(openCount - closeCount)}`;
+  }
+
+  return cleaned.trim();
+}
+
+function cleanProfile(key, profile, isLabel = false) {
   if (!profile || typeof profile !== 'object') return { profile, changed: false };
   let changed = false;
   const updated = JSON.parse(JSON.stringify(profile));
@@ -118,10 +155,39 @@ function cleanProfile(key, profile) {
     }
   }
 
+  // 4. Systemic Label imageUrl: null enforcement
+  if (isLabel) {
+    if (updated.imageUrl !== null) {
+      updated.imageUrl = null;
+      changed = true;
+    }
+    if (updated.details && 'imageUrl' in updated.details && updated.details.imageUrl !== null) {
+      updated.details.imageUrl = null;
+      changed = true;
+    }
+  }
+
+  // 5. Discography normalization & parenthesis balancing
+  if (Array.isArray(updated.discography)) {
+    const notable = updated.details?.notableArtists;
+    const origDisc = JSON.stringify(updated.discography);
+    updated.discography = updated.discography.map(item => {
+      if (!item || typeof item !== 'object') return item;
+      return {
+        ...item,
+        albumName: sanitizeAlbumName(item.albumName, notable),
+        releaseYear: typeof item.releaseYear === 'string' ? item.releaseYear.trim() : String(item.releaseYear || '')
+      };
+    });
+    if (JSON.stringify(updated.discography) !== origDisc) {
+      changed = true;
+    }
+  }
+
   return { profile: updated, changed };
 }
 
-async function cleanUserProjects(userId) {
+async function cleanUserProjects(userId, labelSet) {
   console.log(`\n--- Inspecting Projects for user: ${userId} ---`);
   const projectsRef = db.collection(`users/${userId}/projects`);
   const snapshot = await projectsRef.get();
@@ -147,22 +213,35 @@ async function cleanUserProjects(userId) {
     let projectChanged = false;
     let newCache;
 
+    const checkIsLabel = (key, val) => {
+      const k = String(key || '').toLowerCase();
+      if (labelSet && (labelSet.has(k) || labelSet.has(k.replace(/(?:-(?:records|recordings|music|company|entertainment|group|productions|inc|ltd))+$/, '')))) {
+        return true;
+      }
+      if (val?.type === 'label' || val?.details?.type === 'label') return true;
+      if (k.includes('records') || k.includes('recordings')) return true;
+      if (val?.details && val.details.style === undefined && Array.isArray(val.details.notableArtists)) return true;
+      return false;
+    };
+
     if (Array.isArray(cacheObj)) {
       newCache = cacheObj.map(([k, v]) => {
-        const { profile, changed } = cleanProfile(k, v);
+        const isLabel = checkIsLabel(k, v);
+        const { profile, changed } = cleanProfile(k, v, isLabel);
         if (changed) {
           projectChanged = true;
-          console.log(`  [Project ${doc.id}] Modified cache entry: ${k}`);
+          console.log(`  [Project ${doc.id}] Modified cache entry: ${k} (isLabel: ${isLabel})`);
         }
         return [k, profile];
       });
     } else if (cacheObj && typeof cacheObj === 'object') {
       newCache = {};
       for (const [k, v] of Object.entries(cacheObj)) {
-        const { profile, changed } = cleanProfile(k, v);
+        const isLabel = checkIsLabel(k, v);
+        const { profile, changed } = cleanProfile(k, v, isLabel);
         if (changed) {
           projectChanged = true;
-          console.log(`  [Project ${doc.id}] Modified cache entry: ${k}`);
+          console.log(`  [Project ${doc.id}] Modified cache entry: ${k} (isLabel: ${isLabel})`);
         }
         newCache[k] = profile;
       }
@@ -186,6 +265,7 @@ async function cleanCollection(collectionName) {
   const snapshot = await colRef.get();
   console.log(`Found ${snapshot.docs.length} documents in /${collectionName}.`);
 
+  const isLabelCollection = collectionName === 'labels';
   let updatedCount = 0;
   let skippedStubs = 0;
 
@@ -210,13 +290,19 @@ async function cleanCollection(collectionName) {
       }
     }
 
-    const { profile, changed } = cleanProfile(doc.id, cacheObj);
-    if (changed) {
-      await doc.ref.update({
+    const { profile, changed } = cleanProfile(doc.id, cacheObj, isLabelCollection);
+    const rootNeedsImageNull = isLabelCollection && data.imageUrl !== null && data.imageUrl !== undefined;
+
+    if (changed || rootNeedsImageNull) {
+      const updateData = {
         detailsCache: isString ? JSON.stringify(profile) : profile,
         updatedAt: FieldValue.serverTimestamp(),
-      });
-      console.log(`✅ Updated ${collectionName}/${doc.id}`);
+      };
+      if (isLabelCollection) {
+        updateData.imageUrl = null;
+      }
+      await doc.ref.update(updateData);
+      console.log(`✅ Updated ${collectionName}/${doc.id}${rootNeedsImageNull ? ' (enforced root imageUrl: null)' : ''}`);
       updatedCount++;
     }
   }
@@ -230,9 +316,14 @@ async function main() {
   console.log("EXECUTING COMPREHENSIVE FIRESTORE SANITIZATION & CACHE CLEANUP");
   console.log("===============================================================");
 
+  // Pre-load all label IDs for cross-referencing project cache entries
+  const labelDocs = await db.collection('labels').get();
+  const labelSet = new Set(labelDocs.docs.map(d => d.id.toLowerCase()));
+  console.log(`Loaded ${labelSet.size} canonical label IDs into memory.`);
+
   let totalProjectsUpdated = 0;
   for (const uid of TARGET_USERS) {
-    totalProjectsUpdated += await cleanUserProjects(uid);
+    totalProjectsUpdated += await cleanUserProjects(uid, labelSet);
   }
 
   const artistsUpdated = await cleanCollection('artists');

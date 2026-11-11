@@ -2801,6 +2801,7 @@ const App: React.FC = () => {
     );
     if (isFinalEntryComplete || isGuest) {
        const fallbackSummary = cachedDetails?.summary || "";
+       const isLabelNode = node.type === 'label' || (cachedDetails as any)?.type === 'label' || (cachedDetails?.details as any)?.type === 'label';
        const hydratedNode = {
           ...node,
           bio: fallbackSummary,
@@ -2809,7 +2810,7 @@ const App: React.FC = () => {
           origin: cachedDetails?.details?.origin || "",
           founded: cachedDetails?.details?.founded || "",
           name: cachedDetails?.details?.artist || node.label || canonicalNodeId,
-          imageUrl: cachedDetails?.imageUrl || (cachedDetails as any)?.image || (node as any).imageUrl || "",
+          imageUrl: isLabelNode ? null : (cachedDetails?.imageUrl || (cachedDetails as any)?.image || (node as any).imageUrl || ""),
           isLibrary: true
        };
        
@@ -6413,8 +6414,9 @@ const App: React.FC = () => {
         // Parse the detailsCache safely
         let parsed: any = parseDetailsCacheSafely(data.detailsCache);
 
+        const isLabel = n.type === 'label';
         const bio = parsed?.summary || parsed?.bio || parsed?.description || parsed?.text || '';
-        const imageUrl = parsed?.imageUrl || parsed?.image || '';
+        const imageUrl = isLabel ? null : (parsed?.imageUrl || parsed?.image || '');
         const genre = parsed?.details?.genre || parsed?.genre || parsed?.genres || '';
         const style = parsed?.details?.style || parsed?.style || '';
         const origin = parsed?.details?.origin || parsed?.origin || parsed?.location || parsed?.country || '';
@@ -6448,7 +6450,7 @@ const App: React.FC = () => {
 
         const payload: NodeDetails = {
           summary: bio,
-          imageUrl,
+          imageUrl: isLabel ? null : imageUrl,
           details: { artist: artistName, genre, style, origin, founded, notableArtists },
           members,
           links,

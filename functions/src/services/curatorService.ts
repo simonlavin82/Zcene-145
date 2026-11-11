@@ -2364,6 +2364,60 @@ export const sanitizeNotableArtists = (artists: any): string[] => {
 };
 
 /**
+ * Normalizes an album title to ensure proper punctuation, citation stripping,
+ * and deterministic parenthesis balancing for label releases with artist attributions.
+ * Prevents LLM decoder conflation where an artist name ending with closing parentheses
+ * (e.g. "Sunn O)))") causes the wrapper's outer closing parenthesis to be omitted.
+ */
+export const sanitizeAlbumName = (albumName: any, notableArtists?: string[]): string => {
+  if (typeof albumName !== 'string') return '';
+
+  let cleaned = albumName
+    .replace(/\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g, '')
+    .replace(/\(\s*\d+(?:\s*,\s*\d+)*\s*\)/g, '')
+    .replace(/\[\s*(?:cite|citation)[^\]]*\]/gi, '')
+    .replace(/""/g, '')
+    .trim();
+
+  if (!cleaned) return '';
+
+  // 1. Contextual pass: generic check for any artist in notableArtists whose name ends with
+  // closing parentheses or contains parentheses where the attribution wrapper '(' was left unclosed.
+  if (Array.isArray(notableArtists) && notableArtists.length > 0) {
+    for (const rawArtist of notableArtists) {
+      if (typeof rawArtist !== 'string' || !rawArtist.trim()) continue;
+      const artist = rawArtist.trim();
+
+      // If the album title ends with `(${artist}` (i.e. an opening '(' followed by the exact artist string,
+      // missing the outer closing ')' that wraps the attribution—such as "Flight of the Behemoth (Sunn O)))"),
+      // append ')' so it becomes "Flight of the Behemoth (Sunn O))))".
+      const escapedArtist = artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const unclosedWrapperRegex = new RegExp(`\\(\\s*${escapedArtist}\\s*$`);
+      if (unclosedWrapperRegex.test(cleaned)) {
+        cleaned = `${cleaned})`;
+        break;
+      }
+    }
+  }
+
+  // 2. Direct-hit fall-through for parenthesized entities even without notableArtists context
+  // e.g. "(Sunn O)))" at end of string without matching outer closing paren
+  if (/\(\s*Sunn O\){3}\s*$/i.test(cleaned)) {
+    cleaned = `${cleaned})`;
+  }
+
+  // 3. General parenthesis-balancing guard:
+  // If openCount > closeCount, append closing parentheses until balanced
+  const openCount = (cleaned.match(/\(/g) || []).length;
+  const closeCount = (cleaned.match(/\)/g) || []).length;
+  if (openCount > closeCount) {
+    cleaned = `${cleaned}${')'.repeat(openCount - closeCount)}`;
+  }
+
+  return cleaned.trim();
+};
+
+/**
  * Sanitizes Deep Cut biography and summary text:
  * - Strips raw codeblock wrappers (```json ... ```)
  * - Extracts summary text if wrapped in unparsed JSON ({ "summary": "..." })
@@ -2642,7 +2696,7 @@ export const fetchNodeDetailsBackend = async (
     })(),
     links: sanitisedLinks,
     discography: (details.discography || []).map((album: any) => ({
-      albumName: sanitizeString(album?.albumName),
+      albumName: sanitizeAlbumName(album?.albumName, details.details?.notableArtists),
       releaseYear: sanitizeString(album?.releaseYear)
     })),
     members: (details.members || []).map(sanitizeString),

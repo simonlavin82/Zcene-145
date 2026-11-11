@@ -50,7 +50,7 @@ const hslToRgb = (h: number, s: number, l: number): [number, number, number] => 
 };
 
 export const extractDominantColor = async (imageUrl?: string, fallbackName?: string): Promise<string> => {
-  if (!imageUrl || imageUrl === 'not-found') {
+  if (!imageUrl || imageUrl === 'not-found' || typeof imageUrl !== 'string' || !imageUrl.trim() || !imageUrl.startsWith('http')) {
     return getFallbackAccentColor(fallbackName || '');
   }
 

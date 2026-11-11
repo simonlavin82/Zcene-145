@@ -770,11 +770,12 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const imgRef = useRef<HTMLImageElement>(null);
 
     const currentImageUrl = useMemo(() => {
+        if (isLabelNode) return null;
         if (imageTier === 'source' && details?.imageUrl) {
             return details.imageUrl;
         }
         return null;
-    }, [imageTier, details?.imageUrl]);
+    }, [isLabelNode, imageTier, details?.imageUrl]);
 
     const localDominantColor = useDominantColor(currentImageUrl, node.label || node.id || '');
 
@@ -2462,7 +2463,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const viewedNodeDetails = viewedNode 
         ? (detailsCache.get(viewedNode.id) || detailsCache.get(viewedNode.id.toLowerCase()) || detailsCache.get(normalizeArtistId(viewedNode.id)) || null)
         : null;
-    const viewedNodeImageUrl = viewedNodeDetails?.imageUrl || (viewedNodeDetails?.details as any)?.imageUrl || undefined;
+    const viewedNodeIsLabel = viewedNode?.type === 'label' || (viewedNodeDetails as any)?.type === 'label' || (viewedNodeDetails?.details as any)?.type === 'label';
+    const viewedNodeImageUrl = viewedNodeIsLabel ? undefined : (viewedNodeDetails?.imageUrl || (viewedNodeDetails?.details as any)?.imageUrl || undefined);
     const dominantColor = useDominantColor(viewedNodeImageUrl, viewedNode?.label || viewedNode?.id || '');
 
     const isProfileGenuinelyDisplayed = useMemo(() => {

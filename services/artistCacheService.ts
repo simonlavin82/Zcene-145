@@ -19,7 +19,7 @@ import {
   ISO_TO_COUNTRY_NAME,
 } from '../shared/isoCountries';
 import { stripSceneNamespace } from '../shared/multiSceneUtils';
-import { sanitizeNotableArtists } from './geminiService';
+import { sanitizeNotableArtists, sanitizeAlbumName } from './geminiService';
 
 // ─── JIT ASSET HEALER DEDUPLICATION & COOLDOWN (V22) ──────────────────────────
 const healingInFlight = new Set<string>();
@@ -1526,13 +1526,18 @@ export const sanitizeLabelProfile = (details: any): any => {
     genre: parsed.details?.genre || null,
     origin: parsed.details?.origin || null,
     founded: parsed.details?.founded || null,
-    notableArtists: parsed.details?.notableArtists || [],
+    notableArtists: sanitizeNotableArtists(parsed.details?.notableArtists),
   };
   return {
     summary: parsed.summary || parsed.bio || parsed.description || "",
     imageUrl: null,
     details: cleanDetails,
-    discography: Array.isArray(parsed.discography) ? parsed.discography : [],
+    discography: Array.isArray(parsed.discography)
+      ? parsed.discography.map((album: any) => ({
+          albumName: sanitizeAlbumName(album?.albumName, cleanDetails.notableArtists),
+          releaseYear: typeof album?.releaseYear === 'string' ? album.releaseYear.trim() : String(album?.releaseYear || '')
+        }))
+      : [],
     links: Array.isArray(parsed.links) ? parsed.links : [],
     recommendationReason: parsed.recommendationReason || "",
   };
@@ -1545,6 +1550,23 @@ export const sanitizeLabelProfile = (details: any): any => {
 export const enforceArtistCacheSchema = (payload: any): void => {
   if (!payload) return;
   if (payload.redirectTo) return;
+
+  const isLabel = payload.type === 'label' || !!payload.labelId || (typeof payload.cacheKey === 'string' && payload.cacheKey.startsWith('label:'));
+  if (isLabel) {
+    payload.imageUrl = null;
+    if (payload.detailsCache) {
+      try {
+        const parsed = typeof payload.detailsCache === 'string' ? JSON.parse(payload.detailsCache) : payload.detailsCache;
+        if (parsed && typeof parsed === 'object') {
+          parsed.imageUrl = null;
+          payload.detailsCache = typeof payload.detailsCache === 'string' ? JSON.stringify(parsed) : parsed;
+        }
+      } catch (e) {
+        // Ignore parse error on malformed label cache
+      }
+    }
+    return;
+  }
 
   const isDeep = payload.isDeep === true;
 
