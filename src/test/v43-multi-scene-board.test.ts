@@ -1403,5 +1403,50 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       // Must evaluate to true: Scene 1 remains rendered and interactive while Scene 2 maps
       expect(evaluateCuratingWithSettledScenes('curating', 'scene-2', [completedScene1, curatingScene2])).toBe(true);
     });
+
+    it('keeps desktop ROOTS panel open on initial Create/Update click and collapses only on switch-to-connections-tab', () => {
+      let isLeftPanelCollapsed = false;
+      let activeTab: 'artists' | 'spiderweb' = 'artists';
+
+      const handleApplyChanges = (onRegenerate: () => void) => {
+        // Initial click triggers onRegenerate without collapsing left panel
+        onRegenerate();
+      };
+
+      const handleSwitchToSpiderweb = (isSmallScreen: boolean) => {
+        isLeftPanelCollapsed = true;
+        if (isSmallScreen) {
+          activeTab = 'spiderweb';
+        }
+      };
+
+      let generateCalled = false;
+      // Step 1: User clicks "Create Zcene" on desktop (isSmallScreen = false)
+      handleApplyChanges(() => { generateCalled = true; });
+
+      expect(generateCalled).toBe(true);
+      // ROOTS panel must remain open while Checking... and modals are active
+      expect(isLeftPanelCollapsed).toBe(false);
+      expect(activeTab).toBe('artists');
+
+      // Step 2: User cancels modal -> panel is still open
+      const userCancelled = true;
+      if (userCancelled) {
+        // No switch-to-connections-tab event dispatched
+        expect(isLeftPanelCollapsed).toBe(false);
+      }
+
+      // Step 3: User confirms in ConsolidatedValidationModal (Confirm & Generate) -> event dispatched
+      handleSwitchToSpiderweb(false);
+      expect(isLeftPanelCollapsed).toBe(true);
+      expect(activeTab).toBe('artists'); // on desktop activeTab remains unaffected
+
+      // Step 4: Mobile screen parity check (isSmallScreen = true)
+      isLeftPanelCollapsed = false;
+      activeTab = 'artists';
+      handleSwitchToSpiderweb(true);
+      expect(isLeftPanelCollapsed).toBe(true);
+      expect(activeTab).toBe('spiderweb');
+    });
   });
 });

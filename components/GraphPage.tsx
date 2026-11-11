@@ -1370,9 +1370,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   useEffect(() => {
     const handleSwitchToSpiderweb = () => {
+      setIsLeftPanelCollapsed(true);
       if (isSmallScreen) {
         setActiveTab('spiderweb');
-        setIsLeftPanelCollapsed(true);
       }
     };
     window.addEventListener('switch-to-connections-tab', handleSwitchToSpiderweb);
@@ -1747,8 +1747,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
     }
 
     onRegenerate(newSeed);
-    
-    if (!isSmallScreen) setIsLeftPanelCollapsed(true);
     if (!onboardingProgress.step2) updateOnboarding('step2');
   };
   
@@ -2475,13 +2473,11 @@ const GraphPage: React.FC<GraphPageProps> = ({
             onOverwrite={() => {
                 setIsUpdateModalOpen(false);
                 onRegenerate(pendingUpdateSeed);
-                if (!isSmallScreen) setIsLeftPanelCollapsed(true);
                 if (!onboardingProgress.step2) updateOnboarding('step2');
             }}
             onSaveAsNew={() => {
                 setIsUpdateModalOpen(false);
                 if (onFork) onFork(pendingUpdateSeed);
-                if (!isSmallScreen) setIsLeftPanelCollapsed(true);
                 if (!onboardingProgress.step2) updateOnboarding('step2');
             }}
         />
