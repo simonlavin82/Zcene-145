@@ -811,7 +811,7 @@ LINK DISTANCES & STIFFNESS:
 - Artist <-> Artist: 450px * distMult (derived from 3.6 Flash semantic weight 0.1 - 1.0)
 - Outward-Arc Petals: Satellites at r ∈ [65px, 75px] radiating away from scene centroid
 - Petal Link Distances: 65px (Genre) / 70px (Origin) / 75px (Founded) at 0.35 spring stiffness
-- Cross-Scene Bridge Lines: Non-physics quadratic Bézier curves with 70–200px upward arc lift; rest at knocked-back grey #71717a (0.22 opacity), active hover at yellow #F6E468
+- Cross-Scene Bridge Lines: Non-physics quadratic Bézier curves with 70–200px upward arc lift; rest at neutral grey #e4e4e7 (0.35 opacity), active hover at yellow #F6E468
 
 COLLISION RESOLUTION (resolveSceneNodeOverlaps):
 - Deterministic post-physics AABB bounding box collision resolution (W = 7.2px/char + 22px + padding, H = 24px)

@@ -2348,5 +2348,69 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       const generatedTitle = generateProjectTitleFromScenes(scenes);
       expect(generatedTitle).toBe("Poison The Well + Harm's Way");
     });
+
+    it('verifies unified Cross-Scene Bridge Line styling contract (#e4e4e7 at 0.35-0.4 opacity)', () => {
+      // Resting bridge styling contract
+      const getBridgeRestingStyle = () => ({
+        stroke: '#e4e4e7',
+        mountOpacity: 0.4,
+        effectOpacity: 0.35,
+        strokeWidth: 1.2,
+        strokeDasharray: '6,4'
+      });
+
+      const style = getBridgeRestingStyle();
+      expect(style.stroke).toBe('#e4e4e7');
+      expect(style.mountOpacity).toBe(0.4);
+      expect(style.effectOpacity).toBe(0.35);
+      expect(style.strokeWidth).toBe(1.2);
+      expect(style.strokeDasharray).toBe('6,4');
+
+      // Interactive state transitions
+      const computeBridgeStyle = (
+        isConnectedToActive: boolean,
+        isInSelectionHighlight: boolean,
+        hasActiveNode: boolean
+      ) => {
+        if (!hasActiveNode) {
+          return { stroke: '#e4e4e7', opacity: 0.35, width: 1.2 };
+        }
+        if (isConnectedToActive) {
+          return { stroke: '#F6E468', opacity: 0.95, width: 2.0 };
+        }
+        if (isInSelectionHighlight) {
+          return { stroke: '#e4e4e7', opacity: 0.3, width: 1.2 };
+        }
+        return { stroke: '#e4e4e7', opacity: 0.1, width: 1.2 };
+      };
+
+      // Neutral rest
+      expect(computeBridgeStyle(false, false, false)).toEqual({
+        stroke: '#e4e4e7',
+        opacity: 0.35,
+        width: 1.2
+      });
+
+      // Connected to active selected/hovered node
+      expect(computeBridgeStyle(true, true, true)).toEqual({
+        stroke: '#F6E468',
+        opacity: 0.95,
+        width: 2.0
+      });
+
+      // Non-incident inside selectionHighlightIds
+      expect(computeBridgeStyle(false, true, true)).toEqual({
+        stroke: '#e4e4e7',
+        opacity: 0.3,
+        width: 1.2
+      });
+
+      // Non-incident outside selectionHighlightIds
+      expect(computeBridgeStyle(false, false, true)).toEqual({
+        stroke: '#e4e4e7',
+        opacity: 0.1,
+        width: 1.2
+      });
+    });
   });
 });

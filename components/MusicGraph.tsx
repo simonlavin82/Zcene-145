@@ -840,11 +840,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 .transition().duration(200)
                 .attr("stroke", (l: any) => {
                     const isConnected = isFirstDegreeLink(l);
-                    return isConnected ? "#F6E468" : "#71717a";
+                    return isConnected ? "#F6E468" : "#e4e4e7";
                 })
                 .attr("stroke-opacity", (l: any) => {
                     const isConnected = isFirstDegreeLink(l);
-                    return isConnected ? 0.95 : 0.08;
+                    return isConnected ? 0.95 : 0.05;
                 })
                 .attr("stroke-width", (l: any) => {
                     const isConnected = isFirstDegreeLink(l);
@@ -1070,12 +1070,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     return 0.3;
                 });
 
-            // Restore Cross-Scene Bridge Lines to knocked-back grey
+            // Restore Cross-Scene Bridge Lines to neutral grey
             svg.selectAll<SVGPathElement, Link>("path.bridge-visual-line")
                 .transition().duration(200)
-                .attr("stroke", "#71717a")
+                .attr("stroke", "#e4e4e7")
                 .attr("stroke-width", 1.2)
-                .attr("stroke-opacity", 0.22);
+                .attr("stroke-opacity", 0.35);
         }
     };
 
@@ -1760,16 +1760,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke-width", 16)
         .style("cursor", "default");
 
-    // Cross-Scene Curved Bridge Lines (Default rest: knocked-back grey #71717a, stroke-opacity 0.22, stroke-width 1.2)
+    // Cross-Scene Curved Bridge Lines (Default rest: neutral grey #e4e4e7, stroke-opacity 0.4, stroke-width 1.2)
     container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
         .data(bridgeLinks, (d: any) => `bridge:${nodeId(d.source)}-${nodeId(d.target)}`)
         .join("path")
         .attr("class", "bridge-visual-line")
         .attr("fill", "none")
-        .attr("stroke", "#71717a")
+        .attr("stroke", "#e4e4e7")
         .attr("stroke-width", 1.2)
         .attr("stroke-dasharray", "6,4")
-        .attr("stroke-opacity", 0.22)
+        .attr("stroke-opacity", 0.4)
         .attr("d", (d: any) => computeBridgePathD(d, visibleNodes))
         .style("pointer-events", "none");
 
@@ -2012,30 +2012,34 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return 0.3;
         });
 
-    // Cross-Scene Bridge Lines: Default rest (grey #71717a, opacity 0.22, width 1.2)
+    // Cross-Scene Bridge Lines: Default rest (neutral grey #e4e4e7, opacity 0.35, width 1.2)
     // Active hover or selection (peekedNode, selectedNode, or activeHoveredNodeRef when !isPassiveSelection) illuminates connected bridges in yellow #F6E468
     const activeHoverNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null)) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
     container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
         .transition().duration(300)
         .attr("stroke", (d: any) => {
-            if (!activeHoverNode) return "#71717a";
+            if (!activeHoverNode) return "#e4e4e7";
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
             const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
             const isConnected = hasActiveHoverNs
                 ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
                 : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
-            return isConnected ? "#F6E468" : "#71717a";
+            return isConnected ? "#F6E468" : "#e4e4e7";
         })
         .attr("stroke-opacity", (d: any) => {
-            if (!activeHoverNode) return 0.22;
+            if (!activeHoverNode) return 0.35;
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
             const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
             const isConnected = hasActiveHoverNs
                 ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
                 : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
-            return isConnected ? 0.95 : 0.08;
+            if (isConnected) return 0.95;
+            if (selectionHighlightIds && (selectionHighlightIds.has(s) || selectionHighlightIds.has(t))) {
+                return 0.3;
+            }
+            return 0.1;
         })
         .attr("stroke-width", (d: any) => {
             if (!activeHoverNode) return 1.2;
