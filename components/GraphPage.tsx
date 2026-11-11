@@ -3,7 +3,7 @@ import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, St
 import { User, db } from '../services/firebase';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName } from '../services/artistCacheService';
+import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, stripCountrySlug } from '../services/artistCacheService';
 import { hasActiveDiscoveryFilters, sanitizeAnchorLabelInput } from '../services/cacheQualification';
 import { toSeedArtistsArray, stripSceneNamespace, MAX_SCENES_PER_PROJECT } from '../shared/multiSceneUtils';
 import HelpPage from './HelpPage';
@@ -1714,11 +1714,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const baselineSeedArtists = useMemo(() => {
     if (!isSceneCurated) return '';
-    if (activeScene?.curatedSeedArtists !== undefined) return activeScene.curatedSeedArtists;
+    if (activeScene?.curatedSeedArtists && activeScene.curatedSeedArtists.trim().length > 0) {
+      return activeScene.curatedSeedArtists.trim();
+    }
 
     // Guardrail 1 fallback: derive from root/seed artist nodes in activeScene.graphData.nodes
     const rootArtistNodes = (activeScene?.graphData?.nodes || []).filter(
-      (n: any) => n && n.type === 'artist' && Boolean(n.isSceneSeed || n.isSeed)
+      (n: any) => n && n.type === 'artist' && (Boolean(n.isSceneSeed || n.isSeed) || n.group === 0)
     );
     if (rootArtistNodes.length > 0) {
       const seenRoots = new Set<string>();
@@ -1737,14 +1739,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [isSceneCurated, activeScene?.curatedSeedArtists, activeScene?.graphData?.nodes, activeScene?.seedArtists, seedArtists]);
 
   const isArtistPending = useMemo(() => {
+    const normalizeSeedSlug = (s: string) => stripCountrySlug(normalizeArtistId(s));
     const currentEnabled = selectedSeedArtists
       .filter(a => a.enabled)
-      .map(a => normalizeArtistId(a.name))
+      .map(a => normalizeSeedSlug(a.name))
       .sort()
       .join('::');
     const baseline = baselineSeedArtists
       .split('::')
-      .map(s => normalizeArtistId(s))
+      .map(s => normalizeSeedSlug(s))
       .filter(Boolean)
       .sort()
       .join('::');
@@ -1769,6 +1772,27 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const artistIndicatorStyles = useMemo(() => isArtistPending ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700', [isArtistPending]);
   
   const isFirstGeneration = useMemo(() => data.nodes.length === 0, [data.nodes.length]);
+  
+  // Option A UX: A user can only add up to 5 scenes after mapping existing scenes
+  const hasUncuratedScene = useMemo(() => {
+    if (data.nodes.length === 0) return true;
+    return scenes.length === 0 || scenes.some(s => (s.graphData?.nodes?.length ?? 0) === 0);
+  }, [data.nodes.length, scenes]);
+
+  const isAddSceneDisabled = useMemo(() => {
+    return isLoading || Boolean(isHydrating) || scenes.length >= MAX_SCENES_PER_PROJECT || hasUncuratedScene;
+  }, [isLoading, isHydrating, scenes.length, hasUncuratedScene]);
+
+  const addSceneTooltip = useMemo(() => {
+    if (scenes.length >= MAX_SCENES_PER_PROJECT) {
+      return "Maximum of 5 scenes reached for this Zcene";
+    }
+    if (hasUncuratedScene) {
+      return "Map your current scene first before adding another scene";
+    }
+    return "Add a new Scene cluster to this Zcene board";
+  }, [scenes.length, hasUncuratedScene]);
+
   // Guardrail 2: The overwrite intercept gate applies ONLY when the active scene itself
   // is already curated (overwriting existing connections). Uncurated scenes (Scene 2..5)
   // curate directly via onRegenerate / preflight without popping up the overwrite intercept modal.
@@ -2129,17 +2153,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
                       type="button"
                       data-testid="add-scene-button"
                       onClick={onAddScene}
-                      disabled={isLoading || Boolean(isHydrating) || scenes.length >= MAX_SCENES_PER_PROJECT}
+                      disabled={isAddSceneDisabled}
                       className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border text-[11px] font-medium transition-all ${
-                        scenes.length >= MAX_SCENES_PER_PROJECT
+                        scenes.length >= MAX_SCENES_PER_PROJECT || hasUncuratedScene
                           ? 'border-zinc-800 bg-zinc-900/40 text-zinc-600 cursor-not-allowed opacity-60'
                           : 'border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed'
                       }`}
-                      title={
-                        scenes.length >= MAX_SCENES_PER_PROJECT
-                          ? "Maximum of 5 scenes reached for this Zcene"
-                          : "Add a new Scene cluster to this Zcene board"
-                      }
+                      title={addSceneTooltip}
                     >
                       <span className="material-symbols-outlined !text-[14px]">
                         {scenes.length >= MAX_SCENES_PER_PROJECT ? 'check' : 'add'}

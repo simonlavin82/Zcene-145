@@ -347,12 +347,12 @@ function normalizeProjectScene(raw, fallbackIndex = 0) {
         : seedsArray.map((seed) => normalizeCanonicalEntityId(seed)).filter(Boolean);
     const isCurated = Boolean(graphData.nodes && graphData.nodes.length > 0);
     let curatedSeedArtists;
-    if (typeof s.curatedSeedArtists === 'string') {
-        curatedSeedArtists = s.curatedSeedArtists;
+    if (typeof s.curatedSeedArtists === 'string' && s.curatedSeedArtists.trim().length > 0) {
+        curatedSeedArtists = s.curatedSeedArtists.trim();
     }
     else if (isCurated) {
         // Guardrail 1: derive curatedSeedArtists from the scene's actual root/seed artist node labels in graphData.nodes first (if present) before falling back to raw.seedArtists.
-        const rootArtistNodes = graphData.nodes.filter((n) => n && n.type === 'artist' && Boolean(n.isSceneSeed || n.isSeed));
+        const rootArtistNodes = graphData.nodes.filter((n) => n && n.type === 'artist' && (Boolean(n.isSceneSeed || n.isSeed) || n.group === 0 || rawSeedIds.some((id) => String(id) === n.id || String(id) === stripSceneNamespace(n.canonicalId || n.id))));
         if (rootArtistNodes.length > 0) {
             const seenRoots = new Set();
             const rootNames = [];
@@ -373,6 +373,28 @@ function normalizeProjectScene(raw, fallbackIndex = 0) {
     else {
         curatedSeedArtists = '';
     }
+    // Heal slug names in curatedSeedArtists and seedArtists if graphData.nodes has human .label (e.g. harms-way-us -> Harm's Way)
+    let resolvedSeedArtists = seedArtists;
+    if (isCurated && graphData.nodes && graphData.nodes.length > 0) {
+        const cleanSeedString = (str) => {
+            if (!str)
+                return str;
+            const list = toSeedArtistsArray(str);
+            const cleaned = list.map(seed => {
+                const matchingNode = graphData.nodes.find((n) => n && n.type === 'artist' &&
+                    (n.id === seed ||
+                        n.id === normalizeCanonicalEntityId(seed) ||
+                        stripSceneNamespace(n.canonicalId || n.id) === stripSceneNamespace(seed)));
+                if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
+                    return matchingNode.label.trim();
+                }
+                return seed;
+            });
+            return cleaned.join('::');
+        };
+        curatedSeedArtists = cleanSeedString(curatedSeedArtists);
+        resolvedSeedArtists = cleanSeedString(resolvedSeedArtists);
+    }
     let curatedDiscoveryFilters;
     if (s.curatedDiscoveryFilters && typeof s.curatedDiscoveryFilters === 'object') {
         try {
@@ -389,11 +411,24 @@ function normalizeProjectScene(raw, fallbackIndex = 0) {
     }
     const rawTitle = String(s.title || s.name || '').trim();
     const isGenericDefaultTitle = /^Scene\s+\d+$/i.test(rawTitle);
-    const title = rawTitle && (!isGenericDefaultTitle || seedsArray.length === 0)
+    let title = rawTitle && (!isGenericDefaultTitle || seedsArray.length === 0)
         ? rawTitle
         : seedsArray.length > 0
             ? seedsArray.join(' + ')
             : `Scene ${sceneIndex + 1}`;
+    // Heal slug title if graphData.nodes has matching human label
+    if (isCurated && graphData.nodes && graphData.nodes.length > 0) {
+        const matchingNode = graphData.nodes.find((n) => n && n.type === 'artist' &&
+            (n.id === title ||
+                n.id === normalizeCanonicalEntityId(title) ||
+                stripSceneNamespace(n.canonicalId || n.id) === stripSceneNamespace(title)));
+        if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
+            title = matchingNode.label.trim();
+        }
+        else if (curatedSeedArtists && (!rawTitle || isGenericDefaultTitle || /^[a-z0-9_-]+$/.test(title))) {
+            title = toSeedArtistsArray(curatedSeedArtists).join(' + ');
+        }
+    }
     const status = s.status ||
         (graphData.nodes && graphData.nodes.length > 0 ? 'ready' : 'unmapped');
     // Coordinate Memory Migration (1600px → 950px stride): rebase legacy centers and any
@@ -414,7 +449,7 @@ function normalizeProjectScene(raw, fallbackIndex = 0) {
         sceneIndex,
         title,
         name: title,
-        seedArtists,
+        seedArtists: resolvedSeedArtists,
         curatedSeedArtists,
         seedIds,
         seedArtistIds: seedIds,

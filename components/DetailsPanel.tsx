@@ -4,7 +4,7 @@ import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, ProjectScene, COST_PER_AI_CALL } from '../types';
 import { stripSceneNamespace, toSeedArtistsArray } from '../shared/multiSceneUtils';
 import { streamNodeChat, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
-import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch } from '../services/artistCacheService';
+import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch, stripCountrySlug } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
 import { Spinner, HelpIcon, MicIcon, LoadingSpinner, DETAIL_THINKING_STEPS, StackIcon, BandcampIcon } from './Icons';
 import { TokenConfirmationDialog, PROFILE_COLORS, MODAL_PROFILE_COLORS } from './SharedModals';
@@ -2806,7 +2806,12 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 <div className="space-y-12" data-testid="scene-editorials-stack">
                                     {scenes.map((scene, idx) => {
                                         const sceneKey = scene.sceneId || scene.id || `scene-${idx + 1}`;
-                                        const sceneSeeds = toSeedArtistsArray(scene.seedArtists);
+                                        const rawSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+                                        const sceneSeeds = rawSeeds.map(seed => {
+                                            return cleanArtistDisplayName(seed, scene.graphData?.nodes) ||
+                                                detailsCache.get(normalizeArtistId(seed))?.details?.artist ||
+                                                titleCaseArtistId(stripCountrySlug(seed));
+                                        });
                                         const sceneRationale = sanitizeRationaleMarkdown(scene.synthesisRationale, scene.graphData?.nodes?.length);
                                         const firstSeedNorm = sceneSeeds[0] ? normalizeArtistId(sceneSeeds[0]) : '';
                                         const seedDetailsFallback = firstSeedNorm ? detailsCache.get(firstSeedNorm)?.summary : '';
@@ -2831,7 +2836,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                     )}
                                                 </div>
                                                 <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-8 leading-tight" style={{ wordBreak: 'break-word' }}>
-                                                    {sceneSeeds.length > 0 ? sceneSeeds.join(' + ') : (scene.title || scene.name || `Scene ${idx + 1}`)}
+                                                    {sceneSeeds.length > 0 ? sceneSeeds.join(' + ') : (cleanArtistDisplayName(scene.title || scene.name, scene.graphData?.nodes) || `Scene ${idx + 1}`)}
                                                 </h2>
                                                 {effectiveSceneCopy && (
                                                     <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">

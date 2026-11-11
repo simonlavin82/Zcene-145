@@ -18,6 +18,7 @@ import {
   stripCountrySlug,
   ISO_TO_COUNTRY_NAME,
 } from '../shared/isoCountries';
+export { stripCountrySlug };
 import { stripSceneNamespace } from '../shared/multiSceneUtils';
 import { sanitizeNotableArtists, sanitizeAlbumName } from './geminiService';
 

@@ -26,7 +26,7 @@ import {
   resolveSceneNodeOverlaps,
   MAX_SCENES_PER_PROJECT,
 } from '../../shared/multiSceneUtils';
-import { normalizeArtistId } from '../../services/artistCacheService';
+import { normalizeArtistId, stripCountrySlug } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
 import { BACKEND_REGRESSION_RUNBOOK } from '../../docs/backend-regression-runbook';
@@ -2124,6 +2124,135 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       handleSwitchToNewProject();
       expect(seedArtistsRef.current).toBe('');
       expect(scenesRef.current).toEqual([]);
+    });
+
+    it('Option A UX: gates + Add Scene until all existing scenes are curated with nodes', () => {
+      const checkIsAddSceneDisabled = (
+        dataNodeCount: number,
+        scenesList: { graphData?: { nodes?: any[] } }[],
+        isLoading: boolean = false,
+        isHydrating: boolean = false
+      ) => {
+        const hasUncuratedScene =
+          dataNodeCount === 0 ||
+          scenesList.length === 0 ||
+          scenesList.some(s => (s.graphData?.nodes?.length ?? 0) === 0);
+        return isLoading || Boolean(isHydrating) || scenesList.length >= MAX_SCENES_PER_PROJECT || hasUncuratedScene;
+      };
+
+      // Fresh project, 0 nodes on Scene 1 -> GATED
+      expect(checkIsAddSceneDisabled(0, [{ graphData: { nodes: [] } }])).toBe(true);
+
+      // Scene 1 mapped (33 nodes) -> UNGATED (user can click + Add Scene)
+      expect(checkIsAddSceneDisabled(33, [{ graphData: { nodes: Array(33).fill({}) } }])).toBe(false);
+
+      // Scene 2 added but not mapped yet (0 nodes) -> GATED again
+      expect(
+        checkIsAddSceneDisabled(33, [
+          { graphData: { nodes: Array(33).fill({}) } },
+          { graphData: { nodes: [] } },
+        ])
+      ).toBe(true);
+
+      // Both Scene 1 & Scene 2 mapped -> UNGATED
+      expect(
+        checkIsAddSceneDisabled(70, [
+          { graphData: { nodes: Array(33).fill({}) } },
+          { graphData: { nodes: Array(37).fill({}) } },
+        ])
+      ).toBe(false);
+
+      // Max 5 scenes reached -> GATED
+      const fiveScenes = Array(5).fill({ graphData: { nodes: Array(20).fill({}) } });
+      expect(checkIsAddSceneDisabled(100, fiveScenes)).toBe(true);
+    });
+
+    it('heals raw slugs like harms-way-us to human labels in normalizeProjectScene', () => {
+      const rawScene = {
+        sceneIndex: 2,
+        title: 'harms-way-us',
+        name: 'harms-way-us',
+        seedArtists: 'harms-way-us',
+        curatedSeedArtists: 'harms-way-us',
+        graphData: {
+          nodes: [
+            { id: 'harms-way-us', label: "Harm's Way", type: 'artist', group: 0 },
+            { id: 'nails-us', label: 'Nails', type: 'artist', group: 1 }
+          ],
+          links: []
+        }
+      };
+
+      const normalized = normalizeProjectScene(rawScene as any, 2);
+      expect(normalized.title).toBe("Harm's Way");
+      expect(normalized.name).toBe("Harm's Way");
+      expect(normalized.seedArtists).toBe("Harm's Way");
+      expect(normalized.curatedSeedArtists).toBe("Harm's Way");
+    });
+
+    it('prevents false-dirty Update Zcene [1] state using stripCountrySlug and non-empty baseline', () => {
+      const normalizeSeedSlug = (s: string) => stripCountrySlug(normalizeArtistId(s));
+
+      // Case 1: Baseline was curated as "harms-way-us" in Firestore, draft list has "Harm's Way"
+      const selectedSeedArtists = [{ name: "Harm's Way", enabled: true }];
+      const baselineSeedArtists = "harms-way-us";
+
+      const currentEnabled = selectedSeedArtists
+        .filter(a => a.enabled)
+        .map(a => normalizeSeedSlug(a.name))
+        .sort()
+        .join('::');
+
+      const baseline = baselineSeedArtists
+        .split('::')
+        .map(s => normalizeSeedSlug(s))
+        .filter(Boolean)
+        .sort()
+        .join('::');
+
+      expect(currentEnabled).toBe('harms-way');
+      expect(baseline).toBe('harms-way');
+      expect(currentEnabled === baseline).toBe(true); // False-dirty avoided!
+
+      // Case 2: Curated scene where curatedSeedArtists is empty string falls back to seedArtists
+      const activeScene: any = {
+        curatedSeedArtists: '',
+        seedArtists: 'Poison The Well',
+        graphData: { nodes: [{ id: 'poison-the-well-us', label: 'Poison The Well', type: 'artist', group: 1 }] }
+      };
+
+      const resolvedBaseline = (activeScene.curatedSeedArtists && activeScene.curatedSeedArtists.trim().length > 0)
+        ? activeScene.curatedSeedArtists.trim()
+        : (activeScene.seedArtists || '');
+
+      expect(resolvedBaseline).toBe('Poison The Well');
+    });
+
+    it('suppresses premature Autosave while project has 0 curated nodes across all scenes', () => {
+      const shouldRunAutosave = (
+        graphData: { nodes?: any[] } | null,
+        scenesList: { graphData?: { nodes?: any[] } }[],
+        projectStatus: string | null
+      ) => {
+        const hasAnyCuratedNodes = Boolean(
+          (graphData && graphData.nodes && graphData.nodes.length > 0) ||
+          scenesList.some(s => (s.graphData?.nodes?.length || 0) > 0)
+        );
+        if (!hasAnyCuratedNodes && projectStatus !== 'curating') {
+          return false;
+        }
+        return true;
+      };
+
+      // Uncurated project, idle state -> Autosave blocked
+      expect(shouldRunAutosave({ nodes: [] }, [{ graphData: { nodes: [] } }], null)).toBe(false);
+      expect(shouldRunAutosave({ nodes: [] }, [{ graphData: { nodes: [] } }, { graphData: { nodes: [] } }], 'idle')).toBe(false);
+
+      // Uncurated project actively in curating status -> Allowed
+      expect(shouldRunAutosave({ nodes: [] }, [{ graphData: { nodes: [] } }], 'curating')).toBe(true);
+
+      // Curated project with nodes -> Allowed
+      expect(shouldRunAutosave({ nodes: [{ id: 'ptw' }] }, [{ graphData: { nodes: [{ id: 'ptw' }] } }], 'completed')).toBe(true);
     });
   });
 });

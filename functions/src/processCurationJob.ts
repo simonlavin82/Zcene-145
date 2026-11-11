@@ -2286,13 +2286,19 @@ export const processCurationJob = onDocumentCreated({
             ? Array.from(mergedDetailsMap.entries())
             : detailsCacheEntries;
 
-        const completedSceneTitle = artistList
-          .map((a: string) => {
-            const norm = normalizeArtistId(a);
-            const canonical = resolvedSeedNormMap.get(norm) ?? norm;
-            return seedNamesMap[canonical] || seedNamesMap[norm] || stripCountrySlug(a);
-          })
-          .join(" + ");
+        const humanSeedList = artistList.map((a: string) => {
+          const norm = normalizeArtistId(a);
+          const canonical = resolvedSeedNormMap.get(norm) ?? norm;
+          const nameFromMap = seedNamesMap[canonical] || seedNamesMap[norm];
+          if (nameFromMap) return nameFromMap;
+          const matchingNode = (finalGraph.nodes || []).find((n: any) =>
+            n && (n.id === a || n.id === canonical || n.id === norm || normalizeArtistId(n.id) === norm)
+          );
+          if (matchingNode && matchingNode.label) return matchingNode.label.trim();
+          return stripCountrySlug(a);
+        });
+        const cleanHumanSeedString = humanSeedList.join('::');
+        const completedSceneTitle = humanSeedList.join(" + ");
 
         const completedScene: ProjectScene = normalizeProjectScene({
           id: targetSceneId,
@@ -2300,8 +2306,8 @@ export const processCurationJob = onDocumentCreated({
           sceneIndex: targetSceneIndex,
           title: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
           name: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
-          seedArtists: cleanSeedArtistsContext,
-          curatedSeedArtists: cleanSeedArtistsContext,
+          seedArtists: cleanHumanSeedString || cleanSeedArtistsContext,
+          curatedSeedArtists: cleanHumanSeedString || cleanSeedArtistsContext,
           seedIds: resolvedSeedArray.map((s: any) => s.id),
           seedArtistIds: resolvedSeedArray.map((s: any) => s.id),
           discoveryFilters: inputPayload.filters || {},
@@ -2315,11 +2321,10 @@ export const processCurationJob = onDocumentCreated({
           updatedAt: Date.now(),
         }, targetSceneIndex);
 
-        const updatedScenes: ProjectScene[] = [...existingProjectScenes];
-        const existingSceneIdx = updatedScenes.findIndex((s) => (s.sceneId || s.id) === targetSceneId);
-        if (existingSceneIdx !== -1) {
-          updatedScenes[existingSceneIdx] = completedScene;
-        } else {
+        const updatedScenes: ProjectScene[] = existingProjectScenes.map((s, idx) =>
+          (s.sceneId || s.id) === targetSceneId ? completedScene : normalizeProjectScene(s, idx)
+        );
+        if (!updatedScenes.some((s) => (s.sceneId || s.id) === targetSceneId)) {
           updatedScenes.push(completedScene);
         }
         updatedScenes.sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));

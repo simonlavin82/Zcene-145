@@ -6,7 +6,7 @@ import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink } from './types';
 import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
-import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing } from './services/artistCacheService';
+import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing, stripCountrySlug } from './services/artistCacheService';
 import { qualifyCacheEntry, deriveRoutingDecision, isLocallyRenderable, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
 import { normalizeCountry } from './utils/normalization';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from './utils/projectHydrationFingerprint';
@@ -1803,6 +1803,15 @@ const App: React.FC = () => {
     curationSessionIdRef.current = null;
     sessionTokenApprovedRef.current = false;
 
+    // Option A UX Guard: Block adding a new scene if canvas is empty or any existing scene is uncurated
+    const hasUncuratedScene = (graphDataRef.current?.nodes?.length || 0) === 0 ||
+      scenesRef.current.length === 0 ||
+      scenesRef.current.some(s => (s.graphData?.nodes?.length || 0) === 0);
+    if (hasUncuratedScene) {
+      console.warn('[App] Blocked handleAddScene: All existing scenes must be curated before adding another scene.');
+      return;
+    }
+
     let baseScenes: ProjectScene[] = scenesRef.current;
     if (baseScenes.length >= MAX_SCENES_PER_PROJECT) return;
     if (baseScenes.length === 0) {
@@ -3553,15 +3562,28 @@ const App: React.FC = () => {
       .filter((n: any) => n.type === 'artist' || n.type === 'label')
       .map((n: any) => stripSceneNamespace(n.canonicalId || n.id));
     const normSeedIds = artistList.map(a => normalizeArtistId(a));
+
+    // Resolve clean human display names for seed artists and scene title (preventing raw slugs like harms-way-us)
+    const humanSeedNames = toSeedArtistsArray(artistsString).map(s => {
+      const cleanFromGraph = cleanArtistDisplayName(s, normalizedGraph.nodes);
+      const isClean = cleanFromGraph && !cleanFromGraph.includes('-') && !cleanFromGraph.includes('_');
+      if (isClean) return cleanFromGraph;
+      const cached = detailsCacheRef.current.get(normalizeArtistId(s)) || detailsCacheRef.current.get(s);
+      if (cached?.details?.artist) return cached.details.artist;
+      return cleanFromGraph || titleCaseArtistId(stripCountrySlug(s));
+    });
+    const humanSeedString = humanSeedNames.join('::');
+    const humanSceneTitle = humanSeedNames.join(' + ');
+
     const updatedScene: ProjectScene = normalizeProjectScene({
       ...currentScenesList[targetSceneIdx],
       id: targetSceneId,
       sceneId: targetSceneId,
       sceneIndex: targetSceneIdx,
-      title: currentScenesList[targetSceneIdx]?.title || currentScenesList[targetSceneIdx]?.name || `Scene ${targetSceneIdx + 1}`,
-      name: currentScenesList[targetSceneIdx]?.name || currentScenesList[targetSceneIdx]?.title || `Scene ${targetSceneIdx + 1}`,
-      seedArtists: artistsString,
-      curatedSeedArtists: artistsString,
+      title: humanSceneTitle || currentScenesList[targetSceneIdx]?.title || currentScenesList[targetSceneIdx]?.name || `Scene ${targetSceneIdx + 1}`,
+      name: humanSceneTitle || currentScenesList[targetSceneIdx]?.name || currentScenesList[targetSceneIdx]?.title || `Scene ${targetSceneIdx + 1}`,
+      seedArtists: humanSeedString,
+      curatedSeedArtists: humanSeedString,
       seedIds: normSeedIds,
       seedArtistIds: normSeedIds,
       discoveryFilters: discoveryFiltersRef.current || {},
@@ -3605,6 +3627,11 @@ const App: React.FC = () => {
     setScenes(currentScenesList);
     crossSceneLinksRef.current = nextBridges;
     setCrossSceneLinks(nextBridges);
+
+    if (targetSceneId === (activeSceneIdRef.current || 'scene-1')) {
+      seedArtistsRef.current = humanSeedString;
+      setSeedArtists(humanSeedString);
+    }
 
     let targetProjectId = explicitProjectId || currentProjectIdRef.current || currentProjectId;
     let isNewProject = false;
@@ -7578,6 +7605,15 @@ const App: React.FC = () => {
   useEffect(() => {
     if (!user || !isFirebaseReady || !isAuthInitialized || !currentProjectId || isGuest) return;
     if (!graphData || isProjectLoadingRef.current || isHydratingSessionRef.current || filterGuidanceState?.isOpen || consolidatedValidationDialog?.isOpen) return;
+
+    // Suppress Premature Autosave: Do not repeatedly write to Firestore while a project has 0 curated nodes across all scenes
+    const hasAnyCuratedNodes = Boolean(
+      (graphData && graphData.nodes && graphData.nodes.length > 0) ||
+      scenes.some(s => (s.graphData?.nodes?.length || 0) > 0)
+    );
+    if (!hasAnyCuratedNodes && projectStatus !== 'curating') {
+      return;
+    }
 
     const basePayload = buildBaseProjectPayload();
     if (!basePayload) return;

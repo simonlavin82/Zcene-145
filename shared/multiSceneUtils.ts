@@ -337,12 +337,12 @@ export function normalizeProjectScene(
   const isCurated = Boolean(graphData.nodes && graphData.nodes.length > 0);
 
   let curatedSeedArtists: string;
-  if (typeof s.curatedSeedArtists === 'string') {
-    curatedSeedArtists = s.curatedSeedArtists;
+  if (typeof s.curatedSeedArtists === 'string' && s.curatedSeedArtists.trim().length > 0) {
+    curatedSeedArtists = s.curatedSeedArtists.trim();
   } else if (isCurated) {
     // Guardrail 1: derive curatedSeedArtists from the scene's actual root/seed artist node labels in graphData.nodes first (if present) before falling back to raw.seedArtists.
     const rootArtistNodes = graphData.nodes.filter(
-      (n: any) => n && n.type === 'artist' && Boolean(n.isSceneSeed || n.isSeed)
+      (n: any) => n && n.type === 'artist' && (Boolean(n.isSceneSeed || n.isSeed) || n.group === 0 || rawSeedIds.some((id: any) => String(id) === n.id || String(id) === stripSceneNamespace(n.canonicalId || n.id)))
     );
     if (rootArtistNodes.length > 0) {
       const seenRoots = new Set<string>();
@@ -363,6 +363,30 @@ export function normalizeProjectScene(
     curatedSeedArtists = '';
   }
 
+  // Heal slug names in curatedSeedArtists and seedArtists if graphData.nodes has human .label (e.g. harms-way-us -> Harm's Way)
+  let resolvedSeedArtists = seedArtists;
+  if (isCurated && graphData.nodes && graphData.nodes.length > 0) {
+    const cleanSeedString = (str: string) => {
+      if (!str) return str;
+      const list = toSeedArtistsArray(str);
+      const cleaned = list.map(seed => {
+        const matchingNode = graphData.nodes.find((n: any) =>
+          n && n.type === 'artist' &&
+          (n.id === seed ||
+           n.id === normalizeCanonicalEntityId(seed) ||
+           stripSceneNamespace(n.canonicalId || n.id) === stripSceneNamespace(seed))
+        );
+        if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
+          return matchingNode.label.trim();
+        }
+        return seed;
+      });
+      return cleaned.join('::');
+    };
+    curatedSeedArtists = cleanSeedString(curatedSeedArtists);
+    resolvedSeedArtists = cleanSeedString(resolvedSeedArtists);
+  }
+
   let curatedDiscoveryFilters: DiscoveryFilters;
   if (s.curatedDiscoveryFilters && typeof s.curatedDiscoveryFilters === 'object') {
     try {
@@ -378,12 +402,27 @@ export function normalizeProjectScene(
 
   const rawTitle = String(s.title || s.name || '').trim();
   const isGenericDefaultTitle = /^Scene\s+\d+$/i.test(rawTitle);
-  const title =
+  let title =
     rawTitle && (!isGenericDefaultTitle || seedsArray.length === 0)
       ? rawTitle
       : seedsArray.length > 0
         ? seedsArray.join(' + ')
         : `Scene ${sceneIndex + 1}`;
+
+  // Heal slug title if graphData.nodes has matching human label
+  if (isCurated && graphData.nodes && graphData.nodes.length > 0) {
+    const matchingNode = graphData.nodes.find((n: any) =>
+      n && n.type === 'artist' &&
+      (n.id === title ||
+       n.id === normalizeCanonicalEntityId(title) ||
+       stripSceneNamespace(n.canonicalId || n.id) === stripSceneNamespace(title))
+    );
+    if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
+      title = matchingNode.label.trim();
+    } else if (curatedSeedArtists && (!rawTitle || isGenericDefaultTitle || /^[a-z0-9_-]+$/.test(title))) {
+      title = toSeedArtistsArray(curatedSeedArtists).join(' + ');
+    }
+  }
 
   const status =
     s.status ||
@@ -411,7 +450,7 @@ export function normalizeProjectScene(
     sceneIndex,
     title,
     name: title,
-    seedArtists,
+    seedArtists: resolvedSeedArtists,
     curatedSeedArtists,
     seedIds,
     seedArtistIds: seedIds,

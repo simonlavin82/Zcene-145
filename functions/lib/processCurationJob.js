@@ -2053,21 +2053,27 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 const unifiedDetailsCacheEntries = existingProjectScenes.length > 1 || existingProjectDetailsMap.size > 0
                     ? Array.from(mergedDetailsMap.entries())
                     : detailsCacheEntries;
-                const completedSceneTitle = artistList
-                    .map((a) => {
+                const humanSeedList = artistList.map((a) => {
                     const norm = (0, curatorService_1.normalizeArtistId)(a);
                     const canonical = resolvedSeedNormMap.get(norm) ?? norm;
-                    return seedNamesMap[canonical] || seedNamesMap[norm] || (0, isoCountries_1.stripCountrySlug)(a);
-                })
-                    .join(" + ");
+                    const nameFromMap = seedNamesMap[canonical] || seedNamesMap[norm];
+                    if (nameFromMap)
+                        return nameFromMap;
+                    const matchingNode = (finalGraph.nodes || []).find((n) => n && (n.id === a || n.id === canonical || n.id === norm || (0, curatorService_1.normalizeArtistId)(n.id) === norm));
+                    if (matchingNode && matchingNode.label)
+                        return matchingNode.label.trim();
+                    return (0, isoCountries_1.stripCountrySlug)(a);
+                });
+                const cleanHumanSeedString = humanSeedList.join('::');
+                const completedSceneTitle = humanSeedList.join(" + ");
                 const completedScene = (0, multiSceneUtils_1.normalizeProjectScene)({
                     id: targetSceneId,
                     sceneId: targetSceneId,
                     sceneIndex: targetSceneIndex,
                     title: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
                     name: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
-                    seedArtists: cleanSeedArtistsContext,
-                    curatedSeedArtists: cleanSeedArtistsContext,
+                    seedArtists: cleanHumanSeedString || cleanSeedArtistsContext,
+                    curatedSeedArtists: cleanHumanSeedString || cleanSeedArtistsContext,
                     seedIds: resolvedSeedArray.map((s) => s.id),
                     seedArtistIds: resolvedSeedArray.map((s) => s.id),
                     discoveryFilters: inputPayload.filters || {},
@@ -2080,12 +2086,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     pathway: isComplexGeneration ? "complex_generation" : "root_generation",
                     updatedAt: Date.now(),
                 }, targetSceneIndex);
-                const updatedScenes = [...existingProjectScenes];
-                const existingSceneIdx = updatedScenes.findIndex((s) => (s.sceneId || s.id) === targetSceneId);
-                if (existingSceneIdx !== -1) {
-                    updatedScenes[existingSceneIdx] = completedScene;
-                }
-                else {
+                const updatedScenes = existingProjectScenes.map((s, idx) => (s.sceneId || s.id) === targetSceneId ? completedScene : (0, multiSceneUtils_1.normalizeProjectScene)(s, idx));
+                if (!updatedScenes.some((s) => (s.sceneId || s.id) === targetSceneId)) {
                     updatedScenes.push(completedScene);
                 }
                 updatedScenes.sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
