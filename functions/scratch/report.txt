@@ -1,0 +1,25 @@
+I ran a direct query against the live `zcene-production` Firestore database for project document `aGvMprmZKuIA69tvESCw`. Here are the exact findings:
+
+1. **Extraction**: I successfully retrieved and parsed the `graphData` JSON string.
+2. **Total Nodes**: There are exactly 30 nodes in the `nodes` array.
+3. **Verification**: I searched specifically for `{"id": "uk"}`, `{"id": "austria"}`, and `{"id": "usa"}`.
+
+### Findings:
+Yes, the orphaned country node is **physically saved** in the live Firestore document. 
+
+I found the following node in the `nodes` array:
+```json
+[
+  {
+    "id": "uk",
+    "type": "country",
+    "group": 1,
+    "label": "UK",
+    "fx": null,
+    "fy": null
+  }
+]
+```
+I also verified the links array, and there are **zero** edges connecting to this `"uk"` node. 
+
+Because this generation (`aGvMprmZKuIA69tvESCw`) was completed *before* the new Degree-0 Cleanup Phase was deployed, the phantom node survived serialization and was written permanently to the database. The cleanup phase we just deployed will prevent this exact scenario from happening on all future generations, but this historical document still contains the ghost data.

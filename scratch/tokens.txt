@@ -1,0 +1,584 @@
+<USER_REQUEST>
+Task: Read-Only Architectural Audit & Cost Investigation
+
+Context: We successfully executed a net-new Root Generation pipeline for "Limp Bizkit." The pipeline worked perfectly, mapping 38 nodes and hydrating 27 entities. However, we have a massive discrepancy in cost reporting:
+
+The internal Zcene Projects Ledger calculated the run at exactly $0.1497.
+
+The Google AI Studio Billing Dashboard showed a spike of £3.68 (though we suspect this may be delayed batch aggregation from previous days).
+
+Goal: We need absolute certainty on the true API cost of a Root Generation and must identify any hidden inefficiencies.
+
+Strict Directive: This is a purely diagnostic trace. DO NOT MODIFY ANY CODE. The pipeline is delicate and functioning perfectly. You are only to read, analyze, and report.
+
+Investigation Vectors:
+
+Log Analysis: Review the provided downloaded-logs-20260906-150401_2.json. Trace the exact execution path and token payloads for executeCurationPipeline and processCurationJob. Calculate the true cost using standard 2026 Gemini API token rates (e.g., Gemini 3.1 Pro and Gemini 3.5 Flash).
+
+Inefficiency Hunt (The 404 Loop): The logs show over a dozen rapid GET requests to api/artist/limp-bizkit on the proxy resulting in 404s. Trace where this frontend polling originates. Does this loop trigger any hidden, repetitive LLM calls, or is it strictly a harmless (but noisy) UI polling mechanism?
+
+Hidden Retries: Are there any silent Firebase retry policies or recursive loops in the background worker that could be artificially inflating token usage beyond what the final database payload reports?
+
+Ledger Accuracy: Briefly audit the calculateTelemetryForUser logic. Why did it output $0.1497 when the raw token counts suggest a different total?
+
+Please return a comprehensive diagnostic report outlining exactly what the system is doing, what the true cost is, and where the inefficiencies lie. Do not write any patch code yet.
+
+Logs:
+[
+  {
+    "insertId": "6a9d7120000738bf789f29ac",
+    "httpRequest": {
+      "requestMethod": "OPTIONS",
+      "requestUrl": "https://us-central1-zcene-production.cloudfunctions.net/validateSeedOriginCallable",
+      "requestSize": "744",
+      "status": 204,
+      "responseSize": "257",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "2a01:4b00:b80b:4e00:684f:8e92:30cb:3e1a",
+      "referer": "https://zcene.online/",
+      "serverIp": "2001:4860:4802:36::36",
+      "latency": "1.735571099s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "revision_name": "validateseedorigincallable-00038-lig",
+        "configuration_name": "validateseedorigincallable",
+        "service_name": "validateseedorigincallable"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:46.473763Z",
+    "severity": "INFO",
+    "labels": {
+      "instanceId": "00a41e8c1d1aa7d9a538ea8c73cd97f5935725063691ad7165c9b643bba39c5aaead5154547d71aaf6acf9199d228924c277a51d71cedbbee549c0892711bc5c4fb498caa1c30a7ece69e055a947d0",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "validateseedorigincallable",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "deployment-callable": "true",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/0c19c9ad3ad67470fdd46064f3c3a96b",
+    "receiveTimestamp": "2026-09-06T13:56:48.480446791Z",
+    "spanId": "57561f6d64c3730e",
+    "traceSampled": true
+  },
+  {
+    "textPayload": "Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.",
+    "insertId": "6a9d711e0007d94bbb8029d1",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "validateseedorigincallable",
+        "location": "us-central1",
+        "revision_name": "validateseedorigincallable-00038-lig",
+        "configuration_name": "validateseedorigincallable",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:46.514379Z",
+    "severity": "INFO",
+    "labels": {
+      "deployment-callable": "true",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "scaling_reason": "AUTOSCALING",
+      "goog-drz-cloudfunctions-id": "validateseedorigincallable",
+      "instanceId": "00a41e8c1d1aa7d9a538ea8c73cd97f5935725063691ad7165c9b643bba39c5aaead5154547d71aaf6acf9199d228924c277a51d71cedbbee549c0892711bc5c4fb498caa1c30a7ece69e055a947d0",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2026-09-06T13:56:46.521699615Z"
+  },
+  {
+    "textPayload": "Default STARTUP TCP probe succeeded after 1 attempt for container \"worker\" on port 8080.",
+    "insertId": "6a9d71200006994da43e4c18",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "validateseedorigincallable",
+        "project_id": "zcene-production",
+        "revision_name": "validateseedorigincallable-00038-lig",
+        "configuration_name": "validateseedorigincallable"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:48.432461Z",
+    "severity": "INFO",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "instanceId": "00a41e8c1d1aa7d9a538ea8c73cd97f5935725063691ad7165c9b643bba39c5aaead5154547d71aaf6acf9199d228924c277a51d71cedbbee549c0892711bc5c4fb498caa1c30a7ece69e055a947d0",
+      "goog-drz-cloudfunctions-id": "validateseedorigincallable",
+      "deployment-callable": "true"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2026-09-06T13:56:48.521640240Z"
+  },
+  {
+    "insertId": "6a9d7122000bf6bf7ea74862",
+    "httpRequest": {
+      "requestMethod": "POST",
+      "requestUrl": "https://us-central1-zcene-production.cloudfunctions.net/validateSeedOriginCallable",
+      "requestSize": "2054",
+      "status": 200,
+      "responseSize": "278",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "2a01:4b00:b80b:4e00:684f:8e92:30cb:3e1a",
+      "referer": "https://zcene.online/",
+      "serverIp": "2001:4860:4802:36::36",
+      "latency": "2.165405204s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "configuration_name": "validateseedorigincallable",
+        "service_name": "validateseedorigincallable",
+        "revision_name": "validateseedorigincallable-00038-lig",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:48.616030Z",
+    "severity": "INFO",
+    "labels": {
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "instanceId": "00a41e8c1d1aa7d9a538ea8c73cd97f5935725063691ad7165c9b643bba39c5aaead5154547d71aaf6acf9199d228924c277a51d71cedbbee549c0892711bc5c4fb498caa1c30a7ece69e055a947d0",
+      "goog-drz-cloudfunctions-id": "validateseedorigincallable",
+      "goog-managed-by": "cloudfunctions",
+      "deployment-callable": "true",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/5e1802313ddbde2afdd46064f3c3af7e",
+    "receiveTimestamp": "2026-09-06T13:56:50.812381093Z",
+    "spanId": "ae41b2ce4275bd7f"
+  },
+  {
+    "insertId": "6a9d7120000a984ad089f4c1",
+    "jsonPayload": {
+      "message": "Callable request verification passed",
+      "verifications": {
+        "app": "MISSING",
+        "auth": "VALID"
+      }
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "validateseedorigincallable",
+        "project_id": "zcene-production",
+        "configuration_name": "validateseedorigincallable",
+        "revision_name": "validateseedorigincallable-00038-lig",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:48.694346Z",
+    "severity": "DEBUG",
+    "labels": {
+      "firebase-log-type": "callable-request-verification",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "execution_id": "pvl6kgl5pcmf",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "deployment-callable": "true",
+      "instanceId": "00a41e8c1d1aa7d9a538ea8c73cd97f5935725063691ad7165c9b643bba39c5aaead5154547d71aaf6acf9199d228924c277a51d71cedbbee549c0892711bc5c4fb498caa1c30a7ece69e055a947d0",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "validateseedorigincallable",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "trace": "projects/zcene-production/traces/5e1802313ddbde2afdd46064f3c3af7e",
+    "receiveTimestamp": "2026-09-06T13:56:48.703984469Z",
+    "spanId": "12556513835033673087"
+  },
+  {
+    "insertId": "6a9d7125000a4707bd254019",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1537",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.200",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.75.2",
+      "latency": "0.065976002s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "project_id": "zcene-production",
+        "configuration_name": "zcene-backend-proxy"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:53.598410Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/5bc3c848a2dd860c88cd901d14bc755a",
+    "receiveTimestamp": "2026-09-06T13:56:53.679021229Z",
+    "spanId": "a0cd432c8cda9923",
+    "traceSampled": true
+  },
+  {
+    "insertId": "6a9d7125000dbd2a76a8b409",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1412",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.70",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.76.2",
+      "latency": "0.023613263s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "service_name": "zcene-backend-proxy",
+        "configuration_name": "zcene-backend-proxy",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:53.874526Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/32e3f58d5b4827e986a73a76f02d82cf",
+    "receiveTimestamp": "2026-09-06T13:56:54.012517291Z",
+    "spanId": "a42e62673f761bd8"
+  },
+  {
+    "insertId": "6a9d712800043abe311fd681",
+    "httpRequest": {
+      "requestMethod": "OPTIONS",
+      "requestUrl": "https://us-central1-zcene-production.cloudfunctions.net/executeCurationPipeline",
+      "requestSize": "741",
+      "status": 204,
+      "responseSize": "257",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "2a01:4b00:b80b:4e00:684f:8e92:30cb:3e1a",
+      "referer": "https://zcene.online/",
+      "serverIp": "2001:4860:4802:36::36",
+      "latency": "1.944851492s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "executecurationpipeline",
+        "configuration_name": "executecurationpipeline",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "revision_name": "executecurationpipeline-00049-dol"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.089223Z",
+    "severity": "INFO",
+    "labels": {
+      "deployment-callable": "true",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/55f69d9f4807b18a1ddb99296102d032",
+    "receiveTimestamp": "2026-09-06T13:56:56.283660518Z",
+    "spanId": "2c8b3aa71eace630",
+    "traceSampled": true
+  },
+  {
+    "insertId": "6a9d712600021a29c8ed2607",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1412",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.97",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.74.2",
+      "latency": "0.033727483s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "zcene-backend-proxy",
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "project_id": "zcene-production",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.101797Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/db834795d7822e42353e3c872759e455",
+    "receiveTimestamp": "2026-09-06T13:56:54.345450292Z",
+    "spanId": "4d2da5d6e5dd7fd6"
+  },
+  {
+    "textPayload": "Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.",
+    "insertId": "6a9d71260001f0ff72828ac8",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "executecurationpipeline",
+        "location": "us-central1",
+        "service_name": "executecurationpipeline",
+        "project_id": "zcene-production",
+        "revision_name": "executecurationpipeline-00049-dol"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.127231Z",
+    "severity": "INFO",
+    "labels": {
+      "scaling_reason": "AUTOSCALING",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "deployment-callable": "true",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2026-09-06T13:56:54.136387557Z"
+  },
+  {
+    "insertId": "6a9d71260004a55c445cca2a",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1412",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "142.250.32.9",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.77.2",
+      "latency": "0.025230276s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.277328Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/d65ce70dc3d92f2335e2d8b788e67c79",
+    "receiveTimestamp": "2026-09-06T13:56:54.345450292Z",
+    "spanId": "c93b83d005d35567"
+  },
+  {
+    "insertId": "6a9d712600072a5e7f36dd22",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1412",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.7",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.74.2",
+      "latency": "0.022599536s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "project_id": "zcene-production",
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.444731Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/5931ed5f33ba67aaf535a490c7f555bf",
+    "receiveTimestamp": "2026-09-06T13:56:54.677482604Z",
+    "spanId": "9d1f3e2e9c55d51b"
+  },
+  {
+    "insertId": "6a9d7126000a284c2772e836",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1412",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.131",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.77.2",
+      "latency": "0.025251564s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.638387Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/9ff5a30ca9c8c527b16ba479ced26aad",
+    "receiveTimestamp": "2026-09-06T13:56:54.677482604Z",
+    "spanId": "49e57ccbf7b9e06f"
+  },
+  {
+    "textPayload": "Default STARTUP TCP probe succeeded after 1 attempt for container \"worker\" on port 8080.",
+    "insertId": "6a9d7128000341288241a8ab",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "executecurationpipeline",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "configuration_name": "executecurationpipeline",
+        "project_id": "zcene-production",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.213288Z",
+    "severity": "INFO",
+    "labels": {
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "deployment-callable": "true",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2026-09-06T13:56:56.466044842Z"
+  },
+  {
+    "insertId": "6a9d716500085b119c2231d9",
+    "httpRequest": {
+      "requestMethod": "POST",
+      "requestUrl": "https://us-central1-zcene-production.cloudfunctions.net/executeCurationPipeline",
+      "requestSize": "2247",
+      "status": 200,
+      "responseSize": "10119",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "2a01:4b00:b80b:4e00:684f:8e92:30cb:3e1a",
+      "referer": "https://zcene.online/",
+      "serverIp": "2001:4860:4802:36::36",
+      "latency": "61.143844195s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "configuration_name": "executecurationpipeline",
+        "location": "us-central1",
+        "service_name": "executecurationpipeline"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.396034Z",
+    "severity": "INFO",
+    "labels": {
+      "deployment-callable": "true",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/73180df5db9698791ddb99296102d551",
+    "receiveTimestamp": "2026-09-06T13:57:57.553964173Z",
+    "spanId": "b49a0ad190411fbd"
+  },
+  {
+    "insertId": "6a9d712800076092e9faa8d8",
+    "jsonPayload": {
+      "message": "Callable request verification passed",
+      "verifications": {
+        "app": "MISSING",
+        "auth": "VALID"
+      }
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "executecurationpipeline",
+        "location": "us-central1",
+        "configuration_name": "executecurationpipeline",
+        "project_id": "zcene-production",
+        "revision_name": "executecurationpipeline-00049-dol"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.483474Z",
+    "severity": "DEBUG",
+    "labels": {
+      "deployment-callable": "true",
+      "execution_id": "pvlckkxayyqc",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "firebase-log-type": "callable-request-verification",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "trace": "projects/zcene-production/traces/73180df5db9698791ddb99296102d551",
+    "receiveTimestamp": "2026-09-06T13:56:56.493916558Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "textPayload": "[Curation Backend] Executing executeCurationPipeline with payload: {

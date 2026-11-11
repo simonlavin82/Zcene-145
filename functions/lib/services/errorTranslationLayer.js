@@ -42,35 +42,35 @@ exports.ERROR_MAPPING_RULES = [
         rawPattern: "RESOURCE_EXHAUSTED",
         finalMessage: "Operational limits exceeded. The curation engine is temporarily saturated. Retrying in a moment.",
         severity: "transient",
-        targetComponent: "Toast / Local Catch"
+        targetComponent: "GLOBAL TOAST"
     },
     {
         scenario: "API Rate Limit (429)",
         rawPattern: "429",
         finalMessage: "Operational limits exceeded. The curation engine is temporarily saturated. Retrying in a moment.",
         severity: "transient",
-        targetComponent: "Toast / Local Catch"
+        targetComponent: "GLOBAL TOAST"
     },
     {
         scenario: "API Rate Limit (429)",
         rawPattern: "busy",
         finalMessage: "Operational limits exceeded. The curation engine is temporarily saturated. Retrying in a moment.",
         severity: "transient",
-        targetComponent: "Toast / Local Catch"
+        targetComponent: "GLOBAL TOAST"
     },
     {
         scenario: "Proxy Route Failure",
         rawPattern: "Proxying failed",
         finalMessage: "Signal degradation. The curation node is unreachable. Re-establishing connection...",
         severity: "transient",
-        targetComponent: "Toast / Local Catch"
+        targetComponent: "GLOBAL TOAST"
     },
     {
         scenario: "Proxy Route Failure",
         rawPattern: "AI unreachable",
         finalMessage: "Signal degradation. The curation node is unreachable. Re-establishing connection...",
         severity: "transient",
-        targetComponent: "Toast / Local Catch"
+        targetComponent: "GLOBAL TOAST"
     },
     {
         scenario: "Network Loss",
@@ -98,7 +98,7 @@ exports.ERROR_MAPPING_RULES = [
         rawPattern: "taking too long to respond",
         finalMessage: "Curation latency. The AI engine is taking longer than usual to map connections. Retrying in background...",
         severity: "transient",
-        targetComponent: "Toast / Local Catch"
+        targetComponent: "GLOBAL TOAST"
     },
     {
         scenario: "AI Response Timeout",
@@ -155,6 +155,13 @@ exports.ERROR_MAPPING_RULES = [
         finalMessage: "Curation missing. The requested project could not be found or has been deleted.",
         severity: "system",
         targetComponent: "Global Error Overlay"
+    },
+    {
+        scenario: "Empty Bridge / Orphan",
+        rawPattern: "relational bridges",
+        finalMessage: "Synthesis constrained. The curation engine could not discover any relational bridges between the requested seeds within the applied filters. Try widening your search parameters.",
+        severity: "system",
+        targetComponent: "Global Error Overlay"
     }
 ];
 exports.TOAST_MAPPING_RULES = {
@@ -167,8 +174,8 @@ exports.TOAST_MAPPING_RULES = {
     'Zcene renamed (offline sandbox)': 'Local curation renamed. Changes saved in offline sandbox.',
     'Zcene renamed': 'Project title amended. The database has been updated.',
     'Removed from My Stack': 'Artist evicted from your collection stack.',
-    'Added to My Stack': 'Artist catalogued in your collection stack.',
-    'Zcene saved to your dashboard!': 'Curation saved. Project catalogued in your dashboard.',
+    'Added to My Stack': 'Artist cataloged in your collection stack.',
+    'Zcene saved to your dashboard!': 'Curation saved. Project cataloged in your dashboard.',
     'Walkthrough restarted!': 'Introductory protocol re-initialised.',
     'Account deleted successfully': 'Profile purged. Your identity and associated data have been permanently erased.',
     '⚠️ Cache Incomplete': '⚠️ Curation incomplete: Some metadata is missing. Auto-revalidation queued.',
@@ -182,6 +189,12 @@ exports.TOAST_MAPPING_RULES = {
 const translateError = (error) => {
     const rawMessage = error?.message || String(error) || '';
     const errorCode = error?.code || '';
+    // Prevent double-translation: if the backend already translated the error into a valid finalMessage,
+    // return it directly instead of letting it fall through to the 'System anomaly' fallback.
+    const isAlreadyTranslated = exports.ERROR_MAPPING_RULES.find(rule => rule.finalMessage === rawMessage);
+    if (isAlreadyTranslated) {
+        return new ZceneError(rawMessage, isAlreadyTranslated.severity, rawMessage, error);
+    }
     // Loop through defined rules and check for matching patterns
     for (const rule of exports.ERROR_MAPPING_RULES) {
         if (rule.rawPattern === 'auth/requires-recent-login' && (errorCode === 'auth/requires-recent-login' || rawMessage.includes('auth/requires-recent-login'))) {

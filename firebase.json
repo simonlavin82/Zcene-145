@@ -21,6 +21,35 @@
       "**/.*",
       "**/node_modules/**"
     ],
+    "headers": [
+      {
+        "source": "**/*.@(js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=31536000, immutable"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(png|jpg|jpeg|gif|svg|webp)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "max-age=86400"
+          }
+        ]
+      },
+      {
+        "source": "/**",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      }
+    ],
     "rewrites": [
       {
         "source": "/api/gemini/**",
@@ -31,6 +60,34 @@
       },
       {
         "source": "/api/artist/**",
+        "run": {
+          "serviceId": "zcene-backend-proxy",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/label/**",
+        "run": {
+          "serviceId": "zcene-backend-proxy",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/api/og/**",
+        "run": {
+          "serviceId": "zcene-backend-proxy",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/app**",
+        "run": {
+          "serviceId": "zcene-backend-proxy",
+          "region": "us-central1"
+        }
+      },
+      {
+        "source": "/z/**",
         "run": {
           "serviceId": "zcene-backend-proxy",
           "region": "us-central1"

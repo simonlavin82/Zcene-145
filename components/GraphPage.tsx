@@ -1,18 +1,23 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste } from '../types';
-import { User } from '../services/firebase';
+import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste, CanvasNodeRef, ProjectScene, CrossSceneLink, ERA_MIN_BOUND, ERA_MAX_BOUND, CANONICAL_COUNTRIES_22, CANONICAL_GENRE_TAXONOMY, CANONICAL_GENRES_FLAT } from '../types';
+import { User, db } from '../services/firebase';
+import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { normalizeArtistId, titleCaseArtistId, cleanArtistDisplayName } from '../services/artistCacheService';
+import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName } from '../services/artistCacheService';
+import { hasActiveDiscoveryFilters, sanitizeAnchorLabelInput } from '../services/cacheQualification';
+import { toSeedArtistsArray, MAX_SCENES_PER_PROJECT } from '../shared/multiSceneUtils';
 import HelpPage from './HelpPage';
 import Header from './Header';
 import MusicGraph from './MusicGraph';
 import { DetailsPanel } from './DetailsPanel';
-import { LoadingSpinner, ZceneAbbreviatedLogo, FaviconLogo, SortControls, LegendSymbol, HelpIcon, MicIcon, Spinner, StackIcon, LibraryIcon } from './Icons';
+import { LoadingSpinner, ZceneAbbreviatedLogo, FaviconLogo, SortControls, LegendSymbol, HelpIcon, Spinner, StackIcon, LibraryIcon } from './Icons';
 import { analyticsService } from '../services/analyticsService';
 import AdSenseUnit from './AdSenseUnit';
 import OnboardingTooltip from './OnboardingTooltip';
 import * as d3 from 'd3';
-import { RootsBreakdownButton } from './DesignSystem';
+import { RootsBreakdownButton, Select, InputSizes, LayoutSizes, Checkbox, CanvasControlStyles } from './DesignSystem';
+import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
+import { nodeTypeColorMap } from '../utils/formatters';
 
 // Inform TypeScript about the SpeechRecognition and WakeLock APIs
 declare global {
@@ -52,17 +57,21 @@ interface GraphPageProps {
   libraryArtists: ParsedArtist[];
   seedArtists: string;
   onRegenerate: (newArtists: string) => void;
+  onFork?: (newArtists: string) => void;
   isLoading: boolean;
   onCancelGeneration: () => void;
   onFileUpload: (file: File) => void;
   onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
-  onGenerateDeepCut?: (node: Node) => void;
   selectedNode: Node | null;
   peekedNode: Node | null;
   activeNodes: Node[];
   detailsCache: Map<string, NodeDetails>;
+  onUpdateDetailsCache: (cache: Map<string, NodeDetails>) => void;
   loadingNodeIds: Set<string>;
-  onCloseNode: (nodeId: string) => void;
+  isHydrating?: boolean;
+  isPreFlightChecking?: boolean;
+  onTogglePinNode: (nodeId: string) => void;
+  pinnedNodes: Set<string>;
   onRefreshNode: (nodeId: string) => void;
   detailsError: string | null;
   systemError: string | null;
@@ -72,11 +81,11 @@ interface GraphPageProps {
   onClearZcene: () => void;
   isActive: boolean;
   chatHistories: Map<string, ChatMessage[]>;
-  onUpdateChatHistories: (histories: Map<string, ChatMessage[]>) => void;
+  onUpdateChatHistories: (histories: Map<string, ChatMessage[]> | ((prev: Map<string, ChatMessage[]>) => Map<string, ChatMessage[]>)) => void;
   onShowToast: (message: string) => void;
   onRefreshUI: () => void;
-  stack: StackItem[];
-  onToggleStack: (node: Node, link?: string) => void;
+  onAddToStack: (node: Node, link?: string) => void;
+  stackCount: number;
   lastViewedStackCount: number;
   onUpdateLastViewedStackCount: (count: number) => void;
   discoveryFilters: DiscoveryFilters;
@@ -84,7 +93,7 @@ interface GraphPageProps {
   areFiltersChanged?: boolean;
   isMagazineViewOpen: boolean;
   onUpdateIsMagazineViewOpen: (isOpen: boolean) => void;
-  onExtendNode?: (node: Node) => void;
+
   onRemoveNode?: (node: Node) => void;
   user: User | null;
   profile: any;
@@ -108,18 +117,27 @@ interface GraphPageProps {
   setIsStackDialogOpen: (open: boolean) => void;
   isMenuOpen: boolean;
   setIsMenuOpen: (open: boolean) => void;
-  disambiguationDialog: {
-    isOpen: boolean;
-    query: string;
-    candidates: DisambiguationCandidate[];
-    isLiveAISuggestions?: boolean;
-  } | null;
-  onSelectDisambiguation: (choice: string | 'synthesis' | 'cancel') => void;
+  onStashArtist?: (artistName: string) => void;
+  projectId?: string;
+  activeDeepWebSession?: { sessionId: string; remainingMessages: number } | null;
+  /** Phase A — Coordinate Memory: passed through to MusicGraph, fired when
+   * the D3 simulation settles with final artist/label node positions. */
+  onCoordinatesSettled?: (layout: CanvasNodeRef[]) => void;
+  /** V43 Multi-Scene Infinite Board & Layered Zine props */
+  scenes?: ProjectScene[];
+  activeSceneId?: string;
+  onSelectScene?: (sceneId: string) => void;
+  onAddScene?: () => void;
+  onRemoveScene?: (sceneId: string) => void;
+  overarchingRationale?: string;
+  crossSceneLinks?: CrossSceneLink[];
+  isPassiveSelection?: boolean;
 }
 
 const DEFAULT_LEFT_PANEL_WIDTH = 320;
-const DEFAULT_RIGHT_PANEL_WIDTH = 380;
+const DEFAULT_RIGHT_PANEL_WIDTH = 440;
 const MIN_PANEL_WIDTH = 250;
+const MIN_RIGHT_PANEL_WIDTH = 340;
 const MAX_PANEL_WIDTH = 600;
 const COLLAPSED_WIDTH = 64;
 const MIN_GRAPH_WIDTH = 400;
@@ -127,150 +145,693 @@ const MIN_GRAPH_WIDTH = 400;
 // --- Components ---
 import { GenerativeRationaleModal, DisambiguationModal, DisambiguationCandidate } from './SharedModals';
 
-
 const DiscoveryFiltersPanel: React.FC<{
   filters: DiscoveryFilters;
   onUpdate: (filters: DiscoveryFilters) => void;
   isGuest?: boolean;
   onAuthRequest?: () => void;
   userTaste?: UserTaste;
-}> = ({ filters, onUpdate, isGuest, onAuthRequest, userTaste }) => {
+  graphNodes?: Node[];
+}> = ({ filters, onUpdate, isGuest, userTaste, graphNodes }) => {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [originMode, setOriginMode] = useState<'include' | 'exclude'>(() =>
+    filters.excludeOrigins && filters.excludeOrigins.length > 0 ? 'exclude' : 'include'
+  );
+  const [originQuery, setOriginQuery] = useState('');
+  const [isOriginDropdownOpen, setIsOriginDropdownOpen] = useState(false);
+
+  const [genreQuery, setGenreQuery] = useState('');
+  const [isGenreDropdownOpen, setIsGenreDropdownOpen] = useState(false);
+
+  const [labelQuery, setLabelQuery] = useState('');
+  const [isLabelDropdownOpen, setIsLabelDropdownOpen] = useState(false);
+  const [cachedLabelNames, setCachedLabelNames] = useState<string[]>([]);
+  const hasLoadedLabelsRef = useRef(false);
+
+  const originContainerRef = useRef<HTMLDivElement>(null);
+  const genreContainerRef = useRef<HTMLDivElement>(null);
+  const labelContainerRef = useRef<HTMLDivElement>(null);
+
+  // Sync originMode if external filters change (e.g. project load or Reset)
+  useEffect(() => {
+    if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
+      setOriginMode('exclude');
+    } else if (filters.includeOrigins && filters.includeOrigins.length > 0) {
+      setOriginMode('include');
+    }
+  }, [filters.includeOrigins, filters.excludeOrigins]);
+
+  // Load global cached labels strictly from live Firestore /labels collection once when the drawer opens
+  useEffect(() => {
+    if (!isExpanded || hasLoadedLabelsRef.current) return;
+    hasLoadedLabelsRef.current = true;
+    const fetchCachedLabels = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'labels'));
+        const names: string[] = [];
+        snap.forEach(docSnap => {
+          const d = docSnap.data();
+          const rawName = d?.detailsCache?.name || d?.detailsCache?.details?.artist || d?.seedArtists || d?.labelId || d?.artistId || docSnap.id;
+          if (rawName && typeof rawName === 'string') {
+            const display = cleanLabelDisplayName(rawName);
+            if (display) {
+              names.push(display);
+            }
+          }
+        });
+        setCachedLabelNames(names);
+      } catch (err) {
+        // Non-fatal fallback to active graph label nodes
+      }
+    };
+    fetchCachedLabels();
+  }, [isExpanded]);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (originContainerRef.current && !originContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsOriginDropdownOpen(false);
+      }
+      if (genreContainerRef.current && !genreContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsGenreDropdownOpen(false);
+      }
+      if (labelContainerRef.current && !labelContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsLabelDropdownOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const allLabelSuggestions = useMemo(() => {
+    const byNormId = new Map<string, string>();
+    const registerLabel = (raw: string) => {
+      const display = cleanLabelDisplayName(raw);
+      if (!display) return;
+      const normId = normalizeLabelId(display);
+      if (!normId) return;
+      if (!byNormId.has(normId)) {
+        byNormId.set(normId, display);
+      }
+    };
+    cachedLabelNames.forEach(registerLabel);
+    if (Array.isArray(graphNodes)) {
+      graphNodes.forEach(n => {
+        if (n.type === 'label' && (n.label || n.id)) {
+          registerLabel(n.label || n.id);
+        }
+      });
+    }
+    return Array.from(byNormId.values()).sort((a, b) => a.localeCompare(b));
+  }, [cachedLabelNames, graphNodes]);
 
   if (isGuest) {
     return null;
   }
 
-  const updateField = (field: keyof DiscoveryFilters, value: any) => {
-    onUpdate({ ...filters, [field]: value });
-  };
-
-  const hasTasteData = !!userTaste && !!(
-    userTaste.favoriteArtist?.trim() ||
-    userTaste.favoriteGenre?.trim() ||
-    userTaste.favoriteOrigin?.trim() ||
-    userTaste.eraMin !== null ||
-    userTaste.eraMax !== null
+  const activeProfiles = Array.isArray(userTaste) ? userTaste.filter(p => p.isActive) : [];
+  const hasTasteData = activeProfiles.length > 0 && activeProfiles.some(p =>
+    p.style?.trim() ||
+    p.favoriteGenre?.trim() ||
+    p.favoriteOrigin?.trim() ||
+    p.eraMin !== null ||
+    p.eraMax !== null
   );
 
   const handleApplyTaste = () => {
-    if (!userTaste) return;
+    if (!userTaste || !Array.isArray(userTaste)) return;
+    const active = userTaste.filter(p => p.isActive);
+    if (active.length === 0) return;
+
+    let minEra: number | undefined = undefined;
+    let maxEra: number | undefined = undefined;
+    const genres = new Set<string>();
+    const origins = new Set<string>();
+
+    active.forEach(p => {
+      if (p.eraMin !== null && p.eraMin !== undefined) {
+        const clamped = Math.max(ERA_MIN_BOUND, Math.min(ERA_MAX_BOUND, p.eraMin));
+        minEra = minEra === undefined ? clamped : Math.min(minEra, clamped);
+      }
+      if (p.eraMax !== null && p.eraMax !== undefined) {
+        const clamped = Math.max(ERA_MIN_BOUND, Math.min(ERA_MAX_BOUND, p.eraMax));
+        maxEra = maxEra === undefined ? clamped : Math.max(maxEra, clamped);
+      }
+      if (p.favoriteGenre?.trim()) {
+        const match = CANONICAL_GENRES_FLAT.find(g => g.toLowerCase() === p.favoriteGenre!.trim().toLowerCase());
+        if (match) genres.add(match);
+      }
+      if (p.favoriteOrigin?.trim()) {
+        const match = CANONICAL_COUNTRIES_22.find(c => c.toLowerCase() === p.favoriteOrigin!.trim().toLowerCase());
+        if (match) origins.add(match);
+      }
+    });
+
+    const resolvedMin = minEra !== undefined && minEra > ERA_MIN_BOUND ? minEra : undefined;
+    const resolvedMax = maxEra !== undefined && maxEra < ERA_MAX_BOUND ? maxEra : undefined;
+
+    setOriginMode('include');
     onUpdate({
       ...filters,
-      foundedAfter: userTaste.eraMin ?? undefined,
-      foundedBefore: userTaste.eraMax ?? undefined,
-      includeGenres: userTaste.favoriteGenre?.trim() ? [userTaste.favoriteGenre.trim()] : undefined,
-      includeOrigins: userTaste.favoriteOrigin?.trim() ? [userTaste.favoriteOrigin.trim()] : undefined,
+      foundedAfter: resolvedMin,
+      foundedBefore: resolvedMax,
+      includeGenres: genres.size > 0 ? Array.from(genres) : undefined,
+      includeOrigins: origins.size > 0 ? Array.from(origins) : undefined,
+      excludeOrigins: undefined,
     });
   };
 
-  const hasActiveFilters = filters.foundedAfter || 
-                          filters.foundedBefore ||
-                          (filters.includeGenres && filters.includeGenres.length > 0) ||
-                          (filters.includeOrigins && filters.includeOrigins.length > 0) || 
-                          (filters.excludeOrigins && filters.excludeOrigins.length > 0) || 
-                          filters.additionalInstructions;
+  // --- Tier 2: Era Range (1965 – Dynamic Rolling Horizon ERA_MAX_BOUND) ---
+  const isEraActive = (filters.foundedAfter !== undefined && Number(filters.foundedAfter) > ERA_MIN_BOUND) ||
+                      (filters.foundedBefore !== undefined && Number(filters.foundedBefore) < ERA_MAX_BOUND);
+  const minEraVal = filters.foundedAfter !== undefined
+    ? Math.max(ERA_MIN_BOUND, Math.min(ERA_MAX_BOUND, Number(filters.foundedAfter)))
+    : ERA_MIN_BOUND;
+  const maxEraVal = (filters.foundedBefore !== undefined && Number(filters.foundedBefore) < ERA_MAX_BOUND)
+    ? Math.max(ERA_MIN_BOUND, Math.min(ERA_MAX_BOUND, Number(filters.foundedBefore)))
+    : ERA_MAX_BOUND;
+
+  const handleEraRangeChange = (nextMin: number, nextMax: number) => {
+    const clampedMin = Math.max(ERA_MIN_BOUND, Math.min(nextMin, nextMax));
+    const clampedMax = Math.min(ERA_MAX_BOUND, Math.max(nextMin, nextMax));
+
+    // Horizon Normalization:
+    // If the right thumb rests at or above ERA_MAX_BOUND, omit foundedBefore (unbounded upper horizon).
+    // If the left thumb rests at or below ERA_MIN_BOUND, omit foundedAfter (unbounded lower bound).
+    const nextFoundedAfter = clampedMin > ERA_MIN_BOUND ? clampedMin : undefined;
+    const nextFoundedBefore = clampedMax < ERA_MAX_BOUND ? clampedMax : undefined;
+
+    onUpdate({
+      ...filters,
+      foundedAfter: nextFoundedAfter,
+      foundedBefore: nextFoundedBefore,
+    });
+  };
+
+  const handleResetEra = () => {
+    onUpdate({
+      ...filters,
+      foundedAfter: undefined,
+      foundedBefore: undefined,
+    });
+  };
+
+  const eraSpan = ERA_MAX_BOUND - ERA_MIN_BOUND;
+  const minPercent = ((minEraVal - ERA_MIN_BOUND) / eraSpan) * 100;
+  const maxPercent = ((maxEraVal - ERA_MIN_BOUND) / eraSpan) * 100;
+
+  // --- Tier 2: Country Origins (Include | Exclude Toggle + 22-Country Multi-Select) ---
+  const selectedOrigins = originMode === 'include'
+    ? (filters.includeOrigins || [])
+    : (filters.excludeOrigins || []);
+
+  const handleOriginModeToggle = (nextMode: 'include' | 'exclude') => {
+    if (nextMode === originMode) return;
+    const currentList = originMode === 'include'
+      ? (filters.includeOrigins || [])
+      : (filters.excludeOrigins || []);
+    setOriginMode(nextMode);
+    if (nextMode === 'include') {
+      onUpdate({
+        ...filters,
+        includeOrigins: currentList.length > 0 ? currentList : undefined,
+        excludeOrigins: undefined,
+      });
+    } else {
+      onUpdate({
+        ...filters,
+        excludeOrigins: currentList.length > 0 ? currentList : undefined,
+        includeOrigins: undefined,
+      });
+    }
+  };
+
+  const handleAddOrigin = (country: string) => {
+    if (selectedOrigins.includes(country)) return;
+    const next = [...selectedOrigins, country];
+    if (originMode === 'include') {
+      onUpdate({ ...filters, includeOrigins: next, excludeOrigins: undefined });
+    } else {
+      onUpdate({ ...filters, excludeOrigins: next, includeOrigins: undefined });
+    }
+    setOriginQuery('');
+  };
+
+  const handleRemoveOrigin = (country: string) => {
+    const next = selectedOrigins.filter(c => c !== country);
+    if (originMode === 'include') {
+      onUpdate({ ...filters, includeOrigins: next.length > 0 ? next : undefined, excludeOrigins: undefined });
+    } else {
+      onUpdate({ ...filters, excludeOrigins: next.length > 0 ? next : undefined, includeOrigins: undefined });
+    }
+  };
+
+  const filteredCountries = CANONICAL_COUNTRIES_22.filter(c =>
+    !selectedOrigins.includes(c) &&
+    c.toLowerCase().includes(originQuery.trim().toLowerCase())
+  );
+
+  // --- Tier 3: Canonical Genres (Searchable Multi-Select) ---
+  const selectedGenres = filters.includeGenres || [];
+
+  const handleAddGenre = (genre: string) => {
+    if (selectedGenres.includes(genre)) return;
+    onUpdate({ ...filters, includeGenres: [...selectedGenres, genre] });
+    setGenreQuery('');
+  };
+
+  const handleRemoveGenre = (genre: string) => {
+    const next = selectedGenres.filter(g => g !== genre);
+    onUpdate({ ...filters, includeGenres: next.length > 0 ? next : undefined });
+  };
+
+  // --- Tier 3: Anchor Labels (Creatable Combobox) ---
+  const selectedLabels = filters.anchorLabels || [];
+  const sanitizedTypedLabel = sanitizeAnchorLabelInput(labelQuery);
+  const cleanedTypedLabel = cleanLabelDisplayName(sanitizedTypedLabel) || sanitizedTypedLabel;
+
+  const handleAddLabel = (rawLabel: string) => {
+    const sanitized = sanitizeAnchorLabelInput(rawLabel);
+    const clean = cleanLabelDisplayName(sanitized) || sanitized;
+    if (!clean) return;
+    const cleanNorm = normalizeLabelId(clean);
+    if (selectedLabels.some(l => normalizeLabelId(l) === cleanNorm || l.toLowerCase() === clean.toLowerCase())) {
+      setLabelQuery('');
+      return;
+    }
+    onUpdate({ ...filters, anchorLabels: [...selectedLabels, clean] });
+    setLabelQuery('');
+    setIsLabelDropdownOpen(false);
+  };
+
+  const handleRemoveLabel = (label: string) => {
+    const next = selectedLabels.filter(l => l !== label);
+    onUpdate({ ...filters, anchorLabels: next.length > 0 ? next : undefined });
+  };
+
+  const filteredLabelSuggestions = allLabelSuggestions.filter(l => {
+    const lNorm = normalizeLabelId(l);
+    if (selectedLabels.some(sel => normalizeLabelId(sel) === lNorm || sel.toLowerCase() === l.toLowerCase())) {
+      return false;
+    }
+    return l.toLowerCase().includes(sanitizedTypedLabel.toLowerCase()) ||
+      lNorm.includes(normalizeLabelId(sanitizedTypedLabel));
+  }).slice(0, 25);
+
+  const canCreateCustomLabel = cleanedTypedLabel.length > 0 &&
+    !selectedLabels.some(sel => normalizeLabelId(sel) === normalizeLabelId(cleanedTypedLabel) || sel.toLowerCase() === cleanedTypedLabel.toLowerCase()) &&
+    !allLabelSuggestions.some(s => normalizeLabelId(s) === normalizeLabelId(cleanedTypedLabel) || s.toLowerCase() === cleanedTypedLabel.toLowerCase());
+
+  const hasActiveFilters = hasActiveDiscoveryFilters(filters);
+  const activeAnchorCount =
+    (isEraActive ? 1 : 0) +
+    selectedOrigins.length +
+    selectedGenres.length +
+    selectedLabels.length;
 
   return (
     <div className="px-4 mb-2">
       <button
+        type="button"
         onClick={() => setIsExpanded(!isExpanded)}
         className="flex items-center gap-2 text-[10px] font-medium text-zinc-500 hover:text-zinc-300 transition-colors uppercase tracking-widest group"
       >
         <span className={`material-symbols-outlined !text-sm transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`}>
           expand_more
         </span>
-        Seed Filters
+        <span>Anchors</span>
+        {hasActiveFilters && (
+          <span className="px-1.5 py-0.5 text-[9px] font-mono bg-primary/15 text-primary border border-primary/30 rounded-md leading-none">
+            {activeAnchorCount}
+          </span>
+        )}
         {hasActiveFilters && !isExpanded && (
           <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
         )}
       </button>
 
       {isExpanded && (
-        <div className="mt-3 p-4 rounded-none bg-zinc-800/30 border border-zinc-700/50 space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
+        <div className="mt-3 p-4 rounded-xl bg-zinc-800/30 border border-zinc-700/50 space-y-5 animate-in fade-in slide-in-from-top-2 duration-300">
           {hasTasteData && (
             <button
               type="button"
               onClick={handleApplyTaste}
               className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none cursor-pointer"
             >
-              Apply my taste
+              Apply Style
             </button>
           )}
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Founded Era Range (Years)</label>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
+
+          {/* ── TIER 2: SPATIAL & TEMPORAL GUARDRAILS ────────────────────── */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-400">
+                Hard Guardrails
+              </span>
+            </div>
+
+            {/* 1. Dual-Thumb Era Range Slider (1965 – Dynamic Horizon) */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
+                  Founded
+                </label>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[11px] font-mono ${isEraActive ? 'text-primary font-semibold' : 'text-zinc-500'}`}>
+                    {isEraActive ? `${minEraVal} – ${maxEraVal}` : `${ERA_MIN_BOUND} – ${ERA_MAX_BOUND}`}
+                  </span>
+                  {isEraActive && (
+                    <button
+                      type="button"
+                      onClick={handleResetEra}
+                      className="text-[9px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white px-1.5 py-0.5 rounded bg-zinc-800/80 hover:bg-zinc-700 transition-colors"
+                      title={`Reset Founded range to ${ERA_MIN_BOUND} – ${ERA_MAX_BOUND}`}
+                    >
+                      Reset
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <div className="relative h-6 flex items-center select-none">
+                <div className="w-full h-1.5 bg-zinc-950 border border-zinc-800 rounded-full relative overflow-hidden">
+                  <div
+                    className={`absolute top-0 bottom-0 rounded-full transition-colors ${isEraActive ? 'bg-primary' : 'bg-zinc-600/50'}`}
+                    style={{ left: `${minPercent}%`, width: `${Math.max(0, maxPercent - minPercent)}%` }}
+                  />
+                </div>
                 <input
-                  type="number"
-                  placeholder="Min Year"
-                  value={filters.foundedAfter || ''}
-                  onChange={(e) => updateField('foundedAfter', e.target.value ? parseInt(e.target.value) : undefined)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  type="range"
+                  min={ERA_MIN_BOUND}
+                  max={ERA_MAX_BOUND}
+                  step={1}
+                  value={minEraVal}
+                  aria-label="Minimum Founded Year"
+                  onChange={(e) => {
+                    const val = Math.min(Number(e.target.value), maxEraVal);
+                    handleEraRangeChange(val, maxEraVal);
+                  }}
+                  className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-grab"
+                  style={{ zIndex: minEraVal > ERA_MAX_BOUND - 5 ? 5 : 3 }}
+                />
+                <input
+                  type="range"
+                  min={ERA_MIN_BOUND}
+                  max={ERA_MAX_BOUND}
+                  step={1}
+                  value={maxEraVal}
+                  aria-label="Maximum Founded Year"
+                  onChange={(e) => {
+                    const val = Math.max(Number(e.target.value), minEraVal);
+                    handleEraRangeChange(minEraVal, val);
+                  }}
+                  className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-grab"
+                  style={{ zIndex: 4 }}
                 />
               </div>
-              <div className="space-y-1">
+              <div className="flex justify-between text-[9px] font-mono text-zinc-600">
+                <span>{ERA_MIN_BOUND}</span>
+                <span>1980</span>
+                <span>1995</span>
+                <span>2010</span>
+                <span>{ERA_MAX_BOUND}</span>
+              </div>
+            </div>
+
+            {/* 2. Origins (Include | Exclude Toggle + 22-Country Multi-Select) */}
+            <div className="space-y-2" ref={originContainerRef}>
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest">
+                  Origins
+                </label>
+                <div className="inline-flex rounded-lg bg-zinc-950 p-0.5 border border-zinc-800">
+                  <button
+                    type="button"
+                    onClick={() => handleOriginModeToggle('include')}
+                    className={`px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-md transition-colors ${
+                      originMode === 'include'
+                        ? 'bg-zinc-800 text-white font-semibold'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    Include
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleOriginModeToggle('exclude')}
+                    className={`px-2 py-0.5 text-[9px] font-mono uppercase tracking-wider rounded-md transition-colors ${
+                      originMode === 'exclude'
+                        ? 'bg-red-950/80 text-red-300 font-semibold'
+                        : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                  >
+                    Exclude
+                  </button>
+                </div>
+              </div>
+
+              {selectedOrigins.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedOrigins.map(country => (
+                    <span
+                      key={country}
+                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium border ${
+                        originMode === 'exclude'
+                          ? 'bg-red-950/40 border-red-800/50 text-red-200'
+                          : 'bg-zinc-900 border-zinc-700 text-zinc-200'
+                      }`}
+                    >
+                      {originMode === 'exclude' && <span className="text-red-400 font-mono text-[10px]">−</span>}
+                      {country}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveOrigin(country)}
+                        className="text-zinc-400 hover:text-white ml-0.5 leading-none"
+                        aria-label={`Remove ${country}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="relative">
                 <input
-                  type="number"
-                  placeholder="Max Year"
-                  value={filters.foundedBefore || ''}
-                  onChange={(e) => updateField('foundedBefore', e.target.value ? parseInt(e.target.value) : undefined)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  type="text"
+                  placeholder="Select origins..."
+                  value={originQuery}
+                  onFocus={() => setIsOriginDropdownOpen(true)}
+                  onChange={(e) => {
+                    setOriginQuery(e.target.value);
+                    setIsOriginDropdownOpen(true);
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
+                {isOriginDropdownOpen && (
+                  <div className="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                    {filteredCountries.length > 0 ? (
+                      filteredCountries.map(country => (
+                        <button
+                          key={country}
+                          type="button"
+                          onClick={() => handleAddOrigin(country)}
+                          className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center justify-between"
+                        >
+                          <span>{country}</span>
+                          <span className="text-[9px] font-mono text-zinc-500">
+                            {originMode === 'include' ? '+ Include' : '− Exclude'}
+                          </span>
+                        </button>
+                      ))
+                    ) : (
+                      <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical countries</div>
+                    )}
+                  </div>
+                )}
               </div>
             </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Include Genres</label>
-            <input
-              type="text"
-              placeholder="e.g. Hardcore Punk, Grunge"
-              value={filters.includeGenres?.join(', ') || ''}
-              onChange={(e) => updateField('includeGenres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-            />
+          {/* ── TIER 3: SOFT SCENE GRAVITY (Rule 41) ────────────────────── */}
+          <div className="space-y-4 pt-1">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-1.5">
+              <span className="text-[9px] font-mono uppercase tracking-widest text-zinc-400">
+                Scene Gravity
+              </span>
+            </div>
+
+            {/* 3. Genres (Searchable Multi-Select) */}
+            <div className="space-y-2" ref={genreContainerRef}>
+              <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest block">
+                Genres
+              </label>
+
+              {selectedGenres.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedGenres.map(genre => (
+                    <span
+                      key={genre}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-zinc-900 border border-zinc-700 text-zinc-200"
+                    >
+                      {genre}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveGenre(genre)}
+                        className="text-zinc-400 hover:text-white ml-0.5 leading-none"
+                        aria-label={`Remove ${genre}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="relative">
+                <input
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  type="text"
+                  placeholder="Search genres..."
+                  value={genreQuery}
+                  onFocus={() => setIsGenreDropdownOpen(true)}
+                  onChange={(e) => {
+                    setGenreQuery(e.target.value);
+                    setIsGenreDropdownOpen(true);
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                />
+                {isGenreDropdownOpen && (
+                  <div className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                    {Object.entries(CANONICAL_GENRE_TAXONOMY).map(([category, genres]) => {
+                      const matches = genres.filter(g =>
+                        !selectedGenres.includes(g) &&
+                        (g.toLowerCase().includes(genreQuery.trim().toLowerCase()) ||
+                         category.toLowerCase().includes(genreQuery.trim().toLowerCase()))
+                      );
+                      if (matches.length === 0) return null;
+                      return (
+                        <div key={category} className="py-1">
+                          <div className="px-3 py-0.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+                            {category}
+                          </div>
+                          {matches.map(genre => (
+                            <button
+                              key={genre}
+                              type="button"
+                              onClick={() => handleAddGenre(genre)}
+                              className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                            >
+                              {genre}
+                            </button>
+                          ))}
+                        </div>
+                      );
+                    })}
+                    {CANONICAL_GENRES_FLAT.filter(g =>
+                      !selectedGenres.includes(g) &&
+                      g.toLowerCase().includes(genreQuery.trim().toLowerCase())
+                    ).length === 0 && (
+                      <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical genres</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* 4. Labels (Creatable Combobox) */}
+            <div className="space-y-2" ref={labelContainerRef}>
+              <label className="text-[10px] font-medium text-zinc-400 uppercase tracking-widest block">
+                Labels
+              </label>
+
+              {selectedLabels.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedLabels.map(label => (
+                    <span
+                      key={label}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[11px] font-medium bg-zinc-900 border border-zinc-700 text-zinc-200"
+                    >
+                      {label}
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveLabel(label)}
+                        className="text-zinc-400 hover:text-white ml-0.5 leading-none"
+                        aria-label={`Remove ${label}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="relative">
+                <input
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  type="text"
+                  placeholder="Search or add label..."
+                  value={labelQuery}
+                  onFocus={() => setIsLabelDropdownOpen(true)}
+                  onChange={(e) => {
+                    setLabelQuery(e.target.value);
+                    setIsLabelDropdownOpen(true);
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && cleanedTypedLabel) {
+                      e.preventDefault();
+                      handleAddLabel(cleanedTypedLabel);
+                    }
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                />
+                {isLabelDropdownOpen && (filteredLabelSuggestions.length > 0 || canCreateCustomLabel) && (
+                  <div className="absolute z-30 mt-1 w-full max-h-48 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                    {canCreateCustomLabel && (
+                      <button
+                        type="button"
+                        onClick={() => handleAddLabel(cleanedTypedLabel)}
+                        className="w-full text-left px-3 py-1.5 text-xs text-primary hover:bg-zinc-800 transition-colors flex items-center justify-between border-b border-zinc-800/80"
+                      >
+                        <span>Use custom label &ldquo;{cleanedTypedLabel}&rdquo;</span>
+                        <span className="text-[9px] font-mono uppercase">Enter</span>
+                      </button>
+                    )}
+                    {filteredLabelSuggestions.map(label => (
+                      <button
+                        key={label}
+                        type="button"
+                        onClick={() => handleAddLabel(label)}
+                        className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Include Origins</label>
-            <input
-              type="text"
-              placeholder="e.g. Canada, UK"
-              value={filters.includeOrigins?.join(', ') || ''}
-              onChange={(e) => updateField('includeOrigins', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Exclude Origins</label>
-            <input
-              type="text"
-              placeholder="e.g. Australia"
-              value={filters.excludeOrigins?.join(', ') || ''}
-              onChange={(e) => updateField('excludeOrigins', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-            />
-          </div>
-
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-medium text-zinc-500 uppercase tracking-widest block">Additional Instructions</label>
-            <textarea
-              placeholder="e.g. Only underground artists..."
-              value={filters.additionalInstructions || ''}
-              onChange={(e) => updateField('additionalInstructions', e.target.value)}
-              className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all min-h-[60px] resize-none"
-            />
-          </div>
-          
           {hasActiveFilters && (
-            <button 
-              onClick={() => onUpdate({})}
-              className="text-[10px] font-bold text-primary/60 hover:text-primary uppercase tracking-wider transition-colors flex items-center gap-1"
+            <button
+              type="button"
+              onClick={() => {
+                setOriginMode('include');
+                onUpdate({});
+              }}
+              className="text-[10px] font-bold text-primary/60 hover:text-primary uppercase tracking-wider transition-colors flex items-center gap-1 pt-1"
             >
               <span className="material-symbols-outlined !text-xs">restart_alt</span>
-              Reset Filters
+              Reset Anchors
             </button>
           )}
         </div>
@@ -283,41 +844,107 @@ const DiscoveryFiltersPanel: React.FC<{
 const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNavigate }) => (
   <div className="max-w-md w-full pointer-events-auto">
     <div className="flex items-center justify-center mb-2 gap-1">
-        <div className="w-10 shrink-0 invisible" aria-hidden="true" />
-        <h3 className="text-xs font-medium text-white text-center">Create Your Zcene</h3>
-        <button onClick={() => onNavigate(View.Help)} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors pointer-events-auto shrink-0 leading-none" title="Help">
-            <HelpIcon className="!text-[18px]" />
-        </button>
+      <div className="w-10 shrink-0 invisible" aria-hidden="true" />
+      <h3 className="text-xs font-medium text-white text-center">Create Your Zcene</h3>
+      <button
+        onClick={() => onNavigate(View.Help)}
+        className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors pointer-events-auto shrink-0 leading-none"
+        title="View Zcene guide, keyboard shortcuts & rules"
+      >
+        <HelpIcon className="!text-[18px]" />
+      </button>
     </div>
     <div className="mt-3 text-zinc-400 text-xs space-y-4">
-        <p className="text-center px-4">Start with a few of your favourite artists, and Zcene will map how they connect across genres, labels, origins, and scenes.</p>
-        <div className="text-left bg-zinc-800/30 p-5 rounded-none border border-zinc-700/50 mx-4 text-xs">
-            <p className="font-medium text-zinc-200 mb-2">How it works</p>
-            <ol className="list-decimal list-inside space-y-1 text-zinc-400">
-                <li>Add 1–5 artists (or import your library).</li>
-                <li>Create your Zcene.</li>
-                <li>Drag, filter, and explore the spiderweb.</li>
-            </ol>
-        </div>
+      <p className="text-center px-4 leading-relaxed">Start with 1–5 root artists, and Zcene will map how their scenes connect across genres, labels, origins, and eras.</p>
+      <div className="text-left bg-zinc-800/30 p-5 rounded-xl border border-zinc-700/50 mx-4 text-xs">
+        <p className="font-medium text-zinc-200 mb-2">How it works</p>
+        <ol className="list-decimal list-inside space-y-1.5 text-zinc-400 leading-normal">
+          <li>Add 1–5 roots to build your first Scene (or import your library).</li>
+          <li>Create your Zcene to map the musical constellation.</li>
+          <li>Add up to 5 scenes to bridge connections and read the multi-scene Zine.</li>
+        </ol>
+      </div>
     </div>
   </div>
 );
 
+const UpdateInterceptModal: React.FC<{ 
+    isOpen: boolean; 
+    onClose: () => void; 
+    onOverwrite: () => void;
+    onSaveAsNew: () => void;
+    confirmOverwrite: boolean;
+    setConfirmOverwrite: (val: boolean) => void;
+}> = ({ isOpen, onClose, onOverwrite, onSaveAsNew, confirmOverwrite, setConfirmOverwrite }) => {
+    if (!isOpen) return null;
+    return (
+        <ModalBackdrop className="z-[110]" onClick={onClose}>
+            <ModalContainer className="sm:max-w-md">
+                <ModalHeader>
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-primary !text-[18px]">account_tree</span>
+                        <h3 className="font-medium text-white text-base">Update Zcene</h3>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                        <span className="material-symbols-outlined !text-[18px]">close</span>
+                    </button>
+                </ModalHeader>
+                <ModalBody>
+                    <p className="text-zinc-300 text-sm mb-4">
+                        You are about to generate new connections. Would you like to fork a new Zcene, or overwrite the existing one?
+                    </p>
+                    <div className="p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl hover:bg-zinc-800/50 transition-colors">
+                        <Checkbox 
+                            checked={confirmOverwrite}
+                            onChange={(e) => setConfirmOverwrite(e.target.checked)}
+                            label="I understand that overwriting will replace my current connections."
+                        />
+                    </div>
+                </ModalBody>
+                <ModalFooter className="flex flex-col sm:flex-row gap-3 justify-end items-center">
+                    <button 
+                        onClick={onOverwrite} 
+                        disabled={!confirmOverwrite}
+                        className={`w-full sm:w-auto px-4 py-2 rounded-xl font-medium text-sm transition-all text-center ${confirmOverwrite ? 'bg-zinc-800 text-red-400 border border-red-500/30 hover:bg-red-500/10' : 'bg-zinc-800/50 text-zinc-600 border border-zinc-800 cursor-not-allowed'}`}
+                    >
+                        Overwrite Existing
+                    </button>
+                    <button 
+                        onClick={onSaveAsNew} 
+                        className="w-full sm:w-auto px-4 py-2 bg-white text-brand-black rounded-xl font-medium text-sm transition-colors hover:opacity-90 text-center"
+                    >
+                        Save as New Zcene
+                    </button>
+                </ModalFooter>
+            </ModalContainer>
+        </ModalBackdrop>
+    );
+};
+
 const LimitReachedDialog: React.FC<{ isOpen: boolean; onClose: () => void; }> = ({ isOpen, onClose }) => {
     if (!isOpen) return null;
     return (
-        <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down" style={{ animationDuration: '200ms' }} onClick={onClose}>
-            <div className="bg-background-dark border border-zinc-600 rounded-none w-full sm:max-w-md shadow-2xl p-6 text-center space-y-4" onClick={e => e.stopPropagation()}>
-                 <div className="mx-auto w-12 h-12 bg-zinc-800 rounded-none flex items-center justify-center text-zinc-400">
-                    <span className="material-symbols-outlined !text-3xl">warning</span>
-                 </div>
-                 <h3 className="text-xl font-medium text-white">Artist Limit Reached</h3>
-                 <p className="text-zinc-400 text-sm leading-relaxed">To ensure the best performance and graph quality, you can only add up to 5 seed artists.</p>
-                 <button onClick={onClose} className="w-full rounded-xl bg-primary px-4 py-1.5 text-sm font-medium text-brand-black transition-colors hover:bg-primary/90">
-                    Got it
-                 </button>
-            </div>
-        </div>
+        <ModalBackdrop className="z-[110]" onClick={onClose}>
+            <ModalContainer className="sm:max-w-md">
+                <ModalHeader>
+                    <div className="flex items-center gap-2">
+                        <span className="material-symbols-outlined text-yellow-400 !text-[18px]">warning</span>
+                        <h3 className="font-medium text-white text-base">Artist Limit Reached</h3>
+                    </div>
+                    <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
+                        <span className="material-symbols-outlined !text-[18px]">close</span>
+                    </button>
+                </ModalHeader>
+                <ModalBody>
+                    To ensure the best performance and graph quality, you can only add up to 5 seeds.
+                </ModalBody>
+                <ModalFooter>
+                    <button onClick={onClose} className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-colors hover:opacity-90">
+                        Got it
+                    </button>
+                </ModalFooter>
+            </ModalContainer>
+        </ModalBackdrop>
     );
 };
 
@@ -338,10 +965,10 @@ const LibraryDialog: React.FC<{
   artistGenreMap, fileInputRef, onTriggerClear
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
-  const [isListening, setIsListening] = useState(false);
   const [sortConfig, setSortConfig] = useState<{ key: SortKey; direction: 'asc' | 'desc' }>({ key: 'dateAdded', direction: 'desc' });
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [isGenreSectionVisible, setSearchSectionVisible] = useState(false);
+  const [isGenreOpen, setIsGenreOpen] = useState(false);
+  const genrePopoverRef = useRef<HTMLDivElement>(null);
   
   const selectedArtistNames = useMemo(() => new Set(selectedArtists.map(a => a.name)), [selectedArtists]);
 
@@ -358,39 +985,16 @@ const LibraryDialog: React.FC<{
     setSelectedGenres(prev => prev.includes(genre) ? prev.filter(g => g !== genre) : [...prev, genre]);
   };
 
-  const handleSpeechToText = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Speech recognition is not supported in this browser. Try Chrome or Safari.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.interimResults = false;
-    recognition.maxAlternatives = 1;
-
-    setIsListening(true);
-    recognition.start();
-
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      setSearchTerm(transcript);
-    };
-
-    recognition.onerror = (event: any) => {
-      if (event.error === 'not-allowed') {
-        alert("Microphone access was denied. Please enable microphone permissions in your browser settings to use speech-to-text.");
-      } else {
-        console.error("Speech recognition error", event.error);
+  useEffect(() => {
+    if (!isGenreOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (genrePopoverRef.current && !genrePopoverRef.current.contains(e.target as HTMLElement)) {
+        setIsGenreOpen(false);
       }
-      setIsListening(false);
     };
-
-    recognition.onend = () => {
-      setIsListening(false);
-    };
-  };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isGenreOpen]);
 
   const sortedAndFilteredLibraryArtists = useMemo(() => {
     const sorted = [...libraryArtists].sort((a, b) => {
@@ -413,8 +1017,14 @@ const LibraryDialog: React.FC<{
     const genreFiltered = selectedGenres.length === 0
         ? sorted
         : sorted.filter(artist => {
-            const artistGenres = artistGenreMap.get(artist.name);
-            return artistGenres ? selectedGenres.some(g => artistGenres.has(g)) : false;
+            const normalizedArtistId = normalizeArtistId(artist.name);
+            const artistGenres = artistGenreMap.get(normalizedArtistId) || artistGenreMap.get(artist.name) || artistGenreMap.get(artist.name.trim());
+            if (!artistGenres) return false;
+            
+            return selectedGenres.some(selected => {
+                const selLower = selected.trim().toLowerCase();
+                return Array.from(artistGenres).some(g => (g as string).trim().toLowerCase() === selLower);
+            });
         });
 
     if (!searchTerm) return genreFiltered;
@@ -423,9 +1033,9 @@ const LibraryDialog: React.FC<{
   }, [libraryArtists, searchTerm, sortConfig, selectedGenres, artistGenreMap, selectedArtistNames]);
 
   if (!isOpen) return null;  return (
-    <div className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down" style={{animationDuration: '200ms'}} onClick={onClose}>
-        <div className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-2xl h-[90vh] max-h-[700px] shadow-2xl flex flex-col" onClick={e => e.stopPropagation()}>
-            <header className="p-3 bg-zinc-900 flex-shrink-0 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop className="z-[110]" onClick={onClose}>
+        <ModalContainer className="max-w-3xl h-[90vh] max-h-[700px]">
+            <ModalHeader>
                 <div className="flex items-center gap-2">
                     <LibraryIcon className="text-primary !text-[18px]" />
                     <h3 className="text-lg font-medium text-white">Your Music Library ({libraryArtists.length})</h3>
@@ -433,57 +1043,69 @@ const LibraryDialog: React.FC<{
                 <button onClick={onClose} className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none aspect-square">
                     <span className="material-symbols-outlined !text-[18px]">close</span>
                 </button>
-            </header>
+            </ModalHeader>
 
-            <div className="p-4 flex-shrink-0 border-b border-zinc-700 space-y-3">
+            <div className="relative z-10 p-4 flex-shrink-0 border-b border-zinc-700 space-y-3">
                 <div className="relative">
-                    <input
+                    <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
+                    <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                         type="search"
                         placeholder="Search your library..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 text-sm px-4 pr-24 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none font-normal"
+                        className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none font-normal ${InputSizes.md.magazineSearch}`}
                     />
-                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                        {!searchTerm && (
-                            <button
-                                onClick={handleSpeechToText}
-                                className={`w-10 h-10 flex flex-shrink-0 items-center justify-center rounded-xl transition-colors leading-none ${isListening ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`}
-                                title="Search by voice"
-                            >
-                                <MicIcon className="!text-[18px]" />
-                            </button>
-                        )}
-                        {searchTerm && (
+                    {searchTerm && (
+                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                             <button 
                                 onClick={() => setSearchTerm('')} 
-                                className="w-10 h-10 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none" 
+                                className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.md.iconBtn}`}
                                 aria-label="Clear search"
                             >
-                                <span className="material-symbols-outlined !text-[18px]">close</span>
+                                <span className={`material-symbols-outlined ${InputSizes.md.icon}`}>close</span>
                             </button>
-                        )}
-                    </div>
+                        </div>
+                    )}
                 </div>
-                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex flex-row items-center justify-between gap-3 w-full">
                     <SortControls sortConfig={sortConfig} onSortChange={handleSortChange} />
-                    <div className="relative w-full sm:w-56">
-                        <button onClick={() => setSearchSectionVisible(!isGenreSectionVisible)} className="w-full flex items-center justify-between text-left text-sm font-medium text-zinc-300 py-3 sm:py-2 px-3 bg-zinc-800 hover:bg-zinc-700 rounded-xl" aria-expanded={isGenreSectionVisible}>
-                            <span>Filter by Genre {selectedGenres.length > 0 && `(${selectedGenres.length})`}</span>
-                            <span className="material-symbols-outlined transition-transform duration-200" style={{ transform: isGenreSectionVisible ? 'rotate(180deg)' : '' }}>expand_more</span>
+                    <div className="static sm:relative shrink-0" ref={genrePopoverRef}>
+                        <button
+                            onClick={() => setIsGenreOpen(v => !v)}
+                            className={`flex items-center gap-2 rounded-xl border px-3 ${LayoutSizes.controlBar} text-xs font-medium transition-colors ${
+                                selectedGenres.length > 0
+                                    ? 'border-primary/60 bg-primary/10 text-primary'
+                                    : 'border-zinc-700 bg-zinc-950 text-zinc-200'
+                            }`}
+                            aria-expanded={isGenreOpen}
+                        >
+                            <span className="material-symbols-outlined !text-[14px]">filter_list</span>
+                            {selectedGenres.length > 0 ? `${selectedGenres.length} Genre${selectedGenres.length > 1 ? 's' : ''}` : 'All Genres'}
+                            <span className="material-symbols-outlined !text-[14px] transition-transform duration-200" style={{ transform: isGenreOpen ? 'rotate(180deg)' : '' }}>expand_more</span>
                         </button>
-                        {isGenreSectionVisible && (
-                            <div className="absolute top-full right-0 mt-1 w-full sm:w-64 bg-zinc-900 border border-zinc-700 rounded-none shadow-lg z-10 p-2">
-                                <div className="flex justify-end items-center px-1 mb-1">
-                                    <button onClick={() => setSelectedGenres([])} className="text-xs font-medium text-zinc-400 transition-colors hover:text-primary hover:underline">Clear</button>
+                        {isGenreOpen && uniqueGenres.length > 0 && (
+                            <div className="absolute top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-1.5 w-auto sm:w-56 max-w-none rounded-xl border border-zinc-700 bg-zinc-950 z-20 flex flex-col">
+                                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 rounded-t-xl">
+                                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Filter by Genre</span>
+                                    {selectedGenres.length > 0 && (
+                                        <button onClick={() => setSelectedGenres([])} className="text-[10px] font-semibold text-zinc-400 hover:text-primary transition-colors uppercase tracking-widest">
+                                            Clear
+                                        </button>
+                                    )}
                                 </div>
-                                <div className="max-h-48 overflow-y-auto space-y-1 pr-1">
-                                    {uniqueGenres.map(genre => (
-                                        <label key={genre} className="flex items-center gap-2 px-2.5 py-1.5 rounded-xl transition-colors hover:bg-zinc-800 cursor-pointer">
-                                            <input type="checkbox" checked={selectedGenres.includes(genre)} onChange={() => handleGenreToggle(genre)} className="h-4 w-4 rounded-md bg-zinc-700 border-zinc-600 text-primary focus:ring-primary focus:ring-offset-zinc-900" />
-                                            <span className="text-sm text-zinc-300 select-none">{genre}</span>
-                                        </label>
-                                    ))}
+                                <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5 rounded-b-xl">
+                                    {[...uniqueGenres].sort().map(genre => {
+                                        const isChecked = selectedGenres.includes(genre);
+                                        return (
+                                            <label key={genre} className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${ isChecked ? 'bg-primary/10' : 'hover:bg-zinc-800/80' }`}>
+                                                <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors ${ isChecked ? 'text-primary' : 'text-zinc-600' }`}>
+                                                    {isChecked ? 'check_box' : 'check_box_outline_blank'}
+                                                </span>
+                                                <input type="checkbox" checked={isChecked} onChange={() => handleGenreToggle(genre)} className="sr-only" />
+                                                <span className={`text-xs select-none truncate ${ isChecked ? 'text-white font-medium' : 'text-zinc-300' }`}>{genre}</span>
+                                            </label>
+                                        );
+                                    })}
                                 </div>
                             </div>
                         )}
@@ -492,44 +1114,54 @@ const LibraryDialog: React.FC<{
             </div>
 
             <div className="flex-grow overflow-y-auto p-4" style={{ overscrollBehaviorY: 'contain' }}>
-                <div className="space-y-1">
-                    {sortedAndFilteredLibraryArtists.map(artist => (
-                        <button
-                            key={artist.name}
-                            onClick={() => onArtistToggle(artist.name)}
-                            className={`w-full text-left rounded-xl px-4 py-3 text-base sm:py-2 sm:text-sm font-medium transition-colors flex items-center justify-between ${
-                                selectedArtistNames.has(artist.name)
-                                    ? 'text-white bg-zinc-700/80'
-                                    : 'text-zinc-300 hover:bg-zinc-800/50'
-                            }`}
-                        >
-                            <span className="truncate select-none">{artist.name}</span>
-                            <span className={`material-symbols-outlined transition-colors ${selectedArtistNames.has(artist.name) ? 'text-primary' : 'text-transparent'}`}>
-                               check_circle
-                            </span>
-                        </button>
-                    ))}
-                </div>
+                {sortedAndFilteredLibraryArtists.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-zinc-500 space-y-3 min-h-[200px]">
+                        <span className="material-symbols-outlined !text-4xl text-zinc-700">search_off</span>
+                        <p className="text-sm font-medium">No artists found matching selected filters.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-1">
+                        {sortedAndFilteredLibraryArtists.map(artist => (
+                            <button
+                                key={artist.name}
+                                onClick={() => onArtistToggle(artist.name)}
+                                className={`w-full text-left rounded-xl px-4 py-3 text-base sm:py-2 sm:text-sm font-medium transition-colors flex items-center justify-between ${
+                                    selectedArtistNames.has(artist.name)
+                                        ? 'text-white bg-zinc-700/80'
+                                        : 'text-zinc-300 hover:bg-zinc-800/50'
+                                }`}
+                            >
+                                <span className="truncate select-none">{artist.name}</span>
+                                <span className={`material-symbols-outlined transition-colors ${selectedArtistNames.has(artist.name) ? 'text-primary' : 'text-transparent'}`}>
+                                   check_circle
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                )}
             </div>
 
-            <footer className="p-4 bg-zinc-900 flex-shrink-0 border-t border-zinc-700 flex justify-between items-center">
-                <button onClick={onTriggerClear} className="rounded-xl border border-zinc-600 bg-transparent px-6 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-800 transition-colors">Clear Library</button>
-                <button onClick={onClose} className="rounded-xl bg-primary px-6 py-2 text-sm font-medium text-brand-black transition-opacity hover:opacity-90">Done</button>
-            </footer>
-        </div>
-    </div>
+            <ModalFooter className="justify-between">
+                <button onClick={onTriggerClear} className="flex items-center gap-2 rounded-xl border border-red-500/50 bg-red-500/10 px-4 py-2 text-sm font-medium text-red-400 hover:bg-red-500/20 transition-colors">
+                    <span className="material-symbols-outlined !text-[18px]">delete_sweep</span>
+                    Clear Library
+                </button>
+                <button onClick={onClose} className="rounded-xl bg-white px-6 py-2 text-sm font-medium text-brand-black transition-opacity hover:opacity-90">Done</button>
+            </ModalFooter>
+        </ModalContainer>
+    </ModalBackdrop>
   );
 };
 
 const GraphPage: React.FC<GraphPageProps> = ({
-  data, baseGraph, libraryArtists, seedArtists, onRegenerate, isLoading,
-  onCancelGeneration, onFileUpload, onNodeClick, onGenerateDeepCut, selectedNode, peekedNode,
-  activeNodes, detailsCache, loadingNodeIds, onCloseNode, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
-  chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, stack, onToggleStack,
-  lastViewedStackCount, onUpdateLastViewedStackCount,
+  data, baseGraph, libraryArtists, seedArtists, onRegenerate, onFork, isLoading,
+  onCancelGeneration, onFileUpload, onNodeClick, selectedNode, peekedNode,
+  activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onTogglePinNode, pinnedNodes, onRefreshNode, detailsError, systemError, onLogoClick, onNavigate, onClearLibrary, onClearZcene, isActive,
+  chatHistories, onUpdateChatHistories, onShowToast, onRefreshUI, onAddToStack,
+  stackCount, lastViewedStackCount, onUpdateLastViewedStackCount,
   discoveryFilters, onUpdateDiscoveryFilters, areFiltersChanged = false,
   isMagazineViewOpen, onUpdateIsMagazineViewOpen,
-  onExtendNode, onRemoveNode,
+  onRemoveNode,
   user, profile, onUpdateProfile, isAuthInitialized, onLogin, onLogout,
   onDeleteAccount,
   onSaveToDashboard,
@@ -542,22 +1174,44 @@ const GraphPage: React.FC<GraphPageProps> = ({
   isDeleteAccountModalOpen, setIsDeleteAccountModalOpen,
   isStackDialogOpen, setIsStackDialogOpen,
   isMenuOpen, setIsMenuOpen,
-  disambiguationDialog, onSelectDisambiguation
+  onStashArtist,
+  projectId,
+  onCoordinatesSettled,
+  isHydrating,
+  isPreFlightChecking = false,
+  activeDeepWebSession: propsActiveDeepWebSession,
+  scenes = [],
+  activeSceneId,
+  onSelectScene,
+  onAddScene,
+  onRemoveScene,
+  overarchingRationale,
+  crossSceneLinks,
+  isPassiveSelection = false,
 }) => {
   const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  const [focusedSceneCluster, setFocusedSceneCluster] = useState<{ sceneId: string; timestamp: number } | undefined>(undefined);
+  const hasInitializedPanelRef = useRef(false);
+
+  useEffect(() => {
+      if (hasInitializedPanelRef.current || data.nodes.length === 0) return;
+      hasInitializedPanelRef.current = true;
+      const isFirst = data.nodes.length === seedArtists.split('::').filter(Boolean).length;
+      setIsLeftPanelCollapsed(!isFirst);
+  }, [data.nodes.length, seedArtists]);
   const [isDetailsPanelCollapsed, setIsDetailsPanelCollapsed] = useState(true);
+  const [deepWebSession, setDeepWebSession] = useState<{ sessionId: string; remainingMessages: number } | null>(null);
+  const effectiveDeepWebSession = propsActiveDeepWebSession !== undefined ? propsActiveDeepWebSession : deepWebSession;
+
   const fileInputRef = React.useRef<HTMLInputElement>(null);
   const [viewedRationale, setViewedRationale] = useState<string | null>(null);
   
   const [selectedSeedArtists, setSelectedSeedArtists] = useState<SelectedArtist[]>(() =>
     seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }))
   );
-  const [prevSeedArtists, setPrevSeedArtists] = useState(seedArtists);
-
-  if (seedArtists !== prevSeedArtists) {
-    setPrevSeedArtists(seedArtists);
+  useEffect(() => {
     setSelectedSeedArtists(seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true })));
-  }
+  }, [seedArtists]);
   
   const handleToggleArtist = (artistName: string) => {
     setSelectedSeedArtists(prev => prev.map(a => 
@@ -566,8 +1220,29 @@ const GraphPage: React.FC<GraphPageProps> = ({
   };
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [isSeedDropdownOpen, setIsSeedDropdownOpen] = useState(false);
+  const [highlightedSeedIndex, setHighlightedSeedIndex] = useState(-1);
+  const seedInputContainerRef = useRef<HTMLDivElement>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
+  const [isSimulationSettling, setIsSimulationSettling] = useState(true);
+
+  // Simulation Settling Safety Timeout: If not loading, not hydrating, and nodes are present,
+  // ensure the connections overlay blur/spinner never deadlocks longer than 2.5s.
+  useEffect(() => {
+    if (!isLoading && !isHydrating && data.nodes.length > 0 && isSimulationSettling) {
+      const timer = setTimeout(() => {
+        setIsSimulationSettling(false);
+      }, 2500);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, isHydrating, data.nodes.length, isSimulationSettling]);
+
+  useEffect(() => {
+    if (isLoading || isHydrating) {
+      setIsSimulationSettling(true);
+    }
+  }, [isLoading, isHydrating]);
   
   const [isSmallScreen, setIsSmallScreen] = useState(() => {
       if (typeof window !== 'undefined') {
@@ -610,10 +1285,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
   });
 
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
+  const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
+  const [scenePendingRemoval, setScenePendingRemoval] = useState<{ sceneId: string; title: string; index: number } | null>(null);
+  const [pendingUpdateSeed, setPendingUpdateSeed] = useState('');
+  const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [isExpectingUpload, setIsExpectingUpload] = useState(false);
   const [leftPanelWidth, setLeftPanelWidth] = useState(DEFAULT_LEFT_PANEL_WIDTH);
   const [rightPanelWidth, setRightPanelWidth] = useState(DEFAULT_RIGHT_PANEL_WIDTH);
-  const [isRationaleModalOpen, setIsRationaleModalOpen] = useState(false);
   const leftPanelPreCollapseWidth = useRef(DEFAULT_LEFT_PANEL_WIDTH);
   const rightPanelPreCollapseWidth = useRef(DEFAULT_RIGHT_PANEL_WIDTH);
   const resizingPanelRef = useRef<'left' | 'right' | null>(null);
@@ -678,14 +1356,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isLoading, requestWakeLock]);
 
-  useEffect(() => {
-    if (isSmallScreen && seedArtists) {
-      const seeds = seedArtists.split('::').map(a => a.trim()).filter(Boolean);
-      if (seeds.length > 0) {
-        setActiveTab('spiderweb');
-      }
-    }
-  }, [seedArtists, isSmallScreen]);
+  // V44: Retain ROOTS tab on mobile when switching Scene pills (do not flip to spiderweb).
 
   useEffect(() => {
     if (isSmallScreen && mobileTabContainerRef.current) mobileTabContainerRef.current.scrollLeft = 0;
@@ -696,6 +1367,17 @@ const GraphPage: React.FC<GraphPageProps> = ({
       setActiveTab('details');
     }
   }, [isMagazineViewOpen, isSmallScreen, activeTab]);
+
+  useEffect(() => {
+    const handleSwitchToSpiderweb = () => {
+      setIsLeftPanelCollapsed(true);
+      if (isSmallScreen) {
+        setActiveTab('spiderweb');
+      }
+    };
+    window.addEventListener('switch-to-connections-tab', handleSwitchToSpiderweb);
+    return () => window.removeEventListener('switch-to-connections-tab', handleSwitchToSpiderweb);
+  }, [isSmallScreen]);
 
 
 
@@ -771,7 +1453,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     setIsLeftPanelCollapsed(false);
     
     // Show a toast to notify user
-    onShowToast("Walkthrough restarted!");
+
   }, [user, onUpdateProfile, onNodeClick, onUpdateIsMagazineViewOpen, onShowToast]);
 
   useEffect(() => {
@@ -820,7 +1502,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
       if (target === 'artists') {
           setSearchTerm(prev => prev ? `${prev}, ${transcript}` : transcript);
           if (!onboardingProgress.step1) updateOnboarding('step1');
-      } else setSearchQuery(transcript);
+      } else {
+          setSearchQuery(transcript);
+          if (selectedNode) onNodeClick(null);
+      }
     };
     recognition.onerror = () => { setIsListeningForArtists(false); setIsListeningForGraph(false); };
     recognition.onend = () => { setIsListeningForArtists(false); setIsListeningForGraph(false); };
@@ -852,9 +1537,20 @@ const GraphPage: React.FC<GraphPageProps> = ({
       setActiveTab('spiderweb');
     }
   }, []);
-  
-  
-  
+
+  // Close seed autocomplete dropdown on outside click
+  useEffect(() => {
+    if (!isSeedDropdownOpen) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      if (seedInputContainerRef.current && !seedInputContainerRef.current.contains(e.target as globalThis.Node)) {
+        setIsSeedDropdownOpen(false);
+        setHighlightedSeedIndex(-1);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [isSeedDropdownOpen]);
+
   useEffect(() => {
     if (isLeftPanelCollapsed) {
         if (leftPanelWidth > COLLAPSED_WIDTH) leftPanelPreCollapseWidth.current = leftPanelWidth;
@@ -873,8 +1569,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
     onNodeClick(node, forceActionState);
     if (node) {
       analyticsService.track('Node Clicked', { node_id: node?.id, node_type: node?.type });
-      if (!isSmallScreen) {
-        setIsLeftPanelCollapsed(true);
+      
+      const isEntityNode = node.type === 'artist' || node.type === 'label';
+      
+      if (isEntityNode) {
+        if (!isSmallScreen) {
+          setIsLeftPanelCollapsed(true);
+        } else {
+          setActiveTab('details');
+        }
       }
     }
   }, [onNodeClick, isSmallScreen]);
@@ -981,11 +1684,22 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const memoizedAllSeedArtists = useMemo(() => selectedSeedArtists.map(a => a.name), [selectedSeedArtists]);
 
   // My Stack Action State logic: Action if stack size has grown since last visit to dialog
-  const isStackNew = useMemo(() => stack.length > lastViewedStackCount, [stack.length, lastViewedStackCount]);
+  const isStackNew = useMemo(() => stackCount > lastViewedStackCount, [stackCount, lastViewedStackCount]);
   const unreadDetailsCount = useMemo(() => activeNodes.filter(n => !readNodeIds.has(n.id.trim().toLowerCase())).length, [activeNodes, readNodeIds]);
-  const artistIndicatorStyles = useMemo(() => isArtistPending ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700', [isArtistPending]);
+  const artistIndicatorStyles = useMemo(() => isArtistPending ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700', [isArtistPending]);
   
+  const activeScene = useMemo(
+    () => scenes.find(s => (s.sceneId || s.id) === activeSceneId) || scenes[0] || null,
+    [scenes, activeSceneId]
+  );
   const isFirstGeneration = useMemo(() => data.nodes.length === 0 && !seedArtists, [data.nodes.length, seedArtists]);
+  // V43.1: The Update gate is project-scoped. Once ANY scene is mapped, every subsequent
+  // generation (modifying a scene OR curating a newly added scene) routes through
+  // UpdateInterceptModal (Save as New Zcene [default] vs. Overwrite Existing).
+  const hasExistingProjectGraph = useMemo(
+    () => data.nodes.length > 0 || scenes.some(s => (s.graphData?.nodes?.length || 0) > 0),
+    [data.nodes.length, scenes]
+  );
 
   const handleApplyChanges = () => {
     if (!user) {
@@ -1024,9 +1738,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
     if (enabledArtists.length === 0 || isOverLimit) return;
     
     const newSeed = enabledArtists.join('::');
-    onRegenerate(newSeed);
     
-    if (isSmallScreen) { setActiveTab('spiderweb'); setIsLeftPanelCollapsed(true); } else setIsLeftPanelCollapsed(true);
+    if (hasExistingProjectGraph) {
+      setPendingUpdateSeed(newSeed);
+      setConfirmOverwrite(false);
+      setIsUpdateModalOpen(true);
+      return;
+    }
+
+    onRegenerate(newSeed);
     if (!onboardingProgress.step2) updateOnboarding('step2');
   };
   
@@ -1045,7 +1765,87 @@ const GraphPage: React.FC<GraphPageProps> = ({
         return [...prev, ...artistsToAdd.map(name => ({ name, enabled: true }))];
       });
       setSearchTerm('');
+      setIsSeedDropdownOpen(false);
+      setHighlightedSeedIndex(-1);
       if (!onboardingProgress.step1) updateOnboarding('step1');
+    }
+  };
+
+  const matchingLibraryArtists = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    if (!query || !libraryArtists || libraryArtists.length === 0) return [];
+
+    const selectedNorms = new Set(selectedSeedArtists.map(s => normalizeArtistId(s.name)));
+
+    const startsWithMatches: ParsedArtist[] = [];
+    const containsMatches: ParsedArtist[] = [];
+
+    for (const artist of libraryArtists) {
+      if (!artist || !artist.name) continue;
+      const norm = normalizeArtistId(artist.name);
+      if (selectedNorms.has(norm)) continue;
+
+      const lowerName = artist.name.toLowerCase();
+      if (lowerName.startsWith(query)) {
+        startsWithMatches.push(artist);
+      } else if (lowerName.includes(query)) {
+        containsMatches.push(artist);
+      }
+    }
+
+    startsWithMatches.sort((a, b) => a.name.localeCompare(b.name));
+    containsMatches.sort((a, b) => a.name.localeCompare(b.name));
+
+    return [...startsWithMatches, ...containsMatches].slice(0, 15);
+  }, [libraryArtists, searchTerm, selectedSeedArtists]);
+
+  const handleSelectLibraryArtist = (artistName: string) => {
+    const normName = normalizeArtistId(artistName);
+    const isAlreadySelected = selectedSeedArtists.some(a => normalizeArtistId(a.name) === normName);
+    if (isAlreadySelected) {
+      setSearchTerm('');
+      setIsSeedDropdownOpen(false);
+      setHighlightedSeedIndex(-1);
+      return;
+    }
+    if (selectedSeedArtists.length >= MAX_SEED_ARTISTS) {
+      setShowLimitDialog(true);
+      return;
+    }
+    setSelectedSeedArtists(prev => [...prev, { name: artistName, enabled: true }]);
+    setSearchTerm('');
+    setIsSeedDropdownOpen(false);
+    setHighlightedSeedIndex(-1);
+    if (!onboardingProgress.step1) updateOnboarding('step1');
+    artistInputRef.current?.focus();
+  };
+
+  const handleSeedInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!isSeedDropdownOpen) return;
+
+    if (e.key === 'ArrowDown') {
+      if (matchingLibraryArtists.length === 0) return;
+      e.preventDefault();
+      setHighlightedSeedIndex(prev => 
+        prev < matchingLibraryArtists.length - 1 ? prev + 1 : 0
+      );
+    } else if (e.key === 'ArrowUp') {
+      if (matchingLibraryArtists.length === 0) return;
+      e.preventDefault();
+      setHighlightedSeedIndex(prev => 
+        prev > 0 ? prev - 1 : matchingLibraryArtists.length - 1
+      );
+    } else if (e.key === 'Enter') {
+      if (highlightedSeedIndex >= 0 && highlightedSeedIndex < matchingLibraryArtists.length) {
+        e.preventDefault();
+        e.stopPropagation();
+        handleSelectLibraryArtist(matchingLibraryArtists[highlightedSeedIndex].name);
+      }
+      // If highlightedSeedIndex === -1, default form submission handleAddFromSearch handles custom seed
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsSeedDropdownOpen(false);
+      setHighlightedSeedIndex(-1);
     }
   };
 
@@ -1082,7 +1882,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
         leftPanelPreCollapseWidth.current = clampedWidth;
     } else {
         const newWidth = startWidthRef.current - dx;
-        const clampedWidth = Math.max(MIN_PANEL_WIDTH, Math.min(newWidth, MAX_PANEL_WIDTH));
+        const clampedWidth = Math.max(MIN_RIGHT_PANEL_WIDTH, Math.min(newWidth, MAX_PANEL_WIDTH));
         setRightPanelWidth(clampedWidth);
         rightPanelPreCollapseWidth.current = clampedWidth;
     }
@@ -1125,9 +1925,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [isLeftPanelCollapsed, isDetailsPanelCollapsed]);
 
   const selectFirstUnread = useCallback(() => {
+    if (isGuest) return;
     const firstUnread = activeNodes.find(n => !readNodeIds.has(n.id.trim().toLowerCase()));
     if (firstUnread) onNodeClick(firstUnread);
-  }, [activeNodes, readNodeIds, onNodeClick]);
+  }, [activeNodes, readNodeIds, onNodeClick, isGuest]);
   
   const toggleDetailsPanel = useCallback(() => {
     const isOpening = isDetailsPanelCollapsed;
@@ -1138,8 +1939,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
             const wouldBeCramped = (totalWidth - leftPanelWidth - rightPanelPreCollapseWidth.current - (16 * 3)) < MIN_GRAPH_WIDTH;
             if (wouldBeCramped) setIsLeftPanelCollapsed(true);
         }
-        const isCurrentRead = selectedNode && readNodeIds.has(selectedNode.id.trim().toLowerCase());
-        if (!selectedNode || isCurrentRead) selectFirstUnread();
     }
     setIsDetailsPanelCollapsed(prev => !prev);
   }, [isDetailsPanelCollapsed, isLeftPanelCollapsed, leftPanelWidth, onboardingProgress.step5, selectedNode, readNodeIds, selectFirstUnread]);
@@ -1156,16 +1955,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [data.nodes, onNodeClick, isSmallScreen, isDetailsPanelCollapsed, toggleDetailsPanel, onShowToast]);
 
   const ConfirmDeleteModal = () => (
-    <div 
-      className="fixed inset-0 bg-black/60 z-[110] flex items-center justify-center p-4 animate-fade-in-down"
-      style={{ animationDuration: '200ms' }}
-      onClick={() => setShowConfirmDelete(false)}
-    >
-      <div 
-        className="bg-background-dark border border-zinc-600 rounded-none w-full max-w-md shadow-2xl flex flex-col overflow-hidden text-left"
-        onClick={e => e.stopPropagation()}
-      >
-        <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex items-center justify-between">
+    <ModalBackdrop className="z-[110]" onClick={() => setShowConfirmDelete(false)}>
+      <ModalContainer className="text-left">
+        <ModalHeader>
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-red-400 !text-[18px]">delete</span>
             <h3 className="text-base font-medium text-white">Clear Library</h3>
@@ -1176,7 +1968,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           >
             <span className="material-symbols-outlined !text-[18px]">close</span>
           </button>
-        </header>
+        </ModalHeader>
 
         <div className="p-5 space-y-4 text-sm text-zinc-400">
           <p className="leading-relaxed">
@@ -1184,7 +1976,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
           </p>
         </div>
 
-        <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+        <ModalFooter>
           <button 
             onClick={() => setShowConfirmDelete(false)} 
             className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
@@ -1202,14 +1994,16 @@ const GraphPage: React.FC<GraphPageProps> = ({
           >
             Clear
           </button>
-        </footer>
-      </div>
-    </div>
+        </ModalFooter>
+      </ModalContainer>
+    </ModalBackdrop>
   );
 
   const enabledArtistsCount = selectedSeedArtists.filter(a => a.enabled).length;
 
-  const loadingSubtext = "Mapping your Zcene connections... This usually takes a minute or two to find the best musical paths.";
+  const loadingSubtext = isHydrating 
+    ? "Hydrating curatorial dataset..." 
+    : "Mapping your Zcene connections... This usually takes a minute or two to find the best musical paths.";
 
   const totalPendingCount = useMemo(() => {
     if (!searchTerm.trim()) return enabledArtistsCount;
@@ -1219,22 +2013,119 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [searchTerm, enabledArtistsCount, selectedSeedArtists]);
 
   const createButtonLabel = useMemo(() => {
+    if (isPreFlightChecking) {
+      return hasExistingProjectGraph ? 'Verifying...' : 'Checking...';
+    }
     const hasSearch = searchTerm.trim().length > 0;
     if (hasSearch) {
-        return isFirstGeneration ? 'Add & Create Zcene' : 'Add & Update Zcene';
+        return hasExistingProjectGraph ? 'Add & Update Zcene' : 'Add & Create Zcene';
     }
-    return isFirstGeneration ? 'Create Zcene' : 'Update Zcene';
-  }, [searchTerm, isFirstGeneration]);
+    return hasExistingProjectGraph ? 'Update Zcene' : 'Create Zcene';
+  }, [searchTerm, hasExistingProjectGraph, isPreFlightChecking]);
 
   const ArtistsPanelContent = (
     <div className="flex flex-col flex-1 bg-zinc-900 overflow-hidden relative">
         <div className="flex-grow overflow-y-auto" style={{ overscrollBehaviorY: 'contain', flexBasis: 0 }}>
+            {/* V43 Multi-Scene Switcher Strip */}
+            {(scenes.length > 0 || (!isGuest && onAddScene)) && (
+              <div className="px-4 pt-4 pb-2 border-b border-zinc-800/80">
+                <div className="flex items-center justify-between mb-2">
+                  <h3 className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                    Scenes
+                  </h3>
+                  {!isGuest && onAddScene && (
+                    <button
+                      type="button"
+                      data-testid="add-scene-button"
+                      onClick={onAddScene}
+                      disabled={isLoading || Boolean(isHydrating) || scenes.length >= MAX_SCENES_PER_PROJECT}
+                      className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border text-[11px] font-medium transition-all ${
+                        scenes.length >= MAX_SCENES_PER_PROJECT
+                          ? 'border-zinc-800 bg-zinc-900/40 text-zinc-600 cursor-not-allowed opacity-60'
+                          : 'border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed'
+                      }`}
+                      title={
+                        scenes.length >= MAX_SCENES_PER_PROJECT
+                          ? "Maximum of 5 scenes reached for this Zcene"
+                          : "Add a new Scene cluster to this Zcene board"
+                      }
+                    >
+                      <span className="material-symbols-outlined !text-[14px]">
+                        {scenes.length >= MAX_SCENES_PER_PROJECT ? 'check' : 'add'}
+                      </span>
+                      <span>{scenes.length >= MAX_SCENES_PER_PROJECT ? 'Max Scenes (5/5)' : 'Add Scene'}</span>
+                    </button>
+                  )}
+                </div>
+                {scenes.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Project Scenes">
+                    {scenes.map((scene, idx) => {
+                      const sceneKey = scene.sceneId || scene.id || `scene-${idx + 1}`;
+                      const activeSceneKey = activeScene?.sceneId || activeScene?.id || activeSceneId;
+                      const isCurrent = sceneKey === activeSceneKey;
+                      const seedCount = toSeedArtistsArray(scene.seedArtists).length;
+                      return (
+                        <div
+                          key={sceneKey}
+                          role="tab"
+                          aria-selected={isCurrent}
+                          data-testid={`scene-pill-${sceneKey}`}
+                          onClick={() => {
+                            onSelectScene?.(sceneKey);
+                            if (!isSmallScreen) {
+                              setFocusedSceneCluster({ sceneId: sceneKey, timestamp: Date.now() });
+                            }
+                          }}
+                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none ${
+                            isCurrent
+                              ? 'bg-zinc-800 text-primary border border-zinc-700 ring-1 ring-primary/30 shadow-sm'
+                              : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:border-zinc-700'
+                          }`}
+                        >
+                          <span>Scene {idx + 1}</span>
+                          {seedCount > 0 && (
+                            <span className={`text-[10px] font-mono px-1 rounded ${isCurrent ? 'bg-primary/15 text-primary' : 'bg-zinc-900 text-zinc-500'}`}>
+                              {seedCount}
+                            </span>
+                          )}
+                          {!isGuest && scenes.length > 1 && onRemoveScene && (
+                            <button
+                              type="button"
+                              data-testid={`remove-scene-${sceneKey}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                const targetScene = scenes.find(s => (s.sceneId || s.id) === sceneKey);
+                                const isMapped = (targetScene?.graphData?.nodes?.length || 0) > 0;
+                                if (isMapped) {
+                                  setScenePendingRemoval({
+                                    sceneId: sceneKey,
+                                    title: targetScene?.title || targetScene?.name || `Scene ${idx + 1}`,
+                                    index: idx + 1
+                                  });
+                                } else {
+                                  onRemoveScene(sceneKey);
+                                }
+                              }}
+                              className="ml-0.5 text-zinc-500 hover:text-red-400 transition-colors leading-none"
+                              title={`Remove Scene ${idx + 1}`}
+                              aria-label={`Remove Scene ${idx + 1}`}
+                            >
+                              ×
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            )}
             <div className="px-4 pt-4 pb-2">
             {!isGuest && (
               <div className="mb-3">
                 {libraryArtists.length > 0 ? (
                     <button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none">
-                      <span className="material-symbols-outlined !text-[16px]">library_music</span>
+                      <span className="material-symbols-outlined !text-[16px]">queue_music</span>
                       Select from Library ({libraryArtists.length})
                     </button>
                 ) : (
@@ -1246,29 +2137,125 @@ const GraphPage: React.FC<GraphPageProps> = ({
               </div>
             )}
             {!isGuest && (
-              <form onSubmit={handleAddFromSearch} className="relative">
-                  <input ref={artistInputRef} onFocus={() => { if (!onboardingProgress.step1) updateOnboarding('step1'); }} type="search" placeholder="Add artist" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all" />
+              <div ref={seedInputContainerRef} className="relative">
+                <form onSubmit={handleAddFromSearch} className="relative">
+                  <input
+                    autoComplete="off"
+                    data-1p-ignore="true"
+                    data-lpignore="true"
+                    data-testid="seed-input"
+                    ref={artistInputRef}
+                    onFocus={() => {
+                      if (!onboardingProgress.step1) updateOnboarding('step1');
+                      if (searchTerm.trim().length > 0 && libraryArtists.length > 0) {
+                        setIsSeedDropdownOpen(true);
+                      }
+                    }}
+                    onKeyDown={handleSeedInputKeyDown}
+                    type="search"
+                    placeholder="Add artist"
+                    value={searchTerm}
+                    onChange={(e) => {
+                      setSearchTerm(e.target.value);
+                      if (libraryArtists.length > 0) {
+                        setIsSeedDropdownOpen(true);
+                        setHighlightedSeedIndex(-1);
+                      }
+                    }}
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={isSeedDropdownOpen && libraryArtists.length > 0 && searchTerm.trim().length > 0}
+                    aria-controls="seed-autocomplete-list"
+                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                  />
                   <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                      {!searchTerm && (
-                          <button type="button" onClick={() => handleSpeechToText('artists')} className={`w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl transition-colors leading-none ${isListeningForArtists ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`} title="Search by voice">
-                            <MicIcon className="!text-[18px]" />
-                          </button>
-                      )}
-                      {searchTerm && (
-                          <button type="button" onClick={() => setSearchTerm('')} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search">
-                              <span className="material-symbols-outlined !text-[18px]">close</span>
-                          </button>
-                      )}
-                      <button type="submit" disabled={!searchTerm.trim()} className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-primary text-brand-black shadow-[0_0_12px_rgba(246,228,104,0.3)] hover:scale-110 active:scale-95'}`} aria-label="Add artists">
-                          <span className="material-symbols-outlined !text-lg">add</span>
+                    {searchTerm && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setSearchTerm('');
+                          setIsSeedDropdownOpen(false);
+                          setHighlightedSeedIndex(-1);
+                        }}
+                        className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none"
+                        aria-label="Clear search"
+                      >
+                        <span className="material-symbols-outlined !text-[18px]">close</span>
                       </button>
+                    )}
+                    <button
+                      data-testid="curate-button"
+                      type="submit"
+                      disabled={!searchTerm.trim()}
+                      className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-white text-brand-black hover:scale-110 active:scale-95'}`}
+                      aria-label="Add artist"
+                    >
+                      <span className="material-symbols-outlined !text-lg">add</span>
+                    </button>
                   </div>
-              </form>
+                </form>
+
+                {/* Inline Library Autocomplete Dropdown */}
+                {isSeedDropdownOpen && libraryArtists.length > 0 && searchTerm.trim().length > 0 && (
+                  <div
+                    id="seed-autocomplete-list"
+                    role="listbox"
+                    className="absolute top-full left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-2xl py-1"
+                  >
+                    {matchingLibraryArtists.length > 0 ? (
+                      matchingLibraryArtists.map((artist, idx) => {
+                        const isHighlighted = idx === highlightedSeedIndex;
+                          const normalizedId = normalizeArtistId(artist.name);
+                          const artistGenres = artistGenreMap.get(normalizedId) || artistGenreMap.get(artist.name) || artistGenreMap.get(artist.name.trim());
+                          const primaryGenre = artistGenres && artistGenres.size > 0 ? Array.from(artistGenres)[0] : null;
+
+                          return (
+                            <button
+                              key={artist.name}
+                              role="option"
+                              aria-selected={isHighlighted}
+                              type="button"
+                              ref={(el) => {
+                                if (isHighlighted && el) {
+                                  el.scrollIntoView({ block: 'nearest' });
+                                }
+                              }}
+                              onMouseDown={(e) => e.preventDefault()}
+                              onClick={() => handleSelectLibraryArtist(artist.name)}
+                              onMouseEnter={() => setHighlightedSeedIndex(idx)}
+                              className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${
+                                isHighlighted
+                                  ? 'bg-zinc-800 text-white'
+                                  : 'text-zinc-300 hover:bg-zinc-800/70 hover:text-white'
+                              }`}
+                            >
+                              <span className="truncate font-medium">{artist.name}</span>
+                              {primaryGenre && (
+                                <span className="text-[10px] text-zinc-500 font-mono flex-shrink-0 uppercase tracking-wider">
+                                  {primaryGenre}
+                                </span>
+                              )}
+                            </button>
+                          );
+                      })
+                    ) : (
+                      <div className="px-3 py-2.5 text-xs text-zinc-400 flex flex-col gap-1">
+                        <div className="text-[11px] text-zinc-400">
+                          No matching artists in your library.
+                        </div>
+                        <div className="text-[10px] text-zinc-500">
+                          Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[9px]">Enter</kbd> or click <span className="text-zinc-300 font-bold">+</span> to add as custom root.
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
             )}
           </div>
           {selectedSeedArtists.length > 0 && (
             <div className="px-4 pt-2 pb-4">
-                <h3 className="text-[10px] font-medium mb-2 uppercase tracking-widest text-zinc-500">Seed Artists</h3>
+                <h3 className="text-[10px] font-medium mb-2 uppercase tracking-widest text-zinc-500">Artists</h3>
               <div className="space-y-1">
                 {selectedSeedArtists.map(artist => (
                   <div key={artist.name} className="flex items-center gap-1 group">
@@ -1296,26 +2283,30 @@ const GraphPage: React.FC<GraphPageProps> = ({
             isGuest={isGuest}
             onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
             userTaste={profile?.taste}
+            graphNodes={data?.nodes}
           />
 
           {/* New Inline Action Button: Moving from absolute footer to inline flow */}
-          <div className="px-4 pt-4 pb-12">
+          <div className="px-4 pt-4 pb-[calc(env(safe-area-inset-bottom)+5.5rem)]">
 
 
             {!isGuest ? (
               <button 
                   ref={createZceneBtnRef} 
                   onClick={handleApplyChanges} 
-                  disabled={(enabledArtistsCount === 0 && !searchTerm.trim()) || isLoading || isOverLimit} 
-                  className={`w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg ${visibleTooltips.step2 ? 'animate-pulse' : ''}`}
+                  disabled={!isArtistPending || isLoading || isOverLimit || isPreFlightChecking} 
+                  className={`w-full flex items-center justify-center gap-2 bg-white px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 ${visibleTooltips.step2 ? 'animate-pulse' : ''}`}
               >
+                  {isPreFlightChecking && (
+                    <span className="material-symbols-outlined !text-[14px] animate-spin text-brand-black">progress_activity</span>
+                  )}
                   <span>{createButtonLabel}</span>
-                  <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-brand-black text-primary border-primary/50`}>
+                  <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 bg-transparent border-brand-black text-brand-black`}>
                       {totalPendingCount}
                   </span>
               </button>
             ) : (
-              <div className="flex flex-col gap-4 p-5 bg-zinc-900/50 border border-zinc-800/80 backdrop-blur-sm shadow-none rounded-none">
+              <div className="flex flex-col gap-4 p-5 bg-zinc-900/50 border border-zinc-800/80 backdrop-blur-sm shadow-none rounded-xl">
                 <div className="flex items-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-[#f97316] animate-pulse-orange" />
                   <p className="text-[10px] text-zinc-400 uppercase tracking-[0.2em] font-bold">
@@ -1335,7 +2326,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   {user ? (
                     <button 
                       onClick={onSaveToDashboard}
-                      className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg"
+                      className="w-full flex items-center justify-center gap-2 bg-white px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                     >
                       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                         <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
@@ -1347,8 +2338,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   ) : (
                     <>
                       <button 
-                        onClick={onLogin}
-                        className="w-full flex items-center justify-center gap-2 bg-primary px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50 shadow-lg"
+                        onClick={onSaveToDashboard}
+                        className="w-full flex items-center justify-center gap-2 bg-white px-6 py-2 text-sm rounded-xl font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
                           <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
@@ -1377,69 +2368,164 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [activeTab]);
 
   const legendConfig: Record<FilterKeys, { label: string; shape: React.ReactNode }> = {
-    seed: { label: 'Seed Artist', shape: <LegendSymbol symbol={d3.symbolCircle} size={260} className="text-[#F6E468] stroke-[#F6E468] stroke-1 fill-zinc-700"/> },
-    recommended: { label: 'AI Artist', shape: <LegendSymbol symbol={d3.symbolStar} size={400} className="text-[#A855F7] -mt-0.5"/> },
-    founded: { label: 'Founded', shape: <LegendSymbol symbol={d3.symbolCross} size={320} className="text-[#EC4899]" /> },
-    label: { label: 'Label', shape: <LegendSymbol symbol={d3.symbolDiamond} size={320} className="text-[#10B981]" /> },
-    genre: { label: 'Genre', shape: <LegendSymbol symbol={d3.symbolSquare} size={260} className="text-[#3B82F6]" /> },
-    country: { label: 'Origin', shape: <LegendSymbol symbol={d3.symbolTriangle} size={260} className="text-[#F59E0B]" /> },
+    seed: { label: 'Root Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.seed, fontVariationSettings: "'FILL' 1" }}>album</span> },
+    recommended: { label: 'Artist', shape: <span className="material-symbols-outlined text-[28px]" style={{ color: nodeTypeColorMap.ai, fontVariationSettings: "'FILL' 1" }}>equalizer</span> },
+    founded: { label: 'Founded', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.founded, fontVariationSettings: "'FILL' 1" }}>event</span> },
+    label: { label: 'Label', shape: <span className="material-symbols-outlined text-[24px]" style={{ color: nodeTypeColorMap.label, fontVariationSettings: "'FILL' 1" }}>label</span> },
+    genre: { label: 'Genre', shape: <span className="material-symbols-outlined text-[20px]" style={{ color: nodeTypeColorMap.genre, fontVariationSettings: "'FILL' 1" }}>library_music</span> },
+    country: { label: 'Origin', shape: <span className="material-symbols-outlined text-[26px]" style={{ color: nodeTypeColorMap.country, fontVariationSettings: "'FILL' 1" }}>location_on</span> },
   };
   const legendOrder: FilterKeys[] = ['seed', 'recommended', 'label', 'genre', 'country', 'founded'];
   const toggleFilterInternal = (filter: FilterKeys) => {
     setActiveFilters(prev => { const newState = !prev[filter]; analyticsService.track('Filter Toggled', { filter, is_active: newState }); return { ...prev, [filter]: newState }; });
     if (!onboardingProgress.step3) updateOnboarding('step3');
   };
-  const SearchControl = useMemo(() => {
-    const hasRationale = !!data?.synthesisRationale;
-    const isRationaleViewed = viewedRationale === data?.synthesisRationale;
-    
-    let btnState: 'disabled' | 'attention' | 'neutral' = 'disabled';
-    if (!isLoading && hasRationale) {
-      btnState = isRationaleViewed ? 'neutral' : 'attention';
-    }
-
-    return (
-        <div className="relative flex items-center gap-2">
-            <div className="relative">
-                <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-60 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
-                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
-            </div>
-            
-            <RootsBreakdownButton 
-                state={btnState}
-                onClick={() => {
-                    setIsRationaleModalOpen(true);
-                    if (data?.synthesisRationale) {
-                        setViewedRationale(data.synthesisRationale);
-                    }
-                }}
-                isLoading={isLoading}
-            />
-        </div>
-    );
-  }, [searchQuery, isListeningForGraph, data?.synthesisRationale, isLoading, viewedRationale]);
 
   const displayBadgeCount = systemError ? 0 : activeNodes.length;
+
+  const detailsPanelElement = (
+      <DetailsPanel 
+          projectId={projectId}
+          projectName={projectName}
+          scenes={scenes}
+          activeSceneId={activeSceneId}
+          overarchingRationale={overarchingRationale}
+          activeDeepWebSession={effectiveDeepWebSession}
+          onUpdateDeepWebSession={setDeepWebSession}
+          selectedNode={selectedNode} 
+          activeNodes={activeNodes} 
+          isAdmin={isAdmin}
+          tokenBalance={profile?.tokenBalance ?? 0}
+          detailsCache={detailsCache} onUpdateDetailsCache={onUpdateDetailsCache}
+          loadingNodeIds={loadingNodeIds} 
+          onTogglePinNode={onTogglePinNode} 
+          pinnedNodes={pinnedNodes} 
+          onRefreshNode={onRefreshNode} 
+
+          error={detailsError} 
+          systemError={systemError}
+          graphData={data} 
+          libraryArtists={memoizedLibraryArtists} 
+          seedArtists={memoizedAllSeedArtists}
+          onAddArtist={(artist) => {
+              const normalizedArtist = normalizeArtistId(artist);
+              const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
+              if (isAlreadySeed) {
+                  setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
+              } else {
+                  setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
+              }
+          }}
+          isCollapsed={isSmallScreen ? false : isDetailsPanelCollapsed} 
+          onToggleCollapse={isSmallScreen ? () => {} : toggleDetailsPanel} 
+          isSmallScreen={isSmallScreen} 
+          onNodeClick={handleNodeClickInternal} 
+          onNavigate={onNavigate} 
+          isGlobalLoading={isLoading} 
+          onCancelGlobalLoading={onCancelGeneration} 
+          unreadCount={systemError ? 0 : unreadDetailsCount} 
+          collapseBtnRef={isSmallScreen ? undefined : detailsCollapseBtnRef}
+          isMagazineViewOpen={isMagazineViewOpen} 
+          onMagazineViewToggle={onUpdateIsMagazineViewOpen} 
+          chatHistories={chatHistories} 
+          onUpdateChatHistories={onUpdateChatHistories} 
+          isActive={isActive} 
+          onAddToStack={onAddToStack} 
+          isGuest={isGuest}
+          user={user}
+          onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
+          userTaste={profile?.taste}
+          onUpdateTasteProfile={async (taste) => { await onUpdateProfile({ taste }); }}
+          onShowToast={onShowToast}
+          onOpenTasteModal={() => window.dispatchEvent(new CustomEvent('open-taste-modal'))}
+          onStashArtist={(artistName) => {
+              const normalizedId = normalizeArtistId(artistName);
+              const nodeToAdd = { id: normalizedId, type: 'artist' as const, label: titleCaseArtistId(artistName), group: 0 };
+              onAddToStack(nodeToAdd);
+              setIsStackDialogOpen(true);
+          }}
+          onOpenStackDrawer={() => setIsStackDialogOpen(true)}
+      />
+  );
 
   return (
     <div 
         className="absolute inset-0 flex flex-col overflow-hidden"
         style={{
-            backgroundImage: 'url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
+            backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
             backgroundSize: 'cover',
-            backgroundPosition: 'center',
-            backgroundAttachment: 'fixed'
+            backgroundPosition: 'center'
         }}
     >
-        <OnboardingTooltip isVisible={visibleTooltips.step1} content="Add your seed artists to start your Zcene. These are your starting points, you can type them or select from your library." position="bottom" anchorRef={artistInputRef} onDismiss={() => updateOnboarding('step1')} />
+        <OnboardingTooltip isVisible={visibleTooltips.step1} content="Add your roots to start your Zcene. These are your starting points, you can type them or select from your library." position="bottom" anchorRef={artistInputRef} onDismiss={() => updateOnboarding('step1')} />
         <OnboardingTooltip isVisible={visibleTooltips.step2} content="Click here to create your Zcene from your selected artists and see the connections visually." position="top" anchorRef={createZceneBtnRef} onDismiss={() => updateOnboarding('step2')} />
-        <OnboardingTooltip isVisible={visibleTooltips.step3} content="Drag, zoom and toggle node types to focus on what matters most: Seed Artists, AI Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
+        <OnboardingTooltip isVisible={visibleTooltips.step3} content="Pan, zoom and toggle node types to focus on what matters most: Roots, Artists, Genres, Labels, Origins, Founded." position={isSmallScreen ? "top" : "bottom"} anchorRef={isSmallScreen ? mobileLegendAreaRef : desktopLegendAreaRef} onDismiss={() => updateOnboarding('step3')} />
         <OnboardingTooltip isVisible={visibleTooltips.step5} content="This is the Deep Cut, explore bios, connections, and insights." position={isSmallScreen ? "bottom" : "left"} anchorRef={isSmallScreen ? deepCutTabRef : detailsCollapseBtnRef} onDismiss={() => updateOnboarding('step5')} />
 
         <input type="file" accept=".csv,.txt,.xml" ref={fileInputRef} onChange={handleFileChange} className="hidden" />
         <LibraryDialog isOpen={isLibraryDialogOpen} onClose={() => setIsLibraryDialogOpen(false)} libraryArtists={libraryArtists} selectedArtists={selectedSeedArtists} onArtistToggle={handleLibraryArtistToggle} uniqueGenres={uniqueGenres} artistGenreMap={artistGenreMap} fileInputRef={fileInputRef} onTriggerClear={() => setShowConfirmDelete(true)} />
         <LimitReachedDialog isOpen={showLimitDialog} onClose={() => setShowLimitDialog(false)} />
+        <UpdateInterceptModal 
+            isOpen={isUpdateModalOpen}
+            onClose={() => setIsUpdateModalOpen(false)}
+            confirmOverwrite={confirmOverwrite}
+            setConfirmOverwrite={setConfirmOverwrite}
+            onOverwrite={() => {
+                setIsUpdateModalOpen(false);
+                onRegenerate(pendingUpdateSeed);
+                if (!onboardingProgress.step2) updateOnboarding('step2');
+            }}
+            onSaveAsNew={() => {
+                setIsUpdateModalOpen(false);
+                if (onFork) onFork(pendingUpdateSeed);
+                if (!onboardingProgress.step2) updateOnboarding('step2');
+            }}
+        />
         {showConfirmDelete && <ConfirmDeleteModal />}
+        {scenePendingRemoval && (
+          <ModalBackdrop className="z-[110]" onClick={() => setScenePendingRemoval(null)}>
+            <ModalContainer className="text-left sm:max-w-md">
+              <ModalHeader>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-red-400 !text-[18px]">delete</span>
+                  <h3 className="text-base font-medium text-white">Remove Scene?</h3>
+                </div>
+                <button 
+                  onClick={() => setScenePendingRemoval(null)} 
+                  className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
+                  aria-label="Close"
+                >
+                  <span className="material-symbols-outlined !text-[18px]">close</span>
+                </button>
+              </ModalHeader>
+
+              <div className="p-5 space-y-4 text-sm text-zinc-400">
+                <p className="leading-relaxed">
+                  Are you sure you want to remove Scene {scenePendingRemoval.index} ({scenePendingRemoval.title}) from this Zcene? Its mapped connections and editorial narrative will be permanently removed.
+                </p>
+              </div>
+
+              <ModalFooter>
+                <button 
+                  onClick={() => setScenePendingRemoval(null)} 
+                  className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    const sid = scenePendingRemoval.sceneId;
+                    setScenePendingRemoval(null);
+                    onRemoveScene?.(sid);
+                  }} 
+                  className="px-4 py-1.5 bg-red-500 text-white rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
+                >
+                  Remove Scene
+                </button>
+              </ModalFooter>
+            </ModalContainer>
+          </ModalBackdrop>
+        )}
         
         <Header
             user={user}
@@ -1449,9 +2535,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
             onProjectNameChange={onProjectNameChange}
             isSmallScreen={isSmallScreen}
             isMagazineViewOpen={isMagazineViewOpen}
-            stackCount={stack.length}
+            stackCount={stackCount}
             isStackNew={isStackNew}
-            onOpenStack={() => { setIsStackDialogOpen(true); if (stack.length !== lastViewedStackCount) onUpdateLastViewedStackCount(stack.length); }}
+            onOpenStack={() => { setIsStackDialogOpen(true); if (stackCount !== lastViewedStackCount) onUpdateLastViewedStackCount(stackCount); }}
             onShare={handleShareZcene}
             isSharing={isSharing || isSharingZcene}
             isCopied={isCopied}
@@ -1472,244 +2558,103 @@ const GraphPage: React.FC<GraphPageProps> = ({
               await onUpdateProfile({ taste });
             }}
             onRestartWalkthrough={handleRestartWalkthrough}
+            tokenBalance={profile?.tokenBalance ?? 0}
         />
 
         {isSmallScreen ? (
             <>
                 <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative">
-                    <div className={`flex-shrink-0 h-16 border-y border-zinc-700/50 bg-zinc-900 relative z-20 ${isMagazineViewOpen ? 'hidden' : ''}`}>
-                        <nav className="flex h-full">
-                            {(['artists', 'spiderweb', 'details'] as MobileTab[]).map(tab => {
-                                const totalDetails = displayBadgeCount;
-                                return (
-                                    <button key={tab} ref={tab === 'details' ? deepCutTabRef : null} onClick={() => { setActiveTab(tab); if (tab === 'details') { if (!onboardingProgress.step5) updateOnboarding('step5'); const isCurrentRead = selectedNode && readNodeIds.has(selectedNode.id.trim().toLowerCase()); if (!selectedNode || isCurrentRead) selectFirstUnread(); } }} className={`flex-1 flex items-center justify-center gap-2 text-sm font-medium border-b-2 transition-colors ${activeTab === tab ? 'text-primary border-primary' : 'text-zinc-400 border-transparent hover:text-white active:text-white'}`}>
-                                        <span className="uppercase tracking-widest">{tab === 'details' ? 'Deep Cut' : tab}</span>
-                                        {tab === 'artists' && (
-                                            <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${artistIndicatorStyles}`}>
-                                                {enabledArtistsCount}
-                                            </span>
-                                        )}
-                                        {tab === 'details' && (
-                                            <span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-500 ${unreadDetailsCount > 0 ? 'bg-brand-black text-primary border-primary/50' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
-                                                {totalDetails}
-                                            </span>
-                                        )}
-                                    </button>
-                                );
-                            })}
-                        </nav>
-                    </div>
                     <div ref={mobileTabContainerRef} className="flex-grow overflow-hidden relative z-10 min-h-0" style={{ overscrollBehaviorY: 'contain' }}>
                         <div className="flex h-full transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${tabIndex * 100}%)` }}>
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">{ArtistsPanelContent}</div>
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">
                                 <div className="h-full flex flex-col overflow-hidden">
-                                    <div className="pt-2.5 bg-zinc-900 flex-shrink-0">
-                                        <div className="flex items-center gap-2 px-4">
-                                            <div className="relative flex-grow min-w-0 flex items-center gap-2">
-                                                <div className="relative flex-grow min-w-0">
-                                                    <input type="search" placeholder="Search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full h-9 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 pl-4 pr-12 text-sm font-normal focus:ring-1 focus:ring-primary focus:outline-none backdrop-blur-sm" />
-                                                    <div className="absolute right-1 top-1/2 -translate-y-1/2 flex items-center gap-0.5">{!searchQuery && (<button onClick={() => handleSpeechToText('graph')} className={`w-8 h-8 flex items-center justify-center rounded-[10px] transition-colors leading-none ${isListeningForGraph ? 'text-primary animate-pulse' : 'text-zinc-500 hover:text-white'}`} title="Search by voice"><MicIcon className="!text-[18px]" /></button>)}{searchQuery && (<button onClick={() => setSearchQuery('')} className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search"><span className="material-symbols-outlined !text-[18px]">close</span></button>)}</div>
-                                                </div>
-                                                <RootsBreakdownButton 
-                                                    state={(() => {
-                                                        const hasRationale = !!data?.synthesisRationale;
-                                                        const isRationaleViewed = viewedRationale === data?.synthesisRationale;
-                                                        if (isLoading || !hasRationale) return 'disabled';
-                                                        return isRationaleViewed ? 'neutral' : 'attention';
-                                                    })()}
-                                                    onClick={() => {
-                                                        setIsRationaleModalOpen(true);
-                                                        if (data?.synthesisRationale) {
-                                                            setViewedRationale(data.synthesisRationale);
-                                                        }
-                                                    }}
-                                                    isLoading={isLoading}
-                                                />
-                                            </div>
-                                        </div>
-                                        <div className="mt-2.5 w-full h-px bg-zinc-700" />
-                                    </div>
-                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
+
+                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
                                 </div>
                             </div>
-                            <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative ${isMagazineViewOpen ? 'fixed inset-0 z-[1000] pt-0 md:pt-4' : ''}`}>
+                            <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative`}>
                                 <div className="h-full flex flex-col overflow-hidden bg-zinc-900" style={{ overscrollBehaviorY: 'contain' }}>
-                                    <DetailsPanel 
-                                        selectedNode={selectedNode} 
-                                        activeNodes={activeNodes} 
-                                        isAdmin={isAdmin}
-                                        detailsCache={detailsCache} 
-                                        loadingNodeIds={loadingNodeIds} 
-                                        onCloseNode={onCloseNode} 
-                                        onRefreshNode={onRefreshNode} 
-                                        onExtendNode={onExtendNode} 
-                                        error={detailsError} 
-                                        systemError={systemError}
-                                        graphData={data} 
-                                        libraryArtists={memoizedLibraryArtists} 
-                                        seedArtists={memoizedAllSeedArtists}
-                                        onAddArtist={(artist) => {
-                                            const normalizedArtist = normalizeArtistId(artist);
-                                            const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
-                                            if (isAlreadySeed) {
-                                                setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
-                                                onShowToast(`Removed ${cleanArtistDisplayName(artist, data?.nodes)} from seed list`);
-                                            } else {
-                                                setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
-                                                onShowToast(`Added ${cleanArtistDisplayName(artist, data?.nodes)} to seed list`);
-                                            }
-                                        }}
-                                        isCollapsed={false} 
-                                        onToggleCollapse={() => {}} 
-                                        isSmallScreen={isSmallScreen} 
-                                        onNodeClick={handleNodeClickInternal} 
-                                        onGenerateDeepCut={onGenerateDeepCut}
-                                        onNavigate={onNavigate} 
-                                        isGlobalLoading={isLoading} 
-                                        onCancelGlobalLoading={onCancelGeneration} 
-                                        unreadCount={unreadDetailsCount} 
-                                        isMagazineViewOpen={isMagazineViewOpen} 
-                                        onMagazineViewToggle={onUpdateIsMagazineViewOpen} 
-                                        chatHistories={chatHistories} 
-                                        onUpdateChatHistories={onUpdateChatHistories} 
-                                        isActive={isActive} 
-                                        stack={stack} 
-                                        onToggleStack={onToggleStack} 
-                                        isGuest={isGuest}
-                                        user={user}
-                                        onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
-                                        userTaste={profile?.taste}
-                                    />
+                                    {!isMagazineViewOpen && detailsPanelElement}
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
-                {!isMagazineViewOpen && (
-                    <div className="flex-shrink-0 border-t border-zinc-700/50 bg-zinc-900 py-0 px-2 text-center relative z-50">
-                        <div className="text-zinc-500 text-[10px] sm:text-xs">
-                            <div className="mx-auto flex justify-center items-center" style={{ minHeight: '50px' }}>
-                                <AdSenseUnit 
-                                    adClient="ca-pub-9665950244000141" 
-                                    adSlot="3666473373" 
-                                    style={{ display: 'inline-block', width: '320px', height: '50px' }} 
-                                    customImageUrl="https://storage.googleapis.com/zcene-prod-assets/Zcene%20App%20Mobile%20(slim).png"
-                                    linkUrl="#/merch"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                )}
+
+
+                {/* Mobile Floating Navigation Bar */}
+                <div className={`fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm md:hidden transition-all duration-300 ease-in-out ${isMagazineViewOpen ? 'opacity-0 pointer-events-none translate-y-4' : 'opacity-100 pointer-events-auto translate-y-0'}`}>
+                    <nav className="flex items-center justify-between p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700/80 rounded-xl shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]">
+                        {(['artists', 'spiderweb', 'details'] as MobileTab[]).map(tab => {
+                            const isActive = activeTab === tab;
+                            const totalDetails = displayBadgeCount;
+                            const label = tab === 'details' ? 'Deep Cuts' : tab === 'artists' ? 'Roots' : 'Connections';
+                            return (
+                                <button
+                                    key={tab}
+                                    ref={tab === 'details' ? deepCutTabRef : null}
+                                    onClick={() => {
+                                        setActiveTab(tab);
+                                        if (tab === 'details' && !onboardingProgress.step5) {
+                                            updateOnboarding('step5');
+                                        }
+                                    }}
+                                    className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-200 select-none cursor-pointer active:scale-95 ${
+                                        isActive
+                                            ? 'bg-zinc-800 text-primary shadow-sm border border-zinc-700/60'
+                                            : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
+                                    }`}
+                                >
+                                    <span className="truncate">{label}</span>
+                                    {tab === 'artists' && (
+                                        <span className={`h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-300 ${artistIndicatorStyles}`}>
+                                            {enabledArtistsCount}
+                                        </span>
+                                    )}
+                                    {tab === 'details' && (
+                                        <span className={`h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-300 ${unreadDetailsCount > 0 ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'}`}>
+                                            {totalDetails}
+                                        </span>
+                                    )}
+                                </button>
+                            );
+                        })}
+                    </nav>
+                </div>
             </>
         ) : (
             <main className={`flex-grow flex flex-row relative min-h-0 gap-4 ${isSmallScreen ? 'px-4' : 'px-6 lg:px-8'} pb-6`}>
-                <aside style={{ width: `${leftPanelWidth}px` }} className={`relative h-full z-50 flex flex-col flex-shrink-0 bg-zinc-900 border border-zinc-600/50 transition-all duration-300 ease-in-out overflow-hidden min-h-0 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                    {!isLeftPanelCollapsed && (<div onMouseDown={handleMouseDown('left')} className="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none touch-none z-10 group" aria-label="Resize left panel" role="separator"><div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div></div>)}
-                    <div className={`h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] ${isLeftPanelCollapsed ? 'justify-center px-1' : 'justify-between px-4'}`}>{!isLeftPanelCollapsed && (<div className="flex items-center gap-2 overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Artists</h2><span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm ${artistIndicatorStyles}`}>{enabledArtistsCount}</span></div>)}<button onClick={handleToggleLeftPanel} className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none pointer-events-auto" title={isLeftPanelCollapsed ? "Expand Panel" : "Collapse Panel"}><span className="material-symbols-outlined !text-[18px]">{isLeftPanelCollapsed ? 'left_panel_open' : 'left_panel_close'}</span></button></div>
-                    {isLeftPanelCollapsed ? (<div className="flex-grow flex-col items-center justify-between py-6 text-zinc-400"><div className="flex flex-col items-center gap-y-6">{ libraryArtists.length > 0 ? (<button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Select from Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">library_music</span></button>) : (<button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Import Music Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">upload</span></button>)}</div><div className="absolute bottom-6 left-1/2 -translate-x-1/2"><button onClick={handleApplyChanges} disabled={enabledArtistsCount === 0 || isLoading || isOverLimit} className="group" title="Update Zcene"><span className={`h-8 w-8 rounded-md flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${artistIndicatorStyles} ${enabledArtistsCount === 0 ? 'opacity-100' : 'group-active:scale-95'}`}>{enabledArtistsCount}</span></button></div></div>) : ( <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">{ArtistsPanelContent}</div> )}
+                <aside style={{ width: `${leftPanelWidth}px` }} className={`relative h-full z-50 flex flex-col flex-shrink-0 bg-zinc-900 border border-zinc-600/50 transition-all duration-300 ease-in-out overflow-hidden min-h-0 rounded-2xl ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                    {!isLeftPanelCollapsed && (<div onMouseDown={handleMouseDown('left')} className="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none touch-none z-[100] group" aria-label="Resize left panel" role="separator"><div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div></div>)}
+                    <div className={`${LayoutSizes.headerBar} flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] ${isLeftPanelCollapsed ? 'justify-center px-1' : 'justify-between px-4'}`}>{!isLeftPanelCollapsed && (<div className="flex items-center gap-2 overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Roots</h2><span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm ${artistIndicatorStyles}`}>{enabledArtistsCount}</span></div>)}<button onClick={handleToggleLeftPanel} className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none pointer-events-auto" title={isLeftPanelCollapsed ? "Expand Panel" : "Collapse Panel"}><span className="material-symbols-outlined !text-[18px]">{isLeftPanelCollapsed ? 'left_panel_open' : 'left_panel_close'}</span></button></div>
+                    {isLeftPanelCollapsed ? (<div className="flex-grow flex-col items-center justify-between py-6 text-zinc-400"><div className="flex flex-col items-center gap-y-6">{ libraryArtists.length > 0 ? (<button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Select from Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">queue_music</span></button>) : (<button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Import Music Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">upload</span></button>)}</div><div className="absolute bottom-6 left-1/2 -translate-x-1/2"><button onClick={handleApplyChanges} disabled={!isArtistPending || isLoading || isOverLimit || isPreFlightChecking} className="group" title="Update Zcene"><span className={`h-8 w-8 rounded-md flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${artistIndicatorStyles} ${enabledArtistsCount === 0 ? 'opacity-100' : 'group-active:scale-95'}`}>{enabledArtistsCount}</span></button></div></div>) : ( <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">{ArtistsPanelContent}</div> )}
                 </aside>
 
                 <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
-                    <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden">
-                        <div className="h-12 px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Spiderweb</h2>{!isSmallScreen && (<div className="flex items-center gap-1.5 flex-shrink-0">{SearchControl}</div>)}</div>
-                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{isLoading && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !isLoading && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} />)}</div>
-                    </div>
-                    <div key={`ad-container-${adSize}`} className="flex-shrink-0 bg-zinc-900 border border-zinc-600/50 px-2 py-0 flex justify-center items-center overflow-hidden">
-                        <div className="text-zinc-500 text-[10px] text-center max-w-full">
-                            {adSize === 'small' ? (
-                                <div className="mx-auto flex justify-center items-center" style={{ minHeight: '50px', width: '320px' }}>
-                                    <AdSenseUnit 
-                                        adClient="ca-pub-9665950244000141" 
-                                        adSlot="3666473373" 
-                                        style={{ display: 'inline-block', width: '320px', height: '50px' }} 
-                                        customImageUrl="https://storage.googleapis.com/zcene-prod-assets/Zcene%20App%20Mobile%20(slim).png"
-                                        linkUrl="#/merch"
-                                    />
-                                </div>
-                            ) : (
-                                <div className="mx-auto flex justify-center items-center" style={{ minHeight: '90px', width: '728px', maxWidth: '100%' }}>
-                                    <AdSenseUnit 
-                                        adClient="ca-pub-9665950244000141" 
-                                        adSlot="3666473373" 
-                                        style={{ display: 'inline-block', width: '728px', height: '90px' }} 
-                                        customImageUrl="https://storage.googleapis.com/zcene-prod-assets/Zcene%20App%20Desktop.png"
-                                        linkUrl="#/merch"
-                                    />
-                                </div>
-                            )}
-                        </div>
+                    <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden rounded-2xl">
+                        <div className={`${LayoutSizes.headerBar} px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden`}><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Connections</h2></div>
+                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
                     </div>
                 </div>
                 
-                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-background-dark/95' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden transition-all duration-300 ease-in-out'}`}>
+                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 outline-none transition-colors transition-[width] duration-300 ease-in-out ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-zinc-900 border border-zinc-900' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden rounded-2xl'}`}>
                        {!isDetailsPanelCollapsed && !isMagazineViewOpen && (
-                         <div onMouseDown={handleMouseDown('right')} className="absolute top-0 left-0 h-full w-2 cursor-col-resize select-none touch-none z-10 group" aria-label="Resize right panel" role="separator">
+                         <div onMouseDown={handleMouseDown('right')} className="absolute top-0 left-0 h-full w-2 cursor-col-resize select-none touch-none z-[100] group" aria-label="Resize right panel" role="separator">
                            <div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div>
                          </div>
                        )}
-                       <DetailsPanel 
-                         selectedNode={selectedNode} 
-                         activeNodes={activeNodes} 
-                         isAdmin={isAdmin}
-                         detailsCache={detailsCache} 
-                         loadingNodeIds={loadingNodeIds} 
-                         onCloseNode={nodeId => onCloseNode(nodeId)} 
-                         onRefreshNode={nodeId => onRefreshNode(nodeId)} 
-                         onExtendNode={onExtendNode} 
-                         error={detailsError} 
-                         systemError={systemError}
-                         graphData={data} 
-                         libraryArtists={memoizedLibraryArtists} 
-                         seedArtists={memoizedAllSeedArtists} 
-                         onAddArtist={(artist) => {
-                              const normalizedArtist = normalizeArtistId(artist);
-                              const isAlreadySeed = selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizedArtist);
-                              if (isAlreadySeed) {
-                                  setSelectedSeedArtists(prev => prev.filter(s => normalizeArtistId(s.name) !== normalizedArtist));
-                                  onShowToast(`Removed ${cleanArtistDisplayName(artist, data?.nodes)} from seed list`);
-                              } else {
-                                  setSelectedSeedArtists(prev => [...prev, { name: artist, enabled: true }]);
-                                  onShowToast(`Added ${cleanArtistDisplayName(artist, data?.nodes)} to seed list`);
-                              }
-                         }} 
-                         isCollapsed={isDetailsPanelCollapsed} 
-                         onToggleCollapse={toggleDetailsPanel}
-                         onGenerateDeepCut={onGenerateDeepCut}
-                         isSmallScreen={isSmallScreen} 
-                         onNodeClick={handleNodeClickInternal} 
-                         onNavigate={onNavigate} 
-                         isGlobalLoading={isLoading} 
-                         onCancelGlobalLoading={onCancelGeneration} 
-                         unreadCount={systemError ? 0 : unreadDetailsCount} 
-                         collapseBtnRef={detailsCollapseBtnRef} 
-                         isMagazineViewOpen={isMagazineViewOpen} 
-                         onMagazineViewToggle={onUpdateIsMagazineViewOpen} 
-                         chatHistories={chatHistories} 
-                         onUpdateChatHistories={onUpdateChatHistories} 
-                         isActive={isActive} 
-                         stack={stack} 
-                         onToggleStack={onToggleStack} 
-                         isGuest={isGuest}
-                         user={user}
-                         onAuthRequest={() => { user ? onSaveToDashboard?.() : onLogin(); }}
-                         userTaste={profile?.taste}
-                       />
+                       <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
+                            {detailsPanelElement}
+                       </div>
                 </aside>
             </main>
         )}
-        <GenerativeRationaleModal 
-          isOpen={isRationaleModalOpen} 
-          onClose={() => setIsRationaleModalOpen(false)} 
-          rationale={data.synthesisRationale} 
-        />
-        <DisambiguationModal
-          isOpen={!!disambiguationDialog}
-          query={disambiguationDialog?.query || ''}
-          candidates={disambiguationDialog?.candidates || []}
-          isLiveAISuggestions={disambiguationDialog?.isLiveAISuggestions}
-          onSelect={onSelectDisambiguation}
-        />
+        {isSmallScreen && isMagazineViewOpen && (
+            <div className="fixed inset-0 z-[9999] bg-zinc-900 overflow-y-auto overscroll-contain">
+                {detailsPanelElement}
+            </div>
+        )}
     </div>
   );
 };

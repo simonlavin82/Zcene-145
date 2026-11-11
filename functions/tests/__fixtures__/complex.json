@@ -1,0 +1,11 @@
+{
+  "nodes": [
+    { "id": "nirvana-usa", "label": "Nirvana", "type": "artist", "origin": "USA", "genres": ["Grunge"] },
+    { "id": "wu-tang-clan-usa", "label": "Wu-Tang Clan", "type": "artist", "origin": "USA", "genres": ["Hip Hop"] },
+    { "id": "rick-rubin-usa", "label": "Rick Rubin", "type": "artist", "origin": "USA", "genres": ["Producer"] }
+  ],
+  "links": [
+    { "source": "rick-rubin-usa", "target": "nirvana-usa" },
+    { "source": "rick-rubin-usa", "target": "wu-tang-clan-usa" }
+  ]
+}

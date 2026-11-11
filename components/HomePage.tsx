@@ -9,7 +9,15 @@ import HeroBackgroundGraph from './HeroBackgroundGraph';
 import CollectionIntelligenceVisual from './CollectionIntelligenceVisual';
 import ArtistFeatureVisual from './ArtistFeatureVisual';
 import AdSenseUnit from './AdSenseUnit';
+import { GlobalFooter } from './GlobalFooter';
 import { analyticsService } from '../services/analyticsService';
+import {
+  ZCENE_SUPPORT_EMAIL,
+  ZCENE_SUPPORT_MAILTO,
+  ZCENE_TSHIRT_MAILTO,
+  ZCENE_INSTAGRAM_URL,
+  ZCENE_BUYMEACOFFEE_URL,
+} from '../shared/tokenEconomy';
 
 interface HomePageProps {
   onNavigate: (view: View) => void;
@@ -24,8 +32,6 @@ interface HomePageProps {
 }
 
 const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = false, isActive, user, isAuthInitialized, onLogin, onLogout, isAdmin, onRestartWalkthrough }) => {
-  const [isCopied, setIsCopied] = useState(false);
-  const [isSharing, setIsSharing] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const lastInteractionRef = useRef<{ count: number; time: number }>({ count: 0, time: 0 });
@@ -79,9 +85,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                       window.location.hash === '#/merch' || 
                       window.location.hash === '#merch';
       if (isActive && containerRef.current && isMerch) {
-        const merchEl = document.getElementById('merch');
-        if (merchEl) {
-          const topPos = merchEl.offsetTop;
+        const supportEl = document.getElementById('support');
+        if (supportEl) {
+          const topPos = supportEl.offsetTop;
           containerRef.current.scrollTo({ top: topPos, behavior: 'smooth' });
         }
       }
@@ -118,42 +124,6 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
     }
   };
 
-  const handleShareSite = async () => {
-    if (isSharing) return;
-    
-    const baseUrl = window.location.origin + window.location.pathname;
-    analyticsService.track('Share Initiated', { type: 'home_footer' });
-
-    if (navigator.share) {
-        setIsSharing(true);
-        try {
-            // Native share is instant to trigger but we want to clear the state 
-            // once triggered so the underlying UI isn't spinning indefinitely
-            const shareData = {
-                title: 'Zcene - Own Music Discovery',
-                text: 'Check out Zcene, the most immersive music discovery app to visualize your collection.',
-                url: baseUrl,
-            };
-            setIsSharing(false);
-            await navigator.share(shareData);
-        } catch (err: any) {
-            if (err.name !== 'AbortError') {
-                console.error("Native share failed", err);
-            }
-        } finally {
-            setIsSharing(false);
-        }
-    } else {
-        try {
-            await navigator.clipboard.writeText(baseUrl);
-            setIsCopied(true);
-            setTimeout(() => setIsCopied(false), 2000);
-        } catch (err) {
-            console.error("Clipboard copy failed", err);
-        }
-    }
-  };
-
   return (
     <div ref={containerRef} className="h-full w-full bg-background-dark text-zinc-200 font-display relative overflow-y-auto">
       {/* Hero Visual Container: Image + Fade constrained to 100vh */}
@@ -173,9 +143,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
           <div className="flex items-center gap-3">
             <button 
               onClick={scrollToSupport}
-              className="rounded-xl border border-primary bg-transparent px-4 py-1.5 font-medium text-primary transition-colors hover:bg-primary/20 text-sm"
+              className="rounded-xl border border-white bg-transparent px-4 py-1.5 font-medium text-white transition-colors hover:bg-white/10 text-sm"
             >
-              Support
+              Merch & Support
             </button>
             <div className="relative">
               <button 
@@ -216,7 +186,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black text-left font-display antialiased"
+                      className="absolute right-0 mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-black text-left font-display antialiased"
                     >
                       {user ? (
                         <div className="px-3 py-2.5 border-b border-white/5">
@@ -239,7 +209,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                                 onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
                               });
                             }}
-                            className="w-full bg-primary text-black rounded-xl px-4 py-2 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-xs font-semibold cursor-pointer"
+                            className="w-full bg-white text-brand-black rounded-xl px-4 py-2 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-xs font-semibold cursor-pointer"
                           >
                             <span className="material-symbols-outlined !text-[14px] text-black font-bold">login</span>
                             Sign In with Google
@@ -288,7 +258,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                         <button
                           onClick={() => {
                             setIsProfileOpen(false);
-                            window.open('https://instagram.com/zcene.io', '_blank');
+                            window.open(ZCENE_INSTAGRAM_URL, '_blank');
                           }}
                           className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
                         >
@@ -351,7 +321,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                         <span className="text-primary whitespace-nowrap">Own Music Discovery</span>
                     </h1>
                     <h2 className="text-xl md:text-2xl text-zinc-400 max-w-3xl mx-auto">
-                        Zcene lets you explore music through a <span className="text-white">visual spiderweb</span> map, revealing connections across genres, labels, scenes and eras.
+                        Zcene lets you explore music through an interactive <span className="text-white">visual connections map</span>, revealing deep relationships across genres, labels, scenes and eras.
                     </h2>
                     <div className="flex flex-col items-center gap-4">
                         <button
@@ -364,11 +334,11 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                               onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
                             }
                           }}
-                          className="cta-button rounded-2xl bg-primary px-8 py-4 text-base sm:text-lg font-medium text-brand-black transition-all hover:scale-105 shadow-xl shadow-primary/20 active:scale-95"
+                          className="cta-button rounded-2xl bg-white px-8 py-4 text-base sm:text-lg font-medium text-brand-black transition-all hover:scale-105 hover:opacity-90 shadow-white/20 active:scale-95"
                         >
                           {hasExistingGraph ? 'Resume Your Zcene' : 'Create Your Zcene'}
                         </button>
-                        <p className="text-base text-zinc-500">Completely Free. Start by signing in with Google.</p>
+                        <p className="text-base text-zinc-400">Independent, ad-free music discovery. Pay-as-you-go token curation & 0T shared viewing.</p>
                         {!user && <p className="text-xs text-zinc-600 font-normal mt-1">We collect your email address via Google Sign-In to manage your account.</p>}
                     </div>
                 </div>
@@ -391,58 +361,58 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
             </motion.div>
         </section>
 
-        {/* Feature: Artists (Zinc 900) */}
-        <section className="py-24 sm:py-32 bg-zinc-900/50 border-y border-zinc-800/50">
+        {/* Feature: Roots (Zinc 900) */}
+        <section id="roots" className="py-24 sm:py-32 bg-zinc-900/50 border-y border-zinc-800/50">
             <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="max-w-3xl mx-auto text-center space-y-8">
-                    <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Artists</h2>
+                    <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Roots</h2>
                     <h3 className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                        Instead of endless playlists, <span className="text-white font-medium">navigate your taste</span>, uncover hidden connections, and discover artists that genuinely fit your sound.
+                        Define the genesis of your taste. Start with your <span className="text-white font-medium">favorite root artists</span> or select from your personal library to anchor the exploration engine.
                     </h3>
                 </div>
                 <div 
                     onClick={handleVisualInteraction}
-                    className="mt-16 max-w-4xl mx-auto shadow-[0_0_50px_rgba(0,0,0,0.3)] flex flex-col items-center cursor-default pointer-events-auto"
+                    className="mt-16 w-full max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
                 >
                     <ArtistFeatureVisual />
                 </div>
             </div>
         </section>
 
-        {/* Feature: Spiderweb (Background Dark) */}
+        {/* Feature: Connections (Background Dark) */}
         <section id="features" className="py-24 sm:py-32 bg-background-dark">
             <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="max-w-3xl mx-auto text-center space-y-12">
                     <div className="space-y-8">
-                        <h2 className="text-4xl sm:text-5xl md:text-6xl font-medium text-white tracking-tighter uppercase">Spiderweb</h2>
+                        <h2 className="text-4xl sm:text-5xl md:text-6xl font-medium text-white tracking-tighter uppercase">Connections</h2>
                         <h3 className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                            Don’t just browse your collection, <span className="text-white font-medium">explore it visually</span> with an immersive spiderweb map. <span className="text-white font-medium">You're in control</span>, toggle seed artists, recommendations, labels, genres, origins and eras.
+                            Don’t just browse static lists, <span className="text-white font-medium">explore music visually</span> through dynamic relational graphs. <span className="text-white font-medium">You're in control</span>. Toggle root artists, discoveries, record labels, genres, origins, and eras.
                         </h3>
                     </div>
                 </div>
                 <div 
                     onClick={handleVisualInteraction}
-                    className="mt-16 max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
+                    className="mt-16 w-full max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
                 >
                     <ExampleMusicGraph />
                 </div>
             </div>
         </section>
 
-        {/* Feature: Deep Cut (Zinc 900) */}
+        {/* Feature: Deep Cuts (Zinc 900) */}
         <section className="py-24 sm:py-32 bg-zinc-900/50 border-y border-zinc-800/50">
             <div className="w-full max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="max-w-3xl mx-auto text-center space-y-12">
                     <div className="space-y-8">
-                        <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Deep Cut</h2>
+                        <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Deep Cuts</h2>
                         <h3 className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                            Dig deeper into the artists you love, add new ones, and explore <span className="text-white font-medium">bios, connections, discogs</span> and external links. This is how you <span className="text-white font-medium">curate</span> your next music journey.
+                            Dig deeper into the artists you love, explore <span className="text-white font-medium">editorial insights, Core Taste resonance</span>, release artwork, and instant audio previews. This is how you <span className="text-white font-medium">curate</span> your next musical obsession.
                         </h3>
                     </div>
                 </div>
                 <div 
                     onClick={handleVisualInteraction}
-                    className="mt-16 max-w-4xl mx-auto shadow-[0_0_50px_rgba(0,0,0,0.3)] flex flex-col items-center cursor-default pointer-events-auto"
+                    className="mt-16 w-full max-w-4xl mx-auto flex flex-col items-center cursor-default pointer-events-auto"
                 >
                     <CollectionIntelligenceVisual />
                 </div>
@@ -452,57 +422,87 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
         {/* Support Section (Background Dark) */}
         <section id="support" className="py-20 sm:py-32 bg-background-dark">
           <div className="container mx-auto px-4 sm:px-6 lg:px-8 text-center">
-            <h2 className="text-3xl sm:text-5xl font-medium text-white tracking-tight mb-4">Support The Zcene</h2>
+            <h2 className="text-3xl sm:text-5xl font-medium text-white tracking-tight mb-4">Official Merchandise & Support</h2>
             <h3 className="text-zinc-400 max-w-xl mx-auto mb-12 text-base">
-              Zcene is <span className="text-white font-medium">free</span> and built independently. If you find it useful, please consider supporting its future.
+              Zcene is built <span className="text-white font-medium">independently and 100% ad-free</span>. Order an exclusive made-to-order T-shirt or fuel the server engine directly.
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto text-left">
-                {/* Left Card: Buy Me a Coffee */}
-                <div className="bg-zinc-900/50 border border-zinc-800 p-8 space-y-8 flex flex-col rounded-none shadow-xl">
+                {/* Left Card: Buy Me a Coffee (Tip Jar & Order Settlement) */}
+                <div className="bg-zinc-900/50 border border-zinc-800 p-8 space-y-8 flex flex-col rounded-none">
                     <div className="flex-grow space-y-4">
+                        <div className="flex items-center gap-2">
+                            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary bg-primary/10 border border-primary/20 px-2.5 py-0.5 rounded-none">
+                                Settlement & Tip Jar
+                            </span>
+                        </div>
                         <h4 className="text-2xl font-bold text-white uppercase tracking-tight">Buy Me a Coffee</h4>
                         <p className="text-zinc-400 text-base leading-relaxed">
-                            A simple, friendly way to help keep the servers running and the code flowing.
+                            Settle payment for your confirmed T-shirt order, or drop a tip to help fund server compute and continuous development.
                         </p>
                     </div>
                     <a
-                      href="https://buymeacoffee.com/zcene"
+                      href={ZCENE_BUYMEACOFFEE_URL}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="flex-shrink-0 self-start hover:scale-105 transition-transform"
                     >
-                      <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" className="h-14 w-auto shadow-lg" />
+                      <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" className="h-14 w-auto" />
                     </a>
                 </div>
 
-                {/* Right Card: T-shirt */}
-                <div id="merch" className="relative bg-zinc-900/50 border-2 border-primary p-8 space-y-8 flex flex-col rounded-none shadow-xl shadow-primary/5">
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-brand-black px-4 py-1 rounded-none text-[10px] font-black tracking-[0.2em] uppercase shadow-lg">
-                        ZCENESTER
+                {/* Right Card: T-shirt (Ad-Hoc Order Flow) */}
+                <div id="merch" className="relative bg-zinc-900/50 border-2 border-primary p-8 space-y-8 flex flex-col rounded-none shadow-primary/5">
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-brand-black px-4 py-1 rounded-none text-[10px] font-black tracking-[0.2em] uppercase">
+                        MADE TO ORDER
                     </div>
                     <div className="flex-grow space-y-4">
-                        <h4 className="text-2xl font-bold text-white uppercase tracking-tight">Buy a T-Shirt</h4>
+                        <h4 className="text-2xl font-bold text-white uppercase tracking-tight">Order Official T-Shirt</h4>
                         <p className="text-zinc-400 text-base leading-relaxed">
-                            Represent the community with exclusive, high-quality Zcene T-shirts.
+                            Represent the community with exclusive, high-quality Black & White Zcene T-shirts, made to order.
                         </p>
-                        <p className="text-zinc-500 text-sm italic">
-                            Message me directly to purchase your t-shirt on Instagram.
-                        </p>
+                        <div className="text-xs text-zinc-400 space-y-2 bg-zinc-950/70 p-4 border border-zinc-800/80">
+                            <p className="font-semibold text-zinc-300 uppercase tracking-wider text-[10px]">How to Order:</p>
+                            <ol className="list-decimal list-inside space-y-1.5 text-zinc-400 leading-relaxed">
+                                <li>Contact us with your size (S-XXL), color (Black/White), and delivery location.</li>
+                                <li>Once confirmed, settle payment via Buy Me a Coffee.</li>
+                            </ol>
+                        </div>
                     </div>
-                    <a
-                      href="https://www.instagram.com/zcene.online/"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="self-start rounded-xl bg-primary px-8 py-3.5 text-sm font-medium text-brand-black hover:bg-primary/90 transition-all active:scale-95 shadow-lg shadow-primary/20"
-                    >
-                      Order via Instagram
-                    </a>
+                    <div className="flex flex-wrap items-center gap-3">
+                        <a
+                          href={ZCENE_TSHIRT_MAILTO}
+                          className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-3 text-sm font-medium text-brand-black hover:opacity-90 transition-all active:scale-95 shadow-white/20 whitespace-nowrap"
+                        >
+                          <span className="material-symbols-outlined !text-[18px]">mail</span>
+                          Email Order Inquiry
+                        </a>
+                        <a
+                          href={ZCENE_INSTAGRAM_URL}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-3 text-sm font-medium text-white hover:bg-zinc-700 transition-all active:scale-95 whitespace-nowrap"
+                        >
+                          <InstagramIcon className="w-4 h-4 text-white" />
+                          Order via Instagram
+                        </a>
+                    </div>
                 </div>
             </div>
 
             <div className="mt-20 border-t border-zinc-700/50 pt-12">
                 <div className="text-zinc-500 text-xs text-center">
-                    <div className="mx-auto flex justify-center items-center lg:hidden" style={{ minHeight: '66px' }}>
+                    <div 
+                        className="mx-auto flex justify-center items-center lg:hidden cursor-pointer" 
+                        style={{ minHeight: '66px' }}
+                        onClickCapture={(e) => {
+                            e.preventDefault();
+                            onNavigate(View.Home);
+                            const supportEl = document.getElementById('support');
+                            if (supportEl) {
+                                supportEl.scrollIntoView({ behavior: 'smooth' });
+                            }
+                        }}
+                    >
                         <AdSenseUnit
                             adClient="ca-pub-9665950244000141"
                             adSlot="3666473373"
@@ -511,7 +511,18 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                             linkUrl="#merch"
                         />
                     </div>
-                    <div className="hidden mx-auto lg:flex justify-center items-center" style={{ minHeight: '90px' }}>
+                    <div 
+                        className="hidden mx-auto lg:flex justify-center items-center cursor-pointer" 
+                        style={{ minHeight: '90px' }}
+                        onClickCapture={(e) => {
+                            e.preventDefault();
+                            onNavigate(View.Home);
+                            const supportEl = document.getElementById('support');
+                            if (supportEl) {
+                                supportEl.scrollIntoView({ behavior: 'smooth' });
+                            }
+                        }}
+                    >
                         <AdSenseUnit
                             adClient="ca-pub-9665950244000141"
                             adSlot="3666473373"
@@ -555,49 +566,12 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
       </main>
       
       {/* Footer */}
-      <footer className="w-full p-8 text-zinc-400 text-sm z-10 relative bg-zinc-900">
-        <div className="container mx-auto">
-            <div className="flex flex-col items-center gap-8">
-                <div onClick={scrollToTop} className="cursor-pointer">
-                    <ZceneLogo className="h-8 w-auto text-primary" />
-                </div>
-                <nav className="flex flex-wrap justify-center gap-x-6 gap-y-2 font-medium">
-                    <button onClick={scrollToTop} className="hover:text-primary transition-colors">Home</button>
-                    <button onClick={() => onNavigate(View.Graph)} className="hover:text-primary transition-colors">App</button>
-                    <button onClick={() => onNavigate(View.Help)} className="hover:text-primary transition-colors">Help</button>
-                    {isAdmin && (
-                        <>
-                            <button onClick={() => onNavigate(View.StyleGuide)} className="hover:text-primary transition-colors">Design System</button>
-                            <button onClick={() => onNavigate(View.Engine)} className="hover:text-primary transition-colors">Engine</button>
-                        </>
-                    )}
-                </nav>
-                <div className="flex items-center gap-4 relative">
-                    <a href="https://www.instagram.com/zcene.online/" target="_blank" rel="noopener noreferrer" aria-label="Instagram">
-                        <InstagramIcon className="w-5 h-5 hover:text-primary transition-colors" />
-                    </a>
-                    <div className="relative">
-                        <button 
-                            onClick={handleShareSite} 
-                            disabled={isSharing}
-                            className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors relative"
-                            title="Share Zcene"
-                        >
-                            <span className="material-symbols-outlined !text-[18px]">{isCopied ? 'check' : 'share'}</span>
-                        </button>
-                        {isCopied && (
-                            <span className="absolute -top-10 left-1/2 -translate-x-1/2 bg-primary text-brand-black text-[10px] font-bold py-1 px-2 rounded-none whitespace-nowrap shadow-xl">
-                                Link Copied
-                            </span>
-                        )}
-                    </div>
-                </div>
-            </div>
-            <div className="mt-8 border-t border-zinc-600/50 pt-8 text-center">
-                <p>© 2026 Zcene. All Rights Reserved.</p>
-            </div>
-        </div>
-      </footer>
+      <GlobalFooter 
+        onNavigate={onNavigate} 
+        isAdmin={isAdmin} 
+        showShare={true} 
+        currentView={View.Home} 
+      />
     </div>
   );
 };

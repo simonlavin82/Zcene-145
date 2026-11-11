@@ -1,9 +1,14 @@
-
 import { GoogleGenAI, Type, GenerateContentResponse, ThinkingLevel } from "@google/genai";
-import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters } from "../types";
-import { db } from './firebase';
+import { GraphData, Node, NodeDetails, Link, ChatMessage, DiscoveryFilters, CANONICAL_STYLES_FLAT, UserTaste } from "../types";
+import { db, auth } from './firebase';
 import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData, stripUndefinedProperties } from './artistCacheService';
+import { normalizeArtistId, extractArtistSubGraph, readArtistCacheMany, normalizeGraphData, stripUndefinedProperties, cleanArtistDisplayName } from './artistCacheService';
+import {
+  hasActiveDiscoveryFilters,
+  hasActiveTier2Filters,
+  hasActiveTier3Filters,
+  sanitizeAnchorLabelInput
+} from './cacheQualification';
 
 // --- EXPORTED CONSTANTS FOR SOURCE PAGE VISIBILITY ---
 
@@ -28,7 +33,16 @@ export const extractCleanJsonString = (rawText?: string): string => {
     }
 
     // 2. Find the first occurrence of { or [
-    const startIdx = text.search(/[{[]/);
+    let startIdx = text.indexOf('{');
+    const arrayStartIdx = text.search(/\[\s*(?:\{|")/); // allow array of objects or strings
+    if (startIdx === -1) startIdx = arrayStartIdx;
+    else if (arrayStartIdx !== -1 && arrayStartIdx < startIdx) startIdx = arrayStartIdx;
+    
+    if (startIdx === -1) {
+        // Fallback to just [
+        startIdx = text.indexOf('[');
+    }
+    
     if (startIdx === -1) return text;
     text = text.substring(startIdx);
 
@@ -88,7 +102,15 @@ const repairJson = (json: string): string => {
     let escaped = false;
     
     // Find the first occurrence of { or [
-    const startIdx = json.search(/[{[]/);
+    let startIdx = json.indexOf('{');
+    const arrayStartIdx = json.search(/\[\s*(?:\{|")/); // allow array of objects or strings
+    if (startIdx === -1) startIdx = arrayStartIdx;
+    else if (arrayStartIdx !== -1 && arrayStartIdx < startIdx) startIdx = arrayStartIdx;
+    
+    if (startIdx === -1) {
+        startIdx = json.indexOf('[');
+    }
+    
     if (startIdx === -1) return json;
     let text = json.substring(startIdx);
 
@@ -187,7 +209,7 @@ export const GRAPH_RESPONSE_SCHEMA = {
           },
           group: {
             type: Type.INTEGER,
-            description: "A group identifier for colouring or categorisation, usually based on the initial seed artists."
+            description: "A group identifier for coloring or categorization, usually based on the initial seed artists."
           }
         },
         required: ["id", "type", "group"]
@@ -227,7 +249,7 @@ export const GRAPH_RESPONSE_SCHEMA = {
   required: ["nodes", "links"]
 };
 
-export const NODE_DETAILS_SCHEMA = {
+export const ARTIST_NODE_DETAILS_SCHEMA = {
   type: Type.OBJECT,
   properties: {
     summary: {
@@ -247,6 +269,11 @@ export const NODE_DETAILS_SCHEMA = {
       type: Type.OBJECT,
       properties: {
         genre: { type: Type.STRING },
+        style: {
+          type: Type.STRING,
+          enum: CANONICAL_STYLES_FLAT,
+          description: "The single primary musical style trait describing the artist's sonic identity, strictly chosen from the canonical taxonomy."
+        },
         origin: { type: Type.STRING },
         founded: { type: Type.STRING },
         notableArtists: {
@@ -254,31 +281,23 @@ export const NODE_DETAILS_SCHEMA = {
           items: { type: Type.STRING }
         }
       },
-      required: ["genre", "origin", "founded", "notableArtists"]
+      required: ["genre", "style", "origin", "founded", "notableArtists"]
     },
-    links: {
-      type: Type.ARRAY,
-      description: "Wikipedia link MUST be index 0 if found. Do NOT include Official Website or Bandcamp entries — those are handled by the client. Only include grounded reference links.",
-      items: {
-        type: Type.OBJECT,
-        properties: {
-          site: { type: Type.STRING },
-          url: {
-            type: Type.STRING,
-            nullable: true,
-            description: "The verified, active URL. MUST be null if the URL cannot be confirmed. Do NOT guess or fabricate."
-          }
-        },
-        required: ["site"]
-      }
-    },
+
     discography: {
       type: Type.ARRAY,
+      description: "Array of official, verified studio albums or EPs. If you do not have factual, exact knowledge of the artist's real releases, return an empty array []. NEVER invent, guess, or extrapolate plausible-sounding album titles.",
       items: {
         type: Type.OBJECT,
         properties: {
-          albumName: { type: Type.STRING },
-          releaseYear: { type: Type.STRING }
+          albumName: {
+            type: Type.STRING,
+            description: "The authentic, exact release title as officially issued. Do NOT guess or alter."
+          },
+          releaseYear: {
+            type: Type.STRING,
+            description: "4-digit release year (YYYY)."
+          }
         },
         required: ["albumName", "releaseYear"]
       }
@@ -300,6 +319,67 @@ export const NODE_DETAILS_SCHEMA = {
   required: ["summary", "details", "discography", "recommendationReason", "youtubeSearchQuery"]
 };
 
+export const LABEL_NODE_DETAILS_SCHEMA = {
+  type: Type.OBJECT,
+  properties: {
+    summary: {
+      type: Type.STRING,
+      description: "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on significance and catalogue."
+    },
+    members: {
+      type: Type.ARRAY,
+      items: { type: Type.STRING },
+      description: "Key founders, executives, or notable personnel."
+    },
+    details: {
+      type: Type.OBJECT,
+      properties: {
+        genre: { type: Type.STRING },
+        origin: { type: Type.STRING },
+        founded: { type: Type.STRING },
+        notableArtists: {
+          type: Type.ARRAY,
+          items: { type: Type.STRING }
+        }
+      },
+      required: ["genre", "origin", "founded", "notableArtists"]
+    },
+
+    discography: {
+      type: Type.ARRAY,
+      items: {
+        type: Type.OBJECT,
+        properties: {
+          albumName: { type: Type.STRING },
+          releaseYear: { type: Type.STRING }
+        },
+        required: ["albumName", "releaseYear"]
+      }
+    },
+    recommendationReason: {
+      type: Type.STRING,
+      description: "Curator insight on the label's cultural impact."
+    },
+    youtubeVideoId: {
+      type: Type.STRING,
+      nullable: true,
+      description: "Nullable for labels."
+    },
+    youtubeSearchQuery: {
+      type: Type.STRING,
+      description: "A guaranteed-non-null search query string."
+    }
+  },
+  required: ["summary", "details", "discography", "recommendationReason", "youtubeSearchQuery"]
+};
+
+export const getNodeDetailsSchema = (nodeType?: string) => {
+  const isLabel = String(nodeType || '').toLowerCase() === 'label';
+  return isLabel ? LABEL_NODE_DETAILS_SCHEMA : ARTIST_NODE_DETAILS_SCHEMA;
+};
+
+export const NODE_DETAILS_SCHEMA = ARTIST_NODE_DETAILS_SCHEMA;
+
 export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing music graph. The user wants to enhance it by adding connections for these seed artists: {{artists}}.
 
         The graph ALREADY CONTAINS the following nodes: [{{existingNodeIds}}].
@@ -309,7 +389,8 @@ export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing m
         2.  DO NOT duplicate any of the existing nodes listed above. When creating links, you MUST reference the existing node IDs if a connection is needed.
         3.  For EACH seed artist in "{{artists}}", if they do not already exist as a node, you MUST add them as an 'artist' node to the 'nodes' array. This is a mandatory requirement. After adding the artist node, attempt to find its primary genre, record label, country of origin, and the year they were formed/founded (YYYY). If you find these details, create nodes for them (if they don't already exist) and link them back to the seed artist. The 'id' for the year node must be the 4-digit year (e.g., "1998") and its type must be 'founded'. If you cannot find some or all of these details, that is acceptable, but the seed artist node itself MUST still be included in the graph.
         4.  In addition, identify and add 8-12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. Assign them to the same 'group' as the seed artist they relate to, or a new group if they relate to multiple.
-        5.  It is absolutely critical that each 'founded' node is linked ONLY to the correct artist node who was founded in that year.
+        5.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time.
+        6.  It is absolutely critical that each 'founded' node is linked ONLY to the correct artist node who was founded in that year.
         6.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST include a 'context' string explaining the connection concisely (e.g. 'founded in 1994' or 'is a sub-genre of' or 'signed to XL Recordings' or 'is related to'). Keep the context to a brief 3-7 words in present tense.
         7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Explain in detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
         8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
@@ -321,32 +402,35 @@ export const GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = `I have an existing m
         IMPORTANT: Ensure that any double quotes within string values are properly escaped (e.g., "Artist \\"Name\\""). The final output must be perfectly valid JSON. Your entire response MUST be ONLY the raw JSON object, without any surrounding text, explanations, or markdown code fences.`;
 
 export const GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = `Given the following list of seed artists: {{artists}}.
-We already have cached, independent music graphs for these seed artists.
-Your task is to perform a true co-equal "melting pot" traversal where all input seeds act as simultaneous structural foundations, avoiding any attention bias toward a single anchor artist.
-
-The existing, cached nodes and connections are provided below as context:
-{{cachedSubgraphsContext}}
+Your task is to explore the genuine cultural, historical, and musical intersection of these seed artists from a blank slate (Tabula Rasa), performing a true co-equal "melting pot" traversal where all input seeds act as simultaneous structural foundations, avoiding any attention bias toward a single anchor artist. The output must be a single, valid JSON object with keys: 'nodes', 'links', and 'synthesis_rationale'.
+'nodes' should be an array of objects, each with 'id', 'type', and 'group'. The 'type' can be 'artist', 'genre', 'label', 'country', or 'founded'.
+'links' should be an array of objects, each with 'source', 'target', 'value', and 'context' string describing the nature of their relationship.
 
 Follow these rules precisely:
-1.  CO-EQUAL TRAVERSAL & CROSS-ANALYSIS: Before selecting recommendation branches, perform a concurrent, multi-dimensional cross-analysis of ALL seed artists across:
-    - Acoustic/Sonics: Shared styles, instruments, tempos, tones, production styles.
-    - Geographic: Scene locations, tours, regional interactions.
-    - Chronological: Overlapping time periods, eras, shared sub-culture epochs.
-    Synthesize connections treating every seed as a co-equal anchor. If any seed artist has active filters, do not label them as "[Indirect recommendation]" or isolate them. They must serve as base anchors.
-2.  CONNECTIVE STITCHING: Discover or generate the overlap bridges between the independent seed artist graphs. These bridges can be:
-    - Direct musical links/connections between the seed artists or their related bands.
-    - Shared metadata nodes (e.g. sharing a record label like "Victory Records", a genre like "Alternative Rock", or country of origin/founded year).
-    - UP TO 6 NEW "bridging" artists/bands that musically bridge the gap or are related to multiple seeds, helping connect the separate subgraphs.
-3.  REUSE EXISTING IDENTITIES: For all existing nodes from the cached subgraphs (e.g. genres, labels, countries, founded years, and artists), you MUST reuse their exact 'id' and 'type' without modifying them. Do not duplicate or rename existing metadata or artist nodes.
-4.  NO DISJOINT GRAPHS: Ensure that there is a path connecting the subgraphs so that the resulting graph is fully unified rather than multiple disconnected clusters.
-5.  NEW BRIDGING BANDS: If you add new bridging bands, you must also identify and create their respective genre, label, country, and founded year nodes (YYYY) and link them to build a rich graph.
-6.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST also include a 'context' string explaining the connection (e.g. 'releases music on Epitaph Records' or 'formed in 1988'). Keep the context to a brief 3-7 words in present tense.
-7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your co-equal cross-analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Explain in detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
-8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
+1.  CANONICAL NAMING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry.
+2.  MANDATORY SEED NODES (CO-EQUAL ROOTS): You MUST ensure an 'artist' node exists for EVERY seed artist listed in {{artists}}. Assign a unique 'group' number for each seed artist (e.g. 1 for seed 1, 2 for seed 2). Treat every seed as a co-equal foundational anchor. If any seed artist has active filters, do not label them as "[Indirect recommendation]" or isolate them.
+3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'. For metadata nodes (genre, label, country, founded), use canonical IDs and types.
+4.  TARGET ENTITY DENSITY & DUAL-STRUCTURE TOPOLOGY (RULE 27 — CROSSOVER BRIDGE + NATIVE ECOSYSTEMS):
+    In addition, find and add 10 to 16 NEW related artists total across the seeds (bringing the total artist count including seeds to 12 to 18 artists), structured into two complementary layers:
+    A. THE CROSSOVER BRIDGE (5 to 6 artists + shared labels/genres): Identify authentic bands, imprints, and genres that legitimately connect multiple seeds through shared musical DNA, split releases, shared producers, record labels, or lived touring history.
+    B. NATIVE ECOSYSTEMS (4 to 5 distinct scene artists per seed): Radiate deeply into each seed's authentic regional, temporal, and stylistic ecosystem. Give EACH seed its own dedicated cluster of 2nd-degree peers and formative scene contemporaries rather than stopping at superficial connections.
+    
+    UPPER-BOUND AMBITION & ANTI-LAZINESS DIRECTIVE: When the musical ecosystems surrounding the seeds are historically fertile, DO NOT lazily default to the bottom of the range. Actively strive toward the upper bound (13 to 16 new artists) to give users a deep, rich scene exploration.
+    
+    STRICT ANTI-FILLER VALVE: Conversely, NEVER pad the graph with generic or tenuously connected artists just to hit numbers. If an artist belongs to a genuinely tiny or isolated micro-scene with few authentic peers, scaling down and stopping at 9 to 10 new artists if sparse is required; never pad. Quality, historical veracity, and shared scene reality always override numerical quantity.
+    
+    Labels are explicitly EXCLUDED from this artist cap; generate the natural amount of authentic Label nodes required to accurately connect the generated artists together based on historical reality (typically resulting in an organic overall density of roughly 18 to 26 total Deep Cuts). ONLY include artists that strictly meet any provided discovery filters.
+5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. CRITICAL TOPOLOGY RULE: You MUST create direct links connecting each seed artist to their native ecosystem peers (sharing their 'group' number), and direct links connecting bridging artists to the seeds/peers they connect. Every new artist MUST be connected back to the central spiderweb, either directly to a seed artist or through a chain of artist-to-artist links. DO NOT leave any artist nodes floating or only connected to metadata nodes. Each link MUST include a 'context' string explaining the connection. Keep the contexts brief.
+6.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time. EXCEPTION (3-TIER ANCHOR OVERRIDE): When explicit Level 2 Era or Country Guardrails are active below, those guardrails take absolute precedence for all NEW recommended artists. In that case, you MUST map cross-era or cross-border lineage, influence, and spiritual succession connecting the sacred seed artist(s) to peers founded within the specified era/origin window, even if the seed artist belongs to a different decade or country.
+7.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
+8.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your co-equal cross-analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Explain in detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
+9.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
 
 STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group), connection links (source, target, value, context), and the synthesis_rationale string.
 
-ABSOLUTELY CRITICAL: Ensure NO ORPHANED LINKS. Every source/target in the 'links' array must map to a node in the 'nodes' array.
+ABSOLUTELY CRITICAL: 
+- Ensure NO ORPHANED LINKS. Every source/target in the 'links' array must map to a node in the 'nodes' array.
+- ANTI-HALLUCINATION RULE: EVERY single artist or band you mention in the 'synthesis_rationale' MUST exist as a fully defined node in the 'nodes' array and be properly connected in the 'links' array. Do not write about an artist in the rationale without actually including them in the graph topology!
 
 Your entire response MUST be ONLY the raw JSON object, without any surrounding text or markdown code fences.`;
 
@@ -358,15 +442,25 @@ Follow these rules precisely:
 1.  CANONICAL NAMING: For ALL nodes, use the canonical, professional spelling and capitalization as recognized by the music industry. For example, use "Radiohead" even if the seed provided was "radiohead", and "blink-182" with a lowercase 'b' and hyphen if that is its official name.
 2.  MANDATORY: You MUST create an 'artist' node for EVERY seed artist provided in the list: {{artists}}. Assign a unique 'group' number for each seed artist.
 3.  For each seed artist, find and add nodes for their primary genre, record label, country of origin, and the year they were formed/founded (YYYY). The 'id' for the year node must be the 4-digit year (e.g. "1994") and its type must be 'founded'.
-4.  In addition, find and add UP TO 12 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data. ONLY include artists that strictly meet any provided discovery filters.
-5.  For all artists (seed and related), create links connecting them to their respective genre, label, country, and founded year nodes. Also create links between related artists. All direct connections of a seed artist should share their 'group' number. Each link MUST include a 'context' string explaining the relationship (e.g., 'releases music on XL Recordings' or 'founded in 1985' or 'is a genre of'). Keep the context to a brief 3-7 words in present tense.
-6.  CRITICAL: Each 'founded' node MUST be linked ONLY to the correct artist who was founded in that year.
-7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Explain in detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
-8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
+4.  TARGET ENTITY DENSITY (RULE 27 — 10 TO 16 NEW ARTISTS):
+    In addition, find and add 10 to 16 NEW related artists that are musically connected to the seed artists. For these NEW artists, you MUST also identify and create their respective genre, label, country, and especially their 'founded' year nodes (YYYY) to ensure the spiderweb is rich with chronological data.
+    
+    UPPER-BOUND AMBITION & ANTI-LAZINESS DIRECTIVE: In rich, fertile musical movements, DO NOT satisfice at the lower floor. Strive for the upper range (13 to 16 new artists) by surfacing authentic 2nd-degree scene peers and era contemporaries.
+    
+    STRICT ANTI-FILLER VALVE: If the seed belongs to an isolated micro-niche, scale down, stopping at 9 to 10 new artists if sparse; never pad with irrelevant or generic artists just to hit a number. Quality, historical veracity, and shared scene reality always override numerical quantity.
+    
+    Labels are explicitly EXCLUDED from this cap; generate the natural amount of Label nodes required to accurately connect the generated artists together based on historical reality (resulting in an organic target density of roughly 18 to 26 total Deep Cuts). ONLY include artists that strictly meet any provided discovery filters.
+5.  CANONICAL SIGNATURES (STRICT): For ALL artist nodes generated (both seeds and related artists), their 'id' MUST explicitly append their 3-letter country of origin code to prevent naming collisions (e.g., 'artistname-usa', 'nirvana-gbr', 'turnstile-usa'). 
+    CRITICAL: DO NOT append the country code to the 'label' field. The 'label' MUST remain their exact, original display name without suffixes (e.g. label must be "Turnstile", NOT "Turnstile Usa").
+6.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time.
+7.  LINK RELATIONSHIP CONTEXT: Each link in the 'links' array MUST also include a 'context' string explaining the connection (e.g. 'releases music on Epitaph Records' or 'formed in 1988'). Keep the context to a brief 3-7 words in present tense.
+8.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Explain in detail how the seeds' acoustic, geographic, and chronological dimensions intersect to yield the generated connections.
+9.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
 
 STRUCTURAL ONLY: You MUST NOT generate or include any biographies, summaries, member lists, discographies, or detailed profile metadata for the artists. The response must strictly contain only structural layout nodes (id, type, group), connection links (source, target, value, context), and the synthesis_rationale string.
-        
-ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS. If you create a link with a 'source' or 'target' ID (e.g., "Arista Records"), you MUST ALSO define a node with that exact same 'id' (e.g., { "id": "Arista Records", "type": "label", ... }). Do not invent connections to nodes you haven't defined. This is a architecture requirement.
+
+ABSOLUTELY CRITICAL FINAL CHECK: Before you output the JSON, verify that for EVERY SINGLE OBJECT in the 'links' array, the value of its 'source' property and the value of its 'target' property perfectly match an 'id' from an object in the 'nodes' array. THERE MUST BE NO ORPHANED LINKS.
+- ANTI-HALLUCINATION RULE: EVERY single artist or band you mention in the 'synthesis_rationale' MUST exist as a fully defined node in the 'nodes' array and be properly connected in the 'links' array. Do not write about an artist in the rationale without actually including them in the graph topology!
 
 IMPORTANT: Ensure that any double quotes within string values are properly escaped (e.g., "Artist \\"Name\\""). The final output must be perfectly valid JSON. Your entire response MUST be ONLY the raw JSON object, without any surrounding text, explanations, or markdown code fences.`;
 
@@ -380,8 +474,9 @@ export const EXTEND_GRAPH_PROMPT_TEMPLATE = `I have a music graph. I want to exp
         2.  DO NOT duplicate any existing nodes.
         3.  Create an 'artist' node for the new artist.
         4.  Identify and create nodes for their primary genre, record label, country, and founded year (YYYY).
-        5.  Link the new artist to these new nodes AND to the original artist "{{artistName}}", adding a 'context' string to each link explaining the relationship (e.g., 'formed in 1992', 'releases music on Sub Pop', 'is related to'). Keep the context to a brief 3-7 words in present tense.
-        6.  The 'group' ID should be {{groupId}}.
+        5.  TEMPORAL ECOSYSTEM & SCENE AUTHENTICITY RULE (STRICT): You MUST reconstruct the true historical scene and temporal ecosystem of the seed artist(s). Node selection must be strictly restricted to the primary active era, geographic scene, and lived touring ecosystem of the seed(s). For example, if a seed artist was primarily active in a late-1990s scene, you MUST surface their exact period-accurate peers from that specific 1990s era. If the seed is a modern 2020s band, you MUST surface contemporary peers from their current 2020s ecosystem. Do NOT suggest modern algorithmic equivalents for legacy bands, and do NOT pull in historical legacy ancestors for modern bands unless they genuinely shared the same active touring scene. The graph must represent a period-accurate, contemporary snapshot of the artist's specific moment in time.
+        6.  Link the new artist to these new nodes AND to the original artist "{{artistName}}", adding a 'context' string to each link explaining the relationship (e.g., 'formed in 1992', 'releases music on Sub Pop', 'is related to'). Keep the context to a brief 3-7 words in present tense.
+        7.  The 'group' ID should be {{groupId}}.
         7.  SYNTHESIS RATIONALE (MANDATORY): You MUST output the step-by-step reasoning chain of your analysis in the 'synthesis_rationale' field of the JSON object. The text MUST be scannable and formatted using Markdown: use short paragraphs (separated by double newlines), bolding for key terms, and bullet points for lists. Explain in detail how this extended artist was chosen and how they relate musically to the anchor.
         8.  JSON SCHEMA: The output must be a single, valid JSON object with 'nodes', 'links' arrays and a 'synthesis_rationale' string matching the schema.
         
@@ -392,12 +487,16 @@ export const EXTEND_GRAPH_PROMPT_TEMPLATE = `I have a music graph. I want to exp
 export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed information for the music entity: "{{nodeIdentifier}}" (type: {{nodeType}}).
     
     Context:
-    - Seed artists: {{seedArtists}}.
-    - Connected nodes: {{contextNodes}}.
+    - Seed Artist(s) / Ecosystem Anchor: {{seedArtists}}.
+    - Search Disambiguation & Temporal Era Anchors: {{contextNodes}}.
     - Date: {{currentDate}}.
     {{#if originHint}}
     - Origin Hint: {{originHint}}.
     {{/if}}
+    
+    CRITICAL UNIVERSALITY & TEMPORAL RULE:
+    The summary (bio) MUST be globally universal and entity-focused. DO NOT mention or reference the "Temporal Era Anchors" or any of the disambiguation peers in the generated text. They are provided strictly to lock your Google Search grounding to the entity's exact historical era and lived scene. Do NOT inject historical predecessors into the narrative of a modern band just because they share a hometown or genre.
+
     
     USE GOOGLE SEARCH to find:
     1. The most accurate bio and cultural significance. You MUST dynamically adapt your search strategy to target authoritative sources and knowledge bases specific to the artist's musical genre (e.g., Resident Advisor/Beatport for electronic, DownBeat/Blue Note archives for jazz, Gramophone/publisher databases for classical, or Bandcamp/Discogs/AllMusic for independent rock/punk). Avoid single-genre biases or rigid source hierarchies. Use scannability techniques:
@@ -440,11 +539,11 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     CRITICAL OUTPUT REQUIREMENTS (STRICTLY ENFORCED):
     1. You MUST respond with a single, valid JSON object matching the schema below. Do NOT write any conversational text or prose outside the JSON.
     2. Do NOT include markdown code fences (do NOT wrap the response in \`\`\`json ... \`\`\`). Output raw JSON directly.
-    3. Do NOT include any inline search citations, footnote markers (such as [1], [2], [3], etc.), or source references anywhere in the text or JSON fields. Ensure all string values are plain text or markdown bold/bullets only, with absolutely no citation brackets.
+    3. Do NOT include any inline search citations, footnote markers (such as [1], [4, 9, 11], [cite: 20]), or source references anywhere in the text or JSON fields. Ensure all string values are plain text or markdown bold/bullets only, with absolutely no citation brackets or array-style citations.
     
     Your task is to generate a JSON object matching this structure precisely:
     {
-      "summary": "A scannable bio (approx. 100 words) using Markdown: short paragraphs, bolding for key terms, and bullet points for lists. Focus on style and significance.",
+      "summary": "A scannable bio using Markdown following /design Bio Scannability: 1. Paragraph 1: 1-2 concise sentences on identity, era, and core sound. 2. Capitalized lead-in line (e.g. 'Key stylistic traits include:' or 'Key elements of their sound include:'). 3. Adaptive bullet list: 2 to 4 distinct bullet items (* **Trait**: context) based strictly on verified ground truth; NEVER hallucinate filler for obscure acts. ANTI-CLUMPING: Each trait MUST have its own individual bullet line (NEVER combine multiple traits into a single comma-separated bullet). 4. Optional closing paragraph: 1-2 sentences on defining releases or cultural legacy ONLY if verified.",
       "imageUrl": "https://upload.wikimedia.org/... OR https://f4.bcbits.com/...",
       "members": ["Name (Role)", ...],
       "details": {
@@ -453,9 +552,7 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
         "founded": "YYYY",
         "notableArtists": ["Artist Name", ...]
       },
-      "links": [
-        {"site": "Wikipedia", "url": "https://en.wikipedia.org/wiki/..."}
-      ],
+
       "discography": [{"albumName": "Name", "releaseYear": "YYYY"}],
       "recommendationReason": "Curator insight about their role in this scene.",
       "youtubeVideoId": "dQw4w9WgXcQ",
@@ -473,19 +570,24 @@ export const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed infor
     - NEGATIVE SHORTS CONSTRAINT: DO NOT parse or return video hashes derived from search queries matching vertical formats or the '/shorts/' route structure. Prioritize landscape video IDs with durations longer than 2 minutes.
     - ENTITY VALIDATION: Ensure the chosen video belongs strictly to verified artist channels, high-fidelity archive channels (e.g., Hate5six, KEXP, Audiotree), or standard label uploads (e.g., Relapse Records, Epitaph Records).
     - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your Google Search results. If you do not see the exact URL or video ID in the search results, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
-    - AMBIGUITY RESOLUTION: For bands with common or ambiguous names (such as "Cave In"), make sure your search query includes qualifiers (e.g. "Cave In band" or "Cave In post-hardcore") to avoid generic results.
+    - AMBIGUITY RESOLUTION (CRITICAL): For entities with common or ambiguous names (such as "Missing Link"), you MUST combine the entity name with its Connected Network (e.g., its genre, label, or the Seed Artist) in your search query to prevent entity collisions. For example, search "Missing Link hardcore punk band" or "Missing Link Triple B Records" instead of just "Missing Link band".
 
-    WIKIPEDIA ORDERING RULE (MANDATORY):
-    If a Wikipedia link is found, it MUST be the very first item (index 0) in the links array.
+    MEMBERS GROUNDING & ZERO-HALLUCINATION RULE (CRITICAL):
+    - Only include authentic, verified current or historical members of THIS specific entity.
+    - ABSOLUTELY FORBIDDEN: NEVER include guest contributors, touring package mates, festival peers, or members of other bands (e.g. do NOT associate musicians from touring peers like '68 with Vein.fm).
+    - If you do not possess high-confidence historical knowledge of the artist's lineup, you MUST return an empty array: "members": [].
+    - An empty array [] is 100% compliant, fully valid, and strictly preferred over any unverified, approximate, or hallucinated members.
 
-    OFFICIAL WEBSITE RULE:
-    Do NOT include an "Official Website" entry in your links array. The client application handles Official Website routing independently and safely.
+    DISCOGRAPHY GROUNDING & ZERO-HALLUCINATION RULE (CRITICAL):
+    - Only include real, officially released studio albums, EPs, or qualifying demos that exist in authoritative discographies.
+    - If you do not possess verified, exact historical knowledge of the artist's releases, you MUST return an empty array: "discography": [].
+    - ABSOLUTELY FORBIDDEN: NEVER invent, fabricate, guess, or extrapolate plausible album titles based on the band's location, lyrics, song titles, or genre clichés (e.g. NEVER invent regional titles like 'To Live and Die in New England' for a Massachusetts hardcore band).
+    - An empty array [] is 100% compliant, fully valid, and strictly preferred over any unverified, approximate, or hallucinated titles.
 
-    BANDCAMP RULE:
-    Do NOT include a "Bandcamp" entry in your links array. The client application handles Bandcamp routing independently.
-
-    WIKIPEDIA / OTHER INFO LINKS:
-    Include grounded Wikipedia or other reference links if confirmed by Google Search results. Wikipedia MUST be index 0.
+    NOTABLE ARTISTS GROUNDING RULE:
+    - Array of 2 to 6 authentic peer or contemporary band/artist names (e.g. ["Jesus Piece", "Code Orange", "Fleshwater"]).
+    - ABSOLUTELY FORBIDDEN: NEVER output explanatory sentences, scene summaries, or generic phrases (e.g. DO NOT return "Inclusive of modern metallic hardcore...").
+    - If no specific peer bands are verified, return [].
 
     CURATOR TONE & VARIETY (CRITICAL):
     - BREVITY: Max 25 words. Use exactly ONE snappy, high-impact sentence.
@@ -610,14 +712,14 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
     let foundedYear = preset.founded;
     if (filters?.foundedAfter) {
       const limit = Number(filters.foundedAfter);
-      if (Number(foundedYear) <= limit) {
-        foundedYear = (limit + 1 + Math.floor(Math.random() * 10)).toString();
+      if (Number(foundedYear) < limit) {
+        foundedYear = (limit + Math.floor(Math.random() * 10)).toString();
       }
     }
     if (filters?.foundedBefore) {
       const limit = Number(filters.foundedBefore);
-      if (Number(foundedYear) >= limit) {
-        foundedYear = (limit - 1 - Math.floor(Math.random() * 10)).toString();
+      if (Number(foundedYear) > limit) {
+        foundedYear = (limit - Math.floor(Math.random() * 10)).toString();
       }
     }
 
@@ -633,12 +735,17 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
       genresToUse[0] = filters.includeGenres[0];
     }
 
+    const labelsToUse = [...preset.labels];
+    if (filters?.anchorLabels && filters.anchorLabels.length > 0) {
+      labelsToUse[0] = filters.anchorLabels[0];
+    }
+
     genresToUse.forEach(g => {
       addNode({ id: g, type: 'genre', group: 1000, label: g });
       addLink(resolvedName, g, 1, "performs style");
     });
 
-    preset.labels.forEach(l => {
+    labelsToUse.forEach(l => {
       addNode({ id: l, type: 'label', group: 2000, label: l });
       addLink(resolvedName, l, 1, "releases music via");
     });
@@ -651,11 +758,11 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
 
     preset.related.forEach(relName => {
       let relFounded = (Number(foundedYear) + Math.floor(Math.random() * 8) - 4).toString();
-      if (filters?.foundedAfter && Number(relFounded) <= Number(filters.foundedAfter)) {
-        relFounded = (Number(filters.foundedAfter) + 1 + Math.floor(Math.random() * 5)).toString();
+      if (filters?.foundedAfter && Number(relFounded) < Number(filters.foundedAfter)) {
+        relFounded = (Number(filters.foundedAfter) + Math.floor(Math.random() * 5)).toString();
       }
-      if (filters?.foundedBefore && Number(relFounded) >= Number(filters.foundedBefore)) {
-        relFounded = (Number(filters.foundedBefore) - 1 - Math.floor(Math.random() * 5)).toString();
+      if (filters?.foundedBefore && Number(relFounded) > Number(filters.foundedBefore)) {
+        relFounded = (Number(filters.foundedBefore) - Math.floor(Math.random() * 5)).toString();
       }
 
       addNode({ id: relName, type: 'artist', group, label: relName });
@@ -664,7 +771,7 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
       const relGenre = genresToUse[0];
       addLink(relName, relGenre, 1, "performs style");
 
-      const relLabel = preset.labels[0];
+      const relLabel = labelsToUse[0];
       addLink(relName, relLabel, 1, "releases music via");
 
       addLink(relName, country, 1, "hails from");
@@ -678,7 +785,7 @@ const generateMockGraphData = (artists: string, baseGraph?: GraphData, filters?:
     for (let i = 0; i < artistList.length - 1; i++) {
       const parentName = artistList[i].toLowerCase() === 'gaye' ? 'Marvin Gaye' : artistList[i];
       const childName = artistList[i+1].toLowerCase() === 'gaye' ? 'Marvin Gaye' : artistList[i+1];
-      addLink(parentName, childName, 2, "is connected to");
+      addLink(parentName, childName, 2, "bridges musical lineage with");
     }
   }
 
@@ -810,38 +917,31 @@ const generateMockNodeDetails = (node: Node): NodeDetails => {
  */
 export const resolveArtistCandidatesViaAI = async (
   artistName: string,
+  rejectedCandidates?: Array<{ id: string; label: string; origin: string; genre: string }>,
   signal?: AbortSignal
 ): Promise<Array<{ id: string; label: string; origin: string; genre: string }>> => {
-  if (isLocal) {
-    console.log(`[Disambiguation Probe] Intercepted in sandbox mode for "${artistName}"`);
-    if (artistName.toLowerCase() === 'i wish i') {
-      return [
-        { id: 'i-wish-i-united-kingdom', label: 'I Wish I', origin: 'United Kingdom', genre: 'Indie Pop' },
-        { id: 'i-wish-i-australia', label: 'I Wish I', origin: 'Australia', genre: 'Metalcore' },
-        { id: 'i-wish-i-united-states', label: 'I Wish I', origin: 'United States', genre: 'Screamo' }
-      ];
-    }
-    // Return a generic mock single candidate for other searches to test STATE B
-    return [
-      { id: `${artistName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-mock`, label: artistName, origin: 'Local Sandbox', genre: 'Mock Genre' }
-    ];
-  }
 
   const baseUrl = typeof window !== 'undefined'
     ? window.location.origin + '/api/gemini'
     : 'http://localhost:8080/api/gemini';
 
-  const model = 'gemini-2.0-flash';
+  const model = (typeof process !== 'undefined' && process.env?.GEMINI_FLASH_MODEL) || 'gemini-3.6-flash';
   const targetUrl = `${baseUrl}/v1beta/models/${model}:generateContent`;
 
   const systemInstruction = `You are a music database disambiguation assistant.
-Given an artist or band name, enumerate every distinct musical act that has used this exact name, across all countries, regions, and eras.
-Return ONLY acts with genuinely distinct identities — do not list lineup variations or reissue editions of the same act.
-If only one clear act exists globally, return exactly one entry.
-Maximum 5 entries.
+Given an artist or band name, enumerate distinct musical acts that have used this exact name, across all countries, regions, and eras.
+Return ONLY acts with genuinely distinct identities (do not list lineup variations).
+If there is only one clear act, return exactly one entry.
+If there are multiple acts (e.g. obscure local bands sharing the name), list them all up to a maximum of 5.
+If you are unsure but know at least one act with this name, return it.
 Respond in strict JSON only — no prose, no markdown, no citation markers.`;
 
-  const userPrompt = `List all distinct musical artists or bands named "${artistName}". Return a JSON array of objects with fields: name (string), country (string, country of origin), genre (string, primary genre), activeYears (string, e.g. "1992–2004" or "2010–present").`;
+  let userPrompt = `List all distinct musical artists or bands named "${artistName}". Return a JSON array of objects with fields: name (string), country (string, country of origin), genre (string, primary genre), activeYears (string, e.g. "1992–2004" or "2010–present").`;
+
+  if (rejectedCandidates && rejectedCandidates.length > 0) {
+    const rejectedContext = rejectedCandidates.map(c => `${c.label || c.id} (Origin: ${c.origin}, Genre: ${c.genre})`).join(', ');
+    userPrompt += `\n\nCRITICAL CONSTRAINT: Do NOT include any of the following acts in your response, as the user has already rejected them: [${rejectedContext}]. Focus solely on other distinct acts sharing this name.`;
+  }
 
   const requestBody = {
     contents: [{ role: 'user', parts: [{ text: userPrompt }] }],
@@ -861,30 +961,79 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
           required: ['name', 'country', 'genre']
         }
       },
-      maxOutputTokens: 512
+      maxOutputTokens: 2048
     }
   };
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000);
+  const timeoutId = setTimeout(() => controller.abort(), 60000);
   const combinedSignal = signal || controller.signal;
 
   try {
+    const startTime = Date.now();
+    console.log(`[Diagnostic] Starting fetch for "${artistName}". Signal aborted? ${combinedSignal.aborted}`);
+    combinedSignal.addEventListener('abort', () => {
+      console.warn(`[Diagnostic] signal 'abort' event fired at ${Date.now() - startTime}ms! Reason:`, combinedSignal.reason);
+    });
+
+    const authHeaders: Record<string, string> = {};
+    try {
+      if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+        const idToken = await auth.currentUser.getIdToken();
+        if (idToken) authHeaders['Authorization'] = `Bearer ${idToken}`;
+      }
+    } catch (_) {}
     const response = await fetch(targetUrl, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'x-goog-api-key': 'backend-proxy-key' },
+      headers: { 
+        'Content-Type': 'application/json',
+        ...authHeaders
+      },
       body: JSON.stringify(requestBody),
       signal: combinedSignal
     });
 
     clearTimeout(timeoutId);
+    console.log(`[Diagnostic] Fetch completed successfully at ${Date.now() - startTime}ms. Status: ${response.status}`);
 
-    if (!response.ok) {
-      console.warn(`[Disambiguation Probe] API returned ${response.status} for "${artistName}"`);
-      return [];
+    let finalResponse = response;
+    
+    if (!finalResponse.ok) {
+      if (finalResponse.status === 503 && typeof window !== 'undefined') {
+        const apiKey = typeof process !== 'undefined' ? process.env.GEMINI_API_KEY : (import.meta as any).env?.VITE_GEMINI_API_KEY;
+        if (apiKey) {
+          console.warn(`[Disambiguation Probe] Proxy returned 503. Attempting direct fallback to Google API...`);
+          const fallbackUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+          
+          try {
+            const fallbackResponse = await fetch(fallbackUrl, {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify(requestBody),
+              signal: combinedSignal
+            });
+            
+            if (fallbackResponse.ok) {
+              finalResponse = fallbackResponse;
+              console.log(`[Disambiguation Probe] Direct fallback successful!`);
+            } else {
+              console.warn(`[Disambiguation Probe] Direct fallback also failed with status ${fallbackResponse.status}`);
+            }
+          } catch (fallbackErr) {
+            console.warn(`[Disambiguation Probe] Direct fallback fetch failed:`, fallbackErr);
+          }
+        }
+      }
+
+      if (!finalResponse.ok) {
+        console.warn(`[Disambiguation Probe] API returned ${finalResponse.status} for "${artistName}"`);
+        return [];
+      }
     }
 
-    const json = await response.json();
+    const json = await finalResponse.json();
     const rawText = json?.candidates?.[0]?.content?.parts?.[0]?.text || '';
     if (!rawText) return [];
 
@@ -912,9 +1061,12 @@ Respond in strict JSON only — no prose, no markdown, no citation markers.`;
     }));
   } catch (err) {
     clearTimeout(timeoutId);
+    console.error(`[Diagnostic] Fetch catch block hit! Name: ${(err as any)?.name}, Message: ${(err as any)?.message}`);
+    console.error(`[Diagnostic] Was combinedSignal aborted? ${combinedSignal.aborted}. Reason:`, combinedSignal.reason);
     if ((err as any)?.name !== 'AbortError') {
       console.warn(`[Disambiguation Probe] Failed for "${artistName}":`, err);
     }
+    console.error(`[Disambiguation Probe] Candidate probe error for "${artistName}":`, err);
     return [];
   }
 };
@@ -927,7 +1079,8 @@ export const generateGraphData = async (
   filters?: DiscoveryFilters,
   activeUserId?: string | null,
   signal?: AbortSignal,
-  disambiguationHints?: Record<string, string>
+  disambiguationHints?: Record<string, string>,
+  disambiguationGenres?: Record<string, string>
 ): Promise<GraphData> => {
   if (isLocal) {
     // Add artificial delay to simulate network latency and show loading states during local testing
@@ -988,8 +1141,8 @@ export const generateGraphData = async (
 
       if (isMultiSeed) {
           systemInstruction = GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE
-              .replace('{{cachedSubgraphsContext}}', cachedSubgraphsContext);
-          userPrompt = `Stitch together the music graphs for these seed artists: ${artists}. Use the provided cached graphs as context.`;
+              .replace('{{artists}}', artists);
+          userPrompt = `Explore the genuine cultural, historical, and musical intersection of these seed artists: ${artists} from a blank slate. Map their crossover bridge and native scene ecosystems.`;
       } else if (isEnhancement) {
           const existingNodeIds = baseGraph.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
           systemInstruction = GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE
@@ -1000,53 +1153,57 @@ export const generateGraphData = async (
           userPrompt = `Generate a music graph for these seed artists: ${artists}.`;
       }
 
-      // Inject Discovery Filters into System Instruction with "Zero-Tolerance" logic
-      if (filters) {
-          let filterRules = "\n\nSTRICT DISCOVERY CONSTRAINTS (ZERO-TOLERANCE):";
-          filterRules += "\nYou are a strict filtering agent. Your primary mission is to obey these filters. Musical relevance is secondary.";
-          
-          if (filters.foundedAfter) {
-              filterRules += `\n- MANDATORY: Every NEW artist you add MUST have been founded AFTER the year ${filters.foundedAfter}.`;
-              filterRules += `\n- FORBIDDEN: Do not include any artists founded in ${filters.foundedAfter} or earlier. This includes all 'classic', 'legendary', or 'pioneer' acts of the genre.`;
-              filterRules += `\n- NO FALLBACK: If you cannot find an artist founded after ${filters.foundedAfter}, DO NOT include a substitute. Return an empty array for that recommendation slot.`;
-              filterRules += `\n- LOGIC: If the seed artist is old (e.g. from the 90s), look for MODERN bands (founded > ${filters.foundedAfter}) that are influenced by them or part of the current 'revival' scene.`;
+      // Inject 3-Tier Anchor System (Architecture V30 / Rule 41) into System Instruction
+      if (hasActiveDiscoveryFilters(filters) && filters) {
+          let filterRules = "\n\n3-TIER ANCHOR HIERARCHY & DISCOVERY CONSTRAINTS (RULE 41):";
+          filterRules += `\n- LEVEL 1 (SACRED SEED IMMUNITY): The seed artists [${artists}] are the sacred genesis of the spiderweb and are 100% IMMUNE to all secondary Era, Origin, Genre, and Label filters.`;
+
+          if (hasActiveTier2Filters(filters)) {
+              filterRules += "\n\n- LEVEL 2 (HARD SPATIAL & TEMPORAL GUARDRAILS — ZERO-TOLERANCE):";
+              filterRules += "\n  Every NEW recommended artist you add MUST strictly obey these hard boundaries. Cross-era and cross-border lineage is explicitly authorized.";
+              if (filters.foundedAfter) {
+                  filterRules += `\n  * MANDATORY ERA FLOOR: Every NEW artist you add MUST have been founded in the year ${filters.foundedAfter} or LATER.`;
+                  filterRules += `\n  * FORBIDDEN: Do not include any new artists founded in ${filters.foundedAfter - 1} or earlier.`;
+              }
+              if (filters.foundedBefore) {
+                  filterRules += `\n  * MANDATORY ERA CEILING: Every NEW artist you add MUST have been founded in the year ${filters.foundedBefore} or EARLIER.`;
+                  filterRules += `\n  * FORBIDDEN: Do not include any new artists founded in ${filters.foundedBefore + 1} or later.`;
+              }
+              if (filters.includeOrigins && filters.includeOrigins.length > 0) {
+                  filterRules += `\n  * ORIGIN MANDATE: Only include new artists from: ${filters.includeOrigins.join(', ')}.`;
+              }
+              if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
+                  filterRules += `\n  * FORBIDDEN ORIGINS: Strictly exclude all new artists from: ${filters.excludeOrigins.join(', ')}.`;
+              }
           }
 
-          if (filters.foundedBefore) {
-              filterRules += `\n- MANDATORY: Every NEW artist you add MUST have been founded BEFORE the year ${filters.foundedBefore}.`;
-              filterRules += `\n- FORBIDDEN: Do not include any artists founded in ${filters.foundedBefore} or later.`;
-              filterRules += `\n- NO FALLBACK: If you cannot find an artist founded before ${filters.foundedBefore}, DO NOT include a substitute. Return an empty array for that recommendation slot.`;
-          }
-
-          if (filters.includeGenres && filters.includeGenres.length > 0) {
-              filterRules += `\n- GENRE MANDATE: Only include new artists that play/belong to these genres: ${filters.includeGenres.join(', ')}.`;
-          }
-          
-          if (filters.includeOrigins && filters.includeOrigins.length > 0) {
-              filterRules += `\n- ORIGIN MANDATE: Only include new artists from: ${filters.includeOrigins.join(', ')}.`;
-          }
-          
-          if (filters.excludeOrigins && filters.excludeOrigins.length > 0) {
-              filterRules += `\n- FORBIDDEN ORIGINS: Strictly exclude all artists from: ${filters.excludeOrigins.join(', ')}.`;
-          }
-          
-          if (filters.additionalInstructions) {
-              filterRules += `\n- USER DIRECTION: ${filters.additionalInstructions}`;
+          if (hasActiveTier3Filters(filters)) {
+              filterRules += "\n\n- LEVEL 3 (SOFT SCENE GRAVITY & GRACEFUL DEGRADATION — RULE 41):";
+              if (filters.includeGenres && filters.includeGenres.length > 0) {
+                  filterRules += `\n  * CANONICAL GENRE GRAVITY: Strongly prioritize new artists connected to these genres: ${filters.includeGenres.join(', ')}.`;
+              }
+              if (filters.anchorLabels && filters.anchorLabels.length > 0) {
+                  const sanitizedLabels = filters.anchorLabels.map(l => sanitizeAnchorLabelInput(l)).filter(Boolean);
+                  if (sanitizedLabels.length > 0) {
+                      filterRules += `\n  * ANCHOR LABEL GRAVITY: Strongly prioritize new artists released on or connected to these record labels: ${sanitizedLabels.join(', ')}, and include their 'label' node(s) where authentic.`;
+                  }
+              }
+              filterRules += "\n  * GRACEFUL DEGRADATION MANDATE: Level 2 Era and Origin guardrails ALWAYS supersede Level 3 Genre and Label gravity. If a Level 3 genre or record label has zero authentic artists inside the Level 2 Era/Origin window, DO NOT violate Level 2 and DO NOT return an empty graph. Silently bypass the conflicting Level 3 constraint and complete the spiderweb using Level 1 and Level 2.";
           }
 
           filterRules += "\n\nIMPORTANT: Do NOT include any search citations, grounding markers (like [1], [2]), or footnotes in the JSON output. The JSON must be clean and parseable.";
-          filterRules += `\n\n(Note: The seed artists [${artists}] are the ONLY exception. ALL other artists MUST obey these rules or be excluded.)`;
-          filterRules += "\n\nFINAL VERIFICATION: Before generating JSON, audit your list. Ensure all filters are strictly obeyed. If an artist violates any of the rules above, DELETE them from your response.";
+          filterRules += "\n\nFINAL VERIFICATION: Before generating JSON, audit your list. If any new artist violates a Level 2 Era or Origin guardrail above, DELETE them from your response.";
           
           systemInstruction += filterRules;
 
           // Also reinforce in the user prompt
-          let reminder = `\n\nREMINDER: All new artists MUST meet the active filters:`;
-          if (filters.foundedAfter) reminder += ` founded after ${filters.foundedAfter};`;
-          if (filters.foundedBefore) reminder += ` founded before ${filters.foundedBefore};`;
+          let reminder = `\n\nREMINDER: All new artists MUST obey the active 3-Tier Anchors:`;
+          if (filters.foundedAfter) reminder += ` founded in ${filters.foundedAfter} or later;`;
+          if (filters.foundedBefore) reminder += ` founded in ${filters.foundedBefore} or earlier;`;
           if (filters.includeOrigins && filters.includeOrigins.length > 0) reminder += ` origins in ${filters.includeOrigins.join(', ')};`;
           if (filters.excludeOrigins && filters.excludeOrigins.length > 0) reminder += ` origins NOT in ${filters.excludeOrigins.join(', ')};`;
-          if (filters.includeGenres && filters.includeGenres.length > 0) reminder += ` genres in ${filters.includeGenres.join(', ')};`;
+          if (filters.includeGenres && filters.includeGenres.length > 0) reminder += ` soft genre pull ${filters.includeGenres.join(', ')};`;
+          if (filters.anchorLabels && filters.anchorLabels.length > 0) reminder += ` soft label pull ${filters.anchorLabels.map(l => sanitizeAnchorLabelInput(l)).filter(Boolean).join(', ')};`;
           userPrompt += reminder;
       }
 
@@ -1089,11 +1246,19 @@ export const generateGraphData = async (
       };
 
       const url = `${baseUrl}/v1beta/models/${currentModel}:generateContent`;
+      const authHeaders: Record<string, string> = {};
+      try {
+        if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+          const idToken = await auth.currentUser.getIdToken();
+          if (idToken) authHeaders['Authorization'] = `Bearer ${idToken}`;
+        }
+      } catch (_) {}
       const response = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': proxyKey
+          'x-goog-api-key': proxyKey,
+          ...authHeaders
         },
         body: JSON.stringify(requestBody),
         signal
@@ -1152,6 +1317,73 @@ export const generateGraphData = async (
       const rawNodes = Array.isArray(data?.nodes) ? data.nodes : [];
       const rawLinks = Array.isArray(data?.links) ? data.links : [];
 
+      // --- MULTI-SEED TOPOLOGY MAPPING ---
+      // Re-anchor natural LLM output (e.g. "turnstile") to cached baseGraph roots (e.g. "turnstile-usa")
+      if (disambiguationHints) {
+          rawNodes.forEach(node => {
+              if (!node.id) return;
+              const mapKey = `__MAP__${normalizeArtistId(node.id)}`;
+              if (disambiguationHints[mapKey]) {
+                  node.id = disambiguationHints[mapKey];
+              }
+          });
+          rawLinks.forEach(link => {
+              if (link.source) {
+                  const sourceStr = typeof link.source === 'string' ? link.source : link.source.id;
+                  if (sourceStr) {
+                      const mapKey = `__MAP__${normalizeArtistId(sourceStr)}`;
+                      if (disambiguationHints[mapKey]) {
+                          if (typeof link.source === 'string') {
+                              link.source = disambiguationHints[mapKey];
+                          } else {
+                              link.source.id = disambiguationHints[mapKey];
+                          }
+                      }
+                  }
+              }
+              if (link.target) {
+                  const targetStr = typeof link.target === 'string' ? link.target : link.target.id;
+                  if (targetStr) {
+                      const mapKey = `__MAP__${normalizeArtistId(targetStr)}`;
+                      if (disambiguationHints[mapKey]) {
+                          if (typeof link.target === 'string') {
+                              link.target = disambiguationHints[mapKey];
+                          } else {
+                              link.target.id = disambiguationHints[mapKey];
+                          }
+                      }
+                  }
+              }
+          });
+      }
+
+      // --- SANITIZE POLLUTED IDS ---
+      // Match patterns like "-after-2020", "(After 2020)", "after 2020", etc.
+      const pollutedSuffixRegex = /(?:-|\s*\(?)?(?:after|before)\s*-?\d{4}\)?$/i;
+      
+      rawNodes.forEach(node => {
+          if (node.id) {
+              node.id = node.id.replace(pollutedSuffixRegex, '').trim();
+          }
+      });
+    
+      rawLinks.forEach(link => {
+          if (link.source) {
+              if (typeof link.source === 'string') {
+                  link.source = link.source.replace(pollutedSuffixRegex, '').trim();
+              } else if (link.source.id) {
+                  link.source.id = link.source.id.replace(pollutedSuffixRegex, '').trim();
+              }
+          }
+          if (link.target) {
+              if (typeof link.target === 'string') {
+                  link.target = link.target.replace(pollutedSuffixRegex, '').trim();
+              } else if (link.target.id) {
+                  link.target.id = link.target.id.replace(pollutedSuffixRegex, '').trim();
+              }
+          }
+      });
+
       if (filters?.foundedAfter) {
           const threshold = Number(filters.foundedAfter);
           const artistToYear = new Map<string, number>();
@@ -1176,7 +1408,38 @@ export const generateGraphData = async (
           rawNodes.forEach(node => {
               if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
                   const year = artistToYear.get(node.id.toLowerCase());
-                  if (year && year <= threshold) {
+                  if (year !== undefined && year < threshold) {
+                      nodesToRemove.add(node.id);
+                  }
+              }
+          });
+      }
+
+      if (filters?.foundedBefore) {
+          const threshold = Number(filters.foundedBefore);
+          const artistToYear = new Map<string, number>();
+          const nodeMap = new Map(rawNodes.map(n => [n.id, n]));
+
+          rawLinks.forEach(link => {
+              const sourceId = typeof link.source === 'string' ? link.source : (link.source as Node).id;
+              const targetId = typeof link.target === 'string' ? link.target : (link.target as Node).id;
+              
+              const sourceNode = nodeMap.get(sourceId);
+              const targetNode = nodeMap.get(targetId);
+              
+              if (sourceNode?.type === 'artist' && targetNode?.type === 'founded') {
+                  const year = parseInt(targetNode.id);
+                  if (!isNaN(year)) artistToYear.set(sourceId.toLowerCase(), year);
+              } else if (targetNode?.type === 'artist' && sourceNode?.type === 'founded') {
+                  const year = parseInt(sourceNode.id);
+                  if (!isNaN(year)) artistToYear.set(targetId.toLowerCase(), year);
+              }
+          });
+
+          rawNodes.forEach(node => {
+              if (node.type === 'artist' && !seedArtistIds.has(node.id.toLowerCase())) {
+                  const year = artistToYear.get(node.id.toLowerCase());
+                  if (year !== undefined && year > threshold) {
                       nodesToRemove.add(node.id);
                   }
               }
@@ -1269,10 +1532,28 @@ export const generateGraphData = async (
           return true;
       });
 
+      const finalNodes = Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [];
+      let mergedLinks = Array.isArray(validLinks) ? validLinks : [];
+      
+      // Explicitly merge baseGraph nodes and links to preserve context
+      if (baseGraph) {
+          if (baseGraph.nodes) {
+              baseGraph.nodes.forEach(baseNode => {
+                  const normalizedBaseId = normalizeArtistId(baseNode.id);
+                  if (!finalNodes.some(n => normalizeArtistId(n.id) === normalizedBaseId)) {
+                      finalNodes.push(baseNode);
+                  }
+              });
+          }
+          if (baseGraph.links) {
+              mergedLinks = [...mergedLinks, ...baseGraph.links];
+          }
+      }
+      
       // Explicitly assign generated arrays to the returned graph metadata object
       const finalGraph: GraphData = normalizeGraphData({
-          nodes: Array.isArray(deduplicatedNodes) ? deduplicatedNodes : [],
-          links: Array.isArray(validLinks) ? validLinks : []
+          nodes: finalNodes,
+          links: mergedLinks
       });
 
       if (data && (data as any).synthesis_rationale) {
@@ -1312,72 +1593,84 @@ export const generateGraphData = async (
   return attemptRequest(2);
 };
 
-export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Promise<GraphData> => {
-  if (isLocal) {
-    return generateMockGraphData(node.id, baseGraph);
-  }
-  const proxyKey = 'backend-proxy-key';
-  const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
-  
-  const existingNodeIds = baseGraph.nodes.map(n => `"${n.id}" (${n.type})`).join(', ');
-  const systemInstruction = EXTEND_GRAPH_PROMPT_TEMPLATE
-    .replace('{{artistName}}', node.id)
-    .replace('{{existingNodeIds}}', existingNodeIds)
-    .replace('{{groupId}}', node.group.toString());
 
-  const requestBody = {
-    contents: [
-      {
-        role: "user",
-        parts: [
-          {
-            text: `Extend the music graph from artist: ${node.id}`
-          }
-        ]
+/**
+ * Deterministically sanitizes `details.notableArtists`:
+ * - Ensures all items are strings and trims whitespace
+ * - Strips trailing punctuation
+ * - Strips sentence-length or explanatory category phrases (> 4 words, > 35 chars,
+ *   or matching prefixes like "inclusive of", "acts", "bands", etc.)
+ * - Returns only clean, verified artist/band names
+ */
+export const sanitizeNotableArtists = (artists: any): string[] => {
+  if (!Array.isArray(artists)) return [];
+  const SENTENCE_PREFIX_REGEX = /^(?:inclusive of|associated with|related to|peers in|features|bands like|including|various|such as|influence of|consisting of|pioneers of|spanning|known for)\b/i;
+  const GENERIC_CATEGORY_REGEX = /\b(?:acts|bands|artists|musicians|scene|subgenres?|influences)\b/i;
+
+  return artists
+    .filter((item): item is string => typeof item === 'string' && item.trim().length > 0)
+    .map(s => s.trim().replace(/[.;!?]+$/, ''))
+    .filter(name => {
+      if (name.length < 2 || name.length > 35) return false;
+      if (name.split(/\s+/).length > 4) return false;
+      if (SENTENCE_PREFIX_REGEX.test(name)) return false;
+      if (GENERIC_CATEGORY_REGEX.test(name) && !/^(the|a)\s/i.test(name)) return false;
+      return true;
+    });
+};
+
+/**
+ * Normalizes an album title to ensure proper punctuation, citation stripping,
+ * and deterministic parenthesis balancing for label releases with artist attributions.
+ * Prevents LLM decoder conflation where an artist name ending with closing parentheses
+ * (e.g. "Sunn O)))") causes the wrapper's outer closing parenthesis to be omitted.
+ */
+export const sanitizeAlbumName = (albumName: any, notableArtists?: string[]): string => {
+  if (typeof albumName !== 'string') return '';
+
+  let cleaned = albumName
+    .replace(/\[\s*\d+(?:\s*,\s*\d+)*\s*\]/g, '')
+    .replace(/\(\s*\d+(?:\s*,\s*\d+)*\s*\)/g, '')
+    .replace(/\[\s*(?:cite|citation)[^\]]*\]/gi, '')
+    .replace(/""/g, '')
+    .trim();
+
+  if (!cleaned) return '';
+
+  // 1. Contextual pass: generic check for any artist in notableArtists whose name ends with
+  // closing parentheses or contains parentheses where the attribution wrapper '(' was left unclosed.
+  if (Array.isArray(notableArtists) && notableArtists.length > 0) {
+    for (const rawArtist of notableArtists) {
+      if (typeof rawArtist !== 'string' || !rawArtist.trim()) continue;
+      const artist = rawArtist.trim();
+
+      // If the album title ends with `(${artist}` (i.e. an opening '(' followed by the exact artist string,
+      // missing the outer closing ')' that wraps the attribution—such as "Flight of the Behemoth (Sunn O)))"),
+      // append ')' so it becomes "Flight of the Behemoth (Sunn O))))".
+      const escapedArtist = artist.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const unclosedWrapperRegex = new RegExp(`\\(\\s*${escapedArtist}\\s*$`);
+      if (unclosedWrapperRegex.test(cleaned)) {
+        cleaned = `${cleaned})`;
+        break;
       }
-    ],
-    systemInstruction: {
-      parts: [
-        {
-          text: systemInstruction
-        }
-      ]
-    },
-    generationConfig: {
-      responseMimeType: "application/json",
-      responseSchema: GRAPH_RESPONSE_SCHEMA,
     }
-  };
-
-  const url = `${baseUrl}/v1beta/models/gemini-3.1-pro-preview:generateContent`;
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-goog-api-key': proxyKey
-    },
-    body: JSON.stringify(requestBody)
-  });
-
-  if (!response.ok) {
-    const errText = await response.text();
-    console.error(`[extendGraphFromNode] Outbound fetch failed with status ${response.status}: ${errText}`);
-    throw new Error(`Outbound fetch failed with status ${response.status}: ${errText}`);
   }
 
-  const resJson = await response.json();
-  const jsonText = resJson.candidates?.[0]?.content?.parts?.[0]?.text?.trim();
-
-  if (!jsonText) throw new Error("Empty response from AI.");
-  
-  const cleanedJsonText = extractCleanJsonString(jsonText);
-
-  try {
-    return normalizeGraphData(JSON.parse(cleanedJsonText) as GraphData);
-  } catch (e) {
-    const repaired = repairJson(cleanedJsonText);
-    return normalizeGraphData(JSON.parse(repaired) as GraphData);
+  // 2. Direct-hit fall-through for parenthesized entities even without notableArtists context
+  // e.g. "(Sunn O)))" at end of string without matching outer closing paren
+  if (/\(\s*Sunn O\){3}\s*$/i.test(cleaned)) {
+    cleaned = `${cleaned})`;
   }
+
+  // 3. General parenthesis-balancing guard:
+  // If openCount > closeCount, append closing parentheses until balanced
+  const openCount = (cleaned.match(/\(/g) || []).length;
+  const closeCount = (cleaned.match(/\)/g) || []).length;
+  if (openCount > closeCount) {
+    cleaned = `${cleaned}${')'.repeat(openCount - closeCount)}`;
+  }
+
+  return cleaned.trim();
 };
 
 /**
@@ -1385,8 +1678,10 @@ export const extendGraphFromNode = async (node: Node, baseGraph: GraphData): Pro
  * - Strips raw codeblock wrappers (```json ... ```)
  * - Extracts summary text if wrapped in unparsed JSON ({ "summary": "..." })
  * - Filters out Chain-of-Thought search reasoning preambles
- * - Converts raw escaped newlines (\n*) into formatted bullet points
- * - Cleans trailing Markdown symbols and citations
+ * - Converts raw escaped newlines (\n) into actual newlines
+ * - Strips citation brackets and footnote markers ([1], (1), [cite: 20]) while consuming trailing space
+ * - Unpacks clumped single-bullet trait lists into individual bullet lines with capitalized bullet items
+ * - Fixes leading space and enforces proper capitalization on bullet lead-in lines (e.g. "Key stylistic traits include:")
  */
 export const sanitizeBioText = (rawText?: string): string => {
   if (!rawText || typeof rawText !== 'string') return '';
@@ -1402,7 +1697,7 @@ export const sanitizeBioText = (rawText?: string): string => {
 
   // If text is a raw JSON string wrapper like {"summary": "..."} or {"bio": "..."}, extract the string!
   if (text.startsWith('{') || text.startsWith('[')) {
-      const summaryMatch = text.match(/["'](?:summary|bio|description|text)["']\s*:\s*["']([\s\S]*?)["']\s*(?:,\s*["']|\}|$)/i);
+      const summaryMatch = text.match(/["'](?:summary|bio|description|text)["']\s*:\s*["']([\s\S]*?)(?=["']\s*(?:,\s*["'](?:imageUrl|members|details|discography|tourInfo|recommendationReason|nodes|links|group|id|type)["']|\s*\}|\s*$))/i);
       if (summaryMatch && summaryMatch[1]) {
           text = summaryMatch[1].replace(/\\"/g, '"').replace(/\\\\/g, '\\').trim();
       }
@@ -1415,13 +1710,51 @@ export const sanitizeBioText = (rawText?: string): string => {
       text = text.replace(/^(?:I have confirmed|I will manually check|I will check|I need to check|I need to get|To answer your request|For the YouTube video|Here is the JSON|Here are the details|Here is the information|Note: Some details|Based on the search)[^.\n]*[.\n]+\s*/ig, '').trim();
   } while (text !== prevText && text.length > 0);
 
-  // Convert raw escaped newlines and bullets (\n* or \n-) into formatted line breaks
-  text = text.replace(/\\n\*/g, '\n• ').replace(/\\n-/g, '\n• ').replace(/\\n\n/g, '\n\n');
+  // Convert literal escaped \n to actual newlines (preserves markdown bolding ** and markdown lists \n*)
+  text = text.replace(/\\n/g, '\n');
 
-  // Strip citations like [1], [2]
-  text = text.replace(/\[\d+\]/g, '').replace(/\(\d+\)/g, '').trim();
+  // Strip citations while consuming trailing whitespace so "[1] word" becomes "word" instead of " word"
+  text = text.replace(/\[\s*\d+(?:\s*,\s*\d+)*\s*\][ \t]*/g, '')
+             .replace(/\(\s*\d+(?:\s*,\s*\d+)*\s*\)[ \t]*/g, '')
+             .replace(/\[\s*(?:cite|citation)[^\]]*\][ \t]*/gi, '')
+             .replace(/""/g, ''); // Strip stray empty quotes
 
-  return text;
+  // 1. Capitalize list lead-in lines and clean leading spaces on internal lines
+  // Fixes lines starting with " key stylistic elements include:", " key elements of their sound include:", etc.
+  text = text.replace(/(^|\n)[ \t]*(key (?:stylistic|elements|traits|sonic|characteristics|attributes|achievements|label attributes)\b[^\n]*:)/gi, (m, prefix, leadIn) => {
+    const capitalized = leadIn.charAt(0).toUpperCase() + leadIn.slice(1);
+    return `${prefix}${capitalized}`;
+  });
+
+  // Clean any remaining leading spaces on lines before non-bullet prose
+  text = text.replace(/(^|\n)[ \t]+([^•*\-\s])/g, '$1$2');
+
+  // 2. Clumped Single-Bullet Unpacker:
+  // Detects: * **Key Characteristics**: Blistering breakdowns, sample-heavy glitch textures, erratic mathcore tempo shifts, and oppressive atmosphere.
+  // Unpacks into individual capitalized bullets
+  text = text.replace(
+    /(?:^|\n)[ \t]*[•*-][ \t]*(?:\*\*)?(?:Key Characteristics|Key Traits|Key Elements|Stylistic Traits)(?:\*\*)?:?[ \t]*([^\n]+)/i,
+    (m, rawTraits) => {
+      const cleanTraits = rawTraits
+        .replace(/\band\s+/gi, '')
+        .split(/[,;]/)
+        .map((t: string) => t.trim().replace(/\.$/, ''))
+        .filter((t: string) => t.length > 2);
+
+      if (cleanTraits.length >= 2) {
+        const formattedBullets = cleanTraits
+          .map((t: string) => {
+            const capitalized = t.charAt(0).toUpperCase() + t.slice(1);
+            return `* ${capitalized}`;
+          })
+          .join('\n');
+        return `\n\nKey stylistic traits include:\n${formattedBullets}`;
+      }
+      return m;
+    }
+  );
+
+  return text.trim();
 };
 
 export const extractValidYoutubeId = (rawUrlOrId?: string | null): string | undefined => {
@@ -1528,6 +1861,9 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
             const targetId = typeof l.target === 'string' ? l.target : l.target.id;
             return sourceId === node.id ? targetId : sourceId;
         })
+        .map(id => graphData.nodes.find(n => n.id === id))
+        .filter(Boolean)
+        .map(n => `${n!.label || n!.id} (${n!.type})`)
         .slice(0, 10)
         .join(', ');
 
@@ -1563,15 +1899,40 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
       }
     };
 
-    const url = `${baseUrl}/v1beta/models/gemini-2.5-flash:generateContent`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': proxyKey
-      },
-      body: JSON.stringify(requestBody)
-    });
+    const flashModel = (typeof process !== 'undefined' && process.env?.GEMINI_FLASH_MODEL) || 'gemini-3.6-flash';
+    const url = `${baseUrl}/v1beta/models/${flashModel}:generateContent`;
+    const buildAuthHeaders = async (forceRefresh = false): Promise<Record<string, string>> => {
+      const headers: Record<string, string> = {};
+      try {
+        if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+          const idToken = await auth.currentUser.getIdToken(forceRefresh);
+          if (idToken) {
+            headers['Authorization'] = `Bearer ${idToken}`;
+            headers['x-zcene-id-token'] = idToken;
+          }
+        }
+      } catch (_) {}
+      return headers;
+    };
+
+    const executeFetch = async (authHeaders: Record<string, string>) =>
+      fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': proxyKey,
+          ...authHeaders
+        },
+        body: JSON.stringify(requestBody)
+      });
+
+    let response = await executeFetch(await buildAuthHeaders(false));
+    if (response.status === 401 && auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+      const refreshedHeaders = await buildAuthHeaders(true);
+      if (refreshedHeaders['x-zcene-id-token']) {
+        response = await executeFetch(refreshedHeaders);
+      }
+    }
 
     if (!response.ok) {
       const errText = await response.text();
@@ -1602,41 +1963,7 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
         try {
             details = JSON.parse(repaired) as NodeDetails;
         } catch (repairError) {
-            // [Grounding Prose Fallback] ✦
-            // When Google Search grounding is active the model drops JSON mode and
-            // returns unstructured prose with inline citations. Both JSON.parse and
-            // repairJson fail in this case. If the raw text is a meaningful prose
-            // string (> 40 chars), treat it as the biography and construct a minimal
-            // valid NodeDetails so the queue can write to detailsCache and stop
-            // re-queueing instead of throwing a terminal format exception.
-            const rawProse = sanitizeBioText(cleanedJsonText);
-            // Anti-Leakage Guard: Never treat raw JSON syntax wrappers or CoT reasoning as bio prose!
-            if (rawProse.startsWith('{') || rawProse.startsWith('[') || rawProse.includes('":') || rawProse.includes('": ')) {
-                throw new Error(`Failed to parse AI details JSON (rejected unparsed JSON wrapper in prose fallback).`);
-            }
-            if (rawProse.length > 40) {
-                console.warn(
-                    `[Deep Cut Parse] JSON repair failed — response appears to be grounding prose (${rawProse.length} chars). ` +
-                    `Mapping prose to NodeDetails bio field as graceful fallback.`
-                );
-                details = {
-                    summary: rawProse,
-                    details: {
-                        artist: node.label || node.id,
-                        genre: "",
-                        origin: originHint || "",
-                        founded: "",
-                        notableArtists: []
-                    },
-                    members: [],
-                    links: [],
-                    discography: [],
-                    tourInfo: "",
-                    recommendationReason: "Synthesised from live cultural archives via Google Search grounding."
-                };
-            } else {
-                throw new Error(`Failed to parse AI details JSON: ${parseError instanceof Error ? parseError.message : String(parseError)}`);
-            }
+            throw new Error(`Failed to parse AI details JSON (prose fallback forbidden under Rule 40): ${parseError instanceof Error ? parseError.message : String(parseError)}`);
         }
     }
 
@@ -1679,19 +2006,20 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
                 genre: sanitizeMetaField(d.genre),
                 origin: sanitizeMetaField(d.origin),
                 founded: sanitizeString(d.founded),
-                notableArtists: (d.notableArtists || []).map(sanitizeString)
+                notableArtists: sanitizeNotableArtists(d.notableArtists)
             };
         })(),
         links: sanitisedLinks,
         discography: (details.discography || []).map((album: any) => ({
-            albumName: sanitizeString(album?.albumName),
+            albumName: sanitizeAlbumName(album?.albumName, hydratedDetails.details?.notableArtists),
             releaseYear: sanitizeString(album?.releaseYear)
         })),
         members: (details.members || []).map(sanitizeString),
         recommendationReason: sanitizeString(details.recommendationReason || ""),
     };
 
-    const validImageUrl = sanitizeImageUrl(details.imageUrl, sanitizeString);
+    const isLabelNode = String(node.type || '').toLowerCase() === 'label';
+    const validImageUrl = isLabelNode ? "" : sanitizeImageUrl(details.imageUrl, sanitizeString);
     if (validImageUrl) {
         hydratedDetails.imageUrl = validImageUrl;
     } else {
@@ -1707,6 +2035,10 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
 
     if (typeof details.youtubeSearchQuery === 'string' && details.youtubeSearchQuery.trim().length > 0) {
         hydratedDetails.youtubeSearchQuery = sanitizeString(details.youtubeSearchQuery.trim());
+    } else {
+        const artist = hydratedDetails.details?.artist || details.details?.artist || (details as any).artist || '';
+        const genre = hydratedDetails.details?.genre || details.details?.genre || (details as any).genre || '';
+        hydratedDetails.youtubeSearchQuery = `${artist} ${genre} official music video`.trim();
     }
 
     if (!hydratedDetails.details) hydratedDetails.details = {};
@@ -1728,53 +2060,268 @@ export const fetchNodeDetails = async (node: Node, graphData: GraphData, seedArt
     return stripUndefinedProperties(hydratedDetails);
 };
 
+export const streamLocalHeuristicChat = async (
+  currentNode: Node,
+  userMessage: string,
+  detailsCache: Map<string, NodeDetails>,
+  graphData: GraphData,
+  onChunk: (text: string) => void
+) => {
+    const details = detailsCache.get(currentNode.id) || detailsCache.get(currentNode.id.toLowerCase());
+    const msg = userMessage.toLowerCase();
+
+    const formatTitle = (str: string) => {
+        return str.split(/[-\s]+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+    };
+    const nodeName = cleanArtistDisplayName(currentNode.id, graphData.nodes);
+    
+    // Extracted Data
+    const year = details?.details?.founded || "their early years";
+    const origin = details?.details?.origin ? formatTitle(details.details.origin) : "the underground scene";
+    const genresStr = details?.details?.genre;
+    const genres = genresStr ? genresStr.split(',').map(g => formatTitle(g.trim())).join(", ") : "hardcore punk";
+    
+    const getNodeType = (id: string) => graphData.nodes.find(n => n.id === id)?.type;
+    
+    const getConnectedNodes = (nodeId: string, nodeType: string) => {
+        const connectedIds = graphData.links.filter(l => 
+            (typeof l.source === 'object' ? l.source.id : l.source) === nodeId || 
+            (typeof l.target === 'object' ? l.target.id : l.target) === nodeId
+        ).map(l => {
+            const s = typeof l.source === 'object' ? l.source.id : l.source;
+            const t = typeof l.target === 'object' ? l.target.id : l.target;
+            return s === nodeId ? t : s;
+        });
+        return Array.from(new Set(connectedIds.filter(id => getNodeType(id) === nodeType)));
+    };
+
+    const labelNames = getConnectedNodes(currentNode.id, 'label').map(formatTitle);
+    const labels = labelNames.length ? labelNames.join(" and ") : "various independent labels";
+    
+    // Graph Traversal for generic peers
+    const peers = getConnectedNodes(currentNode.id, 'artist').slice(0, 3).map(id => cleanArtistDisplayName(id, graphData.nodes));
+    
+    let fullText = "";
+
+    // Deterministic Routing for Query Chips
+    if (msg === "where are they from?") {
+        fullText = `${nodeName} emerged from ${origin} in ${year}. This geographic scene heavily influenced their trajectory and sound.`;
+    } 
+    else if (msg === "what labels are they on?") {
+        fullText = `Throughout their history, they have released music on ${labels}. These partnerships were crucial to pushing their sound.`;
+    }
+    else if (msg.startsWith("what is the connection to")) {
+        const peerRaw = msg.replace("what is the connection to ", "").replace("?", "").trim();
+        const peer = formatTitle(peerRaw);
+        
+        const peerNode = graphData.nodes.find(n => cleanArtistDisplayName(n.id, graphData.nodes).toLowerCase() === peerRaw);
+        const actualPeerId = peerNode ? peerNode.id : peerRaw.replace(/\s+/g, '-');
+        
+        const activeLabels = getConnectedNodes(currentNode.id, 'label');
+        const peerLabels = getConnectedNodes(actualPeerId, 'label');
+        const sharedLabels = activeLabels.filter(l => peerLabels.includes(l));
+
+        const activeOrigins = getConnectedNodes(currentNode.id, 'country');
+        const peerOrigins = getConnectedNodes(actualPeerId, 'country');
+        const sharedOrigins = activeOrigins.filter(l => peerOrigins.includes(l));
+
+        const activeGenres = getConnectedNodes(currentNode.id, 'genre');
+        const peerGenres = getConnectedNodes(actualPeerId, 'genre');
+        const sharedGenres = activeGenres.filter(l => peerGenres.includes(l));
+        
+        const hasDirectLink = graphData.links.some(l => 
+            ((typeof l.source === 'object' ? l.source.id : l.source) === currentNode.id && (typeof l.target === 'object' ? l.target.id : l.target) === actualPeerId) ||
+            ((typeof l.source === 'object' ? l.source.id : l.source) === actualPeerId && (typeof l.target === 'object' ? l.target.id : l.target) === currentNode.id)
+        );
+
+        if (sharedLabels.length > 0) {
+            fullText = `${nodeName} and ${peer} are intimately connected through their shared label, ${formatTitle(sharedLabels[0])}, a key driver of their sound.`;
+        } else if (sharedGenres.length > 0) {
+            fullText = `${nodeName} and ${peer} both pushed the boundaries of ${formatTitle(sharedGenres[0])}, defining a core era of the genre.`;
+        } else if (hasDirectLink) {
+            fullText = `Within our data graph, ${nodeName} and ${peer} share a direct structural connection, positioning them closely within the same scene topology.`;
+        } else if (sharedOrigins.length > 0) {
+            fullText = `${nodeName} and ${peer} share deep roots in the ${formatTitle(sharedOrigins[0])} scene, shaping their historical connection.`;
+        } else {
+            fullText = `Within our data graph, ${nodeName} shares deep sonic architecture and historical scene connections with ${peer}.`;
+        }
+    }
+    else if (msg === "what sound do they have?") {
+        const summary = details?.summary || "";
+        const sentences = summary.split(/(?<=[.!?])\s+/);
+        
+        const musicKeywords = ['riffs', 'vocals', 'vocal', 'melodic', 'breakdowns', 'rhythms', 'sound', 'samples', 'lyrical', 'lyrics'];
+        const soundSentence = sentences.find(s => {
+            const lower = s.toLowerCase();
+            return musicKeywords.some(kw => lower.includes(kw));
+        });
+
+        if (soundSentence) {
+            fullText = `Operating within ${genres}, ${soundSentence.charAt(0).toLowerCase() + soundSentence.slice(1)}`;
+        } else {
+            const hash = currentNode.id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+            const templates = [
+                `They are primarily known for pushing the boundaries of ${genres}, blending raw aggression with technical precision.`,
+                `Rooted deeply in ${genres}, their sonic signature relies on high-energy output and dynamic musicianship.`,
+                `They have carved out a unique space within ${genres} by delivering a sound that is both abrasive and compelling.`
+            ];
+            fullText = templates[hash % templates.length];
+        }
+    }
+    else if (msg === "recent history?") {
+        fullText = `Formed around ${year} in ${origin}, ${nodeName} carved a unique space within ${genres}. ${peers.length > 0 ? `They often shared the stage and scene with peers like ${peers.join(" and ")}.` : ""}`;
+    }
+    else if (msg === "when were they founded and where?") {
+        fullText = `${nodeName} was founded in ${year} in ${origin}, quickly becoming a cornerstone of the regional and global scene.`;
+    }
+    else if (msg === "what is their legacy in the scene?") {
+        const sentences = details?.summary ? details.summary.split(/(?<=[.!?])\s+/) : [];
+        fullText = sentences.length > 0 
+            ? sentences.slice(0, 2).join(' ')
+            : `As a foundational cornerstone of ${genres}, ${nodeName} brought raw energy and visionary curation to the scene.`;
+    }
+    else if (msg === "what genres do they specialize in?") {
+        fullText = `${nodeName} specializes in pushing the boundaries of ${genres}, cultivating a distinct and influential catalog.`;
+    }
+    else if (msg === "who are their most notable artists?") {
+        fullText = peers.length > 0 
+            ? `They have been instrumental in launching and sustaining the careers of pioneering acts like ${peers.join(", ")}.`
+            : `They have been instrumental in launching and sustaining the careers of pioneering acts within the ${genres} community.`;
+    }
+    else {
+        // Fallback for anything else
+        fullText = `As a foundational cornerstone of ${genres}, ${nodeName} brought raw energy to the scene.`;
+    }
+    
+    // Universal Markdown Stripper for Instant AI
+    fullText = fullText
+        .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold
+        .replace(/\*(.*?)\*/g, '$1')     // Remove italics
+        .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1'); // Flatten links
+
+    let current = "";
+    const words = fullText.split(" ");
+    for (let i = 0; i < words.length; i++) {
+      current += (i === 0 ? "" : " ") + words[i];
+      onChunk(current);
+      await new Promise(resolve => setTimeout(resolve, 40));
+    }
+    return fullText;
+};
+
+export interface StreamNodeChatAuthOptions {
+  idToken?: string;
+  deepWebSessionId?: string;
+  useSearch?: boolean;
+  detailsCache?: Map<string, NodeDetails>;
+  projectId?: string;
+  projectName?: string;
+  seedArtists?: string[];
+  userTaste?: UserTaste;
+  nodeId?: string;
+  nodeName?: string;
+}
+
 export const streamNodeChat = async (
   currentNode: Node,
   history: ChatMessage[],
   message: string,
   graphData: GraphData,
-  onChunk: (text: string) => void
+  onChunk: (text: string) => void,
+  authOptions?: StreamNodeChatAuthOptions
 ) => {
-    if (isLocal) {
-        const responses = [
-          `Discussing ${currentNode.id} is always exciting. They represent a major stylistic milestone in this scene, particularly with their signature blend of raw energy and musical craftsmanship.`,
-          `${currentNode.id} really broke barriers by fusing their core style with experimental elements. This created a ripple effect, influencing dozens of bands in the subsequent years.`,
-          `If you listen to their early discography, you can hear how ${currentNode.id} shaped the scene's aesthetic. They brought a unique, analog warmth that modern digital releases try hard to replicate.`
-        ];
-        
-        const fullText = responses[Math.floor(Math.random() * responses.length)];
-        let current = "";
-        const words = fullText.split(" ");
-        for (let i = 0; i < words.length; i++) {
-          current += (i === 0 ? "" : " ") + words[i];
-          onChunk(current);
-          await new Promise(resolve => setTimeout(resolve, 60));
-        }
-        return fullText;
-    }
     const proxyKey = 'backend-proxy-key';
     const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
-    const ai = new GoogleGenAI({ 
+    const resolveBearerToken = async (forceRefresh = false): Promise<string | undefined> => {
+      if (!forceRefresh && authOptions?.idToken) {
+        return authOptions.idToken;
+      }
+      try {
+        if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+          return await auth.currentUser.getIdToken(forceRefresh);
+        }
+      } catch (_) {}
+      return authOptions?.idToken;
+    };
+
+    const canonicalName = cleanArtistDisplayName(currentNode.id, graphData.nodes) || currentNode.label || currentNode.id;
+    const nodeDetails = authOptions?.detailsCache?.get(currentNode.id) || authOptions?.detailsCache?.get(currentNode.id.toLowerCase());
+
+    const buildClient = (token?: string) => new GoogleGenAI({ 
         apiKey: proxyKey,
-        httpOptions: { baseUrl }
+        httpOptions: { 
+            baseUrl,
+            headers: {
+                ...(token ? { Authorization: `Bearer ${token}`, 'x-zcene-id-token': token } : {}),
+                ...(authOptions?.deepWebSessionId ? { 'x-zcene-deepweb-session': authOptions.deepWebSessionId } : {}),
+                ...(currentNode?.id ? { 'x-zcene-node-id': currentNode.id } : {}),
+                ...(canonicalName ? { 'x-zcene-node-name': encodeURIComponent(canonicalName) } : {}),
+                ...(authOptions?.projectName ? { 'x-zcene-project-name': encodeURIComponent(authOptions.projectName) } : {}),
+                ...(authOptions?.projectId ? { 'x-zcene-project-id': authOptions.projectId } : {}),
+            }
+        }
     });
     
-    const contextNodes = graphData.nodes.map(n => `"${n.id}" (${n.type})`).slice(0, 30).join(', ');
+    // 1. Context nodes with canonical display names and genres
+    const contextNodes = graphData.nodes.map(n => {
+      const name = cleanArtistDisplayName(n.id, graphData.nodes);
+      const nDetails = authOptions?.detailsCache?.get(n.id) || authOptions?.detailsCache?.get(n.id.toLowerCase());
+      const nGenre = nDetails?.details?.genre || (n as any).genre || '';
+      return `"${name}" (${n.type}${nGenre ? ` - ${nGenre}` : ''})`;
+    }).slice(0, 30).join(', ');
     
-    const systemInstruction = `You are Zcene, a world-class music curator and edgy historian. 
+    // 2. Contextualize Chat with Node Snippet and Edge Contexts
+    const nodeEdges = graphData.links.filter(l => 
+      (typeof l.source === 'object' ? l.source.id : l.source) === currentNode.id ||
+      (typeof l.target === 'object' ? l.target.id : l.target) === currentNode.id
+    );
+    const edgeContexts = nodeEdges.map(l => {
+      const sId = typeof l.source === 'object' ? l.source.id : l.source;
+      const tId = typeof l.target === 'object' ? l.target.id : l.target;
+      const otherId = sId === currentNode.id ? tId : sId;
+      const otherName = cleanArtistDisplayName(otherId, graphData.nodes);
+      return `${l.context || 'connected'} to "${otherName}"`;
+    }).filter(Boolean).join(', ');
+    
+    // 3. Card metadata from detailsCache
+    const genre = nodeDetails?.details?.genre || (currentNode as any).genre || '';
+    const style = nodeDetails?.details?.style || (currentNode as any).style || '';
+    const label = (nodeDetails as any)?.details?.label || (currentNode as any).label || '';
+    const origin = nodeDetails?.details?.origin || currentNode.origin || '';
+    const founded = nodeDetails?.details?.founded || (currentNode as any).founded || '';
+    const summary = nodeDetails?.summary || '';
+
+    const cardDetailsBlock = [
+      genre ? `Genre: ${genre}` : '',
+      style ? `Style: ${style}` : '',
+      label ? `Record Label: ${label}` : '',
+      origin ? `Origin: ${origin}` : '',
+      founded ? `Founded/Active: ${founded}` : '',
+      summary ? `Biography: ${summary.slice(0, 350)}` : ''
+    ].filter(Boolean).join(' | ');
+
+    const narrativeSnippetText = (currentNode as any).narrativeSnippet ? `\n    Their defining narrative hook in this specific web is: "${(currentNode as any).narrativeSnippet}".` : '';
+    const edgeContextText = edgeContexts ? `\n    Direct connections in this Zcene: [${edgeContexts}].` : '';
+    const cardDetailsText = cardDetailsBlock ? `\n    Verified Card Metadata: [${cardDetailsBlock}].` : '';
+    const projectText = authOptions?.projectName ? `\n    Active Zcene Project: "${authOptions.projectName}".` : '';
+    const seedText = authOptions?.seedArtists && authOptions.seedArtists.length > 0 ? `\n    Seed Artists: [${authOptions.seedArtists.join(', ')}].` : '';
+
+    const systemInstruction = `You are Zcene, a world-class music curator, sonic cartographer, and edgy historian. 
     Your tone is atmospheric, precise, and empowering. You are an expert-friend to the user.
     
-    You are currently discussing "${currentNode.id}" (${currentNode.type}).
+    System Context: You are discussing "${canonicalName}" (${currentNode.type}).${projectText}${seedText}${cardDetailsText}${narrativeSnippetText}${edgeContextText}
+    Base your answers firmly on this reality.
+
     The user's current Zcene map includes: [${contextNodes}].
     
     STRICT CHAT OUTPUT RULES:
     1. WORD LIMIT: Max 50 words per response. Be exceptionally concise.
     2. STRUCTURE: Use only ONE short paragraph.
-    3. LANGUAGE: Use UK English (e.g., 'analysing', 'colour').
+    3. LANGUAGE: Use US English (e.g., 'analyzing', 'color').
     4. NO MARKDOWN: Output ONLY plain text sentences.
     5. NO SYMBOLS: Strictly NO bolding (**), no italics (*), no hashes (#), no dashes (-).
     6. NO OPENERS: Do not say "Hi," "Sure," or "I can explain that." Start with the insight.
-    7. FOCUS: Explain the specific musical link or stylistic pivot.`;
+    7. FOCUS: Explain the specific musical link or stylistic pivot with authoritative precision.`;
 
     const contents = [
         ...history.map(m => ({
@@ -1784,86 +2331,46 @@ export const streamNodeChat = async (
         { role: 'user', parts: [{ text: message }] }
     ];
 
-    const result = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
-        contents,
-        config: { systemInstruction }
-    });
+    const flashModel = (typeof process !== 'undefined' && process.env?.GEMINI_FLASH_MODEL) || 'gemini-3.6-flash';
 
-    let fullText = "";
-    for await (const chunk of result) {
-        const text = chunk.text;
-        if (text) {
-            const cleaned = text.replace(/[*#]/g, '');
-            fullText += cleaned;
-            onChunk(fullText);
+    const runStreamWithToken = async (token?: string) => {
+        const ai = buildClient(token);
+        const config: any = { systemInstruction };
+        if (authOptions?.useSearch) {
+            config.tools = [{ googleSearch: {} }];
         }
-    }
-    return fullText;
-};
+        const result = await ai.models.generateContentStream({
+            model: flashModel,
+            contents,
+            config
+        });
 
-/**
- * Executes a fast, isolated micro-request with Google Web Grounding to fetch live tour data.
- * This runs completely bypasses Firestore and does not pollute the permanent artist cache.
- */
-export const fetchLiveTourData = async (artistName: string): Promise<string> => {
-    if (isLocal) {
-        if (artistName.toLowerCase().includes('notour') || artistName.toLowerCase().includes('notouring') || artistName === 'NonTouringBand') {
-            return `No active tour dates found for 2026.`;
-        }
-        return `• London, UK — July 12, 2026
-• New York, USA — August 5, 2026
-• Berlin, Germany — September 1, 2026
-• Tokyo, Japan — October 15, 2026
-• Los Angeles, USA — November 20, 2026`;
-    }
-    const proxyKey = 'backend-proxy-key';
-    const baseUrl = typeof window !== 'undefined' ? window.location.origin + '/api/gemini' : 'http://localhost:8080/api/gemini';
-
-    const prompt = `Search the web for the latest real-time tour, concert, and festival schedules for the music artist "${artistName}" in 2026.
-    If they are actively touring, return ONLY a chronological list of their upcoming dates. Each date must be on its own line and formatted exactly as:
-    • City, Country — Date
-    Do not include any introductory or concluding text. Return as many dates as you can find.
-    If they are not touring, return exactly:
-    No active tour dates found for 2026.`;
-
-    const requestBody = {
-      contents: [
-        {
-          role: "user",
-          parts: [
-            {
-              text: prompt
+        let fullText = "";
+        for await (const chunk of result) {
+            const text = chunk.text;
+            if (text) {
+                const cleaned = text.replace(/[*#]/g, '');
+                fullText += cleaned;
+                onChunk(fullText);
             }
-          ]
         }
-      ],
-      tools: [
-        {
-          googleSearch: {}
-        }
-      ],
-      generationConfig: {
-        maxOutputTokens: 200,
-      }
+        return fullText;
     };
 
-    const url = `${baseUrl}/v1beta/models/gemini-2.5-flash:generateContent`;
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-goog-api-key': proxyKey
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      console.error(`[fetchLiveTourData] Outbound fetch failed with status ${response.status}: ${errText}`);
-      throw new Error(`Outbound fetch failed with status ${response.status}: ${errText}`);
+    const initialToken = await resolveBearerToken(false);
+    try {
+        return await runStreamWithToken(initialToken);
+    } catch (err: any) {
+        const is401AuthError =
+            err?.status === 401 ||
+            /401|AUTH_TOKEN_INVALID|AUTH_TOKEN_MISSING|Invalid or expired authentication token/i.test(err?.message || '');
+        if (is401AuthError && auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
+            const refreshedToken = await resolveBearerToken(true);
+            if (refreshedToken) {
+                return await runStreamWithToken(refreshedToken);
+            }
+        }
+        throw err;
     }
-
-    const resJson = await response.json();
-    return resJson.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || "No tour information available.";
 };
+

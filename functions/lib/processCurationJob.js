@@ -1,0 +1,2365 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.processCurationJob = void 0;
+exports.sanitizeUndefinedProperties = sanitizeUndefinedProperties;
+const firestore_1 = require("firebase-functions/v2/firestore");
+const app_1 = require("firebase-admin/app");
+const firestore_2 = require("firebase-admin/firestore");
+const errorTranslationLayer_1 = require("./services/errorTranslationLayer");
+const curatorService_1 = require("./services/curatorService");
+const cacheQualification_1 = require("./services/cacheQualification");
+const isoCountries_1 = require("./shared/isoCountries");
+const executeCurationPipeline_1 = require("./executeCurationPipeline");
+const routerStubService_1 = require("./services/routerStubService");
+const multiSceneUtils_1 = require("./shared/multiSceneUtils");
+const tokenWallet_1 = require("./tokenWallet");
+// Initialize Firebase Admin SDK if not already done
+if ((0, app_1.getApps)().length === 0) {
+    (0, app_1.initializeApp)();
+}
+const db = (0, firestore_2.getFirestore)();
+try {
+    db.settings({ ignoreUndefinedProperties: true });
+}
+catch (e) {
+    // Ignore if already set by another function module
+}
+/**
+ * Sanity Check (Architecture V33 / Rule 8 & Rule 40):
+ * Validate that detailsCache is a structured object matching the V33 schema,
+ * and specifically reject raw strings, arrays, empty discographies, or prose-fallback stubs
+ * to prevent database pollution.
+ */
+function validateArtistDetailsSchema(artistId, details, expectedIso) {
+    if (!details) {
+        throw new Error(`[Schema Sanity Check] detailsCache is null or undefined for artist: ${artistId}`);
+    }
+    if (typeof details === "string") {
+        throw new Error(`[Schema Sanity Check] detailsCache is serialized as a raw string for artist: ${artistId}`);
+    }
+    if (Array.isArray(details)) {
+        throw new Error(`[Schema Sanity Check] detailsCache is an array instead of a structured object for artist: ${artistId}`);
+    }
+    // Allow explicit primary-seed emergency JIT stub fallback (Rule 17)
+    if (details._isStub === true) {
+        return;
+    }
+    // Verify biography/summary
+    const bio = details.summary || details.bio;
+    if (!bio || typeof bio !== 'string' || bio.trim().length <= 50) {
+        throw new Error(`[Schema Sanity Check] detailsCache is missing or has short summary (<= 50 chars) for artist: ${artistId}`);
+    }
+    // Verify details object
+    if (!details.details || typeof details.details !== 'object') {
+        throw new Error(`[Schema Sanity Check] detailsCache.details is missing or invalid for artist: ${artistId}`);
+    }
+    const { genre, origin, founded } = details.details;
+    if (!genre || typeof genre !== 'string' || !genre.trim()) {
+        throw new Error(`[Schema Sanity Check] detailsCache.details is missing genre for artist: ${artistId}`);
+    }
+    if (!origin || typeof origin !== 'string' || !origin.trim()) {
+        throw new Error(`[Schema Sanity Check] detailsCache.details is missing origin for artist: ${artistId}`);
+    }
+    if (!founded || typeof founded !== 'string' || !founded.trim()) {
+        throw new Error(`[Schema Sanity Check] detailsCache.details is missing founded year for artist: ${artistId}`);
+    }
+    // Verify discography (Rule 40: must be an array; honest empty arrays [] accepted for unindexed artists)
+    if (!Array.isArray(details.discography)) {
+        throw new Error(`[Schema Sanity Check / Rule 40] detailsCache.discography is missing or empty ([]) for artist: ${artistId}`);
+    }
+    // Verify recommendationReason (Rule 40: forbid grounding prose fallback)
+    const recReason = String(details.recommendationReason || '').trim();
+    if (!recReason || recReason.toLowerCase().includes('synthesised from live cultural archives')) {
+        throw new Error(`[Schema Sanity Check / Rule 40] detailsCache.recommendationReason is missing or contains forbidden prose fallback for artist: ${artistId}`);
+    }
+    const lockIso = expectedIso || (0, isoCountries_1.extractTrailingCountryIso)(artistId);
+    if (lockIso && !(0, isoCountries_1.doesOriginMatchExpectedIso)(details.details.origin, lockIso)) {
+        throw new Error('[Schema Sanity Check / Origin-Suffix Parity] detailsCache.details.origin ("' + details.details.origin + '") contradicts expected ISO ("' + lockIso + '") for artist: ' + artistId);
+    }
+    if (!(0, cacheQualification_1.isFullyQualifiedEntityProfile)(details, false, lockIso)) {
+        throw new Error(`[Schema Sanity Check / Rule 40] detailsCache failed V33 isFullyQualifiedEntityProfile check for artist: ${artistId}`);
+    }
+}
+/**
+ * Helper to identify Firestore Sentinel values (FieldValue transforms like serverTimestamp(),
+ * deleteField(), increment(), and Timestamp objects) across both Admin and Client SDKs.
+ */
+function isFirestoreSentinel(obj) {
+    if (!obj || typeof obj !== 'object')
+        return false;
+    if (obj instanceof firestore_2.FieldValue || obj instanceof firestore_2.Timestamp)
+        return true;
+    const cName = obj.constructor ? obj.constructor.name : '';
+    if (cName.includes('FieldValue') || cName.includes('Timestamp') || cName.includes('Transform'))
+        return true;
+    if (typeof obj.isEqual === 'function' && (obj.methodName || obj._methodName || obj.nanoseconds !== undefined))
+        return true;
+    return false;
+}
+/**
+ * Recursively removes any undefined properties from an object to prevent
+ * Firestore serialization errors. Note: null values are intentionally preserved —
+ * Firestore's Node.js SDK accepts null as a valid stored value, and stripping it
+ * would cause fields like imageUrl to be entirely absent from the document.
+ *
+ * CRITICAL (FieldValue / Timestamp Preservation):
+ * Must explicitly preserve Firestore Sentinel values (FieldValue transforms like serverTimestamp(),
+ * deleteField(), increment(), and Timestamp objects). Stripping or traversing them as generic objects
+ * removes their prototype/metadata and flattens them into empty objects ({}), corrupting timestamps into empty maps.
+ */
+function sanitizeUndefinedProperties(obj) {
+    if (obj === null || obj === undefined)
+        return null;
+    if (isFirestoreSentinel(obj)) {
+        return obj;
+    }
+    if (Array.isArray(obj)) {
+        return obj.map(item => sanitizeUndefinedProperties(item));
+    }
+    if (typeof obj === 'object') {
+        const clean = {};
+        for (const key of Object.keys(obj)) {
+            const val = obj[key];
+            if (val !== undefined) { // Only strip undefined — null is a valid Firestore value
+                clean[key] = sanitizeUndefinedProperties(val);
+            }
+        }
+        return clean;
+    }
+    return obj;
+}
+/**
+ * Belt-and-suspenders write boundary normalizer.
+ * Guarantees that imageUrl is always written as a string (even "") to Firestore,
+ * regardless of what upstream LLM parsing or sanitization returned.
+ * Applied immediately before every sanitizeUndefinedProperties call at write time.
+ */
+function normalizeDetailsForWrite(details) {
+    if (!details || typeof details !== 'object' || Array.isArray(details))
+        return details;
+    return {
+        ...details,
+        imageUrl: (typeof details.imageUrl === 'string') ? details.imageUrl : ""
+    };
+}
+/**
+ * Strips artist-centric fields from a label profile before caching in Firestore.
+ */
+function sanitizeLabelProfile(details) {
+    if (!details)
+        return null;
+    let parsed = typeof details === 'string' ? JSON.parse(details) : details;
+    if (!parsed || typeof parsed !== 'object')
+        return null;
+    const cleanDetails = {
+        genre: parsed.details?.genre || null,
+        origin: parsed.details?.origin || null,
+        founded: parsed.details?.founded || null,
+        notableArtists: (0, curatorService_1.sanitizeNotableArtists)(parsed.details?.notableArtists),
+    };
+    return {
+        summary: parsed.summary || parsed.bio || parsed.description || "",
+        imageUrl: null,
+        details: cleanDetails,
+        discography: Array.isArray(parsed.discography)
+            ? parsed.discography.map((album) => ({
+                albumName: (0, curatorService_1.sanitizeAlbumName)(album?.albumName, cleanDetails.notableArtists),
+                releaseYear: typeof album?.releaseYear === 'string' ? album.releaseYear.trim() : String(album?.releaseYear || '')
+            }))
+            : [],
+        links: Array.isArray(parsed.links) ? parsed.links : [],
+        recommendationReason: parsed.recommendationReason || "",
+    };
+}
+/**
+ * Stateful Project UX Upgrade: Update the user's project document status
+ * to reflect in-progress background curation and write back completed graphData.
+ */
+async function updateProjectStatus(userId, projectId, updates) {
+    try {
+        const projectRef = db.collection("users").doc(userId).collection("projects").doc(projectId);
+        const sanitizedUpdates = sanitizeUndefinedProperties(updates);
+        await projectRef.update({
+            ...sanitizedUpdates,
+            updatedAt: firestore_2.FieldValue.serverTimestamp()
+        });
+        console.log(`[Curation Backend] Project ${projectId} status updated successfully:`, sanitizedUpdates);
+    }
+    catch (err) {
+        console.error(`[Curation Backend] Failed to update project ${projectId} status:`, err.message);
+    }
+}
+exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
+    document: "curationJobs/{jobId}",
+    secrets: ["GEMINI_API_KEY"],
+    timeoutSeconds: 540, // Firebase Functions v2 SDK enforces a hard 540s cap for Firestore event triggers
+    memory: "1GiB",
+}, async (event) => {
+    const snapshot = event.data;
+    if (!snapshot) {
+        console.log("No data associated with the event");
+        return;
+    }
+    const jobId = event.params.jobId;
+    const jobDocRef = db.collection("curationJobs").doc(jobId);
+    let jobData = null;
+    let isClaimed = false;
+    try {
+        await db.runTransaction(async (transaction) => {
+            const freshSnap = await transaction.get(jobDocRef);
+            if (!freshSnap.exists) {
+                console.warn(`[Curation Backend] [Idempotency] Job ${jobId} does not exist in Firestore. Skipping.`);
+                return;
+            }
+            const liveData = freshSnap.data();
+            if (liveData?.status !== "pending") {
+                console.log(`[Curation Backend] [Idempotency] Job ${jobId} already claimed or resolved with status: "${liveData?.status}". Duplicate event delivery rejected (CloudEvent ID: ${event.id || 'unknown'}).`);
+                return;
+            }
+            // Atomically transition status: pending -> processing
+            transaction.update(jobDocRef, {
+                status: "processing",
+                claimedAt: firestore_2.FieldValue.serverTimestamp(),
+                claimedByEventId: event.id || null,
+                updatedAt: firestore_2.FieldValue.serverTimestamp()
+            });
+            jobData = liveData;
+            isClaimed = true;
+        });
+    }
+    catch (claimErr) {
+        console.error(`[Curation Backend] [Idempotency] Transaction error attempting to claim job ${jobId}:`, claimErr.message);
+        return; // Exit cleanly with 200 OK to prevent Eventarc crash loop
+    }
+    if (!isClaimed || !jobData) {
+        console.log(`[Curation Backend] [Idempotency] Exiting invocation without processing (Job ${jobId} already active or completed).`);
+        return;
+    }
+    console.log(`[Curation Backend] Successfully claimed job ${jobId} (CloudEvent ID: ${event.id || 'unknown'}). Status transitioned to 'processing'.`);
+    const { jobType, inputPayload } = jobData;
+    if (inputPayload?.projectId && jobData.userId) {
+        await updateProjectStatus(jobData.userId, inputPayload.projectId, { status: "curating" });
+    }
+    try {
+        console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
+        let result = null;
+        const collectedTokens = {};
+        const usageCollector = {
+            push: (model, usage) => {
+                if (!collectedTokens[model])
+                    collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+                collectedTokens[model].prompt += usage.promptTokenCount;
+                collectedTokens[model].candidates += usage.candidatesTokenCount;
+                collectedTokens[model].total += usage.totalTokenCount;
+            }
+        };
+        const targetSceneId = inputPayload?.targetSceneId || inputPayload?.activeSceneId || "scene-1";
+        const parsedTargetIdx = parseInt(String(targetSceneId).replace(/^scene-/i, ""), 10);
+        const targetSceneIndex = typeof inputPayload?.sceneIndex === "number" && inputPayload.sceneIndex >= 0
+            ? inputPayload.sceneIndex
+            : Number.isFinite(parsedTargetIdx) && parsedTargetIdx >= 1
+                ? parsedTargetIdx - 1
+                : 0;
+        let existingProjectScenes = (0, multiSceneUtils_1.parseProjectScenes)(inputPayload?.scenes);
+        const existingProjectDetailsMap = new Map();
+        const ingestDetailsCacheIntoMap = (rawCache) => {
+            if (!rawCache)
+                return;
+            try {
+                const parsed = typeof rawCache === "string" ? JSON.parse(rawCache) : rawCache;
+                if (Array.isArray(parsed)) {
+                    for (const item of parsed) {
+                        if (Array.isArray(item) && item.length === 2 && item[0] && item[1]) {
+                            const key = (0, multiSceneUtils_1.stripSceneNamespace)(String(item[0]));
+                            existingProjectDetailsMap.set(key, item[1]);
+                            existingProjectDetailsMap.set((0, curatorService_1.normalizeArtistId)(key), item[1]);
+                        }
+                    }
+                }
+                else if (parsed && typeof parsed === "object") {
+                    for (const [k, v] of Object.entries(parsed)) {
+                        if (k && v) {
+                            const key = (0, multiSceneUtils_1.stripSceneNamespace)(k);
+                            existingProjectDetailsMap.set(key, v);
+                            existingProjectDetailsMap.set((0, curatorService_1.normalizeArtistId)(key), v);
+                        }
+                    }
+                }
+            }
+            catch {
+                // Ignore malformed cache
+            }
+        };
+        ingestDetailsCacheIntoMap(inputPayload?.detailsCache || inputPayload?.existingDetailsCache);
+        if (inputPayload?.projectId && jobData.userId) {
+            try {
+                const projSnap = await db
+                    .collection("users")
+                    .doc(jobData.userId)
+                    .collection("projects")
+                    .doc(inputPayload.projectId)
+                    .get();
+                if (projSnap && projSnap.exists) {
+                    const projData = projSnap.data();
+                    if (existingProjectScenes.length === 0 && projData?.scenes) {
+                        existingProjectScenes = (0, multiSceneUtils_1.parseProjectScenes)(projData.scenes);
+                    }
+                    if (projData?.detailsCache) {
+                        ingestDetailsCacheIntoMap(projData.detailsCache);
+                    }
+                }
+            }
+            catch {
+                // Safe fallback if project doc isn't mocked in unit tests
+            }
+        }
+        if (jobType === "graph_generation") {
+            // Determine if we should run in mock mode
+            const isEmulator = false; // TEMPORARILY DISABLED: process.env.FUNCTIONS_EMULATOR === "true";
+            const isMissingApiKey = !process.env.GEMINI_API_KEY;
+            const forceMocks = inputPayload?.useMocks === true;
+            if (isEmulator || isMissingApiKey || forceMocks) {
+                console.log(`[Curation Backend] [Step 1: Graph Generation Started] Mock conditions met. Running simulated mock.`);
+                // Keep the 5-second simulated delay for verification of loading screens
+                await new Promise(resolve => setTimeout(resolve, 5000));
+                const mockDetails = [
+                    [
+                        "Skeleton Node",
+                        {
+                            summary: "Skeleton Node is a simulated music project created to verify the background orchestrator pipeline.",
+                            details: { artist: "Skeleton Node", genre: "Synth-wave", origin: "San Jose, USA", founded: "2026", notableArtists: [] },
+                            members: ["Antigravity (Synthesizer)"],
+                            links: [],
+                            discography: [{ albumName: "Beta Launch", releaseYear: "2026" }],
+                            recommendationReason: "Used to test the Cloud Function pipeline.",
+                            youtubeVideoId: "dQw4w9WgXcQ"
+                        }
+                    ]
+                ];
+                result = {
+                    graphData: {
+                        nodes: [
+                            { id: "Skeleton Node", type: "artist", group: 1 }
+                        ],
+                        links: [],
+                    },
+                    detailsCache: JSON.stringify(mockDetails)
+                };
+            }
+            else if (inputPayload?.mode === "overarching_only" && existingProjectScenes.length >= 2) {
+                console.log(`[Curation Backend] [Overarching-Only Mode] Synthesizing Overarching Zine & Cross-Scene Bridges across ${existingProjectScenes.length} scenes...`);
+                const detailsLookupObj = Object.fromEntries(existingProjectDetailsMap.entries());
+                const overarchingResult = await (0, curatorService_1.generateOverarchingZineBackend)(existingProjectScenes, detailsLookupObj, usageCollector);
+                const activeScene = existingProjectScenes.find((s) => (s.sceneId || s.id) === targetSceneId) ||
+                    existingProjectScenes[existingProjectScenes.length - 1];
+                const populatedExistingScenes = existingProjectScenes.filter((s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+                const compositeOverarchingGraph = populatedExistingScenes.length >= 2
+                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedExistingScenes, overarchingResult.crossSceneLinks)
+                    : (activeScene?.graphData || { nodes: [], links: [] });
+                const compactedCacheEntries = (0, multiSceneUtils_1.compactDetailsCacheToCanonical)(existingProjectDetailsMap, compositeOverarchingGraph.nodes);
+                result = {
+                    graphData: compositeOverarchingGraph,
+                    detailsCache: JSON.stringify(compactedCacheEntries),
+                    scenes: existingProjectScenes,
+                    overarchingRationale: overarchingResult.overarchingRationale,
+                    crossSceneLinks: overarchingResult.crossSceneLinks,
+                };
+            }
+            else {
+                const seedNamesMap = inputPayload.seedNames || {};
+                const lockedSeedsMap = inputPayload.lockedSeeds || {};
+                const disambigHintsMap = inputPayload.disambiguationHints || {};
+                const disambigGenresMap = inputPayload.disambiguationGenres || {};
+                const seedStubsMap = inputPayload.seedStubs || {};
+                const getSeedLock = (idOrName) => {
+                    if (!idOrName)
+                        return null;
+                    const norm = (0, curatorService_1.normalizeArtistId)(idOrName);
+                    const bare = (0, isoCountries_1.stripCountrySlug)(norm);
+                    const direct = lockedSeedsMap[norm] || lockedSeedsMap[bare] || lockedSeedsMap[idOrName];
+                    const stub = seedStubsMap[norm] || seedStubsMap[bare];
+                    const hintOrigin = direct?.origin || disambigHintsMap[norm] || disambigHintsMap[bare] || disambigHintsMap[idOrName] || stub?.details?.origin || null;
+                    const cleanOrigin = hintOrigin && hintOrigin !== 'Unknown' ? String(hintOrigin) : null;
+                    const hintGenre = direct?.genre || disambigGenresMap[norm] || disambigGenresMap[bare] || disambigGenresMap[idOrName] || stub?.details?.genre || null;
+                    const cleanGenre = hintGenre && hintGenre !== 'Unknown' ? String(hintGenre) : null;
+                    const countryIso = direct?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(norm) || (cleanOrigin ? (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(cleanOrigin)) : null);
+                    if (!cleanOrigin && !countryIso && !cleanGenre)
+                        return null;
+                    return { origin: cleanOrigin, countryIso, genre: cleanGenre };
+                };
+                const artistList = inputPayload.artists
+                    .split('::')
+                    .map((a) => a.trim())
+                    .filter(Boolean);
+                console.log(`[Curation Backend] [Phase 1: Global Cache Routing] Checking seeds: ${artistList.join(', ')}`);
+                // ── Fix A: Canonical Slug Resolution Map ──────────────────────────────────
+                // Performs the same slug-dedup query that executeCurationPipeline runs in Column 2,
+                // building a single authoritative map of raw seed norm → canonical Firestore doc ID.
+                // All subsequent seed document writes (synthesisRationale, Phase 1 lookup, subgraph
+                // extraction) MUST use this map as their sole source of truth.
+                // Aligns with architecture_truth.md Law §6 (Canonical Alias Resolution).
+                const resolvedSeedNormMap = new Map();
+                for (const seed of artistList) {
+                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    const strippedSeed = (0, isoCountries_1.stripCountrySlug)(seedNorm);
+                    const expectedSeedIso = getSeedLock(seed)?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(seedNorm);
+                    let canonicalId = (seedNorm === strippedSeed && expectedSeedIso) ? (strippedSeed + '-' + expectedSeedIso) : seedNorm;
+                    try {
+                        const dedupQuery = await db.collection('artists')
+                            .where('artistId', '>=', strippedSeed)
+                            .where('artistId', '<=', strippedSeed + '\uf8ff')
+                            .limit(10)
+                            .get();
+                        if (!dedupQuery.empty) {
+                            const hasAmbiguousSibling = (0, isoCountries_1.inspectSlugDedupAmbiguity)(dedupQuery.docs.map(d => ({ id: d.id, data: d.data() })), strippedSeed);
+                            for (const snap of dedupQuery.docs) {
+                                const snapData = snap.data();
+                                if (!(0, executeCurationPipeline_1.shouldAdoptCanonicalSlugCandidate)(expectedSeedIso, snap.id, snapData, strippedSeed, { hasAmbiguousSibling, isSeed: true })) {
+                                    continue;
+                                }
+                                if (snap.id !== seedNorm && snapData.artistId) {
+                                    canonicalId = snap.id;
+                                    if (snapData.graphData)
+                                        break;
+                                }
+                            }
+                        }
+                    }
+                    catch (dedupErr) {
+                        console.warn(`[Curation Backend] [Fix A] Seed slug dedup failed for "${seedNorm}", proceeding with raw norm.`, dedupErr);
+                    }
+                    resolvedSeedNormMap.set(seedNorm, canonicalId);
+                    console.log(`[Curation Backend] [Fix A] Seed slug resolved: "${seedNorm}" → "${canonicalId}"`);
+                }
+                // ─────────────────────────────────────────────────────────────────────────
+                const resolvedSeedArray = [];
+                for (const seed of artistList) {
+                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    // Fix C: Use the canonical slug from resolvedSeedNormMap, not the raw seedNorm.
+                    // Without this, Phase 1 reads artists/buggin (2 fields) instead of
+                    // artists/buggin-us (14 fields), evaluating as a cache miss every time.
+                    // Aligns with architecture_truth.md Law §1 (Column 3 must not re-synthesize hydrated data).
+                    const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                    let cachedDetails = null;
+                    try {
+                        // We check artists collection primarily for seeds (Fix C: use canonical slug doc)
+                        const cacheDoc = await db.collection("artists").doc(canonicalSeedId).get();
+                        if (cacheDoc.exists) {
+                            const cacheData = cacheDoc.data();
+                            if (cacheData && cacheData.detailsCache) {
+                                cachedDetails = typeof cacheData.detailsCache === 'string' ? JSON.parse(cacheData.detailsCache) : cacheData.detailsCache;
+                                if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                                    const match = cachedDetails.find((item) => (0, curatorService_1.normalizeArtistId)(item[0]) === seedNorm);
+                                    if (match && match[1]) {
+                                        cachedDetails = match[1];
+                                    }
+                                    else {
+                                        cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    catch (e) {
+                        console.warn(`Failed cache lookup for ${seedNorm}`, e);
+                    }
+                    const cleanSeedDisplayName = seedNamesMap[canonicalSeedId] ||
+                        seedNamesMap[seedNorm] ||
+                        seedNamesMap[seed.toLowerCase()] ||
+                        seedNamesMap[(0, isoCountries_1.stripCountrySlug)(seedNorm)] ||
+                        (0, isoCountries_1.stripCountrySlug)(seed);
+                    const seedLock = getSeedLock(canonicalSeedId) || getSeedLock(seed);
+                    const expectedSeedIso = seedLock?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(canonicalSeedId);
+                    if ((0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, false, expectedSeedIso)) {
+                        console.log(`[Phase 1] Cache Hit for seed: ${seed}`);
+                        resolvedSeedArray.push({
+                            id: canonicalSeedId,
+                            name: cleanSeedDisplayName,
+                            origin: cachedDetails.details.origin || "",
+                            genre: cachedDetails.details.genre || "",
+                            isCacheHit: true
+                        });
+                    }
+                    else {
+                        console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
+                        // Phase 2: Origin Validation (Flash-Lite) - Enforce lockedSeeds origin & genre hints
+                        const queryForValidation = cleanSeedDisplayName || (0, isoCountries_1.stripCountrySlug)(seed);
+                        const validationHints = (seedLock?.origin || seedLock?.genre)
+                            ? { originHint: seedLock.origin || undefined, genreHint: seedLock.genre || undefined }
+                            : undefined;
+                        const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(queryForValidation, validationHints);
+                        if (validationResult.apiUsage) {
+                            usageCollector.push(validationResult.apiUsage.model, validationResult.apiUsage);
+                        }
+                        if (validationResult.isValid) {
+                            const validatedCleanName = cleanSeedDisplayName || validationResult.id;
+                            const resolvedValidatedOrigin = validationResult.origin || seedLock?.origin || "";
+                            resolvedSeedArray.push({
+                                id: (0, executeCurationPipeline_1.canonicalizeArtistSlugWithOrigin)(validationResult.id, resolvedValidatedOrigin),
+                                name: validatedCleanName,
+                                origin: resolvedValidatedOrigin,
+                                genre: validationResult.genre || seedLock?.genre || "",
+                                isCacheHit: false
+                            });
+                        }
+                        else {
+                            throw new Error(`Validation failed for seed: ${seed}. It is not recognized as a valid musical entity.`);
+                        }
+                    }
+                }
+                console.log(`[Phase 3: The Aggregator Gate] Resolved Seed Array:`, resolvedSeedArray);
+                let finalGraph = inputPayload.baseGraph;
+                // Structural Integrity Guard: Verify that we received a valid, rich graph from the model
+                const artistNodesCount = finalGraph.nodes?.filter((n) => n.type === 'artist' || !n.type).length || 0;
+                const minimumRequiredArtists = 2; // Seed artist + at least 1 recommendation
+                if (!finalGraph.nodes || finalGraph.nodes.length === 0 || artistNodesCount < minimumRequiredArtists) {
+                    throw new Error(`Generated graph failed structural integrity check. Artist nodes count: ${artistNodesCount} (minimum required: ${minimumRequiredArtists}). Curation aborted.`);
+                }
+                // Infer missing `origin` on artist/label nodes from `artist/label <-> country` edges BEFORE hydration
+                const inferredOriginsCount = (0, isoCountries_1.inferNodeOriginsFromCountryLinks)(finalGraph.nodes, finalGraph.links);
+                if (inferredOriginsCount > 0) {
+                    console.log(`[Curation Backend] Inferred origin from country links for ${inferredOriginsCount} graph node(s).`);
+                }
+                // Build sceneAnchorIsos from locked seeds, resolved seeds, and explicit origin guardrails
+                // so deep-cut slug dedup never adopts a cached foreign homonym (e.g. paradox-de inside a Thai scene).
+                const sceneAnchorIsos = new Set();
+                for (const seed of artistList) {
+                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                    const lock = getSeedLock(canonicalSeedId) || getSeedLock(seed);
+                    const iso = lock?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(canonicalSeedId);
+                    if (iso)
+                        sceneAnchorIsos.add(iso);
+                }
+                for (const rs of resolvedSeedArray) {
+                    const rsIso = (0, isoCountries_1.extractTrailingCountryIso)(rs?.id || '') || (rs?.origin ? (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(rs.origin)) : null);
+                    if (rsIso)
+                        sceneAnchorIsos.add(rsIso);
+                }
+                if (Array.isArray(inputPayload.filters?.includeOrigins)) {
+                    for (const rawIncOrigin of inputPayload.filters.includeOrigins) {
+                        const incIso = (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(String(rawIncOrigin)));
+                        if (incIso)
+                            sceneAnchorIsos.add(incIso);
+                    }
+                }
+                // Parse seed artists list (already done above)
+                // Strip regional slugs from the seed artists string to prevent prompt hallucination
+                const cleanSeedArtistsContext = artistList
+                    .map((a) => {
+                    const norm = (0, curatorService_1.normalizeArtistId)(a);
+                    const canonical = resolvedSeedNormMap.get(norm) ?? norm;
+                    return seedNamesMap[canonical] || seedNamesMap[norm] || (0, isoCountries_1.stripCountrySlug)(a);
+                })
+                    .join('::');
+                // [Pre-Hydration ID Standardization Removed]
+                // executeCurationPipeline already correctly assigns canonical slugged IDs (e.g. 'buggin-us')
+                // to both the node AND its links. Muting it here prevents disconnected spiderwebs.
+                // 1. ISOLATE INTERACTIVE NODES: Explicitly filter out Structural Hubs (genre, founded, country)
+                // Structural hubs bypass the hydration loop entirely.
+                const recommendedEntities = finalGraph.nodes.filter((n) => n.type === 'artist' || n.type === 'label').map((n) => {
+                    const norm = (0, curatorService_1.normalizeArtistId)(n.id);
+                    const canonical = resolvedSeedNormMap.get(norm) ?? norm;
+                    const cleanName = n.type === 'label'
+                        ? (0, curatorService_1.cleanLabelDisplayName)(n.label || n.id)
+                        : (seedNamesMap[canonical] || seedNamesMap[norm] || seedNamesMap[n.id] || (n.label ? (0, curatorService_1.cleanArtistDisplayName)(n.label) : n.id));
+                    const isSeed = n.type !== 'label' && artistList.some((s) => (0, isoCountries_1.isEntitySeedMatch)(s, n.id));
+                    const nodeSeedLock = isSeed ? (getSeedLock(n.id) || getSeedLock(canonical)) : null;
+                    return {
+                        id: n.id,
+                        name: cleanName,
+                        type: n.type,
+                        origin: nodeSeedLock?.origin || n.origin || null,
+                        genre: nodeSeedLock?.genre || n.genre || null,
+                        group: n.group || 1
+                    };
+                });
+                // CRITICAL FIX: Ensure all seed artists are explicitly placed into the hydration queue.
+                // The architectural design dictates that seeds must go through the gap-filling phase just like deep cuts,
+                // even if the LLM omitted them or modified their IDs in the graph output.
+                for (const seed of artistList) {
+                    const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                    const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                    const cleanName = seedNamesMap[canonicalSeedId] || seedNamesMap[seedNorm] || (0, isoCountries_1.stripCountrySlug)(seed);
+                    const missingSeedLock = getSeedLock(canonicalSeedId) || getSeedLock(seed);
+                    const exists = recommendedEntities.some((e) => (0, isoCountries_1.isEntitySeedMatch)(seedNorm, e.id) || (0, isoCountries_1.isEntitySeedMatch)(seedNorm, e.name));
+                    if (!exists) {
+                        recommendedEntities.unshift({
+                            id: canonicalSeedId,
+                            name: cleanName,
+                            type: 'artist',
+                            origin: missingSeedLock?.origin || null,
+                            genre: missingSeedLock?.genre || null,
+                            group: 1
+                        });
+                        console.log(`[Curation Backend] Explicitly pushing missing seed artist into gap-filling queue: ${seed} (${cleanName})`);
+                    }
+                }
+                console.log(`[Curation Backend] [Step 2: Hydration Loop Started] Hydrating details for ${recommendedEntities.length} entities in the graph:`, recommendedEntities.map((e) => `${e.name} (${e.type})`));
+                const detailsCacheEntries = [];
+                // Fetch details in concurrency chunks of 3 to respect the 15 RPM Gemini limit
+                // (1 text + 1 image req per node = ~6 requests per batch)
+                const batchSize = 3;
+                for (let i = 0; i < recommendedEntities.length; i += batchSize) {
+                    const chunk = recommendedEntities.slice(i, i + batchSize);
+                    console.log(`[Curation Backend] Hydrating batch ${Math.floor(i / batchSize) + 1} of ${Math.ceil(recommendedEntities.length / batchSize)} (${chunk.length} entities)...`);
+                    const batchStartTime = Date.now();
+                    let batchAiCallsCount = 0;
+                    const chunkResults = await Promise.all(chunk.map(async (entityObj, idx) => {
+                        const rawName = entityObj.name;
+                        const isLabel = entityObj.type === 'label';
+                        let artistNormId = entityObj.id; // Bug 1 & 2 Fix: Preserve the pre-slugged ID
+                        // V11.5 / V30 Guardrail: Strip any filter tags the AI may have hallucinated onto the node ID.
+                        // This must happen at the point of entry — BEFORE any cache lookups or hydration —
+                        // so that a poisoned ID like "spaced-us-after:2018" or "dischord-inc_labels:dischord" is sanitized
+                        // before it can propagate into detailsCacheEntries or Firestore.
+                        artistNormId = artistNormId.replace(/-(after|before|genre|inc_genres|exc_origins|inc_origins|label|inc_labels|anchor_labels):[^\s]+/gi, '');
+                        if (isLabel) {
+                            artistNormId = (0, curatorService_1.normalizeLabelId)(artistNormId);
+                        }
+                        entityObj.id = artistNormId; // Keep entityObj.id in sync so hydration result at line 700 is clean
+                        // ── Slug Deduplication Guard (Cross-Homonym Protected) ─────────────────
+                        const isSeedEntity = !isLabel && artistList.some((s) => (0, isoCountries_1.isEntitySeedMatch)(s, artistNormId));
+                        const entitySeedLock = isSeedEntity ? (getSeedLock(artistNormId) || getSeedLock(rawName)) : null;
+                        let expectedNodeIso = !isLabel
+                            ? (entitySeedLock?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(artistNormId) || (entityObj.origin ? (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(entityObj.origin)) : null))
+                            : null;
+                        const resolvedOriginHint = !isLabel
+                            ? (entitySeedLock?.origin || entityObj.origin || (expectedNodeIso ? isoCountries_1.ISO_TO_COUNTRY_NAME[expectedNodeIso] : null) || null)
+                            : (entityObj.origin || null);
+                        const resolvedGenreHint = entitySeedLock?.genre || entityObj.genre || null;
+                        if (!isLabel) {
+                            try {
+                                const baseNormId = (0, curatorService_1.normalizeArtistId)((0, isoCountries_1.stripCountrySlug)(rawName)); // without country suffix
+                                const existingQuery = await db.collection("artists")
+                                    .where("artistId", ">=", baseNormId)
+                                    .where("artistId", "<=", baseNormId + "\uf8ff")
+                                    .limit(10)
+                                    .get();
+                                if (!existingQuery.empty) {
+                                    const hasAmbiguousSibling = (0, isoCountries_1.inspectSlugDedupAmbiguity)(existingQuery.docs.map(d => ({ id: d.id, data: d.data() })), baseNormId);
+                                    // Pick the most-complete compatible canonical doc (has graphData preferred)
+                                    let bestDocId = artistNormId;
+                                    for (const snap of existingQuery.docs) {
+                                        const snapData = snap.data();
+                                        if (!(0, executeCurationPipeline_1.shouldAdoptCanonicalSlugCandidate)(expectedNodeIso, snap.id, snapData, baseNormId, {
+                                            sceneAnchorIsos,
+                                            hasAmbiguousSibling,
+                                            isSeed: isSeedEntity,
+                                        })) {
+                                            continue;
+                                        }
+                                        if (snap.id !== artistNormId && snapData.artistId) {
+                                            if (snapData.graphData || snap.id === artistNormId) {
+                                                bestDocId = snap.id;
+                                                break;
+                                            }
+                                            bestDocId = snap.id;
+                                        }
+                                    }
+                                    if (bestDocId !== artistNormId) {
+                                        console.log(`[Curation Backend] Slug Dedup: Adopting existing canonical ID "${bestDocId}" instead of minting "${artistNormId}"`);
+                                        artistNormId = bestDocId;
+                                    }
+                                }
+                            }
+                            catch (dedupErr) {
+                                console.warn(`[Curation Backend] Slug dedup query failed for "${rawName}", proceeding with derived ID:`, dedupErr);
+                            }
+                            // V11.6 / V30: Re-sanitize after slug dedup in case the dedup loop adopted a poisoned historical ID
+                            artistNormId = artistNormId.replace(/-(after|before|genre|inc_genres|exc_origins|inc_origins|label|inc_labels|anchor_labels):[^\s]+/gi, '');
+                            entityObj.id = artistNormId;
+                            if (!expectedNodeIso) {
+                                expectedNodeIso = (0, isoCountries_1.extractTrailingCountryIso)(artistNormId);
+                            }
+                        }
+                        // 0. V43 Cross-Scene Project Cache Reuse ([Rule 44]):
+                        // Check existing project detailsCache (from prior Scenes) FIRST before querying Firestore or calling 3.6 Flash.
+                        let details = null;
+                        const priorSceneCached = existingProjectDetailsMap.get(artistNormId) ||
+                            existingProjectDetailsMap.get((0, curatorService_1.normalizeArtistId)(artistNormId));
+                        if (priorSceneCached && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(priorSceneCached, isLabel, expectedNodeIso)) {
+                            details = { ...priorSceneCached, _isReadOnly: true };
+                            console.log(`[Curation Backend] [V43 Cross-Scene Cache Hit] Reusing project detailsCache for: ${artistNormId}`);
+                        }
+                        // 1. Check local Firestore Cache if not already resolved from prior scene
+                        if (!details) {
+                            try {
+                                const collName = isLabel ? "labels" : "artists";
+                                const cacheDoc = await db.collection(collName).doc(artistNormId).get();
+                                if (cacheDoc.exists) {
+                                    const cacheData = cacheDoc.data();
+                                    if (cacheData && cacheData.detailsCache) {
+                                        let cachedDetails = cacheData.detailsCache;
+                                        if (typeof cachedDetails === 'string') {
+                                            try {
+                                                cachedDetails = JSON.parse(cachedDetails);
+                                            }
+                                            catch (e) { }
+                                        }
+                                        if (cachedDetails) {
+                                            // Un-nest array wrapper layer if legacy format [ [ "name", { ... } ] ]
+                                            if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                                                const match = cachedDetails.find((item) => (0, curatorService_1.normalizeArtistId)(item[0]) === artistNormId);
+                                                if (match && match[1]) {
+                                                    cachedDetails = match[1];
+                                                }
+                                                else {
+                                                    cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                                                }
+                                            }
+                                            // Architecture V33 (Rule 8 & Rule 40) Universal Cache Validation:
+                                            // A cached document is only a valid hit if it satisfies isFullyQualifiedEntityProfile
+                                            // (summary > 50 chars, genre, origin, founded, non-empty discography >= 1 album for artists,
+                                            // authentic recommendationReason free of prose-fallback text, and non-empty imageUrl).
+                                            const isCacheComplete = (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, isLabel, expectedNodeIso);
+                                            if (isCacheComplete) {
+                                                details = cachedDetails;
+                                                console.log(`[Curation Backend] Direct cache hit (complete) for details of: ${artistNormId}`);
+                                            }
+                                            else if (cachedDetails) {
+                                                console.log(`[Curation Backend] Cache doc found but failed V33 qualification gate for: ${artistNormId}. Routing to full hydration.`);
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            catch (cacheErr) {
+                                console.warn(`[Curation Backend] Direct cache lookup failed for details of: ${artistNormId}`, cacheErr);
+                            }
+                        }
+                        // 2. Fetch from Gemini if cache miss or partial hydration needed
+                        let requiresTextHydration = false;
+                        let requiresImageScraping = false;
+                        let requiresVideoScraping = false;
+                        // Extract clean human-readable name for APIs by prioritizing seedNamesMap, then stripping known country slugs
+                        let searchArtistName = seedNamesMap[artistNormId] ||
+                            seedNamesMap[(0, curatorService_1.normalizeArtistId)(rawName)] ||
+                            (0, isoCountries_1.stripCountrySlug)(rawName);
+                        if (details && details.details && details.details.artist && details.details.artist !== rawName) {
+                            searchArtistName = seedNamesMap[artistNormId] || details.details.artist;
+                        }
+                        if (!details || !(0, cacheQualification_1.isFullyQualifiedEntityProfile)(details, isLabel, expectedNodeIso)) {
+                            requiresTextHydration = true;
+                            requiresImageScraping = true;
+                            requiresVideoScraping = true;
+                        }
+                        else {
+                            // Complete canonical cache hit -> STRICT BYPASS
+                            // Note: details.imageUrl is guaranteed non-empty (either https:// or terminal 'not-found'
+                            // after a verified 4-tier discography scrape). We do not mutate or re-scrape existing global records.
+                            let isReadOnly = true;
+                            if (!details.imageUrl && !isLabel) {
+                                requiresImageScraping = true;
+                                isReadOnly = false;
+                            }
+                            if (!details.youtubeVideoId && !isLabel) {
+                                requiresVideoScraping = true;
+                                isReadOnly = false;
+                            }
+                            if (isReadOnly) {
+                                details._isReadOnly = true;
+                            }
+                        }
+                        const tempNode = {
+                            id: entityObj.id,
+                            label: searchArtistName,
+                            type: entityObj.type,
+                            origin: resolvedOriginHint || undefined,
+                            genre: resolvedGenreHint || undefined,
+                            group: entityObj.group || 1
+                        };
+                        const hydrationHints = {
+                            originHint: resolvedOriginHint,
+                            countryIso: expectedNodeIso,
+                            genreHint: resolvedGenreHint
+                        };
+                        // Stagger concurrent requests by 1000ms to prevent API burst rate limiting (iTunes & Gemini)
+                        if (idx > 0 && (requiresTextHydration || requiresImageScraping || requiresVideoScraping)) {
+                            await new Promise(resolve => setTimeout(resolve, idx * 1000));
+                        }
+                        if (requiresTextHydration) {
+                            batchAiCallsCount++;
+                            console.log(`[Curation Backend] Cache miss (or missing text). Hydrating details for ${isLabel ? 'label' : 'artist'}: ${searchArtistName}...`);
+                            // Change 2 — Per-node transient retry with 2-second backoff.
+                            // Now also retries on JSON parse failures or schema validation errors (AI hallucination glitches).
+                            const isTransientError = (err) => {
+                                const msg = (err?.message || String(err)).toLowerCase();
+                                return /429|503|resource.?exhausted|service.?unavailable|too many requests|timeout|fetch failed|network|socket|parse|invalid data|json/i.test(msg);
+                            };
+                            try {
+                                details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, cleanSeedArtistsContext, hydrationHints, usageCollector);
+                            }
+                            catch (firstErr) {
+                                if (isTransientError(firstErr)) {
+                                    console.warn(`[Curation Backend] Transient error for ${artistNormId}. Retrying in 8s...`, firstErr.message);
+                                    await new Promise(resolve => setTimeout(resolve, 8000));
+                                    try {
+                                        batchAiCallsCount++;
+                                        details = await (0, curatorService_1.fetchNodeDetailsBackend)(tempNode, finalGraph, cleanSeedArtistsContext, hydrationHints, usageCollector);
+                                        console.log(`[Curation Backend] Retry succeeded for: ${artistNormId}`);
+                                    }
+                                    catch (retryErr) {
+                                        console.error(`[Curation Backend] Retry also failed for: ${artistNormId}. Safely skipping cache write.`, retryErr.message);
+                                        return null;
+                                    }
+                                }
+                                else {
+                                    console.error(`[Curation Backend] Hydration failed (non-transient) for: ${artistNormId}. Safely skipping cache write.`, firstErr.message);
+                                    return null;
+                                }
+                            }
+                            // Realign searchArtistName if the LLM provided a cleaner, verified name
+                            if (details && details.details && details.details.artist) {
+                                searchArtistName = details.details.artist;
+                            }
+                        }
+                        if (details) {
+                            // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
+                            if (!isLabel && requiresVideoScraping) {
+                                try {
+                                    if (details.youtubeVideoId) {
+                                        const playable = await (0, curatorService_1.checkVideoPlayability)(details.youtubeVideoId);
+                                        if (!playable) {
+                                            details.youtubeVideoId = null;
+                                        }
+                                    }
+                                    if (!details.youtubeVideoId && details.youtubeSearchQuery) {
+                                        batchAiCallsCount++;
+                                        const scrapedId = await (0, curatorService_1.scrapeVideoIdBackend)(searchArtistName, artistNormId);
+                                        if (scrapedId) {
+                                            const playable = await (0, curatorService_1.checkVideoPlayability)(scrapedId);
+                                            if (playable) {
+                                                details.youtubeVideoId = scrapedId;
+                                            }
+                                        }
+                                    }
+                                }
+                                catch (e) {
+                                    console.warn(`[Media Sync] Soft warning: Media player validation failed for ${searchArtistName}. Bypassing sync check.`, e);
+                                    details.youtubeVideoId = null;
+                                }
+                            }
+                            if (!details.details) {
+                                details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
+                            }
+                            // 4. Scrape dedicated Image URL & Reconcile Discography (Artists Only, Rule 38)
+                            if (requiresImageScraping && searchArtistName && !isLabel) {
+                                try {
+                                    let attemptName = searchArtistName;
+                                    const lockedOriginForScrape = (expectedNodeIso && !(0, isoCountries_1.doesOriginMatchExpectedIso)(details.details.origin, expectedNodeIso))
+                                        ? (resolvedOriginHint || isoCountries_1.ISO_TO_COUNTRY_NAME[expectedNodeIso] || details.details.origin)
+                                        : (details.details.origin || resolvedOriginHint || "");
+                                    const scrapeResult = await (0, curatorService_1.scrapeImageUrlBackend)(attemptName, 'artist', details.details.genre || resolvedGenreHint || "", details.summary || "", lockedOriginForScrape, details.discography || [], expectedNodeIso);
+                                    if (scrapeResult && scrapeResult.imageUrl) {
+                                        details.imageUrl = scrapeResult.imageUrl;
+                                        if (Array.isArray(scrapeResult.reconciledDiscography)) {
+                                            details.discography = scrapeResult.reconciledDiscography;
+                                        }
+                                        if (scrapeResult.itunesArtistId) {
+                                            details.itunesArtistId = scrapeResult.itunesArtistId;
+                                        }
+                                    }
+                                    else {
+                                        // ⚠️ STRICT FAIL-FAST RULE & TIER 4 QUARANTINE (Rule 38):
+                                        console.warn(`[Image Scraper / Rule 38] No verified image for ${searchArtistName}. Setting not-found and quarantining discography to [].`);
+                                        details.imageUrl = 'not-found';
+                                        details.discography = [];
+                                    }
+                                }
+                                catch (e) {
+                                    console.warn(`[Image Scraper / Rule 38] Timeout/Error for ${searchArtistName}. Enforcing fail-fast quarantine.`);
+                                    details.imageUrl = 'not-found';
+                                    details.discography = [];
+                                }
+                            }
+                            else if (isLabel) {
+                                details.imageUrl = null;
+                            }
+                            const finalCleanArtistName = seedNamesMap[artistNormId] ||
+                                seedNamesMap[(0, curatorService_1.normalizeArtistId)(rawName)] ||
+                                details.details.artist ||
+                                searchArtistName;
+                            details.details.artist = finalCleanArtistName;
+                            // Note: synthesisRationale is NOT stamped here. The real Root Breakdown is
+                            // generated after all hydration completes (Step 4) and written back to the
+                            // seed artist doc explicitly. Pre-stamping a stub would pollute the artist
+                            // doc and corrupt the Roots Breakdown displayed on cache hits.
+                            console.log(`[Curation Backend] Hydration successful for: ${artistNormId}`);
+                        }
+                        if (!details)
+                            return null;
+                        // Sync strictly to the topology node ID, ignoring any internal deduplication mutation.
+                        return [entityObj.id, details];
+                    }));
+                    console.log(`[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing ${chunkResults.length} entities to Firestore cache...`);
+                    for (const res of chunkResults) {
+                        if (res) {
+                            const existingIndex = detailsCacheEntries.findIndex((entry) => entry[0] === res[0] || (0, isoCountries_1.isEntitySeedMatch)((0, curatorService_1.normalizeArtistId)(res[0]), entry[0]));
+                            if (existingIndex !== -1) {
+                                detailsCacheEntries[existingIndex] = res;
+                            }
+                            else {
+                                detailsCacheEntries.push(res);
+                            }
+                        }
+                    }
+                    // ── Dynamic Rate-Limit Cooldown ──────────────────────────────────────────────
+                    // The Gemini 15 RPM quota requires a minimum 25-second window between full batches
+                    // of 3 entities (~6 calls). If the batch made 0 Gemini calls (100% cache hits),
+                    // the rate-limit window does not need to elapse and cooldown is skipped completely.
+                    // For partial batches, the window scales proportionally to batchAiCallsCount.
+                    if (i + batchSize < recommendedEntities.length) {
+                        const batchElapsedMs = Date.now() - batchStartTime;
+                        if (batchAiCallsCount === 0) {
+                            console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active, 0 Gemini calls). 100% cache hits — skipping rate-limit cooldown.`);
+                        }
+                        else {
+                            const dynamicWindowMs = Math.min(25000, Math.max(8000, Math.ceil((batchAiCallsCount / 6) * 25000)));
+                            const remainingCooldownMs = Math.max(0, dynamicWindowMs - batchElapsedMs);
+                            if (remainingCooldownMs > 0) {
+                                console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active, ${batchAiCallsCount} Gemini calls). Cooling down for ${Math.round(remainingCooldownMs / 1000)}s to respect rate limits...`);
+                                await new Promise(resolve => setTimeout(resolve, remainingCooldownMs));
+                            }
+                            else {
+                                console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active, ${batchAiCallsCount} Gemini calls). Rate-limit window already elapsed — skipping cooldown.`);
+                            }
+                        }
+                    }
+                }
+                // Change 3 — Hydration Completeness Audit Log.
+                // Identifies any nodes that failed hydration (null result) and logs a warning.
+                // This provides operational visibility for monitoring the zero-miss hydration mandate.
+                const failedHydrationIds = recommendedEntities
+                    .filter((e) => !detailsCacheEntries.some(entry => entry[0] === e.id || (0, isoCountries_1.isEntitySeedMatch)((0, curatorService_1.normalizeArtistId)(e.name), entry[0])))
+                    .map((e) => e.name);
+                console.log(`[Curation Backend] Hydration complete. Success: ${detailsCacheEntries.length}/${recommendedEntities.length} entities.`);
+                if (failedHydrationIds.length > 0) {
+                    console.warn(`[Curation Backend] ⚠️ HYDRATION INCOMPLETE — ${failedHydrationIds.length} node(s) failed and will not be pre-cached: ${failedHydrationIds.join(', ')}`);
+                }
+                else {
+                    console.log(`[Curation Backend] ✅ All ${recommendedEntities.length} entities hydrated successfully — zero-miss compliance confirmed.`);
+                }
+                // ─── QUALITY BASELINE: Surgical Graph Pruning ────────────────────────────
+                // Any non-seed entity that completely failed text hydration (LLM could not
+                // generate a bio/genre after all retries) is excised from the graph topology
+                // right here, before the Roots Breakdown or any write-back. This prevents
+                // hollow nodes from appearing in the Spiderweb or polluting the database.
+                // Seeds are NOT pruned here — a missing seed causes a fatal throw below.
+                const hydratedNorms = new Set(detailsCacheEntries.map(entry => (0, curatorService_1.normalizeArtistId)(entry[0])));
+                const seedNormSet = new Set(artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a)));
+                if (finalGraph.nodes) {
+                    const prunedIds = new Set();
+                    finalGraph.nodes = finalGraph.nodes.filter((node) => {
+                        const nodeNorm = (0, curatorService_1.normalizeArtistId)(node.id);
+                        const typeLower = (node.type || 'artist').toLowerCase();
+                        const isStructural = !['artist', 'label'].includes(typeLower);
+                        const isSeedNode = Array.from(seedNormSet).some((s) => (0, isoCountries_1.isEntitySeedMatch)(s, nodeNorm));
+                        const isHydrated = Array.from(hydratedNorms).some((h) => h === nodeNorm || (0, isoCountries_1.isEntitySeedMatch)(nodeNorm, h));
+                        if (!isHydrated && !isSeedNode && !isStructural) {
+                            console.warn(`[Quality Baseline] Surgically pruning unhydratable node from graph topology: ${node.id}`);
+                            prunedIds.add(node.id);
+                            return false;
+                        }
+                        return true;
+                    });
+                    if (prunedIds.size > 0 && finalGraph.links) {
+                        finalGraph.links = finalGraph.links.filter((link) => {
+                            const srcId = typeof link.source === 'string' ? link.source : link.source?.id;
+                            const tgtId = typeof link.target === 'string' ? link.target : link.target?.id;
+                            return !prunedIds.has(srcId) && !prunedIds.has(tgtId);
+                        });
+                        console.log(`[Quality Baseline] Pruned ${prunedIds.size} hollow node(s) and their connections from the graph.`);
+                    }
+                }
+                // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown
+                // [Stage 2 LLM Pass] Mint a full, deep-cut-aware Roots Breakdown unconditionally.
+                // Per the Unified Canvas Architecture (Phase 4), once gap-filling is complete the system
+                // ALWAYS mints a rich narrative — for single-seed, multi-seed, and filtered jobs alike.
+                // isSandboxMode governs write-back isolation only; it must not suppress content generation.
+                console.log(`[Curation Backend] Batch hydration complete. Executing Step 2B Level 2 Boundary Audit & Final 3.1 Pro Synthesis...`);
+                const idRewriteMap = new Map();
+                const seedNorms = artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a));
+                inputPayload.filters = (0, cacheQualification_1.sanitizeDiscoveryFilters)(inputPayload.filters);
+                const isComplexGeneration = artistList.length > 1 || (0, cacheQualification_1.hasActiveDiscoveryFilters)(inputPayload.filters);
+                let resolvedAnchorResolution = undefined;
+                // --- Step 2B: Level 2 Post-Hydration Boundary Audit (Architecture V30.3 / Rule 41) ---
+                // Runs BEFORE Step 3 (generateRootsBreakdownBackend) so post-hydration boundary violators
+                // (e.g., drain-us founded 2014 vs 2015–2026 guardrail) are pruned from both finalGraph
+                // and detailsCacheEntries before the Magazine narrative and 1-sentence hooks are synthesized.
+                if ((0, cacheQualification_1.hasActiveTier2Filters)(inputPayload.filters) && inputPayload.filters && finalGraph.nodes) {
+                    const activeFilters = inputPayload.filters;
+                    const includeSlugs = new Set((activeFilters.includeOrigins || []).map((o) => (0, curatorService_1.extractCountrySlug)(o)).filter((s) => s && s !== 'global'));
+                    const excludeSlugs = new Set((activeFilters.excludeOrigins || []).map((o) => (0, curatorService_1.extractCountrySlug)(o)).filter((s) => s && s !== 'global'));
+                    const protectedSeeds = new Set(seedNorms);
+                    for (const sNorm of seedNorms) {
+                        if (resolvedSeedNormMap.has(sNorm))
+                            protectedSeeds.add(resolvedSeedNormMap.get(sNorm));
+                    }
+                    const isProtectedSeed = (nodeId) => {
+                        const normId = (0, curatorService_1.normalizeArtistId)(nodeId);
+                        if (protectedSeeds.has(nodeId) || protectedSeeds.has(normId))
+                            return true;
+                        return seedNorms.some((s) => (0, isoCountries_1.isEntitySeedMatch)(s, normId));
+                    };
+                    const level2Violators = new Set();
+                    const level2ViolatorNorms = new Set();
+                    for (const node of finalGraph.nodes) {
+                        if (node.type !== 'artist' || isProtectedSeed(node.id))
+                            continue;
+                        const nodeNorm = (0, curatorService_1.normalizeArtistId)(node.id);
+                        const nodeLabelNorm = (0, curatorService_1.normalizeArtistId)(node.label || node.id);
+                        const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id ||
+                            (0, isoCountries_1.isEntitySeedMatch)(nodeNorm, entry[0]) ||
+                            (0, isoCountries_1.isEntitySeedMatch)(nodeLabelNorm, entry[0]));
+                        const meta = detailsEntry?.[1]?.details || {};
+                        // Check hydrated founded year only if explicitly present in hydrated detailsEntry (avoid pruning unhydrated nodes)
+                        const rawFounded = meta.founded ? String(meta.founded) : '';
+                        const yearMatch = rawFounded.match(/\b(19\d\d|20\d\d)\b/);
+                        if (yearMatch) {
+                            const foundedYear = Number(yearMatch[1]);
+                            if (activeFilters.foundedAfter && foundedYear < Number(activeFilters.foundedAfter)) {
+                                level2Violators.add(node.id);
+                                level2ViolatorNorms.add(nodeNorm);
+                            }
+                            if (activeFilters.foundedBefore && foundedYear > Number(activeFilters.foundedBefore)) {
+                                level2Violators.add(node.id);
+                                level2ViolatorNorms.add(nodeNorm);
+                            }
+                        }
+                        // Check hydrated origin only if explicitly present in hydrated detailsEntry
+                        if (meta.origin) {
+                            const canonSlug = (0, curatorService_1.extractCountrySlug)(meta.origin);
+                            if (canonSlug && canonSlug !== 'global') {
+                                if (includeSlugs.size > 0 && !includeSlugs.has(canonSlug)) {
+                                    level2Violators.add(node.id);
+                                    level2ViolatorNorms.add(nodeNorm);
+                                }
+                                if (excludeSlugs.size > 0 && excludeSlugs.has(canonSlug)) {
+                                    level2Violators.add(node.id);
+                                    level2ViolatorNorms.add(nodeNorm);
+                                }
+                            }
+                        }
+                    }
+                    if (level2Violators.size > 0) {
+                        const nonSeedArtists = finalGraph.nodes.filter((n) => n.type === 'artist' && !isProtectedSeed(n.id));
+                        // Only prune if at least 1 non-seed artist remains to preserve topological integrity
+                        if (nonSeedArtists.length - level2Violators.size >= 1) {
+                            console.log(`[Curation Backend] Step 2B Level 2 Audit: Pruning ${level2Violators.size} post-hydration boundary violator(s) prior to synthesis:`, Array.from(level2Violators));
+                            finalGraph.nodes = finalGraph.nodes.filter((n) => !level2Violators.has(n.id));
+                            if (finalGraph.links) {
+                                finalGraph.links = finalGraph.links.filter((l) => {
+                                    const sId = typeof l.source === 'string' ? l.source : l.source.id;
+                                    const tId = typeof l.target === 'string' ? l.target : l.target.id;
+                                    return !level2Violators.has(sId) && !level2Violators.has(tId);
+                                });
+                            }
+                            for (let i = detailsCacheEntries.length - 1; i >= 0; i--) {
+                                const entryKey = String(detailsCacheEntries[i]?.[0] || '');
+                                const isViolatorEntry = level2Violators.has(entryKey) ||
+                                    Array.from(level2ViolatorNorms).some((vNorm) => (0, isoCountries_1.isEntitySeedMatch)(vNorm, entryKey));
+                                if (isViolatorEntry) {
+                                    detailsCacheEntries.splice(i, 1);
+                                }
+                            }
+                        }
+                    }
+                }
+                let rootBreakdownStr = "";
+                const sceneArtistSnippetsMap = {};
+                try {
+                    // Step 3A (V10/V43): Native JSON Generation (Scene Root Breakdown + 1-Sentence Hooks)
+                    const rootBreakdownPayload = await (0, curatorService_1.generateRootsBreakdownBackend)(inputPayload.artists, detailsCacheEntries, usageCollector, inputPayload.filters);
+                    if (rootBreakdownPayload) {
+                        rootBreakdownStr = rootBreakdownPayload.editorialMarkdown;
+                        finalGraph.synthesisRationale = rootBreakdownStr;
+                        // Apply native 1-sentence hooks for tooltips (Rule 26)
+                        if (rootBreakdownPayload.artistSnippets && Array.isArray(rootBreakdownPayload.artistSnippets)) {
+                            console.log(`[Curation Backend] Step 3: Natively extracted ${rootBreakdownPayload.artistSnippets.length} epicenter hooks.`);
+                            rootBreakdownPayload.artistSnippets.forEach((s) => {
+                                if (s?.id && s?.snippet) {
+                                    sceneArtistSnippetsMap[s.id] = s.snippet;
+                                    sceneArtistSnippetsMap[(0, curatorService_1.normalizeArtistId)(s.id)] = s.snippet;
+                                }
+                            });
+                            finalGraph.nodes.forEach((n) => {
+                                const snippetObj = rootBreakdownPayload.artistSnippets.find((s) => (0, curatorService_1.normalizeArtistId)(s.id) === (0, curatorService_1.normalizeArtistId)(n.id) ||
+                                    s.id.toLowerCase() === n.id.toLowerCase());
+                                if (snippetObj && snippetObj.snippet) {
+                                    n.narrativeSnippet = snippetObj.snippet;
+                                    sceneArtistSnippetsMap[n.id] = snippetObj.snippet;
+                                }
+                            });
+                        }
+                    }
+                    // Step 4: Topology Parity (Rule 23): reconcile narrative citations against graph edges.
+                    // Runs BEFORE the ID Rewrite so node IDs in the narrative still match pre-rewrite graph IDs.
+                    if (rootBreakdownStr && finalGraph.nodes && finalGraph.links && process.env.GEMINI_API_KEY) {
+                        try {
+                            console.log(`[Curation Backend] Step 4: Auditing narrative for missing graph edges...`);
+                            const existingLinkIds = finalGraph.links.map((l) => ({
+                                source: typeof l.source === 'string' ? l.source : l.source.id,
+                                target: typeof l.target === 'string' ? l.target : l.target.id,
+                            }));
+                            const nodePayload = finalGraph.nodes.map((n) => ({ id: n.id, type: n.type, label: n.label }));
+                            const reconciledEdges = await (0, curatorService_1.reconcileNarrativeEdges)(process.env.GEMINI_API_KEY, rootBreakdownStr, nodePayload, existingLinkIds, usageCollector);
+                            if (reconciledEdges.length > 0) {
+                                console.log(`[Curation Backend] Step 4: Injecting ${reconciledEdges.length} narrative-cited missing edge(s):`, reconciledEdges.map(e => `${e.source} → ${e.target}`));
+                                reconciledEdges.forEach(edge => {
+                                    finalGraph.links.push({
+                                        source: edge.source,
+                                        target: edge.target,
+                                        value: 1,
+                                        weight: edge.weight,
+                                        forwardContext: edge.forwardContext,
+                                        inverseContext: edge.inverseContext,
+                                    });
+                                });
+                            }
+                            else {
+                                console.log(`[Curation Backend] Step 4: No missing narrative edges found. Graph topology is already consistent.`);
+                            }
+                        }
+                        catch (reconcileErr) {
+                            console.warn(`[Curation Backend] Step 4: Narrative parsing failed (non-fatal):`, reconcileErr);
+                        }
+                    }
+                    for (const entityObj of recommendedEntities) {
+                        const isLabel = entityObj.type === 'label';
+                        const recNorm = isLabel ? (0, curatorService_1.normalizeLabelId)(entityObj.name) : (0, curatorService_1.normalizeArtistId)(entityObj.name);
+                        const matchingSeedNorm = seedNorms.find((s) => (0, isoCountries_1.isEntitySeedMatch)(s, recNorm));
+                        const recDetailsEntry = detailsCacheEntries.find((entry) => entry[0] === entityObj.id ||
+                            (0, isoCountries_1.isEntitySeedMatch)(recNorm, entry[0]) ||
+                            (isLabel && (0, curatorService_1.normalizeLabelId)(entry[0]) === recNorm));
+                        let disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
+                        if (isLabel) {
+                            disambiguatedCanonicalId = (0, curatorService_1.normalizeLabelId)(disambiguatedCanonicalId);
+                        }
+                        else if (recDetailsEntry && !matchingSeedNorm) {
+                            const originStr = recDetailsEntry[1]?.details?.origin;
+                            disambiguatedCanonicalId = (0, executeCurationPipeline_1.canonicalizeArtistSlugWithOrigin)(recNorm, originStr);
+                        }
+                        const finalCanonicalId = disambiguatedCanonicalId;
+                        idRewriteMap.set(recNorm, finalCanonicalId);
+                        if (isLabel) {
+                            idRewriteMap.set((0, curatorService_1.normalizeArtistId)(entityObj.name), finalCanonicalId);
+                        }
+                        if (matchingSeedNorm) {
+                            idRewriteMap.set(matchingSeedNorm, finalCanonicalId);
+                        }
+                        if (recDetailsEntry) {
+                            recDetailsEntry[0] = finalCanonicalId; // update entry in-place for later logic
+                        }
+                    }
+                    // Also ensure primary seeds are correctly mapped
+                    for (const seed of artistList) {
+                        const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                        const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                        const finalCanonicalId = canonicalSeedId;
+                        if (!idRewriteMap.has(seedNorm)) {
+                            idRewriteMap.set(seedNorm, finalCanonicalId);
+                        }
+                        if (canonicalSeedId !== seedNorm && !idRewriteMap.has(canonicalSeedId)) {
+                            idRewriteMap.set(canonicalSeedId, finalCanonicalId);
+                        }
+                    }
+                    // ── Apply Canonical ID Rewrite and Strict Deduplication to Graph Topology BEFORE Extraction ──
+                    if (finalGraph.nodes) {
+                        const uniqueNodesMap = new Map();
+                        finalGraph.nodes.forEach((node) => {
+                            const normId = (0, curatorService_1.normalizeArtistId)(node.id);
+                            const baseNormId = (0, isoCountries_1.stripCountrySlug)(normId);
+                            const nodeIso = (0, isoCountries_1.extractTrailingCountryIso)(normId);
+                            if (idRewriteMap.has(normId)) {
+                                node.id = idRewriteMap.get(normId);
+                            }
+                            else if (idRewriteMap.has(baseNormId)) {
+                                const candidateRewrite = idRewriteMap.get(baseNormId);
+                                if (!nodeIso || (0, isoCountries_1.areCountryIsosCompatible)(nodeIso, (0, isoCountries_1.extractTrailingCountryIso)(candidateRewrite))) {
+                                    node.id = candidateRewrite;
+                                }
+                            }
+                            // Gate D: Overwrite node.origin ONLY when hydrated profile's origin satisfies Origin-Suffix Parity
+                            const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id);
+                            if (detailsEntry && detailsEntry[1]?.details?.origin) {
+                                const expectedIso = node.type === 'label'
+                                    ? null
+                                    : ((0, isoCountries_1.extractTrailingCountryIso)(node.id) || getSeedLock(node.id)?.countryIso || null);
+                                if (!expectedIso || (0, isoCountries_1.doesOriginMatchExpectedIso)(detailsEntry[1].details.origin, expectedIso)) {
+                                    node.origin = detailsEntry[1].details.origin;
+                                }
+                                else {
+                                    console.warn(`[Curation Backend] [Gate D] Blocked foreign homonym origin overwrite ("${detailsEntry[1].details.origin}") on node "${node.id}" (expected ISO: "${expectedIso}").`);
+                                }
+                            }
+                            if (!uniqueNodesMap.has(node.id)) {
+                                uniqueNodesMap.set(node.id, node);
+                            }
+                        });
+                        finalGraph.nodes = Array.from(uniqueNodesMap.values());
+                    }
+                    if (finalGraph.links) {
+                        const uniqueLinksMap = new Map();
+                        finalGraph.links.forEach((link) => {
+                            const sId = typeof link.source === 'string' ? link.source : link.source.id;
+                            const tId = typeof link.target === 'string' ? link.target : link.target.id;
+                            const normS = (0, curatorService_1.normalizeArtistId)(sId);
+                            const normT = (0, curatorService_1.normalizeArtistId)(tId);
+                            const baseNormS = (0, isoCountries_1.stripCountrySlug)(normS);
+                            const baseNormT = (0, isoCountries_1.stripCountrySlug)(normT);
+                            let finalS = sId;
+                            let finalT = tId;
+                            const sIso = (0, isoCountries_1.extractTrailingCountryIso)(normS);
+                            const tIso = (0, isoCountries_1.extractTrailingCountryIso)(normT);
+                            if (idRewriteMap.has(normS)) {
+                                finalS = idRewriteMap.get(normS);
+                            }
+                            else if (idRewriteMap.has(baseNormS)) {
+                                const candS = idRewriteMap.get(baseNormS);
+                                if (!sIso || (0, isoCountries_1.areCountryIsosCompatible)(sIso, (0, isoCountries_1.extractTrailingCountryIso)(candS))) {
+                                    finalS = candS;
+                                }
+                            }
+                            if (idRewriteMap.has(normT)) {
+                                finalT = idRewriteMap.get(normT);
+                            }
+                            else if (idRewriteMap.has(baseNormT)) {
+                                const candT = idRewriteMap.get(baseNormT);
+                                if (!tIso || (0, isoCountries_1.areCountryIsosCompatible)(tIso, (0, isoCountries_1.extractTrailingCountryIso)(candT))) {
+                                    finalT = candT;
+                                }
+                            }
+                            if (typeof link.source === 'string')
+                                link.source = finalS;
+                            else
+                                link.source.id = finalS;
+                            if (typeof link.target === 'string')
+                                link.target = finalT;
+                            else
+                                link.target.id = finalT;
+                            if (finalS !== finalT) {
+                                const linkKey = [finalS, finalT].sort().join('--');
+                                if (!uniqueLinksMap.has(linkKey)) {
+                                    uniqueLinksMap.set(linkKey, link);
+                                }
+                            }
+                        });
+                        finalGraph.links = Array.from(uniqueLinksMap.values());
+                    }
+                    // --- Step 4B: Deterministic Graph Enrichment & Pod Genre Affinity [Rule 39] ---
+                    if (finalGraph.nodes && finalGraph.links) {
+                        // Snapshot existing nodes to avoid concurrent modification issues during injection
+                        const existingNodeMap = new Map();
+                        finalGraph.nodes.forEach((n) => existingNodeMap.set(n.id, n));
+                        // Set to track existing bidirectional links
+                        const existingLinkSet = new Set();
+                        finalGraph.links.forEach((l) => {
+                            const s = typeof l.source === 'string' ? l.source : l.source.id;
+                            const t = typeof l.target === 'string' ? l.target : l.target.id;
+                            existingLinkSet.add(`${s}--${t}`);
+                            existingLinkSet.add(`${t}--${s}`);
+                        });
+                        // Helper to determine if an endpoint is a country node or country slug
+                        const isCountryEndpoint = (id) => {
+                            const n = existingNodeMap.get(id);
+                            if (n?.type === 'country')
+                                return true;
+                            return (0, isoCountries_1.isCanonicalCountrySlugOrCode)(id);
+                        };
+                        // Snapshot of all artist nodes before in-place node array growth
+                        const artistNodesSnapshot = finalGraph.nodes.filter((n) => n.type === 'artist');
+                        artistNodesSnapshot.forEach((node) => {
+                            // Resolve metadata from detailsCacheEntries or node properties
+                            const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id || (0, isoCountries_1.isEntitySeedMatch)(node.id, entry[0]));
+                            const meta = detailsEntry?.[1]?.details || {};
+                            const rawOrigin = node.origin || meta.origin;
+                            // Gate D / Rule 40: Prioritize canonical ISO suffix on node.id across all 249 ISO countries (e.g. "klear-th" -> "th", "nasty-be" -> "be")
+                            const suffixIso = typeof node.id === 'string' ? (0, isoCountries_1.extractTrailingCountryIso)(node.id) : null;
+                            // 1. Country Reconciliation & Injection
+                            if (suffixIso || rawOrigin) {
+                                const canonSlug = suffixIso || (0, curatorService_1.extractCountrySlug)(rawOrigin);
+                                if (canonSlug !== 'global') {
+                                    const canonCountryName = isoCountries_1.ISO_TO_COUNTRY_NAME[canonSlug] || canonSlug;
+                                    const canonCountryId = (0, curatorService_1.normalizeArtistId)(canonCountryName);
+                                    // 1a. Reroute any links targeting non-canonical country endpoints
+                                    let reroutedToCanon = false;
+                                    finalGraph.links.forEach((link) => {
+                                        const sId = typeof link.source === 'string' ? link.source : link.source.id;
+                                        const tId = typeof link.target === 'string' ? link.target : link.target.id;
+                                        const otherId = sId === node.id ? tId : (tId === node.id ? sId : null);
+                                        if (otherId && isCountryEndpoint(otherId) && otherId !== canonCountryId) {
+                                            if (sId === node.id) {
+                                                if (typeof link.target === 'string')
+                                                    link.target = canonCountryId;
+                                                else
+                                                    link.target.id = canonCountryId;
+                                            }
+                                            else {
+                                                if (typeof link.source === 'string')
+                                                    link.source = canonCountryId;
+                                                else
+                                                    link.source.id = canonCountryId;
+                                            }
+                                            reroutedToCanon = true;
+                                            console.log(`[Curation Backend] Step 4B: Rerouted country link for "${node.id}" from "${otherId}" to canonical "${canonCountryId}"`);
+                                        }
+                                    });
+                                    // 1b. Instantiate canonical country node if missing
+                                    if (!existingNodeMap.has(canonCountryId)) {
+                                        const newCountryNode = {
+                                            id: canonCountryId,
+                                            type: 'country',
+                                            label: canonCountryName,
+                                            group: node.group || 1
+                                        };
+                                        finalGraph.nodes.push(newCountryNode);
+                                        existingNodeMap.set(canonCountryId, newCountryNode);
+                                        console.log(`[Curation Backend] Step 4B: Injected missing canonical country node "${canonCountryId}" for artist "${node.id}"`);
+                                    }
+                                    // 1c. If rerouted, ensure existingLinkSet has the updated link key
+                                    if (reroutedToCanon) {
+                                        existingLinkSet.add(`${node.id}--${canonCountryId}`);
+                                        existingLinkSet.add(`${canonCountryId}--${node.id}`);
+                                    }
+                                    // 1d. Inject country link if missing
+                                    const hasCanonCountryLink = existingLinkSet.has(`${node.id}--${canonCountryId}`) ||
+                                        finalGraph.links.some((l) => {
+                                            const s = typeof l.source === 'string' ? l.source : l.source.id;
+                                            const t = typeof l.target === 'string' ? l.target : l.target.id;
+                                            return (s === node.id && t === canonCountryId) || (s === canonCountryId && t === node.id);
+                                        });
+                                    if (!hasCanonCountryLink) {
+                                        finalGraph.links.push({
+                                            source: node.id,
+                                            target: canonCountryId,
+                                            value: 1,
+                                            weight: 0.2,
+                                            forwardContext: `Formed in ${canonCountryName}`,
+                                            inverseContext: `Home country of ${node.label || node.id}`
+                                        });
+                                        existingLinkSet.add(`${node.id}--${canonCountryId}`);
+                                        existingLinkSet.add(`${canonCountryId}--${node.id}`);
+                                        console.log(`[Curation Backend] Step 4B: Injected missing country link: "${node.id}" -> "${canonCountryId}" (weight: 0.2)`);
+                                    }
+                                }
+                            }
+                            // 2. Founded Year Injection
+                            const rawFounded = meta.founded ? String(meta.founded) : '';
+                            const yearMatch = rawFounded.match(/\b(19\d\d|20\d\d)\b/);
+                            if (yearMatch) {
+                                const foundedYear = yearMatch[1];
+                                const foundedNodeId = foundedYear;
+                                // Instantiate founded node if missing
+                                if (!existingNodeMap.has(foundedNodeId)) {
+                                    const newFoundedNode = {
+                                        id: foundedNodeId,
+                                        type: 'founded',
+                                        label: foundedYear,
+                                        group: node.group || 1
+                                    };
+                                    finalGraph.nodes.push(newFoundedNode);
+                                    existingNodeMap.set(foundedNodeId, newFoundedNode);
+                                    console.log(`[Curation Backend] Step 4B: Injected missing founded node "${foundedNodeId}"`);
+                                }
+                                // Check if artist is already linked to ANY founded node
+                                const hasFoundedLink = finalGraph.links.some((l) => {
+                                    const s = typeof l.source === 'string' ? l.source : l.source.id;
+                                    const t = typeof l.target === 'string' ? l.target : l.target.id;
+                                    const otherId = s === node.id ? t : (t === node.id ? s : null);
+                                    if (!otherId)
+                                        return false;
+                                    const otherNode = existingNodeMap.get(otherId);
+                                    return otherNode?.type === 'founded' || /^\d{4}$/.test(otherId);
+                                });
+                                if (!hasFoundedLink) {
+                                    finalGraph.links.push({
+                                        source: node.id,
+                                        target: foundedNodeId,
+                                        value: 1,
+                                        weight: 0.3,
+                                        forwardContext: `Founded in ${foundedYear}`,
+                                        inverseContext: `Formation year of ${node.label || node.id}`
+                                    });
+                                    existingLinkSet.add(`${node.id}--${foundedNodeId}`);
+                                    existingLinkSet.add(`${foundedNodeId}--${node.id}`);
+                                    console.log(`[Curation Backend] Step 4B: Injected missing founded link: "${node.id}" -> "${foundedNodeId}" (weight: 0.3)`);
+                                }
+                            }
+                            // 3. Contextual Pod Genre Matching (2-Tier)
+                            const hasGenreLink = finalGraph.links.some((l) => {
+                                const s = typeof l.source === 'string' ? l.source : l.source.id;
+                                const t = typeof l.target === 'string' ? l.target : l.target.id;
+                                const otherId = s === node.id ? t : (t === node.id ? s : null);
+                                if (!otherId)
+                                    return false;
+                                const otherNode = existingNodeMap.get(otherId);
+                                return otherNode?.type === 'genre';
+                            });
+                            if (!hasGenreLink && meta.genre) {
+                                // Split candidate genres by slash or comma
+                                const rawGenres = String(meta.genre).split(/[\/,]/).map((g) => g.trim()).filter(Boolean);
+                                const candidateGenre = rawGenres[0] || 'Alternative';
+                                // Find existing genre nodes belonging to the same pod group
+                                const podGenreNodes = Array.from(existingNodeMap.values()).filter((n) => n.type === 'genre' && (node.group === undefined || n.group === node.group));
+                                // Tier 1: Pod Scene Affinity - find existing pod genre sharing root stem/token
+                                let targetGenreNode = null;
+                                const candidateTokens = rawGenres.flatMap((g) => g.toLowerCase().split(/\s+/).filter((w) => w.length > 2));
+                                for (const pgn of podGenreNodes) {
+                                    const pgnLabel = (pgn.label || pgn.id).toLowerCase();
+                                    const pgnTokens = pgnLabel.split(/\s+/).filter((w) => w.length > 2);
+                                    const sharesToken = candidateTokens.some(ct => pgnTokens.some((pt) => ct.includes(pt) || pt.includes(ct)));
+                                    if (sharesToken) {
+                                        targetGenreNode = pgn;
+                                        break;
+                                    }
+                                }
+                                if (targetGenreNode) {
+                                    // Wire to existing pod genre
+                                    finalGraph.links.push({
+                                        source: node.id,
+                                        target: targetGenreNode.id,
+                                        value: 1,
+                                        weight: 0.8,
+                                        forwardContext: `Performs ${targetGenreNode.label || targetGenreNode.id}`,
+                                        inverseContext: `Key sub-genre representing ${node.label || node.id}`
+                                    });
+                                    existingLinkSet.add(`${node.id}--${targetGenreNode.id}`);
+                                    existingLinkSet.add(`${targetGenreNode.id}--${node.id}`);
+                                    console.log(`[Curation Backend] Step 4B: Pod Genre Affinity wired "${node.id}" to existing genre "${targetGenreNode.id}" (weight: 0.8)`);
+                                }
+                                else {
+                                    // Tier 2: Scene Divergence - mint new genre node for this pod
+                                    const newGenreId = (0, curatorService_1.normalizeArtistId)(candidateGenre);
+                                    if (!existingNodeMap.has(newGenreId)) {
+                                        const newGenreNode = {
+                                            id: newGenreId,
+                                            type: 'genre',
+                                            label: candidateGenre,
+                                            group: node.group || 1
+                                        };
+                                        finalGraph.nodes.push(newGenreNode);
+                                        existingNodeMap.set(newGenreId, newGenreNode);
+                                        console.log(`[Curation Backend] Step 4B: Minted divergent genre node "${newGenreId}" for pod group ${node.group}`);
+                                    }
+                                    finalGraph.links.push({
+                                        source: node.id,
+                                        target: newGenreId,
+                                        value: 1,
+                                        weight: 0.8,
+                                        forwardContext: `Performs ${candidateGenre}`,
+                                        inverseContext: `Genre of ${node.label || node.id}`
+                                    });
+                                    existingLinkSet.add(`${node.id}--${newGenreId}`);
+                                    existingLinkSet.add(`${newGenreId}--${node.id}`);
+                                    console.log(`[Curation Backend] Step 4B: Injected divergent genre link: "${node.id}" -> "${newGenreId}" (weight: 0.8)`);
+                                }
+                            }
+                        });
+                        // --- Step 4B Level 2 Post-Hydration Boundary Audit (Architecture V30 / Rule 41) ---
+                        if ((0, cacheQualification_1.hasActiveTier2Filters)(inputPayload.filters) && inputPayload.filters) {
+                            const activeFilters = inputPayload.filters;
+                            const includeSlugs = new Set((activeFilters.includeOrigins || []).map((o) => (0, curatorService_1.extractCountrySlug)(o)).filter((s) => s && s !== 'global'));
+                            const excludeSlugs = new Set((activeFilters.excludeOrigins || []).map((o) => (0, curatorService_1.extractCountrySlug)(o)).filter((s) => s && s !== 'global'));
+                            const protectedSeeds = new Set(seedNorms);
+                            for (const sNorm of seedNorms) {
+                                if (resolvedSeedNormMap.has(sNorm))
+                                    protectedSeeds.add(resolvedSeedNormMap.get(sNorm));
+                            }
+                            const isProtectedSeed = (nodeId) => {
+                                if (protectedSeeds.has(nodeId))
+                                    return true;
+                                return seedNorms.some((s) => (0, isoCountries_1.isEntitySeedMatch)(s, nodeId));
+                            };
+                            const level2Violators = new Set();
+                            for (const node of finalGraph.nodes) {
+                                if (node.type !== 'artist' || isProtectedSeed(node.id))
+                                    continue;
+                                const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id || (0, isoCountries_1.isEntitySeedMatch)(node.id, entry[0]));
+                                const meta = detailsEntry?.[1]?.details || {};
+                                // Check hydrated founded year only if explicitly present in hydrated detailsEntry (avoid pruning unhydrated nodes)
+                                const rawFounded = meta.founded ? String(meta.founded) : '';
+                                const yearMatch = rawFounded.match(/\b(19\d\d|20\d\d)\b/);
+                                if (yearMatch) {
+                                    const foundedYear = Number(yearMatch[1]);
+                                    if (activeFilters.foundedAfter && foundedYear < Number(activeFilters.foundedAfter)) {
+                                        level2Violators.add(node.id);
+                                    }
+                                    if (activeFilters.foundedBefore && foundedYear > Number(activeFilters.foundedBefore)) {
+                                        level2Violators.add(node.id);
+                                    }
+                                }
+                                // Check hydrated origin only if explicitly present in hydrated detailsEntry
+                                if (meta.origin) {
+                                    const canonSlug = (0, curatorService_1.extractCountrySlug)(meta.origin);
+                                    if (canonSlug && canonSlug !== 'global') {
+                                        if (includeSlugs.size > 0 && !includeSlugs.has(canonSlug)) {
+                                            level2Violators.add(node.id);
+                                        }
+                                        if (excludeSlugs.size > 0 && excludeSlugs.has(canonSlug)) {
+                                            level2Violators.add(node.id);
+                                        }
+                                    }
+                                }
+                            }
+                            if (level2Violators.size > 0) {
+                                const nonSeedArtists = finalGraph.nodes.filter((n) => n.type === 'artist' && !isProtectedSeed(n.id));
+                                // Only prune if at least 1 non-seed artist remains to preserve topological integrity
+                                if (nonSeedArtists.length - level2Violators.size >= 1) {
+                                    console.log(`[Curation Backend] Step 4B Level 2 Audit: Pruning ${level2Violators.size} post-hydration boundary violator(s):`, Array.from(level2Violators));
+                                    finalGraph.nodes = finalGraph.nodes.filter((n) => !level2Violators.has(n.id));
+                                    finalGraph.links = finalGraph.links.filter((l) => {
+                                        const sId = typeof l.source === 'string' ? l.source : l.source.id;
+                                        const tId = typeof l.target === 'string' ? l.target : l.target.id;
+                                        return !level2Violators.has(sId) && !level2Violators.has(tId);
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    // --- Degree-0 Cleanup Phase ---
+                    if (finalGraph.nodes && finalGraph.links) {
+                        // Build a set of ALL valid node IDs currently in the graph
+                        const validNodeIds = new Set(finalGraph.nodes.map((n) => n.id));
+                        const connectedNodeIds = new Set();
+                        finalGraph.links.forEach((link) => {
+                            const sId = typeof link.source === 'string' ? link.source : link.source.id;
+                            const tId = typeof link.target === 'string' ? link.target : link.target.id;
+                            if (validNodeIds.has(sId) && validNodeIds.has(tId)) {
+                                connectedNodeIds.add(sId);
+                                connectedNodeIds.add(tId);
+                            }
+                        });
+                        // Ensure all resolved seed IDs are protected from pruning
+                        const protectedSeedIds = new Set();
+                        for (const seedNorm of seedNorms) {
+                            protectedSeedIds.add(seedNorm);
+                            if (resolvedSeedNormMap.has(seedNorm)) {
+                                protectedSeedIds.add(resolvedSeedNormMap.get(seedNorm));
+                            }
+                        }
+                        // Filter out nodes that have 0 degrees, are not protected seeds, or are orphaned country nodes
+                        const originalNodeCount = finalGraph.nodes.length;
+                        finalGraph.nodes = finalGraph.nodes.filter((node) => {
+                            // Force prune any country node that isn't a canonical target for an active artist
+                            if (node.type === 'country') {
+                                let isRequired = false;
+                                for (const n of finalGraph.nodes) {
+                                    if (n.type === 'artist' || n.type === 'label') {
+                                        const suffixIso = typeof n.id === 'string' ? (0, isoCountries_1.extractTrailingCountryIso)(n.id) : null;
+                                        const canonSlug = suffixIso || (n.origin ? (0, curatorService_1.extractCountrySlug)(n.origin) : 'global');
+                                        if (canonSlug !== 'global') {
+                                            const canonCountryName = isoCountries_1.ISO_TO_COUNTRY_NAME[canonSlug] || canonSlug;
+                                            if ((0, curatorService_1.normalizeArtistId)(canonCountryName) === node.id) {
+                                                isRequired = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                                if (!isRequired) {
+                                    return false; // Drop non-canonical or unverified country node
+                                }
+                            }
+                            return connectedNodeIds.has(node.id) || protectedSeedIds.has(node.id);
+                        });
+                        const prunedCount = originalNodeCount - finalGraph.nodes.length;
+                        if (prunedCount > 0) {
+                            console.log(`[Curation Backend] Degree-0 Cleanup Phase: Pruned ${prunedCount} orphaned ghost node(s).`);
+                        }
+                        // Clean up any phantom links that referenced pruned nodes
+                        const finalValidNodes = new Set(finalGraph.nodes.map((n) => n.id));
+                        const originalLinkCount = finalGraph.links.length;
+                        finalGraph.links = finalGraph.links.filter((link) => {
+                            const sId = typeof link.source === 'string' ? link.source : link.source.id;
+                            const tId = typeof link.target === 'string' ? link.target : link.target.id;
+                            return finalValidNodes.has(sId) && finalValidNodes.has(tId);
+                        });
+                        const prunedLinkCount = originalLinkCount - finalGraph.links.length;
+                        if (prunedLinkCount > 0) {
+                            console.log(`[Curation Backend] Degree-0 Cleanup Phase: Pruned ${prunedLinkCount} phantom edge(s).`);
+                        }
+                    }
+                    // --- Discovery Ledger Telemetry: Compute anchorResolution (Architecture V30.3 / Rule 41) ---
+                    {
+                        const activeFilters = inputPayload.filters;
+                        const tier2Active = (0, cacheQualification_1.hasActiveTier2Filters)(activeFilters);
+                        const tier3Active = (0, cacheQualification_1.hasActiveTier3Filters)(activeFilters);
+                        if (!tier2Active && !tier3Active) {
+                            resolvedAnchorResolution = "Tier 1 Only";
+                        }
+                        else if (tier2Active && !tier3Active) {
+                            resolvedAnchorResolution = "Tier 1 + Tier 2 Applied";
+                        }
+                        else {
+                            const hasRequestedGenres = Boolean(activeFilters?.includeGenres && activeFilters.includeGenres.length > 0);
+                            const hasRequestedLabels = Boolean(activeFilters?.anchorLabels && activeFilters.anchorLabels.length > 0);
+                            let genreSurvived = true;
+                            if (hasRequestedGenres && activeFilters?.includeGenres) {
+                                const reqGenres = activeFilters.includeGenres.map((g) => g.trim().toLowerCase()).filter(Boolean);
+                                genreSurvived = (finalGraph.nodes || []).some((n) => {
+                                    if (n.type !== 'genre')
+                                        return false;
+                                    const gLabel = String(n.label || n.id || '').toLowerCase();
+                                    return reqGenres.some((rg) => gLabel.includes(rg) || rg.includes(gLabel) || (0, curatorService_1.normalizeArtistId)(gLabel) === (0, curatorService_1.normalizeArtistId)(rg));
+                                });
+                            }
+                            let labelSurvived = true;
+                            if (hasRequestedLabels && activeFilters?.anchorLabels) {
+                                const reqLabelIds = activeFilters.anchorLabels.map((l) => (0, curatorService_1.normalizeLabelId)(l)).filter(Boolean);
+                                labelSurvived = (finalGraph.nodes || []).some((n) => {
+                                    if (n.type !== 'label')
+                                        return false;
+                                    const nNorm = (0, curatorService_1.normalizeLabelId)(n.label || n.id || '');
+                                    return reqLabelIds.includes(nNorm);
+                                });
+                            }
+                            if (genreSurvived && labelSurvived) {
+                                resolvedAnchorResolution = tier2Active
+                                    ? "Tier 1 + Tier 2 + Tier 3 (Full Parity)"
+                                    : "Tier 1 + Tier 3 Applied";
+                            }
+                            else if (hasRequestedGenres && hasRequestedLabels && genreSurvived && !labelSurvived) {
+                                resolvedAnchorResolution = tier2Active
+                                    ? "Tier 1 + Tier 2 + Tier 3 (Genre Applied; Label Bypassed — Narrative Gravity Only)"
+                                    : "Tier 1 + Tier 3 (Genre Applied; Label Bypassed — Narrative Gravity Only)";
+                            }
+                            else if (hasRequestedGenres && hasRequestedLabels && !genreSurvived && labelSurvived) {
+                                resolvedAnchorResolution = tier2Active
+                                    ? "Tier 1 + Tier 2 + Tier 3 (Label Applied; Genre Bypassed — Narrative Gravity Only)"
+                                    : "Tier 1 + Tier 3 (Label Applied; Genre Bypassed — Narrative Gravity Only)";
+                            }
+                            else {
+                                resolvedAnchorResolution = tier2Active
+                                    ? "Tier 1 + Tier 2 Applied (Tier 3 bypassed due to boundary conflict)"
+                                    : "Tier 1 Only (Tier 3 bypassed)";
+                            }
+                        }
+                        console.log(`[Curation Backend] Discovery Ledger Telemetry -> anchorResolution: "${resolvedAnchorResolution}"`);
+                    }
+                    // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs (Atomic Self-Heal) ────────────────
+                    // Per the Unified Canvas Architecture (Column 3, Step 5), Single-Seed jobs persist
+                    // the Root Breakdown to the seed artist's Firestore doc so that future cache hits
+                    // serve the full 3.1 Pro narrative without re-generating it.
+                    // This step uses an atomic transaction to detect and heal legacy split-brain orphans.
+                    if (!isComplexGeneration) {
+                        for (const seedName of artistList) {
+                            const seedNorm = (0, curatorService_1.normalizeArtistId)(seedName);
+                            const bareSeedNorm = (0, isoCountries_1.stripCountrySlug)(seedNorm);
+                            const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                            const canonicalDocRef = db.collection('artists').doc(canonicalSeedId);
+                            const rawSeedDocRef = db.collection('artists').doc(bareSeedNorm);
+                            try {
+                                await db.runTransaction(async (transaction) => {
+                                    const canonicalSnap = await transaction.get(canonicalDocRef);
+                                    const canonicalData = canonicalSnap.exists ? canonicalSnap.data() : null;
+                                    let rawData = null;
+                                    if (canonicalSeedId !== bareSeedNorm) {
+                                        const rawSnap = await transaction.get(rawSeedDocRef);
+                                        if (rawSnap.exists) {
+                                            rawData = rawSnap.data();
+                                        }
+                                    }
+                                    const canonicalUpdate = {
+                                        'detailsCache.synthesisRationale': firestore_2.FieldValue.delete(),
+                                        updatedAt: firestore_2.FieldValue.serverTimestamp()
+                                    };
+                                    // Fail-safe: If LLM skipped the primary seed in hydration topology, ensure it inherits Tier 1 global asset schema
+                                    if (!canonicalSnap.exists) {
+                                        canonicalUpdate.createdAt = firestore_2.FieldValue.serverTimestamp();
+                                        canonicalUpdate.cacheVersion = 4;
+                                        canonicalUpdate.cacheKey = canonicalSeedId;
+                                        canonicalUpdate.artistId = bareSeedNorm;
+                                        canonicalUpdate.isDeep = true;
+                                        canonicalUpdate.detailsCache = { _isStub: true }; // Minimum required to prevent frontend crashes
+                                    }
+                                    let finalRationale = rootBreakdownStr;
+                                    // Merge Orphan Data & Redirect (adopt orphaned rationale BEFORE evaluating validity)
+                                    if (canonicalSeedId !== bareSeedNorm) {
+                                        if (rawData) {
+                                            if (!finalRationale && rawData.synthesisRationale) {
+                                                finalRationale = rawData.synthesisRationale;
+                                                console.log(`[Self-Heal] Adopting orphaned synthesisRationale for ${canonicalSeedId} in transaction`);
+                                            }
+                                            if (!rawData.redirectTo && (!rawData._isStub || !rawData.isAmbiguous)) {
+                                                transaction.set(rawSeedDocRef, { redirectTo: canonicalSeedId }, { merge: true });
+                                                console.log(`[Self-Heal] Queued redirectTo for orphaned stub ${bareSeedNorm} -> ${canonicalSeedId}`);
+                                            }
+                                        }
+                                    }
+                                    const hasValidRationale = typeof finalRationale === 'string' && finalRationale.trim().length >= 50;
+                                    // Topology Hydration Check for Stubs
+                                    const hasGraph = canonicalData?.graphData && ((typeof canonicalData.graphData === 'string' && canonicalData.graphData.length > 10) ||
+                                        (typeof canonicalData.graphData === 'object' && canonicalData.graphData.nodes));
+                                    if (hasValidRationale) {
+                                        canonicalUpdate.synthesisRationale = finalRationale;
+                                        canonicalUpdate.isPrimarySeed = true;
+                                        canonicalUpdate.hasUniqueSpiderweb = true;
+                                        if (!hasGraph) {
+                                            const finalExtractId = idRewriteMap.get(canonicalSeedId) ?? idRewriteMap.get(seedNorm) ?? canonicalSeedId;
+                                            const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(finalExtractId, finalGraph, artistList);
+                                            if (rawExtracted) {
+                                                const safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
+                                                if (safeExtractedGraph.nodes && safeExtractedGraph.nodes.length > 0) {
+                                                    if (safeExtractedGraph.links) {
+                                                        for (const link of safeExtractedGraph.links) {
+                                                            link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                                                            link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                                                        }
+                                                    }
+                                                    safeExtractedGraph.synthesisRationale = finalRationale;
+                                                    canonicalUpdate.graphData = JSON.stringify(safeExtractedGraph);
+                                                    console.log(`[Self-Heal] Hydrating graphData for empty stub: ${canonicalSeedId}`);
+                                                }
+                                            }
+                                        }
+                                        else {
+                                            // Partial healing: graphData already exists in canonicalData, but synthesisRationale was missing/stale!
+                                            // Update graphData with the newly synthesized rationale so both root and parsed graph are unified!
+                                            try {
+                                                const existingGraph = typeof canonicalData.graphData === 'string'
+                                                    ? JSON.parse(canonicalData.graphData)
+                                                    : JSON.parse(JSON.stringify(canonicalData.graphData));
+                                                if (existingGraph && existingGraph.nodes && existingGraph.nodes.length > 0) {
+                                                    existingGraph.synthesisRationale = finalRationale;
+                                                    canonicalUpdate.graphData = JSON.stringify(existingGraph);
+                                                    console.log(`[Self-Heal] Updated existing graphData with synthesisRationale for ${canonicalSeedId}`);
+                                                }
+                                            }
+                                            catch (parseErr) {
+                                                console.warn(`[Self-Heal] Failed to re-embed synthesisRationale into existing graphData for ${canonicalSeedId}:`, parseErr);
+                                            }
+                                        }
+                                    }
+                                    else {
+                                        // Architecture V29 Write Gate:
+                                        // Block setting hasUniqueSpiderweb: true and do NOT write graphData if synthesisRationale is missing or < 50 chars!
+                                        canonicalUpdate.hasUniqueSpiderweb = false;
+                                        console.warn(`[Self-Heal] Write Gate: Suppressed graphData & hasUniqueSpiderweb for ${canonicalSeedId} due to missing/short synthesisRationale`);
+                                    }
+                                    transaction.set(canonicalDocRef, canonicalUpdate, { merge: true });
+                                });
+                                console.log(`[Curation Backend] ✅ Atomic write-back & self-heal completed for canonical seed doc: ${canonicalSeedId}`);
+                            }
+                            catch (e) {
+                                console.warn(`[Curation Backend] Root Breakdown / Atomic Heal failed for artist doc: ${canonicalSeedId}`, e.message);
+                            }
+                        }
+                    }
+                    // 3.1 Pro: Final Node Positioning (Semantic Link Weights)
+                    if (finalGraph.links && finalGraph.links.length > 0 && process.env.GEMINI_API_KEY) {
+                        console.log(`[Curation Backend] Executing Final Node Positioning using Flash for ${finalGraph.links.length} links...`);
+                        const weightedLinks = await (0, curatorService_1.generateSemanticLinkWeights)(process.env.GEMINI_API_KEY, detailsCacheEntries, finalGraph.links.map((l) => ({
+                            source: typeof l.source === 'string' ? l.source : l.source.id,
+                            target: typeof l.target === 'string' ? l.target : l.target.id
+                        })), {
+                            push: (model, usage) => {
+                                if (!collectedTokens[model])
+                                    collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+                                collectedTokens[model].prompt += usage.promptTokenCount || 0;
+                                collectedTokens[model].candidates += usage.candidatesTokenCount || 0;
+                                collectedTokens[model].total += usage.totalTokenCount || 0;
+                            }
+                        });
+                        if (weightedLinks && weightedLinks.length > 0) {
+                            const weightMap = new Map();
+                            weightedLinks.forEach((wl) => {
+                                const linkKey = [wl.source, wl.target].sort().join('--');
+                                weightMap.set(linkKey, wl.weight);
+                            });
+                            finalGraph.links.forEach((link) => {
+                                const sId = typeof link.source === 'string' ? link.source : link.source.id;
+                                const tId = typeof link.target === 'string' ? link.target : link.target.id;
+                                const linkKey = [sId, tId].sort().join('--');
+                                if (weightMap.has(linkKey)) {
+                                    link.weight = weightMap.get(linkKey);
+                                }
+                                else if (link.weight === undefined) {
+                                    // Ensure all links have at least a neutral weight
+                                    link.weight = 0.5;
+                                }
+                            });
+                            console.log(`[Curation Backend] Applied semantic weights to ${weightMap.size} links.`);
+                        }
+                        else {
+                            // Graceful Fallback: Apply default neutral weight to ensure physics engine continuity
+                            finalGraph.links.forEach((link) => {
+                                if (link.weight === undefined) {
+                                    link.weight = 0.5;
+                                }
+                            });
+                            console.warn(`[Curation Backend] AI weight generation failed or returned empty. Applied default weight (0.5) to all links.`);
+                        }
+                    }
+                }
+                catch (e) {
+                    console.error(`[Curation Backend] 3.1 Pro Post-Processing failed:`, e);
+                }
+                // Proactively cache each recommended entity (artist or label) as a deep cache entry as well!
+                for (const entityObj of recommendedEntities) {
+                    const recArtist = entityObj.name;
+                    const isLabel = entityObj.type === 'label';
+                    const recNorm = isLabel ? (0, curatorService_1.normalizeLabelId)(recArtist) : (0, curatorService_1.normalizeArtistId)(recArtist);
+                    const matchingSeedNorm = seedNorms.find((s) => (0, isoCountries_1.isEntitySeedMatch)(s, recNorm));
+                    if (matchingSeedNorm) {
+                        // Do NOT continue here. Let the seed fall through so it can be evaluated for partial hydration or missing assets during a cache upgrade.
+                    }
+                    const recDetailsEntry = detailsCacheEntries.find((entry) => entry[0] === entityObj.id ||
+                        (0, isoCountries_1.isEntitySeedMatch)(recNorm, entry[0]) ||
+                        (isLabel && (0, curatorService_1.normalizeLabelId)(entry[0]) === recNorm));
+                    let recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
+                    if (isLabel && !recDetails) {
+                        console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);
+                        continue;
+                    }
+                    const entityExpectedIso = !isLabel
+                        ? (getSeedLock(entityObj.id)?.countryIso ||
+                            (0, isoCountries_1.extractTrailingCountryIso)(entityObj.id) ||
+                            (matchingSeedNorm ? (0, isoCountries_1.extractTrailingCountryIso)(resolvedSeedNormMap.get(matchingSeedNorm) || matchingSeedNorm) : null))
+                        : null;
+                    const lookupSeedStub = () => {
+                        if (!matchingSeedNorm || !inputPayload?.seedStubs)
+                            return null;
+                        const canonSeed = resolvedSeedNormMap.get(matchingSeedNorm) || matchingSeedNorm;
+                        return (inputPayload.seedStubs[canonSeed] ||
+                            inputPayload.seedStubs[entityObj.id] ||
+                            inputPayload.seedStubs[matchingSeedNorm] ||
+                            inputPayload.seedStubs[recNorm] ||
+                            null);
+                    };
+                    // Change 1 — Symmetric artist null-guard + JIT Stub Fallback (Rule 17)
+                    // Prevents writing a null detailsCache to Firestore when hydration failed for this artist.
+                    // If the failed artist is a primary seed, we inject a pre-hydrated stub from inputPayload
+                    // to prevent the frontend from falling into a "DATA UNAVAILABLE" state.
+                    if (!isLabel && !recDetails) {
+                        const fallbackSeedStub = lookupSeedStub();
+                        if (fallbackSeedStub) {
+                            recDetails = fallbackSeedStub;
+                            console.log(`[Curation Backend] Injecting pre-hydrated JIT stub for failed seed artist: ${entityObj.id || recNorm}`);
+                        }
+                        else {
+                            console.warn(`[Curation Backend] Artist cache write skipped for "${recNorm}" — missing detailsCache (hydration failed or was skipped during batch).`);
+                            continue;
+                        }
+                    }
+                    const collName = isLabel ? "labels" : "artists";
+                    const idFieldKey = isLabel ? "labelId" : "artistId";
+                    const rawCanonicalId = recDetailsEntry
+                        ? recDetailsEntry[0]
+                        : (matchingSeedNorm ? (resolvedSeedNormMap.get(matchingSeedNorm) || entityObj.id || recNorm) : (entityObj.id || recNorm));
+                    // Gate C: Run Sanity Check & Origin-Suffix Parity — if a primary seed fails validation due to homonym poisoning,
+                    // fall back to seedStubs (dataIntegrityStatus: 'degraded') rather than poisoning global artists/{id-iso}.
+                    try {
+                        if (!isLabel && recDetails) {
+                            validateArtistDetailsSchema(rawCanonicalId, normalizeDetailsForWrite(recDetails), entityExpectedIso);
+                        }
+                        else if (isLabel && recDetails && !(0, cacheQualification_1.isFullyQualifiedEntityProfile)(recDetails, true)) {
+                            throw new Error(`[Schema Sanity Check / Rule 40] Label detailsCache failed V33 isFullyQualifiedEntityProfile check for label: ${recNorm}`);
+                        }
+                    }
+                    catch (validationErr) {
+                        const fallbackSeedStub = !isLabel ? lookupSeedStub() : null;
+                        if (fallbackSeedStub && !recDetails?._isStub) {
+                            console.warn(`[Curation Backend] [Gate C] Primary seed "${rawCanonicalId}" failed Write Gate (${validationErr.message}). Falling back to seedStubs instead of poisoning global cache.`);
+                            recDetails = fallbackSeedStub;
+                            if (recDetailsEntry) {
+                                recDetailsEntry[1] = fallbackSeedStub;
+                            }
+                        }
+                        else {
+                            console.warn(`[Curation Backend] Recommendation cache write skipped for "${rawCanonicalId}" — schema validation failed: ${validationErr.message}`);
+                            continue;
+                        }
+                    }
+                    // Guardrail: Strip any surviving filter tags hallucinated by the AI
+                    const strippedId = rawCanonicalId.replace(/-(after|before|genre|inc_genres|exc_origins|inc_origins|label|inc_labels|anchor_labels):[^\s]+/gi, '');
+                    const cleanCanonicalId = isLabel ? (0, curatorService_1.normalizeLabelId)(strippedId) : strippedId;
+                    // Ensure the doc path ALWAYS writes strictly to the global, canonical ID
+                    const recDocRef = db.collection(collName).doc(cleanCanonicalId);
+                    const recSnap = await recDocRef.get();
+                    // Bug 2: The Overwrite Violation - skip proactive cache update for perfect hits
+                    if (recDetails && recDetails._isReadOnly && !matchingSeedNorm) {
+                        console.log(`[Curation Backend] Skipping proactive cache update for perfect hit (${collName}): ${cleanCanonicalId}`);
+                        if (recSnap.exists && !recSnap.data()?.createdAt && recSnap.createTime) {
+                            await recDocRef.update({ createdAt: recSnap.createTime });
+                            console.log(`[Curation Backend] Backfilled missing createdAt for read-only doc: ${cleanCanonicalId}`);
+                        }
+                        continue;
+                    }
+                    if (!recSnap.exists) {
+                        const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
+                        if (recDetailsEntry) {
+                            recDetailsEntry[1] = finalRecDetails;
+                        }
+                        let safeExtractedGraph = null;
+                        if (matchingSeedNorm && !isLabel && !isComplexGeneration) {
+                            // Fix D-1: Pass the canonical slug ID (e.g. "buggin-us") instead of the raw
+                            // matchingSeedNorm (e.g. "buggin"). finalGraph nodes carry slugged IDs assigned
+                            // by executeCurationPipeline; extractArtistSubGraph uses strict equality, so
+                            // "buggin" will never match a node whose id is "buggin-us". (Law §6)
+                            const canonicalSeedForExtract = resolvedSeedNormMap.get(matchingSeedNorm) ?? matchingSeedNorm;
+                            const finalExtractId = idRewriteMap.get(canonicalSeedForExtract) ?? canonicalSeedForExtract;
+                            const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(finalExtractId, finalGraph, artistList);
+                            if (rawExtracted) {
+                                safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
+                                // Fix D-1 Guard: An empty subgraph { nodes: [], links: [] } is truthy but
+                                // produces graphData that the frontend topology guard rejects as a stub.
+                                // Coerce to null so no graphData is written — Law §1 (never write null data).
+                                if (!safeExtractedGraph.nodes || safeExtractedGraph.nodes.length === 0) {
+                                    console.warn(`[Curation Backend] [Fix D] extractArtistSubGraph returned empty topology for "${canonicalSeedForExtract}". Nulling graphData write to prevent stub corruption.`);
+                                    safeExtractedGraph = null;
+                                }
+                                else {
+                                    if (safeExtractedGraph.links) {
+                                        for (const link of safeExtractedGraph.links) {
+                                            link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                                            link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                                        }
+                                    }
+                                    if (finalGraph.synthesisRationale) {
+                                        safeExtractedGraph.synthesisRationale = finalGraph.synthesisRationale;
+                                    }
+                                }
+                            }
+                        }
+                        const hasValidRationale = !!(finalGraph.synthesisRationale && typeof finalGraph.synthesisRationale === 'string' && finalGraph.synthesisRationale.trim().length >= 50);
+                        const shouldWriteUniqueSpiderweb = matchingSeedNorm && !isLabel && !isComplexGeneration && hasValidRationale;
+                        const shouldWriteGraphData = safeExtractedGraph && !isComplexGeneration && hasValidRationale;
+                        await recDocRef.set({
+                            cacheKey: cleanCanonicalId,
+                            [idFieldKey]: recNorm,
+                            seedArtists: (recDetails?.details?.artist && !isLabel) ? recDetails.details.artist : recArtist,
+                            graphData: shouldWriteGraphData ? JSON.stringify(safeExtractedGraph) : null,
+                            detailsCache: finalRecDetails, // Save as structured object!
+                            filters: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? inputPayload.filters || null : null,
+                            synthesisRationale: (matchingSeedNorm && hasValidRationale && !isComplexGeneration) ? finalGraph.synthesisRationale : null,
+                            cacheVersion: 4,
+                            createdAt: firestore_2.FieldValue.serverTimestamp(),
+                            updatedAt: firestore_2.FieldValue.serverTimestamp(),
+                            isDeep: true, // Marked Deep!
+                            isPrimarySeed: !!matchingSeedNorm,
+                            hasUniqueSpiderweb: shouldWriteUniqueSpiderweb ? true : false,
+                            dataIntegrityStatus: matchingSeedNorm ? (recDetails?._isStub ? 'degraded' : 'verified') : undefined,
+                        });
+                        console.log(`[Curation Backend] Proactively created DEEP entry for recommendation (${collName}): ${cleanCanonicalId}`);
+                    }
+                    else {
+                        const finalRecDetails = isLabel ? sanitizeLabelProfile(recDetails) : sanitizeUndefinedProperties(normalizeDetailsForWrite(recDetails));
+                        if (recDetailsEntry) {
+                            recDetailsEntry[1] = finalRecDetails;
+                        }
+                        const updatePayload = {
+                            detailsCache: finalRecDetails,
+                            updatedAt: firestore_2.FieldValue.serverTimestamp(),
+                            cacheVersion: 4,
+                            [idFieldKey]: recNorm,
+                            cacheKey: cleanCanonicalId,
+                            isDeep: true
+                        };
+                        if (matchingSeedNorm) {
+                            let safeExtractedGraph = null;
+                            if (!isLabel && !isComplexGeneration) {
+                                // Fix D-2: Same canonical slug resolution and empty-topology guard as Fix D-1,
+                                // applied to the update (recSnap.exists) path. Both call sites must be
+                                // consistent — one unguarded site is enough to corrupt the cache. (Law §1, §8)
+                                const canonicalSeedForExtract = resolvedSeedNormMap.get(matchingSeedNorm) ?? matchingSeedNorm;
+                                const finalExtractId = idRewriteMap.get(canonicalSeedForExtract) ?? canonicalSeedForExtract;
+                                const rawExtracted = (0, curatorService_1.extractArtistSubGraph)(finalExtractId, finalGraph, artistList);
+                                if (rawExtracted) {
+                                    safeExtractedGraph = JSON.parse(JSON.stringify(rawExtracted));
+                                    if (!safeExtractedGraph.nodes || safeExtractedGraph.nodes.length === 0) {
+                                        console.warn(`[Curation Backend] [Fix D] extractArtistSubGraph returned empty topology for "${canonicalSeedForExtract}". Nulling graphData write.`);
+                                        safeExtractedGraph = null;
+                                    }
+                                    else {
+                                        if (safeExtractedGraph.links) {
+                                            for (const link of safeExtractedGraph.links) {
+                                                link.source = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                                                link.target = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                                            }
+                                        }
+                                        if (finalGraph.synthesisRationale) {
+                                            safeExtractedGraph.synthesisRationale = finalGraph.synthesisRationale;
+                                        }
+                                    }
+                                }
+                            }
+                            updatePayload.isPrimarySeed = true;
+                            updatePayload.dataIntegrityStatus = recDetails?._isStub ? 'degraded' : 'verified';
+                            if (!isComplexGeneration) {
+                                const hasValidRationale = !!(finalGraph.synthesisRationale && typeof finalGraph.synthesisRationale === 'string' && finalGraph.synthesisRationale.trim().length >= 50);
+                                const shouldWriteSpiderweb = !isLabel && hasValidRationale;
+                                updatePayload.hasUniqueSpiderweb = shouldWriteSpiderweb;
+                                if (!isLabel) {
+                                    if (shouldWriteSpiderweb && safeExtractedGraph) {
+                                        updatePayload.graphData = JSON.stringify(safeExtractedGraph);
+                                    }
+                                    updatePayload.filters = inputPayload.filters || null;
+                                    if (hasValidRationale) {
+                                        updatePayload.synthesisRationale = finalGraph.synthesisRationale;
+                                    }
+                                }
+                            }
+                        }
+                        await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
+                        console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${cleanCanonicalId}`);
+                    }
+                    // Maintain Root-as-Router / Evolved Ambiguous Stub on `artists/{recNorm}` for all verified `-iso` artists
+                    if (!isLabel &&
+                        !recDetails?._isStub &&
+                        cleanCanonicalId !== recNorm &&
+                        (0, isoCountries_1.extractTrailingCountryIso)(cleanCanonicalId) &&
+                        /-[a-z]{2}$/i.test(cleanCanonicalId) &&
+                        !cleanCanonicalId.endsWith("-uk")) {
+                        try {
+                            await (0, routerStubService_1.upsertBareRouterStub)(db, recNorm, cleanCanonicalId, {
+                                name: recDetails?.details?.artist || recArtist || recNorm,
+                                origin: recDetails?.details?.origin,
+                                genre: recDetails?.details?.genre,
+                                summary: recDetails?.summary,
+                            });
+                        }
+                        catch (stubSyncErr) {
+                            console.warn(`[Curation Backend] Non-fatal bare router stub sync warning for "${recNorm}" -> "${cleanCanonicalId}":`, stubSyncErr);
+                        }
+                    }
+                }
+                // Topology already rewritten and deduplicated in the pre-computation block before Step 5.
+                // Final Node Label Lock: Guarantee that seed nodes in the graph carry the clean display name
+                if (finalGraph && finalGraph.nodes && Array.isArray(finalGraph.nodes)) {
+                    finalGraph.nodes.forEach((node) => {
+                        if (node.type === 'artist' || !node.type) {
+                            const nodeNorm = (0, curatorService_1.normalizeArtistId)(node.id);
+                            const canonical = resolvedSeedNormMap.get(nodeNorm) ?? nodeNorm;
+                            const cleanName = seedNamesMap[canonical] || seedNamesMap[nodeNorm] || seedNamesMap[node.id];
+                            if (cleanName) {
+                                node.label = cleanName;
+                            }
+                        }
+                    });
+                }
+                // V43 Multi-Scene Assembly & Step 3B Overarching Zine Synthesis ([Rule 44]):
+                // Merge existing project detailsCache with the newly hydrated detailsCacheEntries so
+                // shared and prior-scene entities remain in the unified project detailsCache.
+                const mergedDetailsMap = new Map();
+                for (const [k, v] of existingProjectDetailsMap.entries()) {
+                    if (k && v)
+                        mergedDetailsMap.set(k, v);
+                }
+                for (const [k, v] of detailsCacheEntries) {
+                    if (k && v)
+                        mergedDetailsMap.set(k, v);
+                }
+                const unifiedDetailsCacheEntries = existingProjectScenes.length > 1 || existingProjectDetailsMap.size > 0
+                    ? Array.from(mergedDetailsMap.entries())
+                    : detailsCacheEntries;
+                const completedSceneTitle = artistList
+                    .map((a) => {
+                    const norm = (0, curatorService_1.normalizeArtistId)(a);
+                    const canonical = resolvedSeedNormMap.get(norm) ?? norm;
+                    return seedNamesMap[canonical] || seedNamesMap[norm] || (0, isoCountries_1.stripCountrySlug)(a);
+                })
+                    .join(" + ");
+                const completedScene = (0, multiSceneUtils_1.normalizeProjectScene)({
+                    id: targetSceneId,
+                    sceneId: targetSceneId,
+                    sceneIndex: targetSceneIndex,
+                    title: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
+                    name: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
+                    seedArtists: cleanSeedArtistsContext,
+                    seedIds: resolvedSeedArray.map((s) => s.id),
+                    seedArtistIds: resolvedSeedArray.map((s) => s.id),
+                    discoveryFilters: inputPayload.filters || {},
+                    graphData: finalGraph,
+                    synthesisRationale: finalGraph.synthesisRationale || rootBreakdownStr || "",
+                    artistSnippets: sceneArtistSnippetsMap,
+                    centerOffset: (0, multiSceneUtils_1.getSceneCenterOffset)(targetSceneIndex),
+                    status: "ready",
+                    pathway: isComplexGeneration ? "complex_generation" : "root_generation",
+                    updatedAt: Date.now(),
+                }, targetSceneIndex);
+                const updatedScenes = [...existingProjectScenes];
+                const existingSceneIdx = updatedScenes.findIndex((s) => (s.sceneId || s.id) === targetSceneId);
+                if (existingSceneIdx !== -1) {
+                    updatedScenes[existingSceneIdx] = completedScene;
+                }
+                else {
+                    updatedScenes.push(completedScene);
+                }
+                updatedScenes.sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
+                let overarchingRationale = "";
+                let crossSceneLinks = [];
+                if (updatedScenes.length >= 2) {
+                    console.log(`[Curation Backend] [Step 3B: Overarching Zine Synthesis] Synthesizing Master Editorial & Cross-Scene Bridges across ${updatedScenes.length} scenes...`);
+                    const unifiedDetailsObj = Object.fromEntries(unifiedDetailsCacheEntries);
+                    const overarchingPayload = await (0, curatorService_1.generateOverarchingZineBackend)(updatedScenes, unifiedDetailsObj, usageCollector);
+                    overarchingRationale = overarchingPayload.overarchingRationale;
+                    crossSceneLinks = overarchingPayload.crossSceneLinks;
+                }
+                const populatedCompletedScenes = updatedScenes.filter((s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+                const projectGraphToPersist = populatedCompletedScenes.length >= 2
+                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedCompletedScenes, crossSceneLinks)
+                    : finalGraph;
+                result = {
+                    graphData: projectGraphToPersist,
+                    detailsCache: JSON.stringify((0, multiSceneUtils_1.compactDetailsCacheToCanonical)(unifiedDetailsCacheEntries, projectGraphToPersist.nodes)),
+                    scenes: updatedScenes,
+                    overarchingRationale,
+                    crossSceneLinks,
+                    ...(resolvedAnchorResolution ? { anchorResolution: resolvedAnchorResolution } : {})
+                };
+            }
+        }
+        else {
+            throw new Error(`Unsupported jobType: ${jobType}`);
+        }
+        // Complete job with 24-hour TTL expiration policy
+        await jobDocRef.update({
+            status: "completed",
+            result,
+            updatedAt: firestore_2.FieldValue.serverTimestamp(),
+            completedAt: firestore_2.FieldValue.serverTimestamp(),
+            expireAt: firestore_2.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
+        });
+        console.log(`[Curation Backend] Successfully completed job ${jobId} (set TTL expireAt +24h)`);
+        if (inputPayload?.projectId && jobData.userId && result?.graphData) {
+            const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
+            const finalProjectScenes = Array.isArray(result.scenes)
+                ? result.scenes
+                : existingProjectScenes;
+            const isMultiSceneProject = finalProjectScenes.length >= 2;
+            const allNodesAcrossScenes = isMultiSceneProject
+                ? finalProjectScenes.flatMap((s) => s.graphData?.nodes || [])
+                : (graphObj.nodes || []);
+            const artistEntityIds = Array.from(new Set(allNodesAcrossScenes
+                .filter((n) => n.type === 'artist' || !n.type)
+                .map((n) => (0, curatorService_1.normalizeArtistId)((0, multiSceneUtils_1.stripSceneNamespace)(n.id)))));
+            const labelEntityIds = Array.from(new Set(allNodesAcrossScenes
+                .filter((n) => n.type === 'label')
+                .map((n) => (0, curatorService_1.normalizeLabelId)((0, multiSceneUtils_1.stripSceneNamespace)(n.id)))));
+            // Phase 2B — Canonical Seed Pinning & V43 Multi-Scene Deduplication ([Rule 29], [Rule 44])
+            const seedNormList = (inputPayload.artists || '')
+                .split('::')
+                .map((a) => (0, curatorService_1.normalizeArtistId)(a.trim()))
+                .filter(Boolean);
+            const isSeedNode = (nodeId) => {
+                const normId = (0, curatorService_1.normalizeArtistId)(nodeId);
+                return seedNormList.some((s) => normId === s || normId.startsWith(s + '-') || s.startsWith(normId + '-'));
+            };
+            let hoistedActiveNodes = [];
+            if (isMultiSceneProject) {
+                hoistedActiveNodes = (0, multiSceneUtils_1.computeDeduplicatedActiveNodes)(finalProjectScenes);
+            }
+            else if (graphObj.nodes) {
+                // 1. Seeds first — in the order they appear in the graph topology
+                graphObj.nodes.forEach((n) => {
+                    if (isSeedNode(n.id))
+                        hoistedActiveNodes.push(n.id);
+                });
+                // 2. All remaining non-seed nodes
+                graphObj.nodes.forEach((n) => {
+                    if (!isSeedNode(n.id) && !hoistedActiveNodes.includes(n.id)) {
+                        hoistedActiveNodes.push(n.id);
+                    }
+                });
+            }
+            console.log(`[Curation Backend] [Phase 2B] Hoisted activeNodes: seed at [0]="${hoistedActiveNodes[0]}", total=${hoistedActiveNodes.length}`);
+            // Column 3, Node 7 (Architecture V29 / V43): Extract and freeze seedImageUrls array from isolated detailsCache snapshot to project root
+            const allProjectSeeds = isMultiSceneProject
+                ? (0, multiSceneUtils_1.getAllProjectSeedIds)(finalProjectScenes)
+                : (inputPayload.seedArtists || inputPayload.artists || '')
+                    .split('::')
+                    .map((a) => a.trim())
+                    .filter(Boolean);
+            const extractedSeedImageUrls = [];
+            let extractedSeedImageUrl = null;
+            try {
+                if (result.detailsCache) {
+                    const parsedCache = typeof result.detailsCache === 'string' ? JSON.parse(result.detailsCache) : result.detailsCache;
+                    if (Array.isArray(parsedCache)) {
+                        for (const seed of allProjectSeeds) {
+                            const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
+                            const match = parsedCache.find((item) => {
+                                const key = (0, curatorService_1.normalizeArtistId)(item[0]);
+                                return (0, isoCountries_1.isEntitySeedMatch)(seedNorm, key) || key === seedNorm || key.startsWith(seedNorm + '-') || seedNorm.startsWith(key + '-');
+                            });
+                            let url = null;
+                            if (match && match[1]) {
+                                const candidate = match[1].imageUrl || match[1].details?.imageUrl || null;
+                                if (candidate && candidate !== 'not-found' && typeof candidate === 'string' && candidate.trim().length > 0) {
+                                    url = candidate.trim();
+                                }
+                            }
+                            extractedSeedImageUrls.push(url);
+                        }
+                    }
+                }
+            }
+            catch (e) {
+                console.warn(`[Curation Backend] Failed to extract seedImageUrls:`, e);
+            }
+            // Backward compatibility: first valid non-null seed image
+            extractedSeedImageUrl = extractedSeedImageUrls.find(u => !!u) || null;
+            const mergedApiUsage = {};
+            if (inputPayload?.foregroundApiUsage && Object.keys(inputPayload.foregroundApiUsage).length > 0) {
+                for (const [model, usage] of Object.entries(inputPayload.foregroundApiUsage)) {
+                    const safeUsage = usage;
+                    mergedApiUsage[model] = {
+                        prompt: safeUsage.prompt || 0,
+                        candidates: safeUsage.candidates || 0,
+                        total: safeUsage.total || 0,
+                    };
+                }
+            }
+            else if (inputPayload?.mode !== 'overarching_only' && inputPayload?.generationType !== 'Direct Hit') {
+                console.warn(`[Curation Backend] CRITICAL WARNING: inputPayload.foregroundApiUsage is empty or missing! Tokens dropped from Phase 1. Payload:`, inputPayload?.foregroundApiUsage);
+            }
+            for (const [model, usage] of Object.entries(collectedTokens)) {
+                if (!mergedApiUsage[model]) {
+                    mergedApiUsage[model] = { prompt: 0, candidates: 0, total: 0 };
+                }
+                mergedApiUsage[model].prompt += usage.prompt;
+                mergedApiUsage[model].candidates += usage.candidates;
+                mergedApiUsage[model].total += usage.total;
+            }
+            // Accumulate apiUsage and tokensSpent across scenes on the parent project document
+            let accumulatedProjectApiUsage = { ...mergedApiUsage };
+            let accumulatedTokensSpent = typeof inputPayload?.tokensSpent === "number" ? inputPayload.tokensSpent : 0;
+            try {
+                const projectSnap = await db.collection("users").doc(jobData.userId).collection("projects").doc(inputPayload.projectId).get();
+                if (projectSnap.exists) {
+                    const pData = projectSnap.data() || {};
+                    if (pData.apiUsage && typeof pData.apiUsage === "object") {
+                        accumulatedProjectApiUsage = { ...pData.apiUsage };
+                        for (const [model, usage] of Object.entries(mergedApiUsage)) {
+                            const u = usage;
+                            if (!accumulatedProjectApiUsage[model]) {
+                                accumulatedProjectApiUsage[model] = { prompt: 0, candidates: 0, total: 0 };
+                            }
+                            accumulatedProjectApiUsage[model].prompt = (accumulatedProjectApiUsage[model].prompt || 0) + (u.prompt || 0);
+                            accumulatedProjectApiUsage[model].candidates = (accumulatedProjectApiUsage[model].candidates || 0) + (u.candidates || 0);
+                            accumulatedProjectApiUsage[model].total = (accumulatedProjectApiUsage[model].total || 0) + (u.total || 0);
+                        }
+                    }
+                    if (typeof pData.tokensSpent === "number") {
+                        accumulatedTokensSpent = pData.tokensSpent + accumulatedTokensSpent;
+                    }
+                }
+            }
+            catch (pErr) {
+                console.warn(`[Curation Backend] Non-fatal project telemetry fetch warning:`, pErr?.message || pErr);
+            }
+            await updateProjectStatus(jobData.userId, inputPayload.projectId, {
+                status: "completed",
+                schemaVersion: 43,
+                name: (0, multiSceneUtils_1.generateProjectTitleFromScenes)(finalProjectScenes, result.detailsCache),
+                seedArtists: (0, multiSceneUtils_1.getAllProjectSeedArtistsString)(finalProjectScenes, inputPayload.seedArtists || inputPayload.artists || ''),
+                graphData: JSON.stringify(result.graphData),
+                ...(finalProjectScenes.length > 0
+                    ? {
+                        scenes: JSON.stringify(finalProjectScenes),
+                        activeSceneId: targetSceneId,
+                        sceneCount: finalProjectScenes.length,
+                        seedArtistIds: (0, multiSceneUtils_1.getAllProjectSeedIds)(finalProjectScenes),
+                        overarchingRationale: result.overarchingRationale || "",
+                        crossSceneLinks: JSON.stringify(result.crossSceneLinks || []),
+                    }
+                    : {}),
+                artistIds: artistEntityIds,
+                labelIds: labelEntityIds,
+                activeJobId: null,
+                detailsCache: result.detailsCache,
+                activeNodes: hoistedActiveNodes, // Phase 2B: canonical seed-first ordering
+                apiUsage: accumulatedProjectApiUsage,
+                tokensSpent: accumulatedTokensSpent,
+                ...(inputPayload?.generationType ? { generationType: inputPayload.generationType } : {}),
+                ...(result.anchorResolution ? { anchorResolution: result.anchorResolution } : {}),
+                seedImageUrls: extractedSeedImageUrls,
+                ...(extractedSeedImageUrl ? { seedImageUrl: extractedSeedImageUrl } : {})
+            });
+            // V41 Immutable Telemetry Dual-Write: Stamp exact telemetry onto tokenTransactions
+            let calculatedCostUsd = 0;
+            for (const [model, usage] of Object.entries(mergedApiUsage)) {
+                const u = usage;
+                const prompt = Number(u.prompt) || 0;
+                const candidates = Number(u.candidates) || 0;
+                const total = Number(u.total) || (prompt + candidates);
+                const reasoningTokens = Math.max(0, total - (prompt + candidates));
+                if (model.includes('gemini-3.1-pro') || model.includes('gemini-1.5-pro')) {
+                    if (prompt > 128000) {
+                        calculatedCostUsd += (prompt / 1_000_000) * 7.00 + ((candidates + reasoningTokens) / 1_000_000) * 21.00;
+                    }
+                    else {
+                        calculatedCostUsd += (prompt / 1_000_000) * 3.50 + ((candidates + reasoningTokens) / 1_000_000) * 10.50;
+                    }
+                }
+                else {
+                    calculatedCostUsd += (prompt / 1_000_000) * 1.50 + ((candidates + reasoningTokens) / 1_000_000) * 7.50;
+                }
+            }
+            calculatedCostUsd = Number(calculatedCostUsd.toFixed(4));
+            try {
+                const userTxCol = db.collection("users").doc(jobData.userId).collection("tokenTransactions");
+                let targetTxRef = null;
+                if (inputPayload?.curationSessionId) {
+                    const q = await userTxCol.where("curationSessionId", "==", inputPayload.curationSessionId).limit(1).get();
+                    if (!q.empty) {
+                        targetTxRef = q.docs[0].ref;
+                    }
+                }
+                if (!targetTxRef && inputPayload?.projectId) {
+                    const q = await userTxCol.where("projectId", "==", inputPayload.projectId).limit(1).get();
+                    if (!q.empty) {
+                        targetTxRef = q.docs[0].ref;
+                    }
+                }
+                if (targetTxRef) {
+                    await targetTxRef.set({
+                        projectId: inputPayload.projectId,
+                        apiUsage: mergedApiUsage,
+                        costUsd: calculatedCostUsd,
+                        ...(inputPayload?.generationType ? { generationType: inputPayload.generationType } : {}),
+                        ...(result.anchorResolution ? { anchorResolution: result.anchorResolution } : {}),
+                        updatedAt: firestore_2.FieldValue.serverTimestamp(),
+                    }, { merge: true });
+                }
+            }
+            catch (txErr) {
+                console.warn(`[Curation Backend] Non-fatal tokenTransactions dual-write warning:`, txErr?.message || txErr);
+            }
+        }
+    }
+    catch (error) {
+        console.error(`[Curation Backend] Failed processing job ${jobId}:`, error);
+        // Unified error messaging using the shared errorTranslationLayer
+        const translatedError = (0, errorTranslationLayer_1.translateError)(error);
+        if (jobData?.userId && jobData?.inputPayload?.curationSessionId) {
+            await (0, tokenWallet_1.refundProjectSettlementOnError)({
+                uid: jobData.userId,
+                projectId: jobData.inputPayload?.projectId,
+                curationSessionId: jobData.inputPayload.curationSessionId,
+                reason: "Column 3 Hydration Worker Failure",
+            });
+        }
+        await jobDocRef.update({
+            status: "failed",
+            errorMessage: translatedError.userFriendlyMessage,
+            errorDetails: {
+                rawMessage: error.message || String(error),
+                statusCode: error.status || null,
+                stack: error.stack || null
+            },
+            updatedAt: firestore_2.FieldValue.serverTimestamp(),
+            completedAt: firestore_2.FieldValue.serverTimestamp(),
+            expireAt: firestore_2.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
+        });
+        if (jobData?.inputPayload?.projectId && jobData?.userId) {
+            await updateProjectStatus(jobData.userId, jobData.inputPayload.projectId, {
+                status: "failed",
+                errorMessage: translatedError.userFriendlyMessage,
+                activeJobId: null
+            });
+        }
+    }
+});
+//# sourceMappingURL=processCurationJob.js.map

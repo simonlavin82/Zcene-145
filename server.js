@@ -2,13 +2,20 @@ import express from 'express';
 import { createProxyMiddleware } from 'http-proxy-middleware';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fs from 'fs';
+import sharp from 'sharp';
 import admin from 'firebase-admin';
-import { getFirestore } from 'firebase-admin/firestore';
+import { getAuth } from 'firebase-admin/auth';
+import { getFirestore, FieldValue } from 'firebase-admin/firestore';
+
+// Emulator bindings have been explicitly removed to ensure the proxy connects to the live production database.
 
 // Initialize Firebase Admin SDK
 let db;
 try {
-  admin.initializeApp();
+  admin.initializeApp({
+    projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCLOUD_PROJECT || 'zcene-production',
+  });
   db = getFirestore();
   console.log("Firebase Admin initialized successfully.");
 } catch (error) {
@@ -96,9 +103,131 @@ const extractCleanJsonString = (rawText) => {
 };
 
 // Proxy all requests starting with /api/gemini/ to the Google GenAI API
+// Rule 43: Verified via Firebase Bearer ID Token + deepWebSessions lease (Admin zcene.online@gmail.com bypassed)
 app.all('/api/gemini/*wildcard', async (req, res) => {
+  const customIdTokenRaw = (req.headers['x-zcene-id-token'] || '').toString().trim();
+  const forwardedAuthHeader = (req.headers['x-forwarded-authorization'] || '').toString().trim();
+  const authHeader = (req.headers['authorization'] || req.headers['Authorization'] || '').toString().trim();
+  const deepWebSessionId = (req.headers['x-zcene-deepweb-session'] || '').toString().trim();
+
+  const extractBearer = (val) => {
+    if (!val) return '';
+    const match = val.match(/^Bearer\s+(.+)$/i);
+    return match && match[1] ? match[1].trim() : val.trim();
+  };
+
+  const candidateToken =
+    extractBearer(customIdTokenRaw) ||
+    extractBearer(forwardedAuthHeader) ||
+    extractBearer(authHeader);
+
+  let decodedToken = null;
+  if (candidateToken) {
+    try {
+      decodedToken = await getAuth().verifyIdToken(candidateToken);
+    } catch (verifyErr) {
+      console.warn("[Gemini Proxy] Invalid Firebase ID token:", verifyErr?.message || verifyErr);
+    }
+  }
+
+  // Phase 1 / Rule 43: Enforce strict Firebase Auth Bearer token verification on all proxy calls.
+  // Deep Web session leases cannot bypass auth.
+  if (!decodedToken) {
+    return res.status(401).json({
+      code: candidateToken ? "AUTH_TOKEN_INVALID" : "AUTH_TOKEN_MISSING",
+      error: candidateToken ? "Invalid or expired authentication token." : "Missing Firebase Authorization Bearer token.",
+    });
+  }
+
+  const callerEmail = (decodedToken?.email || '').trim().toLowerCase();
+  const isCallerAdmin = callerEmail === 'zcene.online@gmail.com';
+  let decrementedSessionRef = null;
+  let activeSessionData = null;
+
+  const refundDecrementedSessionSlot = async (reason) => {
+    if (!decrementedSessionRef) return;
+    const refToRefund = decrementedSessionRef;
+    decrementedSessionRef = null;
+    try {
+      await refToRefund.update({
+        remainingMessages: FieldValue.increment(1),
+        updatedAt: FieldValue.serverTimestamp(),
+      });
+      console.log(`[Gemini Proxy] Refunded 1 message slot to Deep Web session (${reason})`);
+    } catch (refundErr) {
+      console.error("[Gemini Proxy] Failed to refund Deep Web session slot:", refundErr);
+    }
+  };
+
+  if (isCallerAdmin && deepWebSessionId) {
+    try {
+      const adminSessionSnap = await db.collection('deepWebSessions').doc(deepWebSessionId).get();
+      if (adminSessionSnap.exists) {
+        activeSessionData = adminSessionSnap.data() || null;
+      }
+    } catch (_) {}
+  }
+
+  if (!isCallerAdmin) {
+    if (!deepWebSessionId) {
+      return res.status(403).json({
+        code: "DEEP_WEB_SESSION_REQUIRED",
+        error: "DEEP_WEB_SESSION_REQUIRED: Unlock a 3-message Deep Connections session to continue.",
+      });
+    }
+
+    try {
+      const sessionRef = db.collection('deepWebSessions').doc(deepWebSessionId);
+      await db.runTransaction(async (tx) => {
+        const snap = await tx.get(sessionRef);
+        if (!snap.exists) {
+          throw new Error("INVALID_SESSION");
+        }
+        const sData = snap.data() || {};
+        activeSessionData = sData;
+        // Phase 1 / Rule 43: Enforce strict UID ownership verification ({uid}_global_deepweb_pass / sData.uid)
+        if (!sData.uid || sData.uid !== decodedToken.uid) {
+          throw new Error("SESSION_OWNER_MISMATCH");
+        }
+        // V38.4: Zero time expiry — session remains valid until remainingMessages reaches 0
+        const remaining = Math.max(0, Math.floor(Number(sData.remainingMessages) || 0));
+        if (remaining <= 0) {
+          throw new Error("SESSION_EXHAUSTED");
+        }
+        tx.update(sessionRef, {
+          remainingMessages: remaining - 1,
+          updatedAt: FieldValue.serverTimestamp(),
+        });
+      });
+      decrementedSessionRef = sessionRef;
+    } catch (leaseErr) {
+      const code = leaseErr?.message || 'LEASE_ERROR';
+      console.warn(`[Gemini Proxy] Deep Web lease rejected (${code}) for session=${deepWebSessionId}`);
+      return res.status(403).json({ code, error: code });
+    }
+  }
+
   const headers = { ...req.headers };
-  // Cleanse credentials
+  // Extract custom Zcene headers for telemetry before cleansing
+  const headerNodeId = (req.headers['x-zcene-node-id'] || '').toString().trim();
+  const headerNodeName = decodeURIComponent((req.headers['x-zcene-node-name'] || '').toString().trim());
+  const headerProjectName = decodeURIComponent((req.headers['x-zcene-project-name'] || '').toString().trim());
+  const headerProjectId = (req.headers['x-zcene-project-id'] || '').toString().trim();
+
+  // Cleanse credentials & custom headers before forwarding upstream
+  delete headers['x-zcene-password'];
+  delete headers['x-zcene-deepweb-session'];
+  delete headers['x-zcene-id-token'];
+  delete headers['x-zcene-project-id'];
+  delete headers['x-zcene-project-name'];
+  delete headers['x-zcene-node-id'];
+  delete headers['x-zcene-node-name'];
+  Object.keys(headers).forEach(k => {
+    if (k.toLowerCase().startsWith('x-zcene-')) {
+      delete headers[k];
+    }
+  });
+  delete headers['x-forwarded-authorization'];
   delete headers['authorization'];
   delete headers['Authorization'];
   delete headers['cookie'];
@@ -114,6 +243,17 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
   const targetPath = req.originalUrl.replace(/^\/api\/gemini/, '');
   const targetUrl = `https://generativelanguage.googleapis.com${targetPath}`;
 
+  // Read request body stream entirely (for mock interception and forwarding)
+  let requestBodyString = '';
+  if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+    requestBodyString = await new Promise((resolve, reject) => {
+      let bodyData = '';
+      req.on('data', chunk => bodyData += chunk.toString());
+      req.on('end', () => resolve(bodyData));
+      req.on('error', reject);
+    });
+  }
+
   console.log(`[Gemini Proxy] Forwarding ${req.method} ${req.originalUrl} -> ${targetUrl}`);
 
   try {
@@ -123,19 +263,28 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
     };
 
     if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
-      fetchOptions.body = req;
-      fetchOptions.duplex = 'half';
+      fetchOptions.body = requestBodyString;
     }
 
     const response = await fetch(targetUrl, fetchOptions);
     console.log(`[Gemini Proxy Response] Status: ${response.status} from Google for: ${targetPath}`);
 
+    if (!response.ok) {
+      await refundDecrementedSessionSlot(`upstream_status_${response.status}`);
+    }
+
     res.status(response.status);
     response.headers.forEach((value, key) => {
-      if (key.toLowerCase() !== 'transfer-encoding') {
+      const lowerKey = key.toLowerCase();
+      // Node fetch auto-decompresses the body, so we must strip encoding/length headers
+      // to prevent ERR_CONTENT_DECODING_FAILED in the browser.
+      if (lowerKey !== 'transfer-encoding' && lowerKey !== 'content-encoding' && lowerKey !== 'content-length') {
         res.setHeader(key, value);
       }
     });
+
+    const sseDecoder = new TextDecoder('utf-8');
+    let sseTextBuffer = '';
 
     if (response.body) {
       const reader = response.body.getReader();
@@ -143,10 +292,137 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
         const { done, value } = await reader.read();
         if (done) break;
         res.write(value);
+        if (value) {
+          try {
+            sseTextBuffer += sseDecoder.decode(value, { stream: true });
+          } catch (_) {}
+        }
       }
     }
     res.end();
+
+    if (deepWebSessionId && response.ok && sseTextBuffer) {
+      try {
+        let promptTokens = 0;
+        let candidatesTokens = 0;
+        let totalTokens = 0;
+
+        const lines = sseTextBuffer.split('\n');
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith('data:')) {
+            try {
+              const parsed = JSON.parse(trimmed.slice(5).trim());
+              if (parsed.usageMetadata) {
+                promptTokens = Number(parsed.usageMetadata.promptTokenCount) || 0;
+                candidatesTokens = Number(parsed.usageMetadata.candidatesTokenCount) || 0;
+                totalTokens = Number(parsed.usageMetadata.totalTokenCount) || (promptTokens + candidatesTokens);
+              }
+            } catch (_) {}
+          }
+        }
+
+        if (totalTokens > 0 || promptTokens > 0 || candidatesTokens > 0) {
+          const targetUid = decodedToken?.uid || activeSessionData?.uid;
+          const targetProjectId = headerProjectId || activeSessionData?.projectId || null;
+          const modelMatch = targetPath.match(/models\/([^:]+)/);
+          const modelKey = modelMatch && modelMatch[1] ? modelMatch[1] : 'gemini-3.6-flash';
+
+          console.log(`[Deep Web Telemetry] uid=${targetUid} project=${targetProjectId || 'none'} model=${modelKey} prompt=${promptTokens} candidates=${candidatesTokens} total=${totalTokens}`);
+
+          if (targetUid) {
+            let queryQuestion = '';
+            try {
+              if (requestBodyString) {
+                const parsedBody = JSON.parse(requestBodyString);
+                if (Array.isArray(parsedBody?.contents)) {
+                  const userParts = parsedBody.contents.filter(c => c.role === 'user');
+                  const lastUserPart = userParts[userParts.length - 1];
+                  if (lastUserPart && Array.isArray(lastUserPart.parts)) {
+                    queryQuestion = lastUserPart.parts.map(p => p.text).filter(Boolean).join(' ').trim();
+                  }
+                }
+              }
+            } catch (parseQErr) {
+              console.warn('[Gemini Proxy] Failed to parse query text from requestBodyString:', parseQErr);
+            }
+
+            let queryCostUsd = 0;
+            if (modelKey.includes('gemini-3.1-pro') || modelKey.includes('gemini-1.5-pro')) {
+              queryCostUsd += (promptTokens / 1_000_000) * 3.50;
+              queryCostUsd += (candidatesTokens / 1_000_000) * 10.50;
+            } else {
+              queryCostUsd += (promptTokens / 1_000_000) * 1.50;
+              queryCostUsd += (candidatesTokens / 1_000_000) * 7.50;
+            }
+
+            const resolvedNodeId = headerNodeId || activeSessionData?.lastNodeId || activeSessionData?.nodeId || null;
+            const resolvedNodeName = headerNodeName || activeSessionData?.lastNodeName || activeSessionData?.nodeName || null;
+            const resolvedProjectName = headerProjectName || activeSessionData?.projectName || null;
+
+            const writes = [];
+            const userRef = db.collection('users').doc(targetUid);
+            const queryDocRef = userRef.collection('deepWebQueries').doc();
+
+            writes.push(
+              queryDocRef.set({
+                id: queryDocRef.id,
+                uid: targetUid,
+                userEmail: callerEmail || activeSessionData?.email || '',
+                projectId: targetProjectId || null,
+                projectName: resolvedProjectName,
+                nodeId: resolvedNodeId,
+                nodeName: resolvedNodeName,
+                question: queryQuestion.slice(0, 500),
+                model: modelKey,
+                promptTokens,
+                candidatesTokens,
+                totalTokens,
+                costUsd: queryCostUsd,
+                timestamp: FieldValue.serverTimestamp(),
+              })
+            );
+
+            writes.push(
+              userRef.set({
+                deepWebApiUsage: {
+                  [modelKey]: {
+                    prompt: FieldValue.increment(promptTokens),
+                    candidates: FieldValue.increment(candidatesTokens),
+                    total: FieldValue.increment(totalTokens),
+                    calls: FieldValue.increment(1),
+                  }
+                },
+                updatedAt: FieldValue.serverTimestamp(),
+              }, { merge: true })
+            );
+
+            if (targetProjectId) {
+              const projectRef = db.collection('users').doc(targetUid).collection('projects').doc(targetProjectId);
+              writes.push(
+                projectRef.set({
+                  deepWebApiUsage: {
+                    [modelKey]: {
+                      prompt: FieldValue.increment(promptTokens),
+                      candidates: FieldValue.increment(candidatesTokens),
+                      total: FieldValue.increment(totalTokens),
+                      calls: FieldValue.increment(1),
+                    }
+                  },
+                  updatedAt: FieldValue.serverTimestamp(),
+                }, { merge: true })
+              );
+            }
+
+            await Promise.allSettled(writes);
+          }
+        }
+      } catch (telemetryErr) {
+        console.warn('[Gemini Proxy] Failed to persist Deep Web telemetry:', telemetryErr?.message || telemetryErr);
+      }
+    }
   } catch (error) {
+    await refundDecrementedSessionSlot(`upstream_exception_${error?.message || 'unknown'}`);
     console.error(`[Gemini Proxy Error] Failed to forward request to ${targetUrl}:`, error);
     if (!res.headersSent) {
       res.status(500).json({ error: error.message });
@@ -168,12 +444,14 @@ app.use(
 const FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed information for the music entity: "{{nodeIdentifier}}" (type: {{nodeType}}).
     
     Context:
-    - Seed artists: {{seedArtists}}.
-    - Connected nodes: {{contextNodes}}.
+    - Search Disambiguation (Genres/Origins): {{contextNodes}}.
     - Date: {{currentDate}}.
     {{#if originHint}}
     - Origin Hint: {{originHint}}.
     {{/if}}
+    
+    CRITICAL UNIVERSALITY RULE:
+    The summary (bio) MUST be globally universal and entity-focused. DO NOT mention or reference the "Search Disambiguation (Genres/Origins)" in the generated text. They are provided strictly to help you disambiguate the entity during your Google Search. The biography must stand alone and remain accurate regardless of the user's project context.
     
     USE GOOGLE SEARCH to find:
     1. The most accurate bio and cultural significance. You MUST dynamically adapt your search strategy to target authoritative sources and knowledge bases specific to the artist's musical genre (e.g., Resident Advisor/Beatport for electronic, DownBeat/Blue Note archives for jazz, Gramophone/publisher databases for classical, or Bandcamp/Discogs/AllMusic for independent rock/punk). Avoid single-genre biases or rigid source hierarchies. Use scannability techniques:
@@ -457,6 +735,12 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
     console.error(`[Re-Synthesis] Failed: GEMINI_API_KEY is not defined.`);
     return;
   }
+
+  // Invariant: Never re-synthesize an ambiguous routing stub
+  if (originalData && originalData._isStub && (originalData.isAmbiguous || (Array.isArray(originalData.candidates) && originalData.candidates.length > 1))) {
+    console.log(`[Re-Synthesis] Skipping ambiguous routing stub: ${artistId}`);
+    return;
+  }
   
   // Parse detailsCache
   let details = null;
@@ -490,7 +774,6 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
   const prompt = FETCH_NODE_DETAILS_PROMPT_TEMPLATE
     .replace('{{nodeIdentifier}}', artistName)
     .replace('{{nodeType}}', 'artist')
-    .replace('{{seedArtists}}', seedArtists)
     .replace('{{contextNodes}}', contextNodes)
     .replace(/{{currentDate}}/g, currentDate)
     .replace(/{{#if originHint}}[\s\S]*?{{\/if}}/g, ''); // strip origin hint
@@ -504,11 +787,6 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
             text: prompt
           }
         ]
-      }
-    ],
-    tools: [
-      {
-        googleSearch: {}
       }
     ],
     generationConfig: {
@@ -548,7 +826,7 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
       cacheKey: cleanCanonicalId,
       seedArtists: cleanArtistName,
       detailsCache: updatedDetails,
-      cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+      cachedAt: FieldValue.serverTimestamp(),
       cacheVersion: 2
     };
 
@@ -562,11 +840,8 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
           cacheKey: artistId,
           artistId: artistId,
           seedArtists: originalData.seedArtists || artistId,
-          graphData: JSON.stringify({ nodes: [], links: [] }),
-          filters: {},
           cacheVersion: 2,
-          cachedAt: admin.firestore.FieldValue.serverTimestamp(),
-          hitCount: 0,
+          cachedAt: FieldValue.serverTimestamp(),
           redirectTo: cleanCanonicalId
         });
         console.log(`[Re-Synthesis] Mock Created Alias Redirect: ${artistId} -> ${cleanCanonicalId}`);
@@ -656,7 +931,7 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
       cacheKey: canonicalId,
       seedArtists: artistName,
       detailsCache: updatedDetails,
-      cachedAt: admin.firestore.FieldValue.serverTimestamp(),
+      cachedAt: FieldValue.serverTimestamp(),
       cacheVersion: 2 // Match standard cacheVersion
     };
 
@@ -672,11 +947,8 @@ async function triggerReSynthesis(artistId, originalData, collectionName = 'arti
           cacheKey: artistId,
           artistId: artistId,
           seedArtists: originalData.seedArtists || artistId,
-          graphData: JSON.stringify({ nodes: [], links: [] }),
-          filters: {},
           cacheVersion: 2,
-          cachedAt: admin.firestore.FieldValue.serverTimestamp(),
-          hitCount: 0,
+          cachedAt: FieldValue.serverTimestamp(),
           redirectTo: canonicalId
         });
         console.log(`[Re-Synthesis] Created Alias Redirect: ${artistId} -> ${canonicalId}`);
@@ -700,10 +972,47 @@ async function handleEntityGet(req, res, collectionName = 'artists') {
     const docSnap = await docRef.get();
     
     if (!docSnap.exists) {
-      return res.status(404).json({ error: `${collectionName === 'labels' ? 'Label' : 'Artist'} not found` });
+      // Fuzzy Fallback: If the exact ID doesn't exist (e.g. 'slam-coke-at'),
+      // strip any country suffix (full name or ISO 2-letter code) and query for
+      // any document whose artistId matches the bare slug. This resolves country
+      // mismatch cases where the graph assigned one country suffix but the cache
+      // was stored under a different country (e.g. node is 'slam-coke-at' but
+      // the artist profile was saved as 'slam-coke-jp').
+      const suffixStripMatch = entityId.match(
+        /^(.+)-(?:usa|uk|united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea|[a-z]{2})$/i
+      );
+      if (suffixStripMatch) {
+        const bareId = suffixStripMatch[1];
+        try {
+          const querySnap = await db.collection(collectionName)
+            .where('artistId', '==', bareId)
+            .limit(1)
+            .get();
+          if (!querySnap.empty) {
+            const altData = querySnap.docs[0].data();
+            // Invariant: Do not serve ambiguous routing stubs as fuzzy entity matches
+            if (altData && !altData._isStub && !altData.isAmbiguous && altData.detailsCache) {
+              console.log(`[Proxy Fuzzy Fallback] ${entityId} not found — served via artistId query: ${querySnap.docs[0].id}`);
+              return res.json(altData);
+            }
+          }
+        } catch (queryErr) {
+          console.warn(`[Proxy Fuzzy Fallback] Query for artistId=${bareId} failed:`, queryErr.message);
+        }
+      }
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      return res.status(200).json({ found: false });
     }
+
     
     const data = docSnap.data();
+
+    // Evolved Stub Gatekeeper: Return ambiguous stub payload directly so client can disambiguate
+    if (data && data._isStub && (data.isAmbiguous || (Array.isArray(data.candidates) && data.candidates.length > 1))) {
+      console.log(`[Proxy] Returning ambiguous stub without redirecting (${collectionName}): ${entityId}`);
+      res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0');
+      return res.status(200).json(data);
+    }
     
     // Resolve redirect if present (up to 3 redirects)
     if (data && typeof data.redirectTo === 'string' && data.redirectTo.trim().length > 0) {
@@ -838,11 +1147,6 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
         parts: [{ text: prompt }]
       }
     ],
-    tools: [
-      {
-        googleSearch: {}
-      }
-    ],
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: {
@@ -908,7 +1212,7 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
 
     if (docSnap.exists) {
       docData = docSnap.data();
-      if (docData && typeof docData.redirectTo === 'string' && docData.redirectTo.trim().length > 0) {
+      if (docData && !docData.isAmbiguous && typeof docData.redirectTo === 'string' && docData.redirectTo.trim().length > 0) {
         let currentId = docData.redirectTo.trim();
         let depth = 0;
         while (depth < 3) {
@@ -919,7 +1223,7 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
           docRef = canonicalRef;
           docSnap = nextSnap;
           docData = nextSnap.data();
-          if (docData && typeof docData.redirectTo === 'string' && docData.redirectTo.trim().length > 0) {
+          if (docData && !docData.isAmbiguous && typeof docData.redirectTo === 'string' && docData.redirectTo.trim().length > 0) {
             currentId = docData.redirectTo.trim();
             depth++;
           } else {
@@ -932,7 +1236,7 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
     if (videoId && videoId.length === 11) {
       console.log(`[Scraper API] Found video ID "${videoId}" for artist "${artistName}". Updating Firestore...`);
 
-      if (docSnap.exists) {
+      if (docSnap.exists && (!docData || (!docData.isAmbiguous && !docData._isStub))) {
         let details = {};
         if (docData && docData.detailsCache) {
           try {
@@ -958,7 +1262,7 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
           ...docData,
           youtubeVideoId: videoId,
           detailsCache: details,
-          cachedAt: admin.firestore.FieldValue.serverTimestamp()
+          cachedAt: FieldValue.serverTimestamp()
         };
         enforceArtistCacheSchemaServer(updatePayload);
         await docRef.set(updatePayload, { merge: true });
@@ -997,7 +1301,7 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
           ...docData,
           youtubeVideoId: null,
           detailsCache: details,
-          cachedAt: admin.firestore.FieldValue.serverTimestamp()
+          cachedAt: FieldValue.serverTimestamp()
         };
         enforceArtistCacheSchemaServer(updatePayload);
         await docRef.set(updatePayload, { merge: true });
@@ -1015,13 +1319,318 @@ If you cannot find a clear YouTube video ID for this artist, return null for the
 
 
 // Serve the static files from the React/Vite build output
+app.use('/assets', express.static(path.join(__dirname, 'dist/assets')));
+app.use('/app/assets', express.static(path.join(__dirname, 'dist/assets')));
 app.use(express.static(path.join(__dirname, 'dist')));
 
-// Fallback for SPA (React Router)
-app.use((req, res) => {
-  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
+function formatArtistName(name) {
+  if (!name) return "";
+  let clean = name.toLowerCase();
+  
+  // Strip common location suffixes that get appended to slugs
+  const suffixes = [
+    '-united-states', '-us', '-uk', '-australia', '-canada', '-ireland',
+    ' (us)', ' (uk)', ' (australia)', ' (canada)', ' (ireland)'
+  ];
+  for (const suffix of suffixes) {
+    if (clean.endsWith(suffix)) {
+      clean = clean.substring(0, clean.length - suffix.length);
+      break;
+    }
+  }
+
+  // Replace hyphens with spaces
+  clean = clean.replace(/-/g, ' ');
+
+  // Convert to Title Case
+  return clean.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ').trim();
+}
+
+// --- DYNAMIC SPA TEMPLATE & OPEN GRAPH COMPOSER ---
+
+let cachedIndexHtml = null;
+let cachedIndexHtmlTime = 0;
+const HTML_CACHE_TTL_MS = 60 * 1000; // 60s cache to stay in sync with Firebase Hosting CDN
+
+async function getIndexHtmlTemplate() {
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+
+  if (cachedIndexHtml && (Date.now() - cachedIndexHtmlTime < HTML_CACHE_TTL_MS)) {
+    return cachedIndexHtml;
+  }
+
+  // Attempt to fetch fresh index.html from Firebase Hosting CDN to eliminate bundle hash desynchronization
+  try {
+    const liveResp = await fetch('https://zcene-production.web.app/index.html', {
+      signal: AbortSignal.timeout(3000),
+      headers: { 'Cache-Control': 'no-cache' }
+    });
+    if (liveResp.ok) {
+      const text = await liveResp.text();
+      if (text && text.includes('<div id="root">')) {
+        cachedIndexHtml = text;
+        cachedIndexHtmlTime = Date.now();
+        console.log('[SPA Handler] Successfully synchronized index.html with live Firebase Hosting CDN.');
+        return text;
+      }
+    }
+  } catch (fetchErr) {
+    console.warn('[SPA Handler] Live index.html fetch failed (falling back to disk):', fetchErr.message);
+  }
+
+  // Fallback to local container disk copy
+  try {
+    const diskText = fs.readFileSync(indexPath, 'utf8');
+    cachedIndexHtml = diskText;
+    cachedIndexHtmlTime = Date.now();
+    return diskText;
+  } catch (fsErr) {
+    console.error('[SPA Handler] Failed to read dist/index.html from disk:', fsErr);
+    throw fsErr;
+  }
+}
+
+// In-memory cache for composed OG images (URL pair -> { buffer, timestamp })
+const ogImageCache = new Map();
+const OG_IMAGE_CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+
+async function composeSplitOgImage(url1, url2) {
+  const cacheKey = `${url1}:::${url2}`;
+  const cached = ogImageCache.get(cacheKey);
+  if (cached && (Date.now() - cached.timestamp < OG_IMAGE_CACHE_TTL_MS)) {
+    return cached.buffer;
+  }
+
+  const width = 1200;
+  const height = 630;
+
+  const fetchBuffer = async (url) => {
+    const res = await fetch(url, { signal: AbortSignal.timeout(6000) });
+    if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+    return Buffer.from(await res.arrayBuffer());
+  };
+
+  const [buf1, buf2] = await Promise.all([
+    fetchBuffer(url1),
+    fetchBuffer(url2)
+  ]);
+
+  const [img1Buffer, img2Buffer] = await Promise.all([
+    sharp(buf1).resize(width, height, { fit: 'cover', position: 'left' }).toBuffer(),
+    sharp(buf2).resize(width, height, { fit: 'cover', position: 'right' }).toBuffer()
+  ]);
+
+  const base64Img1 = `data:image/jpeg;base64,${img1Buffer.toString('base64')}`;
+  const base64Img2 = `data:image/jpeg;base64,${img2Buffer.toString('base64')}`;
+
+  // Mirror DashboardProjectCard.tsx split mask & scrim layout
+  const svgComposite = `
+  <svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="mask-left-grad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <stop offset="30%" stop-color="#ffffff" stop-opacity="1" />
+        <stop offset="75%" stop-color="#ffffff" stop-opacity="0" />
+      </linearGradient>
+      <mask id="mask-left">
+        <rect width="${width}" height="${height}" fill="url(#mask-left-grad)" />
+      </mask>
+
+      <linearGradient id="mask-right-grad" x1="100%" y1="0%" x2="0%" y2="0%">
+        <stop offset="30%" stop-color="#ffffff" stop-opacity="1" />
+        <stop offset="75%" stop-color="#ffffff" stop-opacity="0" />
+      </linearGradient>
+      <mask id="mask-right">
+        <rect width="${width}" height="${height}" fill="url(#mask-right-grad)" />
+      </mask>
+    </defs>
+
+    <!-- Base background (zinc-950) -->
+    <rect width="${width}" height="${height}" fill="#09090b" />
+
+    <!-- Left artist with 30%-75% cross-fade mask -->
+    <image href="${base64Img1}" width="${width}" height="${height}" preserveAspectRatio="xMinYMid slice" mask="url(#mask-left)" />
+
+    <!-- Right artist with 30%-75% cross-fade mask -->
+    <image href="${base64Img2}" width="${width}" height="${height}" preserveAspectRatio="xMaxYMid slice" mask="url(#mask-right)" />
+
+    <!-- Uniform Scrim: rgba(9, 9, 11, 0.55) -->
+    <rect width="${width}" height="${height}" fill="#09090b" fill-opacity="0.55" />
+  </svg>
+  `;
+
+  const outputBuffer = await sharp(Buffer.from(svgComposite))
+    .jpeg({ quality: 90 })
+    .toBuffer();
+
+  ogImageCache.set(cacheKey, { buffer: outputBuffer, timestamp: Date.now() });
+  return outputBuffer;
+}
+
+// Dedicated endpoint serving 2-artist split composite images for multi-seed OG tags
+app.get('/api/og/card/:id', async (req, res) => {
+  const projectId = req.params.id;
+  try {
+    let projectSnap = await db.collection('sharedZcenes').doc(projectId).get();
+    if (!projectSnap.exists) {
+      projectSnap = await db.collection('projects').doc(projectId).get();
+    }
+    if (!projectSnap.exists) {
+      return res.redirect(302, "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg");
+    }
+
+    const projectData = projectSnap.data();
+    const validSeedImages = (projectData.seedImageUrls && Array.isArray(projectData.seedImageUrls))
+      ? projectData.seedImageUrls.filter(url => url && typeof url === 'string' && url.trim().length > 0 && url !== 'not-found')
+      : (projectData.seedImageUrl && projectData.seedImageUrl !== 'not-found' ? [projectData.seedImageUrl] : []);
+
+    if (validSeedImages.length >= 2) {
+      try {
+        const compositeJpeg = await composeSplitOgImage(validSeedImages[0], validSeedImages[1]);
+        res.set({
+          'Content-Type': 'image/jpeg',
+          'Cache-Control': 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=86400'
+        });
+        return res.send(compositeJpeg);
+      } catch (composeErr) {
+        console.error(`[OG Composer] Failed to compose split image for ${projectId}:`, composeErr);
+        return res.redirect(302, validSeedImages[0]);
+      }
+    } else if (validSeedImages.length === 1) {
+      return res.redirect(302, validSeedImages[0]);
+    } else {
+      return res.redirect(302, "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg");
+    }
+  } catch (err) {
+    console.error(`[OG Composer Error]`, err);
+    return res.redirect(302, "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg");
+  }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+// Fallback for SPA (React Router) with Dynamic Open Graph Metadata Injection
+app.use(async (req, res) => {
+  const indexPath = path.join(__dirname, 'dist', 'index.html');
+  
+  // Only inject if it's a GET request for an HTML page
+  if (req.method !== 'GET') {
+    return res.sendFile(indexPath);
+  }
+
+  try {
+    let html = await getIndexHtmlTemplate();
+
+    // Force absolute paths for Vite assets to prevent relative routing failures on nested paths
+    html = html.split('src="assets/').join('src="/assets/');
+    html = html.split('src="index').join('src="/assets/index');
+    html = html.split('href="assets/').join('href="/assets/');
+    html = html.split('href="index').join('href="/assets/index');
+
+    // Regex specifically targeting vite chunk formats if they missed the assets folder entirely
+    html = html.replace(/src=["'](?:.\/)?(index-[^"']+\.js)["']/g, 'src="/assets/$1"');
+    html = html.replace(/href=["'](?:.\/)?(index-[^"']+\.css)["']/g, 'href="/assets/$1"');
+
+    console.log("[OG Debug] req.path:", req.path, "req.query:", JSON.stringify(req.query));
+    // Handle dynamic OG tags for shared Zcenes
+    let projectId = null;
+    if (req.path.startsWith('/z/')) {
+      projectId = req.path.split('/z/')[1]?.split('?')[0]; // Strip query params
+    } else if (req.path === '/app' && req.query && req.query.shareId) {
+      projectId = req.query.shareId;
+    }
+    
+    if (projectId) {
+        let projectSnap = await db.collection('sharedZcenes').doc(projectId).get();
+        if (!projectSnap.exists) {
+          projectSnap = await db.collection('projects').doc(projectId).get();
+        }
+        
+        if (projectSnap.exists) {
+          const projectData = projectSnap.data();
+          const seedList = projectData.seedArtists ? projectData.seedArtists.split('::').filter(Boolean) : [];
+          const cleanSeeds = seedList.map(formatArtistName);
+          
+          let title = projectData.name || (cleanSeeds.length > 0 ? `${cleanSeeds[0]} - Zcene` : "Untitled Zcene");
+          if (projectData.name) {
+            title = projectData.name;
+          }
+          
+          let imageUrl = "https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg";
+          let imageWidth = 1200;
+          let imageHeight = 630;
+          let description = cleanSeeds.length > 0 
+            ? `Explore this Zcene seeded by ${cleanSeeds.join(', ')}. Own music discovery.`
+            : `Explore customized music maps and discover underground artists on Zcene.`;
+
+          // ARCHITECTURE: Deterministic Open Graph Routing (Multi-Seed Aware)
+          const validSeedImages = (projectData.seedImageUrls && Array.isArray(projectData.seedImageUrls))
+            ? projectData.seedImageUrls.filter(url => url && typeof url === 'string' && url.trim().length > 0 && url !== 'not-found')
+            : (projectData.seedImageUrl && projectData.seedImageUrl !== 'not-found' ? [projectData.seedImageUrl] : []);
+
+          if (validSeedImages.length >= 2) {
+            // Multi-seed split composer route (mirrors DashboardProjectCard 2-artist split)
+            imageUrl = `https://zcene.online/api/og/card/${projectId}`;
+            imageWidth = 1200;
+            imageHeight = 630;
+            console.log(`[OG Injection] Routing multi-seed sharing for ${projectId} to split-image composer (${validSeedImages.length} seeds)`);
+          } else if (validSeedImages.length === 1) {
+            imageUrl = validSeedImages[0];
+            imageWidth = 600;
+            imageHeight = 600;
+            console.log(`[OG Injection] Using single seedImageUrl for ${projectId}`);
+          } else if (seedList.length > 0) {
+            // Legacy fallback: look up artist image from the global artists collection.
+            const primarySeedId = normalizeArtistId(seedList[0]);
+            try {
+              const artistSnap = await db.collection('artists').doc(primarySeedId).get();
+              if (artistSnap.exists) {
+                const artistData = artistSnap.data();
+                if (artistData.detailsCache) {
+                  const parsedDetails = typeof artistData.detailsCache === 'string' ? JSON.parse(artistData.detailsCache) : artistData.detailsCache;
+                  if (parsedDetails.imageUrl) {
+                    imageUrl = parsedDetails.imageUrl;
+                    imageWidth = 600;
+                    imageHeight = 600;
+                    console.log(`[OG Injection] Legacy fallback: resolved image from artists/${primarySeedId}`);
+                  }
+                }
+              }
+            } catch (artistErr) {
+              console.error(`[OG Injection] Failed to fetch artist image for ${primarySeedId}:`, artistErr);
+            }
+          }
+
+          const ogTags = `
+    <!-- Dynamic Open Graph Tags -->
+    <meta property="og:title" content="${title.replace(/"/g, '&quot;')}" />
+    <meta property="og:description" content="${description.replace(/"/g, '&quot;')}" />
+    <meta property="og:image" content="${imageUrl}" />
+    <meta property="og:image:width" content="${imageWidth}" />
+    <meta property="og:image:height" content="${imageHeight}" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="${title.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:description" content="${description.replace(/"/g, '&quot;')}" />
+    <meta name="twitter:image" content="${imageUrl}" />
+  `;
+          html = html.replace('</head>', `${ogTags}</head>`);
+        }
+      }
+    
+    // Ensure Cloud CDN and Firebase Hosting cache the dynamically injected social tags
+    res.set('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+    res.send(html);
+  } catch (err) {
+    console.error("[OG Injection Error] Failed to serve index.html:", err);
+    res.sendFile(indexPath);
+  }
+});
+
+const server = app.listen(PORT, '0.0.0.0', () => {
   console.log(`Zcene Server listening on port ${PORT}`);
 });
+
+// server.keepAliveTimeout = 60000;
+// server.headersTimeout = 61000;
+// server.setTimeout(60000);
+
+setInterval(() => {}, 1000 * 60 * 60); // Keep event loop alive
+

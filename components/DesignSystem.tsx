@@ -7,19 +7,211 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View } from '../types';
 import * as d3 from 'd3';
-import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS } from './Icons';
+import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS, BandcampIcon } from './Icons';
 import ViewToggle from './ViewToggle';
 import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
+import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
+import { Waypoints, Flame, Check, ArrowLeft, Pin } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
+import { extractInitials, generateDeterministicGradient, nodeTypeColorMap } from '../utils/formatters';
+
+// --- Layout Primitives & Sizings ---
+
+export const LayoutSizes = {
+  topHeader: 'h-16', // Restored roomier height for the main project header
+  headerBar: 'h-12', // Universal strict standard for all structural panel/control bars
+  controlBar: 'h-[38px]', // Exact token alignment for toolbar toggles and dropdown buttons
+  panelRadius: 'rounded-2xl', // Standardized radius for primary layout panels
+  modalRadius: 'rounded-2xl', // Standardized radius for modal containers
+};
+
+// --- Floating Canvas Controls ---
+
+export const CanvasControlStyles = 'w-[38px] h-[38px] rounded-xl bg-zinc-900/80 backdrop-blur-md border border-zinc-700 text-zinc-400 hover:text-white shadow-xl transition-all flex flex-shrink-0 items-center justify-center cursor-pointer active:scale-90';
+
+// --- Input Primitives & Sizings ---
+
+export const InputSizes = {
+  sm: {
+    base: 'py-1.5 text-xs',
+    search: 'py-1.5 pl-8 pr-10 text-xs',
+    magazineSearch: 'py-1.5 pl-8 pr-10 text-xs',
+    iconBtn: 'w-6 h-6 rounded-[8px]',
+    icon: '!text-[14px]',
+    leftIcon: '!text-[16px] left-2.5 z-10 pointer-events-none',
+    select: 'py-1.5 pl-3 pr-8 text-xs',
+    selectIcon: '!text-[16px] right-2'
+  },
+  md: {
+    base: 'py-2 text-sm',
+    search: 'py-2 pl-4 pr-12 text-sm',
+    magazineSearch: 'py-2 pl-10 pr-12 text-sm',
+    iconBtn: 'w-8 h-8 rounded-[10px]',
+    icon: '!text-[18px]',
+    leftIcon: '!text-[18px] left-3 z-10 pointer-events-none',
+    select: 'py-2 pl-4 pr-10 text-sm',
+    selectIcon: '!text-[18px] right-3'
+  }
+};
+
+export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  variant?: 'sm' | 'md';
+}
+
+export const Input = React.forwardRef<HTMLInputElement, InputProps>(
+  ({ variant = 'md', className = '', ...props }, ref) => {
+    const size = InputSizes[variant];
+    return (
+      <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
+        ref={ref}
+        className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${size.base} px-4 ${className}`}
+        {...props}
+      />
+    );
+  }
+);
+Input.displayName = 'Input';
+
+export interface CheckboxProps extends React.InputHTMLAttributes<HTMLInputElement> {
+  label?: React.ReactNode;
+}
+
+export const Checkbox = React.forwardRef<HTMLInputElement, CheckboxProps>(
+  ({ className = '', label, ...props }, ref) => {
+    return (
+      <label className={`flex items-start gap-3 cursor-pointer group ${className}`}>
+        <div className="relative flex items-center justify-center mt-0.5">
+          <input
+            type="checkbox"
+            ref={ref}
+            className="peer sr-only"
+            {...props}
+          />
+          <div className="w-4 h-4 rounded border border-zinc-600 bg-transparent flex items-center justify-center transition-all peer-checked:bg-primary/10 peer-checked:border-primary peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-zinc-900 group-hover:border-zinc-500 peer-checked:group-hover:border-primary/90 [&>svg]:opacity-0 peer-checked:[&>svg]:opacity-100">
+            <Check className="w-3 h-3 text-primary transition-opacity" strokeWidth={3} />
+          </div>
+        </div>
+        {label && <span className="text-sm text-zinc-400 leading-snug">{label}</span>}
+      </label>
+    );
+  }
+);
+Checkbox.displayName = 'Checkbox';
+
+export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
+  size?: 'sm' | 'md' | 'pill';
+  fullWidth?: boolean;
+}
+
+export const Button: React.FC<ButtonProps> = ({
+  variant = 'primary',
+  size = 'md',
+  fullWidth = false,
+  className = '',
+  children,
+  ...props
+}) => {
+  const base = 'font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 active:scale-95 shrink-0 leading-none';
+  const sizes: Record<NonNullable<ButtonProps['size']>, string> = {
+    sm: 'px-3 py-1.5 text-xs rounded-xl',
+    md: 'px-6 py-2 text-sm rounded-xl',
+    pill: 'px-4 py-1.5 text-xs rounded-full',
+  };
+  const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
+    primary: 'bg-white text-brand-black hover:opacity-90',
+    secondary: 'border border-zinc-700 text-zinc-400 bg-zinc-900 hover:text-white hover:border-zinc-600 hover:bg-zinc-800',
+    outline: 'border border-white bg-transparent text-white hover:bg-white/10',
+    ghost: 'bg-transparent hover:bg-zinc-800/50 text-zinc-400 hover:text-white',
+  };
+  return (
+    <button
+      className={`${base} ${sizes[size]} ${variants[variant]}${fullWidth ? ' w-full' : ''}${className ? ` ${className}` : ''}`}
+      {...props}
+    >
+      {children}
+    </button>
+  );
+};
+
+export interface BackButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
+  label?: string;
+  onClose?: () => void;
+  onNavigate?: (view: any) => void;
+  fallbackView?: any;
+}
+
+export const BackButton: React.FC<BackButtonProps> = ({
+  label = 'Back',
+  onClick,
+  onClose,
+  onNavigate,
+  fallbackView = View.Dashboard,
+  className = '',
+  ...props
+}) => {
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    if (onClick) {
+      onClick(e);
+      return;
+    }
+    if (onClose) {
+      onClose();
+      return;
+    }
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    if (onNavigate) {
+      onNavigate(fallbackView);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      onClick={handleClick}
+      className={`h-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 active:scale-95 transition-all leading-none shadow-md border border-zinc-700/50 pl-2.5 pr-3.5 gap-2 text-xs font-medium cursor-pointer ${className}`}
+      title={label}
+      {...props}
+    >
+      <ArrowLeft size={16} className="text-zinc-400 group-hover:text-white shrink-0 transition-colors" />
+      <span>{label}</span>
+    </button>
+  );
+};
+
+export interface SelectProps extends React.SelectHTMLAttributes<HTMLSelectElement> {
+  variant?: 'sm' | 'md';
+}
+
+export const Select: React.FC<SelectProps> = ({ variant = 'md', className = '', children, ...props }) => {
+  const size = InputSizes[variant];
+
+  return (
+    <div className="relative">
+      <select 
+        className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer ${size.select} ${className}`}
+        {...props}
+      >
+        {children}
+      </select>
+      <span className={`material-symbols-outlined pointer-events-none absolute top-1/2 -translate-y-1/2 text-zinc-400 ${size.selectIcon}`}>
+        arrow_drop_down
+      </span>
+    </div>
+  );
+};
 
 const ColorSwatch: React.FC<{ name: string; hex: string; className?: string; style?: React.CSSProperties; description?: string }> = ({ name, hex, className = "", style, description }) => {
     return (
         <div className="group cursor-pointer">
             <div 
-                className={`w-full h-24 rounded-none shadow-md border border-zinc-700 transition-transform group-hover:scale-[1.02] ${className}`}
+                className={`w-full h-24 rounded-none border border-zinc-700 transition-transform group-hover:scale-[1.02] ${className}`}
                 style={style}
             ></div>
             <div className="text-left mt-2">
@@ -87,6 +279,121 @@ const InteractiveFilterableSelectDemo: React.FC = () => {
     </div>
   );
 };
+
+const PasswordInputDemo: React.FC = () => {
+  const [value, setValue] = useState('');
+  const [show, setShow] = useState(false);
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Live Demo</p>
+        <span className="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-full border border-primary/20">Interactive Demo</span>
+      </div>
+      <div className="relative">
+        <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
+          type={show ? 'text' : 'password'}
+          value={value}
+          onChange={e => setValue(e.target.value)}
+          placeholder="Enter a password…"
+          className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-11 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none"
+        />
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setShow(v => !v)}
+          aria-label={show ? 'Hide password' : 'Show password'}
+          className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-500 hover:text-zinc-300 transition-colors"
+        >
+          {show
+            ? <VisibilityOffIcon className="w-4 h-4" />
+            : <VisibilityIcon className="w-4 h-4" />
+          }
+        </button>
+      </div>
+      <p className="text-xs text-zinc-500 leading-relaxed">
+        Type something, then click the Eye icon to reveal/hide. Notice text never overlaps the toggle button thanks to <code className="text-primary bg-zinc-900 px-1 rounded">pr-11</code>.
+      </p>
+    </div>
+  );
+};
+
+const DualThumbRangeSliderDemo: React.FC = () => {
+  const [minVal, setMinVal] = useState(1989);
+  const [maxVal, setMaxVal] = useState(2024);
+  const minBound = 1965;
+  const maxBound = 2026;
+  const span = maxBound - minBound;
+  const minPercent = ((minVal - minBound) / span) * 100;
+  const maxPercent = ((maxVal - minBound) / span) * 100;
+  const isActive = minVal !== minBound || maxVal !== maxBound;
+
+  const handleReset = () => {
+    setMinVal(minBound);
+    setMaxVal(maxBound);
+  };
+
+  return (
+    <div className="p-8 bg-zinc-900/50 border border-zinc-800 space-y-4">
+      <div className="flex justify-between items-center">
+        <label className="text-sm font-medium text-zinc-200">Founded Era Filter</label>
+        <div className="flex items-center gap-2">
+          <span className={`text-xs font-mono px-2 py-0.5 rounded-xl ${isActive ? 'text-primary bg-primary/10 font-semibold' : 'text-zinc-500 bg-zinc-800'}`}>
+            {minVal} – {maxVal}
+          </span>
+          {isActive && (
+            <button
+              type="button"
+              onClick={handleReset}
+              className="text-[9px] font-mono uppercase tracking-wider text-zinc-400 hover:text-white px-1.5 py-0.5 rounded bg-zinc-800/80 hover:bg-zinc-700 transition-colors"
+              title="Reset Founded range"
+            >
+              Reset
+            </button>
+          )}
+        </div>
+      </div>
+      <div className="relative h-6 flex items-center select-none">
+        <div className="w-full h-1.5 bg-zinc-950 border border-zinc-800 rounded-full relative overflow-hidden">
+          <div
+            className={`absolute top-0 bottom-0 rounded-full transition-colors ${isActive ? 'bg-primary' : 'bg-zinc-600/50'}`}
+            style={{ left: `${minPercent}%`, width: `${Math.max(0, maxPercent - minPercent)}%` }}
+          />
+        </div>
+        <input
+          type="range"
+          min={minBound}
+          max={maxBound}
+          step={1}
+          value={minVal}
+          aria-label="Minimum Founded Year"
+          onChange={e => setMinVal(Math.min(Number(e.target.value), maxVal))}
+          className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-grab"
+          style={{ zIndex: minVal > maxBound - 5 ? 5 : 3 }}
+        />
+        <input
+          type="range"
+          min={minBound}
+          max={maxBound}
+          step={1}
+          value={maxVal}
+          aria-label="Maximum Founded Year"
+          onChange={e => setMaxVal(Math.max(Number(e.target.value), minVal))}
+          className="absolute inset-0 w-full h-full appearance-none bg-transparent pointer-events-none [&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:cursor-grab [&::-webkit-slider-thumb]:shadow-md [&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-primary [&::-moz-range-thumb]:border-none [&::-moz-range-thumb]:cursor-grab"
+          style={{ zIndex: 4 }}
+        />
+      </div>
+      <div className="flex justify-between text-[9px] font-mono text-zinc-600">
+        <span>1965</span>
+        <span>1980</span>
+        <span>1995</span>
+        <span>2010</span>
+        <span>2026</span>
+      </div>
+    </div>
+  );
+};
+
+
 
 interface TypographyScaleRowProps {
     role: string;
@@ -159,6 +466,7 @@ interface StyleGuidePageProps {
     onRestartWalkthrough?: () => void;
     onClose?: () => void;
     onNavigateMenu?: (path: string) => void;
+    tokenBalance?: number;
 }
 
 export interface RootsBreakdownButtonProps {
@@ -168,27 +476,26 @@ export interface RootsBreakdownButtonProps {
 }
 
 export const RootsBreakdownButton: React.FC<RootsBreakdownButtonProps> = ({ state, onClick, isLoading }) => {
-  const btnClasses = {
-    disabled: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-800 bg-zinc-900/20 rounded-xl text-zinc-600 cursor-not-allowed transition-all duration-200 leading-none backdrop-blur-sm",
-    attention: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-primary bg-primary/10 rounded-xl text-primary animate-pulse hover:bg-primary/20 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm",
-    neutral: "w-9 h-9 flex flex-shrink-0 items-center justify-center border border-zinc-700 bg-zinc-900/60 rounded-xl text-zinc-400 hover:text-white hover:border-zinc-600 hover:bg-zinc-800 active:scale-95 transition-all duration-200 leading-none backdrop-blur-sm"
+  const btnTitle = {
+    disabled: isLoading ? "Zine View in progress..." : "No Zine View available",
+    attention: "New Zine View available! Click to view",
+    neutral: "View Zine"
   }[state];
 
-  const btnTitle = {
-    disabled: isLoading ? "Roots breakdown in progress..." : "No roots breakdown available",
-    attention: "New roots breakdown available! Click to view",
-    neutral: "View roots breakdown"
-  }[state];
+  const variant = state === 'attention' ? 'outline' : 'secondary';
 
   return (
-    <button 
+    <Button 
+      variant={variant}
+      size="sm"
       onClick={state !== 'disabled' ? onClick : undefined}
       disabled={state === 'disabled'}
-      className={btnClasses}
       title={btnTitle}
+      className="backdrop-blur-sm"
     >
-      <span className="material-symbols-outlined !text-[18px]">info</span>
-    </button>
+      <Waypoints size={16} className="text-current" />
+      <span>Zine</span>
+    </Button>
   );
 };
 
@@ -197,29 +504,34 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     isActive, 
     onShowToast, 
     profile, 
-    onUpdateProfile,
-    user,
-    onLogoClick,
-    isSmallScreen,
-    stackCount,
-    isStackNew,
-    onOpenStack,
-    onLogout,
-    onDeleteAccount,
-    isAdmin,
-    isProfileOpen,
-    setIsProfileOpen,
-    isDeleteAccountModalOpen,
-    setIsDeleteAccountModalOpen,
-    isMenuOpen,
-    setIsMenuOpen,
-    onRestartWalkthrough,
-    onClose,
-    onNavigateMenu
+    onUpdateProfile, 
+    user, 
+    onLogoClick, 
+    isSmallScreen, 
+    stackCount, 
+    isStackNew, 
+    onOpenStack, 
+    onLogout, 
+    onDeleteAccount, 
+    isAdmin, 
+    isProfileOpen, 
+    setIsProfileOpen, 
+    isDeleteAccountModalOpen, 
+    setIsDeleteAccountModalOpen, 
+    isMenuOpen, 
+    setIsMenuOpen, 
+    onRestartWalkthrough, 
+    onClose, 
+    onNavigateMenu,
+    tokenBalance
 }) => {
     const [demoFocusMode, setDemoFocusMode] = useState<'organic' | 'cluster'>('organic');
     const [demoAdminToggle, setDemoAdminToggle] = useState(false);
+    const [demoChatToggle, setDemoChatToggle] = useState<'instant' | 'live'>('instant');
+    const [demoProfileActive, setDemoProfileActive] = useState(false);
     const [demoExpandedRow, setDemoExpandedRow] = useState<string | null>(null);
+    const [demoMobileBannerExpanded, setDemoMobileBannerExpanded] = useState(false);
+    const [demoMobileNavTab, setDemoMobileNavTab] = useState<'artists' | 'spiderweb' | 'details'>('spiderweb');
     const [selectedOnboardingStep, setSelectedOnboardingStep] = useState<string>('step1');
     const containerRef = useRef<HTMLDivElement>(null);
 
@@ -235,17 +547,20 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'typography', title: 'Typography' },
         { id: 'bio-scannability', title: 'Bio Scannability' },
         { id: 'artist-metadata', title: 'Artist Metadata' },
-        { id: 'taste-compatibility', title: 'Taste Compatibility' },
-        { id: 'colour-palette', title: 'Colour Palette' },
+        { id: 'taste-compatibility', title: 'Style Compatibility' },
+        { id: 'color-palette', title: 'Color Palette' },
         { id: 'layout-spacing', title: 'Layout & Spacing' },
         { id: 'iconography', title: 'Iconography' },
-        { id: 'spiderweb-legends', title: 'Spiderweb Legends' },
+        { id: 'spiderweb-legends', title: 'Connections Legends' },
+        { id: 'spiderweb-controls', title: 'Connections Controls' },
+        { id: 'mobile-navigation', title: 'Mobile Navigation Bar' },
         { id: 'buttons', title: 'Buttons' },
         { id: 'toggles', title: 'Toggles' },
         { id: 'links', title: 'Links' },
         { id: 'badges-tags', title: 'Badges & Tags' },
         { id: 'lists', title: 'Lists' },
         { id: 'inputs', title: 'Inputs' },
+        { id: 'form-controls', title: 'Form Controls' },
         { id: 'sliders', title: 'Sliders' },
         { id: 'deep-connections', title: 'Deep Connections' },
         { id: 'toasts', title: 'Toasts' },
@@ -307,6 +622,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                 onLogout={onLogout}
                 onDeleteAccount={onDeleteAccount}
                 isAdmin={isAdmin}
+                tokenBalance={tokenBalance ?? profile?.tokenBalance ?? 0}
                 isProfileOpen={isProfileOpen}
                 setIsProfileOpen={setIsProfileOpen}
                 isDeleteAccountModalOpen={isDeleteAccountModalOpen}
@@ -316,31 +632,26 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                 onRestartWalkthrough={onRestartWalkthrough}
             />
             
-            <div className="lg:hidden p-4 sticky top-0 bg-background-dark z-[90] border-b border-zinc-700">
-                <div className="relative">
+            <div className="lg:hidden p-4 sticky top-0 bg-background-dark/95 backdrop-blur-md z-[90] border-b border-zinc-800 flex items-center gap-3">
+                <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
+                <div className="relative flex-1 min-w-0">
                     <select
                         id="styleguide-nav"
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-8 font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2 pl-4 pr-8 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
                         onChange={handleSelectChange}
                         defaultValue=""
                     >
                         <option value="" disabled>Jump to section...</option>
                         {sections.map(section => (<option key={section.id} value={section.id}>{section.title}</option>))}
                     </select>
-                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400">arrow_drop_down</span>
+                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">arrow_drop_down</span>
                 </div>
             </div>
 
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
                 <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 scrollbar-thin scrollbar-thumb-zinc-800">
-                    <div className="pt-6 pb-2">
-                        <button 
-                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
-                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
-                        >
-                            <span className="material-symbols-outlined text-sm">arrow_back</span>
-                            Back
-                        </button>
+                    <div className="pt-6 pb-4">
+                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
                     </div>
                     <nav className="space-y-1">
                         {sections.map(section => (
@@ -350,21 +661,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                 </aside>
 
                 <main className="flex-1 py-10 space-y-24 min-w-0">
-                    <div className="lg:hidden pt-6 pb-2">
-                        <button 
-                            onClick={() => onClose ? onClose() : (window.history.length > 1 ? window.history.back() : onNavigate(View.Home))} 
-                            className="inline-flex items-center gap-2 text-zinc-400 hover:text-white transition-colors bg-transparent border-0 p-0 cursor-pointer text-sm font-medium"
-                        >
-                            <span className="material-symbols-outlined text-sm">arrow_back</span>
-                            Back
-                        </button>
+                    <div className="lg:hidden pt-4 pb-2">
+                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
                     </div>
                     {/* 0. INTRODUCTION */}
                     <section id="introduction">
                         <div className="mb-10 border-b border-zinc-700 pb-8">
                             <h1 className="text-3xl font-medium text-white mb-4">Design System</h1>
                             <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
-                                This style guide documents the layout patterns, visual tokens, and UI components that form the Zcene experience. It is our unified language for blending brutalist structure with premium interaction.
+                                This style guide documents the layout patterns, visual tokens, and UI components that form the Zcene experience. It is our unified language for blending retro underground authenticity with modern, softened architectural geometry and premium interaction.
                                 <br /><br />
                                 <strong className="text-zinc-300 font-medium">Governance Intent:</strong> This is the source of truth for all UI components, interaction patterns, and visual specs. Any proposed changes to layout, spacing, or component behavior must align with these specs to ensure consistency across the Zcene application.
                             </p>
@@ -374,8 +679,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="bg-zinc-900/50 border border-zinc-800 p-8 rounded-xl">
                                 <h3 className="text-xl font-medium text-primary mb-4">Zcene Design Philosophy: Neo-Retro Fusion</h3>
                                 <p className="text-base text-zinc-300 leading-relaxed max-w-4xl">
-                                    The Zcene design system is built on a deliberate tension between <strong>90s Brutalism</strong> and <strong>Modern Premium Interaction</strong>. 
-                                    We embrace the raw, structural honesty of early web aesthetics while layering on the sophisticated, fluid feedback expected of high-end modern applications.
+                                    The Zcene design system is built on a deliberate harmony between <strong>Nostalgic Audio Culture</strong> and <strong>Modern Fluid Architecture</strong>. 
+                                    We embrace the textured depth, high-contrast borders, and technical data typography of early web subcultures while encasing the application in soft, rounded structural containers and fluid interactive feedback.
                                 </p>
                             </div>
 
@@ -383,12 +688,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-xl space-y-4">
                                     <div className="flex items-center gap-3 text-white font-medium">
                                         <span className="material-symbols-outlined text-zinc-500">grid_view</span>
-                                        90s Structural Brutalism
+                                        Softened Retro Structure
                                     </div>
                                     <ul className="space-y-2 text-sm text-zinc-400 list-disc pl-5">
-                                        <li><strong>Hard Edges:</strong> Structural containers, panels, and layout dividers use 0px radius.</li>
-                                        <li><strong>Visible Grids:</strong> Layout structure is celebrated, not hidden.</li>
-                                        <li><strong>Monospace Data:</strong> Technical metadata and system values use monospace fonts.</li>
+                                        <li><strong>Curved Envelopes:</strong> Primary layout panels, modals, and structural containers use a standardized 16px radius (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">rounded-2xl</code>), softening the application's silhouette.</li>
+                                        <li><strong>Architectural Grids:</strong> Defined borders and visible panels structure the workspace with purpose and clarity.</li>
+                                        <li><strong>Monospace Metadata:</strong> Technical metadata, taxonomy tags, and coordinate telemetry preserve authentic audio cataloging heritage.</li>
                                     </ul>
                                 </div>
                                 <div className="p-6 bg-zinc-900/30 border border-zinc-800 rounded-xl space-y-4">
@@ -397,18 +702,28 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         Modern Premium Interaction
                                     </div>
                                     <ul className="space-y-2 text-sm text-zinc-400 list-disc pl-5">
-                                        <li><strong>Soft Interaction:</strong> Clickable components and contextual indicators use rounded corners (6px to pill).</li>
-                                        <li><strong>Fluid Typography:</strong> Editorial content scales dynamically using fluid math.</li>
-                                        <li><strong>Atmospheric Depth:</strong> Subtle blurs and glows provide a sense of premium layering.</li>
+                                        <li><strong>Concentric Hierarchy:</strong> Clickable components and inner controls scale smoothly from 8px inner frames to 12px buttons (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">rounded-xl</code>) and fluid pills.</li>
+                                        <li><strong>Fluid Typography:</strong> Editorial music biographies and narrative context scale responsively using dynamic type rules.</li>
+                                        <li><strong>Atmospheric Depth:</strong> Subtle backdrop blurs, rich textured fills, and luminous glows establish sophisticated spatial hierarchy.</li>
                                     </ul>
                                 </div>
                             </div>
 
                             <div className="p-8 border border-primary/20 bg-primary/5 rounded-xl">
-                                <h4 className="text-sm font-semibold text-primary uppercase tracking-widest mb-4">Functional Signifiers</h4>
+                                <h4 className="text-sm font-semibold text-primary uppercase tracking-widest mb-4">Concentric Radius Hierarchy</h4>
                                 <p className="text-sm text-zinc-300 leading-relaxed">
-                                    In Zcene, <strong>Border Radius is a functional signifier</strong>. If an element has a hard edge (0px), it is part of the app's structural skeleton. 
-                                    If an element has a rounded edge (6px+), it is an interactive component or a contextual indicator designed to catch the eye and invite engagement.
+                                    In Zcene, <strong>Border Radius establishes spatial and concentric depth rather than a rigid structural-versus-interactive binary</strong>. 
+                                    Large structural containers, dialogs, and primary layout panels adopt generous rounded geometry (16px / <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">rounded-2xl</code>) to ground the interface in a soft, premium frame. 
+                                    Nested within, interactive components (buttons, search inputs, filters) utilize tailored inner radii (12px / <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">rounded-xl</code> down to 8px / <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">rounded-lg</code>) to establish natural concentric harmony—inviting tactile engagement against atmospheric retro textures and monospace data.
+                                </p>
+                            </div>
+
+                            <div className="p-8 border border-zinc-700 bg-zinc-900/30 rounded-xl mt-8">
+                                <h4 className="text-sm font-semibold text-zinc-300 uppercase tracking-widest mb-4">The Depth Hierarchy Matrix</h4>
+                                <p className="text-sm text-zinc-400 leading-relaxed space-y-4">
+                                    <span className="block mb-2">To preserve tactile depth, Zcene enforces a strict <strong>Void vs. Surface</strong> logic:</span>
+                                    <span className="block mb-2"><strong className="text-white">The Void (bg-black / bg-zinc-950):</strong> Reserved strictly for recessed areas designed to receive input (Search bars, Add Artist fields) or elements that should recede visually (inactive/spent states).</span>
+                                    <span className="block"><strong className="text-white">The Surface (bg-zinc-900):</strong> Reserved for elevated interactive components (Secondary Buttons, Nav Utilities, Available AI Chips, Dropdowns). Surfaces must visibly sit above the void.</span>
                                 </p>
                             </div>
                         </div>
@@ -465,7 +780,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     <section id="typography">
                         <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Typography Scale</h2>
                         <p className="text-sm text-zinc-400 mb-12 max-w-2xl leading-relaxed">
-                            Our typography system balances 1990s aesthetic impact with modern legibility. We use heavy weights (Bold) for large headlines while employing medium weights (Medium 500) and wide tracking (tracking-widest) for all-caps section markers and panel headers ("YOUR ZCENES", "ARTISTS", "SPIDERWEB", "DEEP CUT") to ensure category labels act as understated structural markers without competing with main project titles or brand logos.
+                            Our typography system balances 1990s aesthetic impact with modern legibility. We use heavy weights (Bold) for large headlines while employing medium weights (Medium 500) and wide tracking (tracking-widest) for all-caps section markers and panel headers ("YOUR ZCENES", "ROOTS", "CONNECTIONS", "DEEP CUTS") to ensure category labels act as understated structural markers without competing with main project titles or brand logos.
                         </p>
                         <div className="space-y-16">
                             {/* Font Families */}
@@ -478,7 +793,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-3">
                                     <h4 className="text-xs font-semibold text-purple-400 uppercase tracking-widest">Secondary Insight Font</h4>
                                     <p className="text-3xl font-serif italic text-white">System Serif</p>
-                                    <p className="text-sm text-zinc-400 leading-relaxed">Used exclusively for Curator Insights within the Deep Cut cards. It provides a tactile, editorial contrast to the technical Poppins interface.</p>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">Used exclusively for Curator Insights within the Deep Cuts cards. It provides a tactile, editorial contrast to the technical Poppins interface.</p>
                                 </div>
                             </div>
 
@@ -495,9 +810,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                      <TypographyScaleRow role="Hero Title (H1)" sample="Be the Author" className="text-7xl font-bold tracking-tighter" classSpec="text-7xl font-bold" pixelSize="72px" weight="Bold (700)" usage="Landing page headlines. Retains heavy weight for thematic character." />
                                      <TypographyScaleRow role="Section Title (H2)" sample="Discover Music" className="text-5xl font-bold tracking-tight" classSpec="text-5xl font-bold" pixelSize="48px" weight="Bold (700)" usage="Major section headers. Retains heavy weight for thematic character." />
                                      <TypographyScaleRow role="Lead / Subtitle" sample="Combine the power of AI..." className="text-2xl font-medium" classSpec="text-2xl font-medium" pixelSize="24px" weight="Medium (500)" usage="Introductory text." />
-                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cut" className="text-lg font-medium uppercase tracking-widest" classSpec="text-lg font-medium uppercase tracking-widest" pixelSize="18px" weight="Medium (500)" usage="Panel and dashboard headers. Refined weight with wide tracking for improved hierarchy." />
+                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cuts" className="text-lg font-medium uppercase tracking-widest" classSpec="text-lg font-medium uppercase tracking-widest" pixelSize="18px" weight="Medium (500)" usage="Panel and dashboard headers. Refined weight with wide tracking for improved hierarchy." />
                                      <TypographyScaleRow role="Body (Content)" sample="The quick brown fox jumps over the lazy dog." className="text-base text-zinc-300 leading-relaxed font-normal" classSpec="text-base font-normal" pixelSize="16px" weight="Regular (400)" usage="Standard Body Copy, bios, and descriptions." />
                                      <TypographyScaleRow role="Data Value" sample="Emo / Indie Rock" className="text-sm font-normal text-zinc-200" classSpec="text-sm font-normal" pixelSize="14px" weight="Regular" usage="Key data points within cards and details panels. Kept static at 14px across all breakpoints to ensure optimum scannability without layout fracturing." />
+                                     <TypographyScaleRow role="System Timestamp / Data" sample="27/06/2026 • 8:09 am" className="font-mono text-xs text-zinc-300 font-normal" classSpec="font-mono text-xs font-normal" pixelSize="12px" weight="Regular (400)" usage="Standardized across project cards, ledger timestamps, and chat logs." />
                                      <TypographyScaleRow role="Body (Small)" sample="The quick brown fox jumps over the lazy dog." className="text-sm text-zinc-400 font-normal" classSpec="text-sm font-normal" pixelSize="14px" weight="Regular (400)" usage="Compact UI Elements." />
                                      <TypographyScaleRow role="Body (Tiny)" sample="The quick brown fox jumps over the lazy dog." className="text-xs text-zinc-500 font-normal" classSpec="text-xs font-normal" pixelSize="12px" weight="Regular (400)" usage="Metadata and secondary labels." />
                                 </div>
@@ -516,7 +832,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                      <TypographyScaleRow role="Hero Title (H1)" sample="Be the Author" className="text-4xl font-bold tracking-tighter" classSpec="text-4xl font-bold" pixelSize="36px" weight="Bold (700)" usage="Landing page headlines." />
                                      <TypographyScaleRow role="Section Title (H2)" sample="Discover Music" className="text-3xl font-bold tracking-tight" classSpec="text-3xl font-bold" pixelSize="30px" weight="Bold (700)" usage="Major section headers." />
                                      <TypographyScaleRow role="Lead / Subtitle" sample="Combine the power of AI..." className="text-lg font-medium" classSpec="text-lg font-medium" pixelSize="18px" weight="Medium (500)" usage="Introductory text." />
-                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cut" className="text-base font-medium uppercase tracking-widest" classSpec="text-base font-medium uppercase tracking-widest" pixelSize="16px" weight="Medium (500)" usage="Panel headers." />
+                                     <TypographyScaleRow role="Panel Title (H3)" sample="Deep Cuts" className="text-base font-medium uppercase tracking-widest" classSpec="text-base font-medium uppercase tracking-widest" pixelSize="16px" weight="Medium (500)" usage="Panel headers." />
                                      <TypographyScaleRow role="Body (Content)" sample="The quick brown fox jumps over the lazy dog." className="text-sm text-zinc-300 font-normal" classSpec="text-sm font-normal" pixelSize="14px" weight="Regular (400)" usage="Max readability." />
                                 </div>
                             </div>
@@ -561,7 +877,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </p>
                                 <ul className="space-y-2 text-sm text-zinc-400 list-disc pl-5">
                                     <li><strong>Main Artist Header:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-5xl font-bold tracking-tighter</code> (48px static). Longer names wrap naturally onto two lines instead of shrinking.</li>
-                                    <li><strong>Curator Summary Quote:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-2xl font-serif italic text-zinc-100</code> (24px static). Placed tightly beneath metadata tags to eliminate empty layout spacers.</li>
+                                    <li><strong>Curator Summary Quote:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-xl font-serif italic text-zinc-100</code> (20px static). Placed tightly beneath metadata tags to eliminate empty layout spacers.</li>
                                 </ul>
                             </div>
 
@@ -627,6 +943,33 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                             </div>
+
+                            <div className="p-8 border border-primary/20 bg-primary/5 rounded-xl space-y-4">
+                                <h4 className="text-sm font-semibold text-primary uppercase tracking-widest">Architecture Rule: Markdown Preservation &amp; Bio Scannability</h4>
+                                <p className="text-sm text-zinc-300 leading-relaxed">
+                                    To achieve this native formatting, the backend sanitization pipeline (<code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">sanitizeBioText</code>) MUST preserve standard Markdown elements (such as <code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">**</code> for bolding and literal newlines for paragraph/list breaks) within the payload before saving to Firestore. Stripping these markers at the data layer will permanently break the frontend's ability to render structural chunking via the <code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">&lt;Markdown&gt;</code> component and the <code className="text-[10px] bg-zinc-900/80 px-1.5 py-0.5 rounded-none font-mono text-zinc-400">.markdown-bio</code> CSS class.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                                    <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-1.5">
+                                        <h5 className="text-xs font-semibold text-white">Adaptive Bullet Unpacking</h5>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            Adaptive depth (2–4 bullets based strictly on verified ground truth; never padded with filler). Clumped single bullets are deterministically unpacked into separate capitalized bullet points.
+                                        </p>
+                                    </div>
+                                    <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-1.5">
+                                        <h5 className="text-xs font-semibold text-white">Lead-In Capitalization</h5>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            Citation brackets are stripped cleanly while consuming trailing spaces, and bullet lead-in lines (<code className="text-[10px] font-mono text-primary">Key stylistic traits include:</code>) deterministically retain initial capitalization.
+                                        </p>
+                                    </div>
+                                    <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-lg space-y-1.5">
+                                        <h5 className="text-xs font-semibold text-white">Zero-Hallucination Grounding</h5>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">
+                                            Strict deterministic filters (<code className="text-[10px] font-mono text-zinc-300">sanitizeNotableArtists</code>) strip sentence pills and category descriptors, while <code className="text-[10px] font-mono text-zinc-300">members</code> enforcement bans guest musicians and touring mates.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </section>
                     
@@ -686,10 +1029,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                     {/* 2.3 TASTE COMPATIBILITY */}
                     <section id="taste-compatibility">
-                        <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Taste Compatibility</h2>
+                        <h2 className="text-3xl font-medium text-white border-b-2 border-primary/50 pb-2 mb-8">Style Compatibility</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Zcene includes a deterministic, client-side visual compatibility meter within Deep Cut panels that compares the selected artist's attributes directly against the user's active "My Taste" profile.
+                                Zcene includes a deterministic, client-side visual compatibility meter within Deep Cuts panels that compares the selected artist's attributes directly against the user's active "Style" profile.
                             </p>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -697,16 +1040,24 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h4 className="text-xs font-semibold text-primary uppercase tracking-widest">Meter Architecture</h4>
                                     <ul className="space-y-4 text-sm text-zinc-400">
                                         <li>
-                                            <span className="text-white font-medium block font-bold">3-Segment Layout</span>
-                                            The meter consists of exactly 3 blocks mapped exclusively to <strong>Genre</strong>, <strong>Origin</strong>, and <strong>Era</strong> from left to right.
+                                            <span className="text-white font-medium block font-bold">Multi-Row Layout</span>
+                                            The meter renders active profiles as a stacked list. Each row contains exactly 4 segment blocks mapped to <strong>Genre</strong>, <strong>Style</strong>, <strong>Origin</strong>, and <strong>Era</strong> from left to right.
                                         </li>
                                         <li>
-                                            <span className="text-white font-medium block font-bold">Static Header Label</span>
-                                            The gauge tracks under a minimal, static tracking uppercase header label: <strong className="text-white">"MY TASTE"</strong>.
+                                            <span className="text-white font-medium block font-bold">Anchored Taxonomy Labels</span>
+                                            The column labels <strong className="text-white">GENRE | STYLE | ORIGIN | ERA</strong> sit grounded beneath the bottom-most active profile row.
                                         </li>
                                         <li>
-                                            <span className="text-white font-medium block font-bold">Deterministic Matching</span>
-                                            Matches are computed dynamically on the client side without AI API overhead, comparing properties directly to active filters.
+                                            <span className="text-white font-medium block font-bold">Tooltip Pattern</span>
+                                            Hovering over segments on desktop reveals a minimal tooltip (bg-zinc-800, rounded,) displaying the raw criteria value (e.g., "Hardcore", "2018+").
+                                        </li>
+                                        <li>
+                                            <span className="text-white font-medium block font-bold">Mobile Tap-to-Expand</span>
+                                            On touch viewports (<code className="text-xs font-mono text-purple-400">isSmallScreen</code>), each profile row is tappable \u2014 tap reveals criterion values, tap again collapses. <strong>Only one row can be expanded at a time</strong>: <code className="text-xs font-mono text-purple-400">expandedProfileId</code> is lifted to <code className="text-xs font-mono text-purple-400">NodeDetailsCard</code> and resets on <code className="text-xs font-mono text-purple-400">node.id</code> change. On desktop, the outer row div carries the <code className="text-xs font-mono text-purple-400">group</code> class so the <code className="text-xs font-mono text-purple-400">×</code> remove button appears on row hover (<code className="text-xs font-mono text-purple-400">group-hover:opacity-100</code>); the inner bar-grid's <code className="text-xs font-mono text-purple-400">group</code> scopes the per-segment tooltips. Labels render <code className="text-xs font-mono text-purple-400">absolute bottom-full</code> \u2014 zero layout shift.
+                                        </li>
+                                        <li>
+                                            <span className="text-white font-medium block font-bold">Inline Profile Dismissal</span>
+                                            Hovering (desktop) or expanding (mobile) a profile row reveals a subtle <span className="material-symbols-outlined !text-[12px]">close</span> ghost icon button next to the hit count to quickly remove the profile without opening the modal. Hitting the 5-profile cap uses a global event dispatcher (<code className="text-xs font-mono text-purple-400">open-taste-modal</code>) to launch the full Style Manager modal.
                                         </li>
                                     </ul>
                                 </div>
@@ -729,20 +1080,52 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="pt-4 border-t border-zinc-800/80">
                                         <h5 className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-2">Live Demo Sandbox Reference</h5>
-                                        <div className="flex flex-col gap-1.5 max-w-xs bg-zinc-900 p-3 border border-zinc-800">
-                                            <div className="flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">
-                                                <span>MY TASTE</span>
-                                                <span className="font-mono text-[#a855f7] font-bold">2/3 Hits</span>
-                                            </div>
-                                            <div className="grid grid-cols-3 gap-1.5 w-full">
-                                                <div className="h-2 bg-[#a855f7] border border-[#a855f7]" title="Genre: Matched" />
-                                                <div className="h-2 bg-transparent border border-[#52525b] border-solid" title="Origin: Unmatched" />
-                                                <div className="h-2 bg-[#a855f7] border border-[#a855f7]" title="Era: Matched" />
-                                            </div>
-                                            <div className="flex justify-between text-[8px] font-mono tracking-widest text-zinc-500 uppercase">
-                                                <span className="text-[#a855f7] font-bold">Genre</span>
-                                                <span className="text-zinc-400">Origin</span>
-                                                <span className="text-[#a855f7] font-bold">Era</span>
+                                        <div className="flex flex-col gap-2 max-w-xs bg-zinc-900 p-3 border border-zinc-800">
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex flex-col gap-1 group">
+                                                    <div className="flex justify-between items-center text-[10px]">
+                                                        <span className="text-zinc-300 font-medium">Hardcore</span>
+                                                        <div className="flex items-center gap-1.5">
+                                                            <span className="font-mono font-bold text-[#10b981]">
+                                                                3/4 Hits
+                                                            </span>
+                                                            <button className="w-4 h-4 flex flex-shrink-0 items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800" title="Remove Profile">
+                                                                <span className="material-symbols-outlined !text-[12px]">close</span>
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                    <div className="grid grid-cols-4 gap-1.5 w-full relative group">
+                                                        <div className="h-2 bg-[#10b981] border border-[#10b981] transition-all duration-300 relative">
+                                                            {/* Tooltip demo */}
+                                                            <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute bottom-full mb-1 left-1/2 -translate-x-1/2 w-max max-w-[150px] bg-zinc-800 text-white text-[10px] px-2 py-1 rounded pointer-events-none z-50 text-center truncate">
+                                                                Hardcore
+                                                            </div>
+                                                        </div>
+                                                        <div className="h-2 bg-[#10b981] border border-[#10b981]" />
+                                                        <div className="h-2 bg-transparent border border-[#52525b] border-solid" />
+                                                        <div className="h-2 bg-[#10b981] border border-[#10b981]" />
+                                                    </div>
+                                                </div>
+                                                <div className="flex flex-col gap-1">
+                                                    <div className="flex justify-between items-center text-[10px]">
+                                                        <span className="text-zinc-300 font-medium">Soft Rock</span>
+                                                        <span className="font-mono font-bold text-[#f59e0b]">
+                                                            1/4 Hits
+                                                        </span>
+                                                    </div>
+                                                    <div className="grid grid-cols-4 gap-1.5 w-full">
+                                                        <div className="h-2 bg-transparent border border-[#52525b] border-solid" />
+                                                        <div className="h-2 bg-transparent border border-[#52525b] border-solid" />
+                                                        <div className="h-2 bg-transparent border border-[#52525b] border-solid" />
+                                                        <div className="h-2 bg-[#f59e0b] border border-[#f59e0b]" />
+                                                    </div>
+                                                </div>
+                                                <div className="flex justify-between text-[8px] font-mono tracking-widest uppercase select-none text-zinc-500 mt-0">
+                                                    <span>GENRE</span>
+                                                    <span>STYLE</span>
+                                                    <span>ORIGIN</span>
+                                                    <span>ERA</span>
+                                                </div>
                                             </div>
                                         </div>
                                     </div>
@@ -751,14 +1134,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         </div>
                     </section>
 
-                    {/* 3. COLOUR PALETTE */}
-                    <section id="colour-palette">
-                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Colour Palette</h2>
+                    {/* 3. COLOR PALETTE */}
+                    <section id="color-palette">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Color Palette</h2>
                         <div className="space-y-16">
                             <div>
                                 <h3 className="text-xl font-medium text-zinc-200 mb-6">Primary & Brand</h3>
                                 <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
                                     <ColorSwatch name="Primary" hex="#F6E468" className="bg-primary" />
+                                    <ColorSwatch name="Scene Accent" hex="var(--scene-accent)" style={{ backgroundColor: 'var(--scene-accent, #F6E468)' }} description="Dynamic context-aware color driven by image extraction. Strictly restricted to ambient atmospheric glows behind artwork. Functional UI controls remain yellow." />
                                     <ColorSwatch name="White" hex="#FFFFFF" className="bg-white" />
                                     <ColorSwatch name="Brand Black" hex="#111113" className="bg-brand-black" />
                                 </div>
@@ -790,30 +1174,26 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
                                     <ColorSwatch name="Error" hex="#ef4444" className="bg-red-500" />
                                     <ColorSwatch name="Library Tag" hex="#0ea5e9" className="bg-sky-500" />
-                                    <ColorSwatch name="AI Tag" hex="#a855f7" className="bg-purple-500" />
-                                    <ColorSwatch name="Manual Add" hex="#10b981" className="bg-emerald-500" />
+                                    <ColorSwatch name="Discovery Node" hex="#a855f7" className="bg-purple-500" />
+                                    <ColorSwatch name="Seed Node" hex="#10b981" className="bg-emerald-500" />
                                     <ColorSwatch name="Warning / Unsaved State Orange" hex="#f97316" className="bg-[#f97316]" style={{ backgroundColor: '#f97316' }} description="Indicates guest status, unsaved shared view workspaces, or critical session warnings." />
                                 </div>
                             </div>
 
                             <div>
                                 <div className="mb-6">
-                                    <h3 className="text-xl font-medium text-zinc-200">Graph Node Colours</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Zcene Categorical Palette</h3>
                                     <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-2xl">
-                                        These colours are used sequentially to assign a colour to each artist 'group' in the graph, providing visual distinction between different musical clusters. Sourced from D3's schemeTableau10.
+                                        These vibrant "Style Profile" colors are the universal source of truth for all sequential UI mappings. They are used to dynamically color Dashboard Crates (to create physical-record visual rhythm) and to assign visual distinction to nodes in the D3 Connections graph.
                                     </p>
                                 </div>
                                 <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                                    <ColorSwatch name="Graph Blue" hex="#4e79a7" style={{ backgroundColor: '#4e79a7' }} />
-                                    <ColorSwatch name="Graph Orange" hex="#f28e2c" style={{ backgroundColor: '#f28e2c' }} />
-                                    <ColorSwatch name="Graph Red" hex="#e15759" style={{ backgroundColor: '#e15759' }} />
-                                    <ColorSwatch name="Graph Teal" hex="#76b7b2" style={{ backgroundColor: '#76b7b2' }} />
-                                    <ColorSwatch name="Graph Green" hex="#59a14f" style={{ backgroundColor: '#59a14f' }} />
-                                    <ColorSwatch name="Graph Yellow" hex="#edc949" style={{ backgroundColor: '#edc949' }} />
-                                    <ColorSwatch name="Graph Purple" hex="#af7aa1" style={{ backgroundColor: '#af7aa1' }} />
-                                    <ColorSwatch name="Graph Pink" hex="#ff9da7" style={{ backgroundColor: '#ff9da7' }} />
-                                    <ColorSwatch name="Graph Brown" hex="#9c755f" style={{ backgroundColor: '#9c755f' }} />
-                                    <ColorSwatch name="Graph Grey" hex="#bab0ab" style={{ backgroundColor: '#bab0ab' }} />
+                                    <ColorSwatch name="Purple" hex="#A855F7" className="bg-purple-500" />
+                                    <ColorSwatch name="Teal" hex="#2DD4BF" className="bg-teal-400" />
+                                    <ColorSwatch name="Electric Sky" hex="#38BDF8" className="bg-sky-400" />
+                                    <ColorSwatch name="Vivid Indigo" hex="#6366F1" className="bg-indigo-500" />
+                                    <ColorSwatch name="Pink" hex="#EC4899" className="bg-pink-500" />
+                                    <ColorSwatch name="Electric Orange" hex="#f97316" className="bg-orange-500" />
                                 </div>
                             </div>
                         </div>
@@ -857,7 +1237,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span className="px-2.5 py-1 text-[10px] font-mono uppercase bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 rounded-full">Full-Width Canvas</span>
                                         </div>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            The interactive D3 spiderweb graph engine bypasses standard layout containers to occupy 100% of the viewport width and height.
+                                            The interactive D3 connections graph engine bypasses standard layout containers to occupy 100% of the viewport width and height.
                                         </p>
                                         <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800 font-mono text-xs text-emerald-300 overflow-x-auto">
                                             absolute inset-0 w-full h-full
@@ -890,7 +1270,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8">
                                     <IconDisplay icon={<span className="material-symbols-outlined !text-[14px]">star</span>} name="Metadata Only" pxSize="14px" description="Used for inline tags and small metadata markers." implementation="!text-[14px]" overrideIconClass="!text-[14px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">left_panel_open</span>} name="Standard UI" pxSize="18px" description="Primary interactive controls, sidebar toggles, and spiderweb legend symbols." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">left_panel_open</span>} name="Standard UI" pxSize="18px" description="Primary interactive controls, sidebar toggles, and connections legend symbols." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<InstagramIcon />} name="Interactive Social" pxSize="18px" description="Social platform linking. Uses a matching stroke weight." implementation="w-4.5 h-4.5" overrideIconClass="!text-[18px]" />
                                 </div>
                             </div>
@@ -909,12 +1289,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                     <IconDisplay icon={<span className="material-symbols-outlined">left_panel_open</span>} name="Left Panel Open" pxSize="18px" description="Structural Sidebar Layout Toggles: Expands Left Artist Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">left_panel_close</span>} name="Left Panel Close" pxSize="18px" description="Structural Sidebar Layout Toggles: Collapses Left Artist Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_open</span>} name="Right Panel Open" pxSize="18px" description="Structural Sidebar Layout Toggles: Expands Right Deep Cut Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_close</span>} name="Right Panel Close" pxSize="18px" description="Structural Sidebar Layout Toggles: Collapses Right Deep Cut Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_open</span>} name="Right Panel Open" pxSize="18px" description="Structural Sidebar Layout Toggles: Expands Right Deep Cuts Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_close</span>} name="Right Panel Close" pxSize="18px" description="Structural Sidebar Layout Toggles: Collapses Right Deep Cuts Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">close</span>} name="Close Panel / Exit" pxSize="18px" description="Exits magazine full-screen view or closes side panels." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">remove</span>} name="Remove Card" pxSize="18px" description="Dismisses/removes a single artist details card from the workspace stack view." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">refresh</span>} name="Refresh" pxSize="18px" description="Reloads content for a specific node or panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">arrow_back</span>} name="Back" pxSize="18px" description="Navigates to the previous primary view." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<ArrowLeft size={18} strokeWidth={2} />} name="Back (Header)" pxSize="18px" description="Primary structural navigation to return to the dashboard." implementation="<ArrowLeft size={18} strokeWidth={2} />" overrideIconClass="" />
                                     <IconDisplay icon={<HelpIcon />} name="Help Guide" pxSize="18px" description="Triggers help section navigation." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<MicIcon />} name="Speech-to-Text" pxSize="18px" description="Triggers the browser's speech recognition API." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">center_focus_strong</span>} name="Center Focus" pxSize="18px" description="Resets graph zoom and centers simulation." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
@@ -922,6 +1302,24 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <IconDisplay icon={<span className="material-symbols-outlined">remove</span>} name="Zoom Out" pxSize="18px" description="Decreases graph magnification." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">hub</span>} name="Organic View" pxSize="18px" description="Switches the graph to the default organic layout." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">bubble_chart</span>} name="Cluster View" pxSize="18px" description="Switches the graph to the clustered attribute layout." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<Waypoints size={18} />} name="Roots Breakdown" pxSize="18px" description="Dimensional Topology / Roots Breakdown." implementation="size={18}" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Platform Integrations</h3>
+                                <p className="text-base text-zinc-400 leading-relaxed max-w-3xl mb-8">
+                                    For third-party integrations where native Material symbols are insufficient, we utilize custom SVG components. These custom icons strictly adhere to our "Standard UI" scale rules (18px) to ensure perfect visual balance alongside native symbols.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <IconDisplay 
+                                        icon={<BandcampIcon className="w-[18px] h-[18px]" />} 
+                                        name="BandcampIcon" 
+                                        pxSize="18px" 
+                                        description="Custom SVG Integration. Used in Artist Catalogs to link external artist stores." 
+                                        implementation="<BandcampIcon className='w-[18px] h-[18px]' />" 
+                                        overrideIconClass="" 
+                                    />
                                 </div>
                             </div>
 
@@ -942,6 +1340,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                                     <IconDisplay icon={<span className="material-symbols-outlined">shopping_bag</span>} name="Catalog / Shop" pxSize="18px" description="Represents physical media or store links (e.g. Bandcamp)." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">public</span>} name="Website / Public" pxSize="18px" description="Represents official artist domains." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<Flame size={18} />} name="Taste Profile (Flame)" pxSize="18px" description="Represents user's taste compatibility (high energy/independent culture)." implementation="&lt;Flame size={18} /&gt;" />
+                                    <IconDisplay icon={<VisibilityIcon className="w-[18px] h-[18px]" />} name="Show Password (Eye)" pxSize="18px" description="Toggles password field to visible. Used on all password inputs." implementation="&lt;VisibilityIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" />
+                                    <IconDisplay icon={<VisibilityOffIcon className="w-[18px] h-[18px]" />} name="Hide Password (Eye-Off)" pxSize="18px" description="Paired with Eye; shown when the password is currently revealed." implementation="&lt;VisibilityOffIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" />
+                                    <IconDisplay icon={<Pin size={18} />} name="Pin / Deep Cuts Curate" pxSize="18px" description="Action icon for explicitly curating/pinning a Deep Cut node to the top of the stack." implementation="&lt;Pin size={18} /&gt;" />
+
                                 </div>
                             </div>
                         </div>
@@ -949,47 +1352,47 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                     {/* 6. SPIDERWEB LEGENDS */}
                     <section id="spiderweb-legends">
-                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Spiderweb Legends</h2>
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Connections Legends</h2>
                         
                         <div className="space-y-12">
                             <div>
                                 <p className="text-base text-zinc-400 mb-8 leading-relaxed max-w-3xl">
-                                    The legend provides visual decoding of node types and acts as a behavioral filter for the spiderweb. It is <strong>fully responsive</strong>, automatically switching to a compact mobile panel if the viewport or container becomes too narrow for the horizontal bar.
+                                    The legend provides visual decoding of node types and acts as a behavioral filter for the connections map. It is <strong>fully responsive</strong>, automatically switching to a compact mobile panel if the viewport or container becomes too narrow for the horizontal bar.
                                 </p>
                                 <div className="grid grid-cols-2 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#F6E468] group-hover:bg-zinc-700 transition-colors">
-                                             <LegendSymbol symbol={d3.symbolCircle} size={260} />
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.seed }}>
+                                             <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>album</span>
                                          </div>
-                                         <span className="text-sm font-medium">Seed Artist</span>
+                                         <span className="text-sm font-medium">Seed</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#A855F7] group-hover:bg-zinc-700 transition-colors">
-                                             <LegendSymbol symbol={d3.symbolStar} size={400} />
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.ai }}>
+                                             <span className="material-symbols-outlined text-[28px]" style={{ fontVariationSettings: "'FILL' 1" }}>equalizer</span>
                                          </div>
-                                         <span className="text-sm font-medium">AI Artist</span>
+                                         <span className="text-sm font-medium">Artist</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#10B981] group-hover:bg-zinc-700 transition-colors">
-                                             <LegendSymbol symbol={d3.symbolDiamond} size={320} />
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.label }}>
+                                             <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>label</span>
                                          </div>
                                          <span className="text-sm font-medium">Label</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#3B82F6] group-hover:bg-zinc-700 transition-colors">
-                                             <LegendSymbol symbol={d3.symbolSquare} size={260} />
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.genre }}>
+                                             <span className="material-symbols-outlined text-[20px]" style={{ fontVariationSettings: "'FILL' 1" }}>library_music</span>
                                          </div>
                                          <span className="text-sm font-medium">Genre</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#F59E0B] group-hover:bg-zinc-700 transition-colors">
-                                             <LegendSymbol symbol={d3.symbolTriangle} size={260} />
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.country }}>
+                                             <span className="material-symbols-outlined text-[26px]" style={{ fontVariationSettings: "'FILL' 1" }}>location_on</span>
                                          </div>
                                          <span className="text-sm font-medium">Origin</span>
                                      </div>
                                      <div className="flex items-center gap-3 group cursor-pointer">
-                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center text-[#EC4899] group-hover:bg-zinc-700 transition-colors">
-                                             <LegendSymbol symbol={d3.symbolCross} size={320} />
+                                         <div className="w-10 h-10 bg-zinc-800 rounded-xl flex items-center justify-center group-hover:bg-zinc-700 transition-colors" style={{ color: nodeTypeColorMap.founded }}>
+                                             <span className="material-symbols-outlined text-[24px]" style={{ fontVariationSettings: "'FILL' 1" }}>event</span>
                                          </div>
                                          <span className="text-sm font-medium">Founded</span>
                                      </div>
@@ -1011,48 +1414,298 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     Interactive legend items are contained within <code className="text-primary">rounded-xl</code> boxes to signal clickability. The symbols themselves maintain their geometric integrity.
                                 </p>
 
-                                {/* Spiderweb Hover Container Component Documentation */}
+                                {/* Connections Hover Container Component Documentation */}
                                 <div className="mt-12 space-y-6">
-                                    <h3 className="text-xl font-medium text-zinc-200">Spiderweb Hover Container</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Connections Hover Container</h3>
                                     <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
-                                        A contextual container displayed over the graph nodes on hover. It renders high-contrast, real-time relational information organized into direct metadata connections and core 'Spiderweb DNA' background recommendations.
+                                        A contextual container displayed over the graph nodes on hover. It renders high-contrast, real-time relational information organized into direct metadata connections and core 'Connections DNA' background recommendations.
                                     </p>
                                     <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-                                        <div className="space-y-6">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Visual Component Preview</h4>
-                                            <div className="p-8 bg-zinc-900/30 border border-zinc-800 flex items-center justify-center min-h-[260px]">
-                                                 <div className="w-[320px] bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left">
-                                                     <span className="font-poppins text-sm text-white border-b border-zinc-800 pb-1 mb-1 font-medium">Never Ending Game</span>
-                                                     <div className="flex flex-col gap-1">
-                                                         <div className="text-xs font-medium text-zinc-300 leading-tight">
-                                                             <span className="text-zinc-400 font-normal">Performs in the genre of</span>{" "}
-                                                             <span className="text-primary font-normal">Beatdown Hardcore</span>
-                                                         </div>
-                                                         <div className="text-xs font-medium text-zinc-300 leading-tight">
-                                                             <span className="text-zinc-400 font-normal">Releases music on</span>{" "}
-                                                             <span className="text-primary font-normal">Triple B Records</span>
+                                        <div className="space-y-8">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Visual Component Previews</h4>
+                                            
+                                            {/* Desktop Variant */}
+                                            <div className="space-y-3">
+                                                <h5 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Desktop Variant (Floating Card)</h5>
+                                                <div className="p-8 bg-zinc-900/30 border border-zinc-800 flex items-center justify-center min-h-[260px] rounded-lg">
+                                                     <div className="w-[320px] bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 backdrop-blur-md rounded-xl flex flex-col gap-2 text-left shadow-[0_8px_30px_rgb(0,0,0,0.8)]">
+                                                         <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                                                             <div className="shrink-0">
+                                                                  <p className="text-sm leading-relaxed font-normal text-zinc-400 m-0">A defining force in modern beatdown hardcore, originating from Michigan.</p>
+                                                             </div>
+                                                             <div className="flex flex-col gap-1 mt-1 pt-1.5">
+                                                                 <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                     <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                     <span>
+                                                                         <span className="text-zinc-400 font-normal">Performs in the genre of</span>{" "}
+                                                                         <span className="text-primary font-normal">Beatdown Hardcore</span>
+                                                                     </span>
+                                                                 </div>
+                                                                 <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                     <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                     <span>
+                                                                         <span className="text-zinc-400 font-normal">Releases music on</span>{" "}
+                                                                         <span className="text-primary font-normal">Triple B Records</span>
+                                                                     </span>
+                                                                 </div>
+                                                             </div>
                                                          </div>
                                                      </div>
-                                                     <div className="mt-1 pt-1.5 border-t border-zinc-800/60">
-                                                          <p className="text-xs leading-4 font-normal text-zinc-400 m-0">A defining force in modern beatdown hardcore, originating from Michigan.</p>
-                                                      </div>
-                                                 </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Mobile Variant */}
+                                            <div className="space-y-3">
+                                                <h5 className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Mobile Variant (Top Drop Banner)</h5>
+                                                <div className="bg-zinc-900/30 border border-zinc-800 flex flex-col items-center justify-start h-[360px] relative overflow-hidden rounded-lg">
+                                                     <div className="w-full bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 backdrop-blur-md flex flex-col gap-2 text-left shadow-[0_8px_30px_rgb(0,0,0,0.8)] absolute top-0 left-0 max-h-[55vh]">
+                                                         <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-hide">
+                                                             <div className="shrink-0">
+                                                                  <p className={`text-sm leading-relaxed font-normal text-zinc-400 m-0${!demoMobileBannerExpanded ? ' line-clamp-4' : ''}`}>A defining force in modern beatdown hardcore, originating from Michigan.</p>
+                                                             </div>
+                                                             <div className="flex flex-col gap-1 mt-1 pt-1.5">
+                                                                 <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                     <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                     <span>
+                                                                         <span className="text-zinc-400 font-normal">Performs in the genre of</span>{" "}
+                                                                         <span className="text-primary font-normal">Beatdown Hardcore</span>
+                                                                     </span>
+                                                                 </div>
+                                                                 <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                     <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                     <span>
+                                                                         <span className="text-zinc-400 font-normal">Releases music on</span>{" "}
+                                                                         <span className="text-primary font-normal">Triple B Records</span>
+                                                                     </span>
+                                                                 </div>
+                                                                 
+                                                                 {demoMobileBannerExpanded && (
+                                                                     <>
+                                                                         <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                             <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                             <span>
+                                                                                 <span className="text-zinc-400 font-normal">Signed to</span>{" "}
+                                                                                 <span className="text-primary font-normal">Closed Casket Activities</span>
+                                                                             </span>
+                                                                         </div>
+                                                                         <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                             <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                             <span>
+                                                                                 <span className="text-zinc-400 font-normal">Shared early LA scene with</span>{" "}
+                                                                                 <span className="text-primary font-normal">God's Hate</span>
+                                                                             </span>
+                                                                         </div>
+                                                                         <div className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                                             <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                                             <span>
+                                                                                 <span className="text-zinc-400 font-normal">Toured extensively with</span>{" "}
+                                                                                 <span className="text-primary font-normal">Terror</span>
+                                                                             </span>
+                                                                         </div>
+                                                                     </>
+                                                                 )}
+                                                             </div>
+                                                         </div>
+                                                         
+                                                         <div className="pt-2 shrink-0 flex justify-center pointer-events-auto">
+                                                             {!demoMobileBannerExpanded ? (
+                                                                 <button 
+                                                                     onClick={() => setDemoMobileBannerExpanded(true)}
+                                                                     className="bg-zinc-800 text-zinc-200 px-3 py-1 text-xs rounded-xl font-medium border border-zinc-700 hover:bg-zinc-700 transition-colors"
+                                                                 >
+                                                                     View 7 more connections
+                                                                 </button>
+                                                             ) : (
+                                                                 <button 
+                                                                     onClick={() => setDemoMobileBannerExpanded(false)}
+                                                                     className="bg-zinc-800 text-zinc-200 px-3 py-1 text-xs rounded-xl font-medium border border-zinc-700 hover:bg-zinc-700 transition-colors"
+                                                                 >
+                                                                     Close
+                                                                 </button>
+                                                             )}
+                                                         </div>
+                                                     </div>
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="space-y-6">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Specifications & Class Tokens</h4>
                                             <ul className="space-y-3 text-sm text-zinc-400">
-                                                <li><strong>Background Architecture:</strong> <code>bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md</code></li>
+                                                <li><strong>Background Architecture:</strong> <code>bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 backdrop-blur-md</code></li>
                                                 <li><strong>Border Radius:</strong> <code>rounded-xl</code> (12px) for consistent, modern container framing.</li>
-                                                <li><strong>Title Typography:</strong> <code>font-poppins font-medium text-sm text-white</code> for sharp, readable Title Case presentation.</li>
                                                 <li><strong>Relational Contexts:</strong> Uses <code>text-zinc-400 font-normal</code> for structural descriptions and <code>text-primary font-normal</code> for highlighted details.</li>
-                                                <li><strong>Micro-Bio / Editorial Typography:</strong> Bio description text uses <code>text-xs leading-4 font-normal text-zinc-400</code> — a balanced 4:3 compact baseline rhythm. Rendered as a block-level <code>&lt;p&gt;</code> element so line-height applies correctly.</li>
-                                                <li><strong>Responsive Canvas Pattern:</strong> On desktop (<code>≥ 1024px</code>), the panel floats above (or below if within 140px of the top edge) the hovered node using absolute coordinate tracking. On mobile, it collapses to an absolute canvas-anchored top-drop banner: <code>w-full rounded-none border-b</code>, positioned at <code>top: 0</code> relative to the canvas container.</li>
-                                                <li><strong>Client-Side UK English Sanitisation:</strong> Upstream Firestore description strings are intercepted at the render layer via strict word-boundary regex chains (<code>\b</code> anchors) to enforce UK English spelling variants (e.g. <em>colour</em>, <em>technicolour</em>) before mounting to the DOM.</li>
+                                                <li><strong>Micro-Bio / Editorial Typography:</strong> Bio description text uses <code>text-sm leading-relaxed font-normal text-zinc-400</code> matching the 14px Deep Cuts scale to maximize legibility on dark backgrounds. Rendered as a block-level <code>&lt;p&gt;</code> element so line-height applies correctly.</li>
+                                                <li><strong>Responsive Canvas Pattern:</strong> On desktop (<code>≥ 1024px</code>), the panel floats above (or below if within 140px of the top edge) the hovered node using absolute coordinate tracking. On mobile, it collapses to an absolute canvas-anchored top-drop banner restricted to <code>max-h-[55vh]</code> at <code>top: 0</code>. Internally, it utilizes a unified <code>overflow-y-auto</code> layout wrapper combining both narrative DNA and direct connection lists to ensure uniform, synchronized scrolling.</li>
+                                                <li><strong>Client-Side US English:</strong> Upstream Firestore description strings flow directly, relying on standard US English from the backend.</li>
                                             </ul>
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* SPIDERWEB CONTROLS */}
+                    <section id="spiderweb-controls">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Connections Controls</h2>
+                        <p className="text-base text-zinc-300 leading-relaxed max-w-3xl mb-12">
+                            The Connections canvas employs a dedicated set of floating controls utilizing the <code>CanvasControlStyles</code> primitive. These controls ensure consistent interaction models for zoom, centering, filtering, and search logic overlaying the D3 canvas.
+                        </p>
+                        
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mb-24">
+                            {/* Standard Controls */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-medium text-zinc-200">Standard Canvas Controls</h3>
+                                <div className="p-8 bg-zinc-950 border border-zinc-800 rounded-2xl flex flex-col items-center justify-center gap-6 min-h-[240px] relative overflow-hidden bg-[url('https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg')] bg-cover bg-center">
+                                    <div className="absolute inset-0 bg-zinc-900/80 backdrop-blur-sm"></div>
+                                    <div className="relative z-10 flex gap-4">
+                                        <button className={CanvasControlStyles}>
+                                            <span className="material-symbols-outlined !text-[20px]">center_focus_strong</span>
+                                        </button>
+                                        <button className={CanvasControlStyles}>
+                                            <span className="material-symbols-outlined !text-[20px]">add</span>
+                                        </button>
+                                        <button className={CanvasControlStyles}>
+                                            <span className="material-symbols-outlined !text-[20px]">remove</span>
+                                        </button>
+                                        <button className={CanvasControlStyles}>
+                                            <span className="material-symbols-outlined !text-[20px]">search</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Base Primitive</p>
+                                    <p className="text-sm text-zinc-400">All canvas controls utilize a standardized <code>w-12 h-12 rounded-xl bg-zinc-900/80 backdrop-blur-md border border-zinc-700</code> visual baseline, establishing a unified boxy aesthetic.</p>
+                                </div>
+                            </div>
+
+                            {/* Active State (Filter) */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-medium text-zinc-200">Active State Toggle</h3>
+                                <div className="p-8 bg-zinc-950 border border-zinc-800 rounded-2xl flex flex-col items-center justify-center gap-6 min-h-[240px] relative overflow-hidden bg-[url('https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg')] bg-cover bg-center">
+                                    <div className="absolute inset-0 bg-zinc-900/80 backdrop-blur-sm"></div>
+                                    <div className="relative z-10 flex gap-4">
+                                        <button className={`${CanvasControlStyles} bg-zinc-800 border-primary/50 text-primary`}>
+                                            <span className="material-symbols-outlined !text-[20px]">close</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2">
+                                    <p className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Selected Variant</p>
+                                    <p className="text-sm text-zinc-400">When toggled (e.g. expanding the filter drawer), controls shift to <code>bg-zinc-800 border-primary/50 text-primary</code> to communicate active UI focus.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* MOBILE NAVIGATION BAR */}
+                    <section id="mobile-navigation">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Mobile Navigation Bar</h2>
+                        <p className="text-base text-zinc-300 leading-relaxed max-w-3xl mb-12">
+                            On mobile viewports, global section switching transitions from desktop sidebars to a floating glassmorphism navigation bar. Anchored at the bottom with safe-area support, it provides native-app tactile interaction across <strong>Roots</strong>, <strong>Connections</strong>, and <strong>Deep Cuts</strong> with live numeric counter badges while allowing full-bleed background content to scroll underneath.
+                        </p>
+
+                        <div className="space-y-16 mb-24">
+                            {/* Interactive Component Preview */}
+                            <div className="p-8 bg-zinc-900/50 rounded-none border border-zinc-800">
+                                <h3 className="text-xl font-medium text-primary mb-4">Interactive Navigation Bar</h3>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl">
+                                    Click any tab segment below to test active/inactive state transitions, tactile button depression (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">active:scale-95</code>), and status counter badges.
+                                </p>
+
+                                <div className="p-12 bg-zinc-950 border border-zinc-800 flex flex-col items-center justify-center min-h-[220px] relative overflow-hidden bg-[url('https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg')] bg-cover bg-center">
+                                    <div className="absolute inset-0 bg-zinc-900/80 backdrop-blur-sm"></div>
+                                    
+                                    {/* Mock background bleed indicators */}
+                                    <div className="absolute inset-x-8 top-4 flex justify-between items-center opacity-30 text-xs text-zinc-400 select-none pointer-events-none">
+                                        <span>← Content bleeds underneath →</span>
+                                        <span className="font-mono">z-40 floating elevation</span>
+                                    </div>
+
+                                    {/* Floating Nav Preview */}
+                                    <div className="relative z-10 w-full max-w-sm">
+                                        <nav className="flex items-center justify-between p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700/80 rounded-xl shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]">
+                                            {(['artists', 'spiderweb', 'details'] as const).map(tab => {
+                                                const isActive = demoMobileNavTab === tab;
+                                                const label = tab === 'details' ? 'Deep Cuts' : tab === 'artists' ? 'Roots' : 'Connections';
+                                                return (
+                                                    <button
+                                                        key={tab}
+                                                        onClick={() => setDemoMobileNavTab(tab)}
+                                                        className={`flex-1 flex items-center justify-center gap-1.5 py-2 px-2.5 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-200 select-none cursor-pointer active:scale-95 ${
+                                                            isActive
+                                                                ? 'bg-zinc-800 text-primary shadow-sm border border-zinc-700/60'
+                                                                : 'text-zinc-400 hover:text-zinc-200 border border-transparent'
+                                                        }`}
+                                                    >
+                                                        <span className="truncate">{label}</span>
+                                                        {tab === 'artists' && (
+                                                            <span className="h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-300 bg-primary/20 text-primary border-primary/40">
+                                                                1
+                                                            </span>
+                                                        )}
+                                                        {tab === 'details' && (
+                                                            <span className="h-4.5 min-w-[18px] px-1 rounded-full flex items-center justify-center text-[9px] font-bold border shadow-sm transition-all duration-300 bg-zinc-900 text-white border-white/20">
+                                                                24
+                                                            </span>
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </nav>
+                                    </div>
+                                </div>
+
+                                <div className="mt-6 flex flex-wrap items-center justify-between gap-4 text-xs text-zinc-500 font-mono">
+                                    <span>Active Segment: <strong className="text-primary">{demoMobileNavTab === 'details' ? 'Deep Cuts' : demoMobileNavTab === 'artists' ? 'Roots' : 'Connections'}</strong></span>
+                                    <span>Container: <code>rounded-xl w-[calc(100%-2rem)] max-w-sm</code></span>
+                                </div>
+                            </div>
+
+                            {/* Specifications & Anatomy Grid */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="p-6 bg-zinc-900/50 border border-zinc-800 space-y-4">
+                                    <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest flex items-center gap-2">
+                                        <span className="material-symbols-outlined !text-[18px] text-primary">layers</span>
+                                        Glassmorphism Container Shell
+                                    </h4>
+                                    <p className="text-xs text-zinc-400 leading-relaxed">
+                                        The outer shell floats at <code>z-40</code> with safe-area responsive positioning, allowing underlying artist content, canvas nodes, and cards to bleed completely to the bottom edge of the screen.
+                                    </p>
+                                    <ul className="space-y-2 text-xs font-mono text-zinc-400 bg-zinc-950 p-4 border border-zinc-800 rounded-lg">
+                                        <li><strong className="text-zinc-200">Positioning:</strong> <code className="text-primary">fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2</code></li>
+                                        <li><strong className="text-zinc-200">Backdrop:</strong> <code className="text-primary">bg-zinc-900/90 backdrop-blur-xl</code></li>
+                                        <li><strong className="text-zinc-200">Border:</strong> <code className="text-primary">border border-zinc-700/80 rounded-xl</code></li>
+                                        <li><strong className="text-zinc-200">Shadow:</strong> <code className="text-primary">shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]</code></li>
+                                    </ul>
+                                </div>
+
+                                <div className="p-6 bg-zinc-900/50 border border-zinc-800 space-y-4">
+                                    <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest flex items-center gap-2">
+                                        <span className="material-symbols-outlined !text-[18px] text-primary">touch_app</span>
+                                        Segment States & Tactility
+                                    </h4>
+                                    <p className="text-xs text-zinc-400 leading-relaxed">
+                                        Inner segments are rendered as discrete 12px rounded buttons (<code>rounded-xl</code>) inside the continuous parent shell, adhering strictly to the interactive button design standard.
+                                    </p>
+                                    <ul className="space-y-2 text-xs font-mono text-zinc-400 bg-zinc-950 p-4 border border-zinc-800 rounded-lg">
+                                        <li><strong className="text-zinc-200">Active State:</strong> <code className="text-primary">bg-zinc-800 text-primary shadow-sm border border-zinc-700/60</code></li>
+                                        <li><strong className="text-zinc-200">Inactive State:</strong> <code className="text-primary">text-zinc-400 hover:text-zinc-200 border border-transparent</code></li>
+                                        <li><strong className="text-zinc-200">Touch Scale:</strong> <code className="text-primary">active:scale-95 transition-all duration-200</code></li>
+                                        <li><strong className="text-zinc-200">Typography:</strong> <code className="text-primary">text-xs font-semibold uppercase tracking-wider</code></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            {/* Stacking & Clearance Guidelines */}
+                            <div className="p-6 bg-primary/5 border border-primary/20 space-y-3">
+                                <div className="flex items-center gap-2 text-primary">
+                                    <span className="material-symbols-outlined !text-[20px]">architecture</span>
+                                    <h4 className="text-xs font-semibold uppercase tracking-wider">Vertical Stacking & Clearance Guidelines</h4>
+                                </div>
+                                <p className="text-xs text-zinc-300 leading-relaxed">
+                                    To eliminate visual collisions and prevent accidental mis-taps on mobile viewports, floating overlay CTAs (such as the primary <strong>Magazine</strong> button in the Deep Cuts card view) must be positioned at <code>bottom-[calc(env(safe-area-inset-bottom)+5.75rem)]</code>. This guarantees a safe ~36px vertical clearance above the navigation bar. Scrollable card content must provide matching bottom padding (<code>pb-[calc(env(safe-area-inset-bottom)+9rem)]</code>) so that all text, actions, and media can scroll completely clear of the floating CTA.
+                                </p>
                             </div>
                         </div>
                     </section>
@@ -1083,7 +1736,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <div className="space-y-4">
                                         <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-none border border-zinc-800">
-                                            <button className="bg-primary text-brand-black px-6 py-2 text-sm rounded-xl font-medium shadow-lg">Standard CTA</button>
+                                            <button className="bg-white text-brand-black px-6 py-2 text-sm rounded-xl font-medium">Standard CTA</button>
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Medium (Standard)</h4>
@@ -1094,7 +1747,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <div className="space-y-4">
                                         <div className="h-16 flex items-center justify-center bg-zinc-950 rounded-none border border-zinc-800">
-                                            <button className="bg-primary text-brand-black px-8 py-4 text-base sm:text-lg rounded-xl font-medium shadow-xl">Hero Action</button>
+                                            <button className="bg-white text-brand-black px-8 py-4 text-base sm:text-lg rounded-xl font-medium">Hero Action</button>
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Large (Hero/Mobile)</h4>
@@ -1127,29 +1780,52 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    High-impact buttons used for definitive system actions like generating or updating a graph. On Tablet/Mobile, the placement follows a dynamic inline strategy to ensure absolute visibility.
+                                    High-impact buttons used for definitive system actions like generating or updating a graph. To ensure maximum visual hierarchy, primary CTAs use pure White, isolating the Brand Yellow for identity and selection states.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2">
+                                        <button className="w-full bg-white text-brand-black px-6 py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-2 transition-opacity hover:opacity-90">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary">0</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-brand-black bg-transparent text-brand-black">0</span>
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-white border border-zinc-200"></span>
+                                                bg-white
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-brand-black border border-zinc-800"></span>
+                                                text-brand-black
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Pulse Status</p>
-                                        <button className="w-full bg-primary/90 text-brand-black px-6 py-2 rounded-xl font-medium shadow-lg text-sm flex items-center justify-center gap-2 ring-4 ring-primary/20">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
+                                        <button className="w-full bg-white text-brand-black px-6 py-2 rounded-xl font-medium text-sm flex items-center justify-center gap-2 opacity-90 transition-opacity hover:opacity-90">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-primary/50 bg-brand-black text-primary animate-pulse">2</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-brand-black bg-transparent text-brand-black">2</span>
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                hover:opacity-90
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                transition-opacity
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
-                                        <button disabled className="w-full bg-primary text-brand-black px-6 py-2 rounded-xl font-medium opacity-50 cursor-not-allowed text-sm flex items-center justify-center gap-2">
+                                        <button disabled className="w-full bg-white text-brand-black px-6 py-2 rounded-xl font-medium opacity-50 cursor-not-allowed text-sm flex items-center justify-center gap-2">
                                             <span>Create Zcene</span>
-                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-zinc-700 bg-zinc-800 text-zinc-500">0</span>
+                                            <span className="h-5 w-5 rounded-[6px] flex items-center justify-center text-[9px] font-semibold border border-brand-black bg-transparent text-brand-black">0</span>
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                disabled:opacity-50
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1166,28 +1842,118 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Solid dark-background buttons with defined 1px borders used as our standard secondary interactive buttons across the application, including panel utility actions and external catalog links (e.g. <strong>Official Website</strong>, <strong>Watch on YouTube</strong> in the Deep Cut panel). They provide distinct visual substance and structure.
+                                    Solid dark-background buttons with defined 1px borders used as our standard secondary interactive buttons across the application, including panel utility actions and external catalog links (e.g. <strong>Official Website</strong>, <strong>Watch on YouTube</strong> in the Deep Cuts panel). They provide distinct visual substance and structure.
+                                    <br /><br />
+                                    While these buttons default to center alignment, they fully support structural overrides (e.g., <code className="text-zinc-300">w-full justify-start</code>) for contextual uses like vertical catalog menus. This ensures layout flexibility without creating bespoke tokens.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-zinc-800 text-zinc-300 border border-zinc-700 rounded-xl font-medium text-sm gap-2.5">
+                                        <Button variant="secondary" className="w-full justify-start">
                                             <span className="material-symbols-outlined !text-[18px]">public</span>
                                             <span>Official Website</span>
+                                        </Button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700"></span>
+                                                Button variant="secondary"
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-zinc-700 text-white border border-zinc-500 rounded-xl font-medium text-sm gap-2.5">
+                                        <Button variant="secondary" className="w-full justify-start border-zinc-600 bg-zinc-800 text-white scale-95">
                                             <span className="material-symbols-outlined !text-[18px]">play_circle</span>
                                             <span>Watch on YouTube</span>
+                                        </Button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-600"></span>
+                                                hover styles via Button component
+                                            </span>
                                         </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
-                                        <div className="flex items-center justify-center px-4 py-2 bg-zinc-900/40 text-zinc-600 border border-zinc-800/80 rounded-xl font-medium text-sm gap-2.5 opacity-50 cursor-not-allowed">
+                                        <Button variant="secondary" disabled className="w-full justify-start">
                                             <span className="material-symbols-outlined !text-[18px]">public</span>
                                             <span>Official Website</span>
+                                        </Button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700"></span>
+                                                Button variant="secondary" disabled
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Instant AI Query Chips */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Instant AI Query Chips</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 9999px / rounded-full</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-1.5</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 12px / text-xs</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
+                                    Specialized context-aware chips used in the Deep Cuts investigation panel. They feature three distinct visual states to guide the user: available (outline), spent (dimmed), and interactive dropdowns (native <code>&lt;select&gt;</code> masked as a chip).
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Available Action</p>
+                                        <button className="px-4 py-1.5 text-xs text-zinc-400 border border-zinc-700 bg-zinc-900 rounded-full hover:bg-zinc-800 hover:text-white transition-colors">
+                                            What sound do they have?
+                                        </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700"></span>
+                                                bg-zinc-900 border-zinc-700
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-400 border border-zinc-500"></span>
+                                                text-zinc-400
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Spent / Clicked Status</p>
+                                        <button className="px-4 py-1.5 text-xs text-zinc-600 border border-zinc-800 rounded-full bg-zinc-950 flex items-center gap-1.5 cursor-default">
+                                            Where are they from?
+                                            <span className="material-symbols-outlined !text-[12px]">check</span>
+                                        </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-950 border border-zinc-800"></span>
+                                                bg-zinc-950 border-zinc-800
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-600 border border-zinc-700"></span>
+                                                text-zinc-600
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Interactive Connection Dropdown</p>
+                                        <div className="relative inline-block group">
+                                            <select className="px-4 py-1.5 text-xs text-zinc-400 border border-zinc-700 rounded-full appearance-none hover:bg-zinc-800 hover:text-white transition-colors cursor-pointer bg-zinc-900 focus:outline-none focus:ring-1 focus:ring-primary pr-8">
+                                                <option value="">What is the connection to...</option>
+                                                <option value="node-1">Spaced</option>
+                                                <option value="node-2">Buggin</option>
+                                            </select>
+                                            <span className="material-symbols-outlined absolute right-2.5 top-1/2 -translate-y-1/2 !text-[16px] text-zinc-500 pointer-events-none group-hover:text-zinc-300">expand_more</span>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700"></span>
+                                                bg-zinc-900 border-zinc-700
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                focus:ring-primary
+                                            </span>
                                         </div>
                                     </div>
                                 </div>
@@ -1213,18 +1979,43 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <button className="w-full px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
                                             Cancel
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-400 border border-zinc-500"></span>
+                                                text-zinc-400
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
-                                        <button className="w-full px-4 py-2 text-white bg-zinc-800 text-sm font-medium rounded-xl transition-colors border border-zinc-700">
+                                        <button className="w-full px-4 py-2 text-white bg-zinc-800 text-sm font-medium rounded-xl transition-colors border border-transparent">
                                             Cancel
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-transparent"></span>
+                                                hover:bg-zinc-800
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
+                                                hover:text-white
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
                                         <button disabled className="w-full px-4 py-2 text-zinc-600 text-sm font-medium rounded-xl opacity-50 cursor-not-allowed border border-transparent">
                                             Cancel
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-600 border border-zinc-700"></span>
+                                                text-zinc-600
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                opacity-50
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1246,15 +2037,29 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="rounded-xl border border-primary bg-transparent px-4 py-2 font-medium text-primary text-sm">
-                                            Support
-                                        </button>
+                                        <div className="w-fit">
+                                            <Button variant="outline">
+                                                Support
+                                            </Button>
+                                        </div>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-transparent border border-white"></span>
+                                                Button variant="outline"
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
-                                        <button className="rounded-xl border border-primary bg-primary/20 px-4 py-2 font-medium text-primary text-sm">
+                                        <button className="font-medium transition-all flex items-center justify-center gap-2 shrink-0 leading-none px-6 py-2 text-sm rounded-xl border border-white bg-white/10 text-white">
                                             Support
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-white/10 border border-white"></span>
+                                                hover:bg-white/10
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1276,15 +2081,44 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="w-full border border-zinc-600 text-zinc-300 px-4 py-1 rounded-full font-medium text-xs">Import Library</button>
+                                        <Button variant="secondary" size="pill" fullWidth>Import Library</Button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
+                                                Button variant="secondary" size="pill"
+                                            </span>
+                                        </div>
                                      </div>
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover Status</p>
                                         <button className="w-full border border-zinc-500 text-white px-4 py-1 rounded-full font-medium bg-zinc-800 text-xs">Import Library</button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-500"></span>
+                                                bg-zinc-800 border-zinc-500
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
+                                                text-white
+                                            </span>
+                                        </div>
                                      </div>
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
                                         <button disabled className="w-full border border-zinc-700 text-zinc-500 px-4 py-1 rounded-full font-medium opacity-50 cursor-not-allowed text-xs">Import Library</button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-transparent border border-zinc-700"></span>
+                                                border-zinc-700
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-500 border border-zinc-600"></span>
+                                                text-zinc-500
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500">
+                                                opacity-50
+                                            </span>
+                                        </div>
                                      </div>
                                 </div>
                             </div>
@@ -1301,36 +2135,145 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Used within the Deep Cut panel to allow users to quickly add related artists to their seed list. These follow the "Utility Bordered" pattern but with tighter padding and a distinct "Added" state.
+                                    Used within the Deep Cuts panel to allow users to quickly add related artists to their seed list. These follow the "Utility Bordered" pattern but with tighter padding and a distinct "Added" state.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
-                                        <button className="border py-1.5 px-3 transition-all text-sm flex items-center gap-1.5 rounded-xl border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700">
+                                        <Button variant="secondary" size="sm" className="justify-start border-zinc-800 bg-zinc-900/50">
                                             <span className="truncate uppercase font-semibold tracking-tighter">Sunny Day Real Estate</span>
                                             <span className="material-symbols-outlined !text-[14px]">add_circle</span>
-                                        </button>
-                                    </div>
-                                    <div className="space-y-4">
+                                        </Button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-800"></span>
+                                                Button variant="secondary" size="sm"
+                                            </span>
+                                        </div>
+                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active</p>
-                                        <button className="border py-1.5 px-3 transition-all text-sm flex items-center gap-1.5 rounded-xl border-zinc-700 bg-zinc-800 text-white scale-95">
+                                        <Button variant="secondary" size="sm" className="justify-start border-zinc-700 bg-zinc-800 text-white scale-95">
                                             <span className="truncate uppercase font-semibold tracking-tighter">Sunny Day Real Estate</span>
                                             <span className="material-symbols-outlined !text-[14px]">add_circle</span>
-                                        </button>
+                                        </Button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
+                                                hover styles via Button component
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Added (Disabled)</p>
                                         <button disabled className="border py-1.5 px-3 transition-all text-sm flex items-center gap-1.5 rounded-xl text-primary border-primary/30 bg-primary/5 cursor-default">
                                             <span className="truncate uppercase font-semibold tracking-tighter">Sunny Day Real Estate</span>
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-primary/5 border border-primary/30"></span>
+                                                bg-primary/5 border-primary/30
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-primary border border-primary/20"></span>
+                                                text-primary
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
 
-                            {/* Icon Buttons */}
-                            <div className="space-y-8">
+                            {/* Bordered Variant */}
+                            <div className="mt-16 mb-16">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Bordered Variant</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Size: 32x32px (w-8 h-8)</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
+                                    Used for structural actions like Deep Cuts utilities (e.g. Add to Taste, Explore, Remove). These feature a solid container with a distinct stroke border (<code>className="text-zinc-300"bg-zinc-900 border border-zinc-700/50 shadow-lg</code>), providing a self-contained look.
+                                </p>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
+                                    <div className="flex flex-col items-center gap-4">
+                                        <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-zinc-400 bg-zinc-900 shadow-lg hover:text-white hover:bg-zinc-800 transition-colors">
+                                            <span className="material-symbols-outlined !text-[18px]">settings</span>
+                                        </button>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
+                                            <div className="flex flex-wrap justify-center gap-1.5">
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700/50"></span>
+                                                    bg-zinc-900 border-zinc-700/50
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-400 border border-zinc-500"></span>
+                                                    text-zinc-400
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-4">
+                                        <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-white bg-zinc-800 transition-colors shadow-lg">
+                                            <span className="material-symbols-outlined !text-[18px]">settings</span>
+                                        </button>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
+                                            <div className="flex flex-wrap justify-center gap-1.5">
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700/50"></span>
+                                                    bg-zinc-800 border-zinc-700/50
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
+                                                    text-white
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-4">
+                                        <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-primary bg-zinc-900 shadow-lg transition-colors">
+                                            <span className="material-symbols-outlined !text-[18px]">settings</span>
+                                        </button>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Selected Toggle Status</p>
+                                            <div className="flex flex-wrap justify-center gap-1.5">
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700/50"></span>
+                                                    bg-zinc-900 border-zinc-700/50
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-primary border border-primary/80"></span>
+                                                    text-primary
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex flex-col items-center gap-4">
+                                        <button disabled className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-700/50 rounded-xl leading-none text-zinc-600 bg-zinc-900 shadow-lg opacity-50 cursor-not-allowed">
+                                            <span className="material-symbols-outlined !text-[18px]">settings</span>
+                                        </button>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
+                                            <div className="flex flex-wrap justify-center gap-1.5">
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-900 border border-zinc-700/50"></span>
+                                                    bg-zinc-900 border-zinc-700/50
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-600 border border-zinc-700"></span>
+                                                    text-zinc-600
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Borderless Variant */}
+                            <div className="mb-16">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Icon Buttons (States)</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Borderless Variant</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 32px / h-8</span>
@@ -1338,24 +2281,55 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 18px (icon)</span>
                                     </div>
                                 </div>
+                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
+                                    Used for the back arrow, panel expand/collapse toggles, and card menus. These are completely flat at rest, and on hover reveal a tight fill (<code className="text-zinc-300">bg-zinc-800</code>) with zero border or stroke.
+                                </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                     <div className="flex flex-col items-center gap-4">
-                                        <button className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors border border-transparent">
+                                        <button className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors border border-transparent">
                                             <span className="material-symbols-outlined !text-[18px]">settings</span>
                                         </button>
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default</p>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Default Status</p>
+                                            <div className="flex flex-wrap justify-center gap-1.5">
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-400 border border-zinc-500"></span>
+                                                    text-zinc-400
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="flex flex-col items-center gap-4">
-                                        <button className="w-8 h-8 flex items-center justify-center rounded-xl text-white bg-zinc-800 transition-colors border border-zinc-700">
+                                        <button className="w-8 h-8 flex items-center justify-center rounded-xl text-white bg-zinc-800 transition-colors border border-transparent">
                                             <span className="material-symbols-outlined !text-[18px]">settings</span>
                                         </button>
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active</p>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Hover / Active Status</p>
+                                            <div className="flex flex-wrap justify-center gap-1.5">
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-transparent"></span>
+                                                    bg-zinc-800
+                                                </span>
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-white border border-zinc-300"></span>
+                                                    text-white
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                     <div className="flex flex-col items-center gap-4">
                                         <button disabled className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-600 opacity-50 cursor-not-allowed">
                                             <span className="material-symbols-outlined !text-[18px]">settings</span>
                                         </button>
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled</p>
+                                        <div className="flex flex-col items-center gap-2">
+                                            <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled Status</p>
+                                            <div className="flex flex-wrap justify-center gap-1.5">
+                                                <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                    <span className="w-2 h-2 rounded-sm bg-zinc-600 border border-zinc-700"></span>
+                                                    text-zinc-600
+                                                </span>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1381,6 +2355,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span className="material-symbols-outlined !text-[18px]">refresh</span>
                                             Refresh UI
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800/50 border border-zinc-600"></span>
+                                                bg-zinc-800/50 border-zinc-600
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-300 border border-zinc-400"></span>
+                                                text-zinc-300
+                                            </span>
+                                        </div>
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Destructive Action</p>
@@ -1388,6 +2372,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <span className="material-symbols-outlined !text-[18px]">delete_sweep</span>
                                             Clear Zcene
                                         </button>
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-red-500/10 border border-red-500/50"></span>
+                                                bg-red-500/10 border-red-500/50
+                                            </span>
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-red-400 border border-red-500"></span>
+                                                text-red-400
+                                            </span>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1410,30 +2404,41 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
-                            {/* Roots Breakdown Button */}
+                            {/* Magazine View Button */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Roots Breakdown Button</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Magazine View Button</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Component: RootsBreakdownButton</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">States: disabled, attention, neutral</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Icon: Waypoints (lucide)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Size: Compact (sm)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">States: attention, neutral</span>
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    An always-visible, state-driven information button. Guides users to the graph's metadata breakdown using a tri-state visual logic.
+                                    An always-visible, state-driven information button. Guides users to the graph's metadata breakdown using a two-state visual logic.
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
-                                     <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled State (No content/loading)</p>
-                                        <RootsBreakdownButton state="disabled" isLoading={false} />
-                                    </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Attention State (Unread insights)</p>
                                         <RootsBreakdownButton state="attention" />
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-transparent border border-primary"></span>
+                                                Button variant="outline"
+                                            </span>
+                                        </div>
                                     </div>
                                      <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Neutral State (Read insights)</p>
                                         <RootsBreakdownButton state="neutral" />
+                                        <div className="flex flex-wrap gap-1.5 pt-2">
+                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
+                                                Button variant="secondary"
+                                            </span>
+                                        </div>
+                                    </div>
                                     </div>
                                 </div>
                             </div>
@@ -1457,9 +2462,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="flex items-center justify-between w-full border-b border-zinc-800/80 pb-3">
                                         <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Interactive Toggle Preview</span>
                                         <div className="flex flex-wrap gap-1.5">
-                                            <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Radius: Outer rounded-xl (12px) / Inner rounded-[6px]</span>
-                                            <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Height: 36px</span>
-                                            <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Padding: p-0.5</span>
+                                            <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Radius: Outer rounded-xl (12px) / Inner rounded-[10px]</span>
+                                            <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Height: 38px</span>
+                                            <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Padding: None (Flush)</span>
                                             <span className="text-[9px] font-mono text-zinc-400 bg-zinc-950 px-1.5 py-0.5 border border-zinc-800 rounded-full">Font: 18px (icon)</span>
                                         </div>
                                     </div>
@@ -1474,15 +2479,72 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4">
                                     <h4 className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Tactile Specifications</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Interactive selector controls use a custom <strong>12px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code>) outer container and <strong>8px button frames</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-lg">rounded-lg</code>) — deliberately separating them from our strict <strong>0px brutalist</strong> layout containers. The active icon is highlighted by a <strong>tight square sliding badge</strong> that neatly wraps exactly one icon.
+                                        Interactive selector controls use a custom <strong>12px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code>) outer container — concentric with our softened <strong>16px</strong> structural layout containers. The active icon is highlighted by a flush, morphing solid sliding fill that aligns cleanly with the outer container's border stroke, avoiding internal double-bordering.
                                     </p>
                                     <ul className="text-xs text-zinc-500 space-y-2 list-disc list-outside pl-4">
                                         <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through the Material Symbol icons (Hub = Organic, Bubble Chart = Cluster, Grid View = Grid, List = Table, Schedule = Recent, Sort By Alpha = Alphabetical).</li>
-                                        <li><strong>Proportional sliding active badge:</strong> A fixed <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">w-8 h-8</code> <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">bg-zinc-800</code> active block with a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-[6px]">rounded-[6px]</code> radius slides proportionally between positions.</li>
-                                        <li><strong>Outer & Button Radius:</strong> The main outer toggle container uses a soft <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code> border radius, and the button frames use a matching concentric <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-lg">rounded-lg</code> to form a unified set.</li>
+                                        <li><strong>Flush Outer & Inner Radius:</strong> The outer toggle container uses a <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code> (12px) border radius with <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">overflow-hidden</code> and zero padding. To sit perfectly flush against a 1px border, the inner sliding badge dynamically morphs its border radius between left (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5">11px 0 0 11px</code>) and right (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5">0 11px 11px 0</code>) depending on its active state.</li>
+                                        <li><strong>Badge Styling:</strong> Internal rings and shadows have been intentionally stripped from the solid <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5">bg-zinc-800</code> badge to maintain a stark, clean structural appearance.</li>
+                                        <li><strong>Global Height Parity:</strong> Toggles are exactly 38px tall, precisely matching our standard CTAs and Select Dropdowns for perfect side-by-side flex-box alignment.</li>
                                         <li><strong>Spring animation:</strong> Badge translates via <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">stiffness: 480 / damping: 38</code> — snappy and responsive, not floaty.</li>
                                         <li><strong>Main Graph & Dashboard Alignment:</strong> This same component is used generic and dynamically inside the main graph canvas for layout mode switching, and inside the dashboard controls panel for View and Sort mode switching.</li>
                                     </ul>
+                                </div>
+                            </div>
+
+                            <div className="space-y-6 mt-12 border-t border-zinc-800/80 pt-12">
+                                <h3 className="text-xl font-medium text-zinc-200">Segmented Text Toggle</h3>
+                                <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
+                                    An interactive text-based segmented toggle control used for switching modes like "Instant AI" and "Deep Web". Features concentric border radiuses and spring animations similar to the Admin toggle.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl flex flex-col items-center justify-center min-h-[160px] gap-4">
+                                        <SegmentedTextToggle 
+                                            value={demoChatToggle} 
+                                            onChange={(v) => setDemoChatToggle(v as 'instant' | 'live')}
+                                            options={[
+                                                { id: 'instant', label: 'Instant AI' },
+                                                { id: 'live', label: 'Deep Web' }
+                                            ]}
+                                        />
+                                        <p className="text-xs text-zinc-500 font-mono">Current state: {demoChatToggle === 'instant' ? 'Instant AI' : 'Deep Web Live'}</p>
+                                    </div>
+                                    <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4 text-xs text-zinc-500 leading-relaxed">
+                                        <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
+                                        <ul className="list-disc list-outside pl-4 space-y-2">
+                                            <li><strong>Typography:</strong> Uses <code>text-[11px] uppercase tracking-wider font-semibold</code> for clarity.</li>
+                                            <li><strong>Animation:</strong> Spring-based text slider matching the physics of the main toggles.</li>
+                                            <li><strong>Dual Mode:</strong> Specifically designed for the Deep Connections chat to clearly demarcate Free/Local from Paid/Live states.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="space-y-6 mt-12 border-t border-zinc-800/80 pt-12">
+                                <h3 className="text-xl font-medium text-zinc-200">Standard Toggle Switch</h3>
+                                <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
+                                    A simple, standard switch used for generic boolean states like the Taste Profile "Active" toggle.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl flex flex-col items-center justify-center min-h-[160px] gap-6">
+                                        <div className="flex flex-col items-end gap-1.5">
+                                            <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Active</label>
+                                            <button 
+                                                onClick={() => setDemoProfileActive(!demoProfileActive)}
+                                                className="w-10 h-5 rounded-full relative transition-colors bg-zinc-800"
+                                            >
+                                                <div className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform ${demoProfileActive ? 'translate-x-5 bg-primary' : 'bg-zinc-400'}`} />
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl space-y-4 text-xs text-zinc-500 leading-relaxed">
+                                        <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
+                                        <ul className="list-disc list-outside pl-4 space-y-2">
+                                            <li><strong>Track:</strong> Uses <code className="text-zinc-400">bg-zinc-800</code> for a dark, recessed track.</li>
+                                            <li><strong>Handle:</strong> The toggle handle is <code className="text-zinc-400">bg-zinc-400</code> when off, and illuminates to <code className="text-zinc-400">bg-primary</code> (brand yellow) when active.</li>
+                                            <li><strong>Animation:</strong> Uses simple CSS transitions for handle translation and color fading.</li>
+                                        </ul>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -1508,32 +2570,61 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     {/* 9. BADGES & TAGS */}
                     <section id="badges-tags">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Badges & Tags</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                        
+                        <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4 mb-12">
+                            <h4 className="text-xs font-semibold text-primary uppercase tracking-widest">Typographic Watermark Fallback</h4>
+                            <div className="space-y-3">
+                                <p className="text-sm text-zinc-400">Used when a project (Zcene) or artist lacks a valid image. Extracts 1-3 initials and maps them to a subtle, dark gradient with massive, low-opacity text bleeding off the edges to provide texture.</p>
+                                <div className="bg-black/20 p-3 rounded-lg border border-white/5 space-y-1.5 w-fit">
+                                    <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Background:</span> bg-gradient-to-br from-zinc-800/40 to-zinc-900/80</p>
+                                    <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Typography:</span> text-8xl font-black uppercase</p>
+                                    <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Opacity:</span> text-white/10 (dashboard) / text-white/5 (sidebar)</p>
+                                    <p className="text-xs font-mono text-zinc-500"><span className="text-zinc-300">Alignment:</span> absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none</p>
+                                </div>
+                            </div>
+                            
+                            <div className="flex gap-4 mt-4">
+                                <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 border border-white/5 overflow-hidden relative">
+                                    <span className="text-5xl font-black text-white/10 uppercase select-none absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none">WOC</span>
+                                </div>
+                                <div className="w-24 h-24 rounded-lg bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 border border-white/5 overflow-hidden relative">
+                                    <span className="text-5xl font-black text-white/10 uppercase select-none absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none">SS</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-xl flex items-center gap-1 w-fit">
-                                        <span className="material-symbols-outlined !text-[12px]">star</span>AI
-                                    </span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl w-fit">ARTIST</span>
                                 }
-                                title="AI"
-                                description="Suggested by Zcene AI based on seed context."
-                                implementation="bg-purple-500/20 text-purple-300"
+                                title="Artist"
+                                description="Base entity denoting an artist node in the discovery graph."
+                                implementation="text-zinc-300 bg-zinc-800/50"
                             />
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl w-fit">Manual</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl w-fit">LABEL</span>
                                 }
-                                title="Manual"
-                                description="Added manually by the user via search entry."
-                                implementation="bg-emerald-500/20 text-emerald-300"
+                                title="Label"
+                                description="Base entity denoting a record label node."
+                                implementation="text-zinc-300 bg-zinc-800/50"
                             />
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-sky-500/20 text-sky-300 px-2 py-0.5 rounded-xl w-fit">Library</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-xl w-fit">ROOT</span>
+                                }
+                                title="Root"
+                                description="Identifies the user's starting point anchor node."
+                                implementation="bg-yellow-500/20 text-yellow-300"
+                            />
+                            <BadgeDisplay 
+                                badge={
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl w-fit">LIBRARY</span>
                                 }
                                 title="Library"
                                 description="Identified as part of the user's uploaded music library."
-                                implementation="bg-sky-500/20 text-sky-300"
+                                implementation="bg-emerald-500/20 text-emerald-300"
                             />
                         </div>
 
@@ -1542,46 +2633,61 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="border-b border-zinc-800 pb-4">
                                 <h3 className="text-xl font-medium text-zinc-200">Discovery Network Metric Badges</h3>
                                 <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-3xl">
-                                    Displayed in the card footer and table list of the project dashboard. Each badge exposes a live discovery-network count directly inside its label, using a <strong>label-first</strong> syntax that mirrors the spiderweb filter legends. The four badges always render in a fixed sequence.
+                                    Displayed in the card footer and table list of the project dashboard. Each badge exposes a live discovery-network count directly inside its label, using a <strong>label-first</strong> syntax that mirrors the connections filter legends. The four badges always render in a fixed sequence.
                                 </p>
                             </div>
 
                             {/* Token Spec Grid */}
-                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-                                {/* SEED */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                                {/* ROOT ARTISTS */}
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
                                     <div className="mb-4">
-                                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                            SEED: 3
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                                            ROOT ARTISTS: 3
                                         </span>
                                     </div>
-                                    <h4 className="font-medium text-white mb-1">SEED</h4>
-                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of seed artists the user manually anchored the Zcene around. Always visible — present even before the graph is mapped.</p>
+                                    <h4 className="font-medium text-white mb-1">ROOT ARTISTS</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of root artists the user manually anchored the Zcene around. Always visible — present even before the graph is mapped.</p>
                                     <div className="space-y-1 mt-auto">
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: SEED: {'{'}seedList.length{'}'}</p>
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-400 bg-zinc-800</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: ROOT ARTISTS: {'{'}seedList.length{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 rounded-full border-white/10</p>
                                     </div>
                                 </div>
 
-                                {/* AI ARTISTS */}
+                                {/* ARTISTS */}
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
                                     <div className="mb-4">
-                                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                            AI ARTISTS: 24
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                                            ARTISTS: 24
                                         </span>
                                     </div>
-                                    <h4 className="font-medium text-white mb-1">AI ARTISTS</h4>
-                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of non-seed artist nodes in the graph — i.e. all artists recommended by the AI engine. Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
+                                    <h4 className="font-medium text-white mb-1">ARTISTS</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of non-seed nodes in the graph — i.e. all artists recommended by the discovery engine. Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
                                     <div className="space-y-1 mt-auto">
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: AI ARTISTS: {'{'}recommendedCount{'}'}</p>
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-400 bg-zinc-800</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: ARTISTS: {'{'}recommendedCount{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 rounded-full border-white/10</p>
+                                    </div>
+                                </div>
+
+                                {/* LABELS */}
+                                <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
+                                    <div className="mb-4">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                                            LABELS: 8
+                                        </span>
+                                    </div>
+                                    <h4 className="font-medium text-white mb-1">LABELS</h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of label nodes mapped in the graph. Only rendered when label nodes exist.</p>
+                                    <div className="space-y-1 mt-auto">
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: LABELS: {'{'}labelCount{'}'}</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 rounded-full border-white/10</p>
                                     </div>
                                 </div>
 
                                 {/* DEEP CUTS */}
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
                                     <div className="mb-4">
-                                        <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                                             DEEP CUTS: 7
                                         </span>
                                     </div>
@@ -1589,25 +2695,25 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Count of artists the user has promoted to their active Deep Cut stack (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.activeNodes</code>). Only rendered when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.</p>
                                     <div className="space-y-1 mt-auto">
                                         <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Copy: DEEP CUTS: {'{'}deepCutsCount{'}'}</p>
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-400 bg-zinc-800</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Style: text-zinc-300 bg-zinc-900/50 rounded-full border-white/10</p>
                                     </div>
                                 </div>
 
                                 {/* MAPPED / STATUS */}
                                 <div className="flex flex-col p-5 border border-zinc-700/50 rounded-none hover:border-zinc-500 transition-colors bg-zinc-900/20">
-                                    <div className="mb-4 flex gap-2">
-                                        <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 font-mono whitespace-nowrap">
+                                    <div className="mb-4 flex flex-col items-start gap-2">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-950 font-bold px-1.5 py-0.5 rounded-md whitespace-nowrap w-fit" style={{ backgroundColor: '#aaff00' }}>
                                             Mapped
                                         </span>
-                                        <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 font-mono whitespace-nowrap">
+                                        <span className="text-[9px] uppercase tracking-wide text-zinc-500 font-bold px-1.5 py-0.5 bg-zinc-800/80 rounded-md border border-zinc-800 font-mono whitespace-nowrap backdrop-blur-sm w-fit">
                                             Unmapped
                                         </span>
                                     </div>
                                     <h4 className="font-medium text-white mb-1">MAPPED / STATUS</h4>
-                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Binary mapping state. <strong>Mapped</strong> (accent colour) renders when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. <strong>Unmapped</strong> (muted) renders otherwise. Table list exposes both states; card footer only shows Mapped.</p>
+                                    <p className="text-sm text-zinc-400 leading-relaxed mb-4 flex-grow">Binary mapping state. <strong>Mapped</strong> (accent color) renders when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. <strong>Unmapped</strong> (muted) renders otherwise. Table list exposes both states in a column; card header shows mapping status beneath the date.</p>
                                     <div className="space-y-1 mt-auto">
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Mapped: text-primary/60 bg-primary/10</p>
-                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Unmapped: text-zinc-500 bg-zinc-800</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block">Mapped: text-zinc-950 bg-accent</p>
+                                        <p className="text-[10px] text-zinc-500 font-mono bg-zinc-800 px-2 py-1 rounded-none inline-block mt-1">Unmapped: text-zinc-500 bg-zinc-800/80</p>
                                     </div>
                                 </div>
                             </div>
@@ -1619,15 +2725,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h4 className="text-base font-medium text-white">Label-First Copy Format</h4>
                                 </div>
                                 <p className="text-sm text-zinc-400 leading-relaxed max-w-3xl">
-                                    All discovery metric badges use a <strong>label-first</strong> syntax — the descriptive label appears before the numeric value, separated by a colon and space. This mirrors the language used in the spiderweb filter legends and creates instant visual alignment across the product.
+                                    All discovery metric badges use a <strong>label-first</strong> syntax — the descriptive label appears before the numeric value, separated by a colon and space. This mirrors the language used in the connections filter legends and creates instant visual alignment across the product.
                                 </p>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
-                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"SEED: X"</div>
-                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"AI ARTISTS: X"</div>
+                                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 pt-2">
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"ROOT ARTISTS: X"</div>
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"ARTISTS: X"</div>
+                                    <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"LABELS: X"</div>
                                     <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-3 font-mono text-sm text-primary">"DEEP CUTS: X"</div>
                                 </div>
                                 <p className="text-sm text-zinc-50 leading-relaxed max-w-3xl pt-1">
-                                    Because the count is always a plain integer, this format <strong>removes the need for conditional plural string formatting</strong> (e.g. "1 Seed" vs "2 Seeds"). The label is always singular and the number speaks for itself.
+                                    Because the count is always a plain integer, this format <strong>removes the need for conditional plural string formatting</strong> (e.g. "1 Root Artist" vs "2 Root Artists"). The label is always singular and the number speaks for itself.
                                 </p>
                             </div>
 
@@ -1638,7 +2745,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h4 className="text-base font-medium text-white">Mobile Safety — <code className="text-sm text-primary font-mono">whitespace-nowrap</code></h4>
                                 </div>
                                 <p className="text-sm text-zinc-400 leading-relaxed max-w-3xl">
-                                    Individual badge labels <strong>must</strong> carry <code className="text-xs text-primary bg-zinc-800 px-1.5 py-0.5 rounded font-mono">whitespace-nowrap</code>. Without it, a badge like <em>"AI ARTISTS: 24"</em> can split across two lines on narrow viewports, breaking the data token into an unreadable fragment. The class ensures each badge renders as a solid, locked visual unit regardless of screen width.
+                                    Individual badge labels <strong>must</strong> carry <code className="text-xs text-primary bg-zinc-800 px-1.5 py-0.5 rounded font-mono">whitespace-nowrap</code>. Without it, a badge like <em>"ARTISTS: 24"</em> can split across two lines on narrow viewports, breaking the data token into an unreadable fragment. The class ensures each badge renders as a solid, locked visual unit regardless of screen width.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
                                     <div className="space-y-2">
@@ -1647,10 +2754,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <code className="text-xs text-zinc-300 font-mono leading-relaxed">className="... whitespace-nowrap"</code>
                                         </div>
                                         <div className="flex gap-1.5 flex-wrap p-3 bg-zinc-900 rounded-lg border border-zinc-800">
-                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">SEED: 3</span>
-                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">AI ARTISTS: 24</span>
-                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">DEEP CUTS: 7</span>
-                                            <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 font-mono whitespace-nowrap">Mapped</span>
+                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-2 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">ROOT ARTISTS: 3</span>
+                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-2 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">ARTISTS: 24</span>
+                                            <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-2 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">DEEP CUTS: 7</span>
                                         </div>
                                     </div>
                                     <div className="space-y-2">
@@ -1659,7 +2765,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <code className="text-xs text-zinc-300 font-mono leading-relaxed">className="..." {/* no whitespace-nowrap */}</code>
                                         </div>
                                         <div className="p-3 bg-zinc-900 rounded-lg border border-zinc-800">
-                                            <p className="text-xs text-zinc-500 leading-relaxed italic">Labels may break mid-token ("AI ARTISTS:" / "24") on narrow mobile viewports, destroying scannability.</p>
+                                            <p className="text-xs text-zinc-500 leading-relaxed italic">Labels may break mid-token ("ARTISTS:" / "24") on narrow mobile viewports, destroying scannability.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -1727,15 +2833,21 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             {/* Cards inside this parent record crate compartment */}
                                             <div className="grid grid-cols-1 gap-4 w-full md:w-fit">
                                                 {/* Inner Mock Card */}
-                                                <div className="bg-zinc-900 border border-zinc-700/50 p-5 flex flex-col justify-between min-h-[160px] w-full md:w-[360px] shadow-xl">
+                                                <div className="bg-zinc-900 border border-zinc-700/50 rounded-2xl p-5 flex flex-col justify-between min-h-[160px] w-full md:w-[350px] hover:border-primary transition-all cursor-pointer">
                                                     <div className="space-y-3">
                                                         <h3 className="text-sm font-medium text-white truncate">Grayscale</h3>
-                                                        <p className="font-mono text-[10px] text-zinc-400">Edited 05/07/2026</p>
+                                                        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                                                            <p className="font-mono text-[10px] text-zinc-400">Edited 05/07/2026</p>
+                                                            <span className="text-[9px] uppercase tracking-wide text-zinc-950 font-bold px-2 py-0.5 rounded-full whitespace-nowrap transition-colors w-fit mt-0.5" style={{ backgroundColor: '#aaff00' }}>
+                                                                Mapped
+                                                            </span>
+                                                        </div>
                                                     </div>
                                                     <div className="mt-4 pt-3 border-t border-white/5 flex items-center gap-1.5 flex-wrap">
-                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded border border-white/5 font-mono whitespace-nowrap">SEED: 1</span>
-                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded border border-white/5 font-mono whitespace-nowrap">AI ARTISTS: 22</span>
-                                                        <span className="text-[8px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded border border-primary/10 font-mono whitespace-nowrap">Mapped</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">ROOT ARTISTS: 1</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">ARTISTS: 22</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">LABELS: 3</span>
+                                                        <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">DEEP CUTS: 5</span>
                                                     </div>
                                                 </div>
                                             </div>
@@ -1797,16 +2909,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <p className="text-[10px] font-semibold text-emerald-400 uppercase tracking-widest">✓ New — Production</p>
                                             <div className="bg-zinc-950 border border-zinc-800 rounded-lg p-4 space-y-2">
                                                 <code className="text-xs font-mono text-zinc-400 block">
-                                                    flex-wrap <span className="text-emerald-400">gap-x-1.5 gap-y-1.5</span>
+                                                    flex-wrap <span className="text-emerald-400">gap-x-1 gap-y-1.5</span>
                                                 </code>
-                                                <p className="text-xs text-zinc-500 leading-relaxed">Badges wrap naturally when space is tight, with consistent 6px horizontal and vertical gutters. Each badge still remains a solid unit via <code className="text-[10px] text-primary bg-zinc-900 px-1 rounded">whitespace-nowrap</code> on the label itself.</p>
+                                                <p className="text-xs text-zinc-500 leading-relaxed">Badges wrap naturally when space is tight, with consistent 4px horizontal and 6px vertical gutters. Each badge still remains a solid unit via <code className="text-[10px] text-primary bg-zinc-900 px-1 rounded">whitespace-nowrap</code> on the label itself.</p>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="pt-2 border-t border-zinc-800 space-y-1">
                                         <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Full wrapper class string</p>
                                         <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-3 block">
-                                            flex items-center flex-wrap gap-x-1.5 gap-y-1.5
+                                            flex items-center flex-wrap gap-x-1 gap-y-1.5
                                         </code>
                                     </div>
                                 </div>
@@ -1818,46 +2930,51 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <h4 className="text-base font-medium text-zinc-200">Project Card — Grid View Preview</h4>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                        Badges sit in the card footer, separated from the title/timestamp block by a <code className="text-xs text-primary bg-zinc-800 px-1 rounded">border-t border-white/5</code> rule. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">AI ARTISTS</code> and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present.
+                                        Badges sit flush in the card footer, without top borders, creating a cleaner negative space. Card backgrounds support a 50/50 split grid when multiple seeds are present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">ARTISTS</code>, <code className="text-xs text-primary bg-zinc-800 px-1 rounded">LABELS</code>, and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">MAPPED</code> status pill now lives in the card header directly beneath the modified date.
                                     </p>
 
                                     {/* Mock Card */}
                                     <div className="max-w-xs">
-                                        <div className="bg-zinc-900 border border-zinc-700/50 rounded-none p-5 flex flex-col justify-between min-h-[160px] shadow-xl">
+                                        <div className="bg-zinc-900 border border-zinc-700/50 rounded-none p-5 flex flex-col justify-between min-h-[160px]">
                                             {/* Card Header */}
                                             <div className="space-y-4">
-                                                <div className="flex items-center justify-between gap-3">
-                                                    <h3 className="text-base font-medium text-white truncate">Midwest Emo Roots</h3>
-                                                    <div className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-600 flex items-center justify-center">
-                                                        <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                                <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                                                    <div className="flex items-center justify-between gap-3">
+                                                        <h3 className="text-base font-medium text-white truncate">Midwest Emo Roots</h3>
+                                                        <div className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-600 flex items-center justify-center">
+                                                            <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                                        </div>
                                                     </div>
+                                                    <p className="font-mono text-[10px] text-zinc-300 font-normal uppercase tracking-widest">Edited 27/06/2026</p>
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-950 font-bold px-2 py-0.5 rounded-full whitespace-nowrap transition-colors w-fit mt-0.5" style={{ backgroundColor: '#aaff00' }}>
+                                                        Mapped
+                                                    </span>
                                                 </div>
-                                                <p className="font-mono text-xs text-zinc-300 font-normal">Edited 27/06/2026 • 8:09 am</p>
                                             </div>
                                             {/* Card Footer — production badge sequence */}
-                                            <div className="mt-4 pt-4 border-t border-white/5 flex items-center">
-                                                <div className="flex items-center flex-wrap gap-x-1.5 gap-y-1.5">
-                                                    {/* 1. SEED */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                        SEED: 3
+                                            <div className="mt-3 flex items-center">
+                                                <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
+                                                    {/* 1. ROOT ARTISTS */}
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                                                        ROOT ARTISTS: 3
                                                     </span>
-                                                    {/* 2. AI ARTISTS */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                        AI ARTISTS: 24
+                                                    {/* 2. ARTISTS */}
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                                                        ARTISTS: 24
                                                     </span>
-                                                    {/* 3. DEEP CUTS */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                    {/* 3. LABELS */}
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                                                        LABELS: 8
+                                                    </span>
+                                                    {/* 4. DEEP CUTS */}
+                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
                                                         DEEP CUTS: 7
-                                                    </span>
-                                                    {/* 4. MAPPED */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-primary/60 font-bold px-1.5 py-0.5 bg-primary/10 rounded-md border border-primary/10 font-mono whitespace-nowrap">
-                                                        Mapped
                                                     </span>
                                                 </div>
                                             </div>
                                         </div>
                                         <p className="text-[10px] text-zinc-500 font-mono mt-2">
-                                            Sequence: SEED → AI ARTISTS → DEEP CUTS → MAPPED
+                                            Sequence: ROOT ARTISTS → ARTISTS → LABELS → DEEP CUTS
                                         </p>
                                     </div>
                                 </div>
@@ -1879,8 +2996,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
                                                     <th className="py-4 px-6 font-semibold">Title</th>
                                                     <th className="py-4 px-6 font-semibold">Modified Date</th>
-                                                    <th className="py-4 px-6 font-semibold">Seeds</th>
-                                                    <th className="py-4 px-6 font-semibold">AI Artists</th>
+                                                    <th className="py-4 px-6 font-semibold">Roots</th>
+                                                    <th className="py-4 px-6 font-semibold">Artists</th>
                                                     <th className="py-4 px-6 font-semibold">Deep Cuts</th>
                                                     <th className="py-4 px-6 font-semibold">Status</th>
                                                     <th className="py-4 px-6 font-semibold text-right">Actions</th>
@@ -1896,21 +3013,21 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">27/06/2026 • 8:09 am</td>
-                                                    {/* 1. SEED */}
+                                                    {/* 1. ROOT ARTISTS */}
                                                     <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
-                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                            SEED: 3
+                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                                            ROOT ARTISTS: 3
                                                         </span>
                                                     </td>
-                                                    {/* 2. AI ARTISTS */}
+                                                    {/* 2. ARTISTS */}
                                                     <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
-                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                            AI ARTISTS: 24
+                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                                            ARTISTS: 24
                                                         </span>
                                                     </td>
                                                     {/* 3. DEEP CUTS */}
                                                     <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
-                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
+                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
                                                             DEEP CUTS: 7
                                                         </span>
                                                     </td>
@@ -1933,10 +3050,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         </div>
                                                     </td>
                                                     <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">New Project</td>
-                                                    {/* 1. SEED */}
+                                                    {/* 1. ROOT ARTISTS */}
                                                     <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
-                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-md border border-white/5 font-mono whitespace-nowrap">
-                                                            SEED: 1
+                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
+                                                            ROOT ARTISTS: 1
                                                         </span>
                                                     </td>
                                                     {/* 2–3: hidden when unmapped */}
@@ -1960,7 +3077,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </table>
                                     </div>
                                     <p className="text-[10px] text-zinc-500 font-mono">
-                                        Row 1: fully mapped — all 4 badges present. Row 2: unmapped — AI ARTISTS &amp; DEEP CUTS columns suppressed (—).
+                                        Row 1: fully mapped — all 4 badges present. Row 2: unmapped — ARTISTS &amp; DEEP CUTS columns suppressed (—).
                                     </p>
                                 </div>
 
@@ -1976,43 +3093,91 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             {/* Input Size Scale */}
                             <div className="p-8 bg-zinc-900/50 rounded-none border border-zinc-800">
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-primary">Input Size Scale</h3>
+                                    <h3 className="text-xl font-medium text-primary">Input & Select Size Scale</h3>
                                     <div className="flex flex-wrap gap-2">
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px (Standardized)</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm (Standardized)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Component: Select, InputSizes</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Variants: sm, md</span>
                                     </div>
                                 </div>
                                 
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                     <div className="space-y-4">
-                                        <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex items-center justify-center">
-                                            <input 
+                                        <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex flex-col gap-4 justify-center">
+                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                 type="text" 
-                                                placeholder="Desktop Input" 
-                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                placeholder="Compact Input (sm)" 
+                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${InputSizes.sm.base} px-3`} 
                                             /> 
+                                            <Select variant="sm" defaultValue="none">
+                                                <option value="none">Compact Select (sm)</option>
+                                            </Select>
                                         </div>
                                         <div>
-                                            <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Desktop (Standard)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code> (38px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
-                                            <p className="text-xs text-zinc-400 mt-2">The default size for all desktop viewports (lg+).</p>
+                                            <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Compact (sm)</h4>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-1.5</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-xs</code></p>
+                                            <p className="text-xs text-zinc-400 mt-2">Used for tight inline controls, such as headers and sub-nav filters.</p>
                                         </div>
                                     </div>
 
                                     <div className="space-y-4">
-                                        <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex items-center justify-center">
-                                            <input 
+                                        <div className="p-6 bg-zinc-950 rounded-none border border-zinc-800 flex flex-col gap-4 justify-center">
+                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                 type="text" 
-                                                placeholder="Mobile Input" 
-                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                placeholder="Standard Input (md)" 
+                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${InputSizes.md.base} px-4`} 
                                             /> 
+                                            <Select variant="md" defaultValue="none">
+                                                <option value="none">Standard Select (md)</option>
+                                            </Select>
                                         </div>
                                         <div>
-                                            <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Mobile (Standardized)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code> (38px height) | Radius: 12px (<code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">rounded-xl</code>)</p>
-                                            <p className="text-xs text-zinc-400 mt-2">Standardized to text-sm and py-2 across all breakpoints since viewport configuration prevents auto-zoom.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Standard (md)</h4>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code></p>
+                                            <p className="text-xs text-zinc-400 mt-2">The default size for all main forms and primary layout inputs.</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Fully-Featured Search Input */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Fully-Featured Search Input</h3>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
+                                    <div className="space-y-4">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Empty State (Mic Available)</p>
+                                        <div className="relative">
+                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
+                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
+                                                type="search" 
+                                                placeholder="Search..." 
+                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                disabled
+                                            />
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                                                <button className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-500 hover:text-white transition-colors leading-none" title="Search by voice">
+                                                    <MicIcon className="!text-[18px]" />
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Filled State (Clear Available)</p>
+                                        <div className="relative">
+                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
+                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
+                                                type="search" 
+                                                placeholder="Search..." 
+                                                defaultValue="Spaced"
+                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                disabled
+                                            />
+                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
+                                                <button className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search">
+                                                    <span className="material-symbols-outlined !text-[18px]">close</span>
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2047,6 +3212,20 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <InteractiveFilterableSelectDemo />
                                 </div>
+                                <div className="mt-8 border border-zinc-800 bg-zinc-900/30 p-8">
+                                    <div className="space-y-4 max-w-sm">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Toolbar Dropdown Trigger</p>
+                                        <button className={`flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-200 px-3 ${LayoutSizes.controlBar} text-xs font-medium transition-colors`}>
+                                            <span className="material-symbols-outlined !text-[14px]">filter_list</span>
+                                            Filter List
+                                            <span className="material-symbols-outlined !text-[14px]">expand_more</span>
+                                        </button>
+                                        <p className="text-xs text-zinc-500 leading-relaxed">
+                                            Custom popover triggers used in toolbars (like the "All Genres" filter). 
+                                            Must explicitly use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">{LayoutSizes.controlBar}</code> for the height to guarantee perfect vertical alignment alongside segmented toggles.
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
 
                             {/* Input States */}
@@ -2063,7 +3242,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Focus State</p>
-                                        <input 
+                                        <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                             type="text" 
                                             defaultValue="Active Focus" 
                                             className="w-full appearance-none rounded-xl border border-primary bg-zinc-950 py-2 px-4 text-sm text-white ring-1 ring-primary outline-none" 
@@ -2071,7 +3250,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Error State</p>
-                                        <input 
+                                        <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                             type="text" 
                                             defaultValue="Invalid Entry" 
                                             className="w-full appearance-none rounded-xl border-red-500 bg-zinc-950 py-2 px-4 text-sm text-white focus:ring-1 focus:ring-red-500 outline-none" 
@@ -2080,7 +3259,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Disabled State</p>
-                                        <input 
+                                        <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                             disabled
                                             type="text" 
                                             placeholder="Locked Input" 
@@ -2089,55 +3268,118 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                             </div>
+
+                            {/* Password Input Variant */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Password Input</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">type=&quot;password&quot; / &quot;text&quot;</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Icons: VisibilityIcon / VisibilityOffIcon</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-6 leading-relaxed max-w-2xl">
+                                    All password inputs must include a show/hide toggle using the <strong>VisibilityIcon</strong> and <strong>VisibilityOffIcon</strong> from <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">components/Icons.tsx</code>.
+                                    The input is wrapped in a <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">relative</code> container. <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">pr-11</code> is added to the input to prevent text from sliding under the button.
+                                    The toggle button uses <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">tabIndex={-1}</code> to keep tab order on the submit action.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
+                                    <PasswordInputDemo />
+                                    <div className="space-y-4">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Implementation</p>
+                                        <pre className="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl p-4 overflow-x-auto leading-relaxed font-mono">{
+`const [show, setShow] = useState(false);
+
+<div className="relative">
+  <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
+    type={show ? 'text' : 'password'}
+    className="... pr-11"
+  />
+  <button
+    type="button"
+    tabIndex={-1}
+    onClick={() => setShow(v => !v)}
+    className="absolute right-3 top-1/2
+               -translate-y-1/2 ..."
+  >
+    {show
+      ? <VisibilityOffIcon className="w-4 h-4" />
+      : <VisibilityIcon className="w-4 h-4" />
+    }
+  </button>
+</div>`
+                                        }</pre>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </section>
+                    {/* 11.5 FORM CONTROLS */}
+                    <section id="form-controls">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Form Controls</h2>
+                        <div className="space-y-12">
+                            {/* Checkbox Variant */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Checkbox</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Component: Checkbox</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 mb-6 leading-relaxed max-w-2xl">
+                                    Zcene uses a fully custom Checkbox built with Tailwind <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">peer</code> utilities over a visually hidden native input to maintain accessibility while enforcing brand styling.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
+                                    <div className="space-y-4 p-4 bg-zinc-900/60 rounded-xl border border-zinc-700/50 h-fit">
+                                        <Checkbox label="Default unchecked state" />
+                                        <Checkbox checked readOnly label="Checked state" />
+                                        <Checkbox disabled label="Disabled state" className="opacity-50 pointer-events-none" />
+                                    </div>
+                                    <div className="space-y-4">
+                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Implementation</p>
+                                        <pre className="text-xs text-zinc-300 bg-zinc-950 border border-zinc-800 rounded-xl p-4 overflow-x-auto leading-relaxed font-mono">{
+`<Checkbox 
+  label="I agree to the terms"
+  checked={isChecked}
+  onChange={(e) => setIsChecked(e.target.checked)}
+/>`
+                                        }</pre>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {/* Radio buttons will go here */}
+                        </div>
+                    </section>
+
 
                     {/* 12. SLIDERS */}
                     <section id="sliders">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Sliders</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Range controls are used within the Spiderweb Preferences dialog to allow users to tune the visualization density and node scaling.
+                                Range controls allow users to tune bounded temporal intervals (Founded Year Ranges) in the Roots Anchors panel and Style Profiles modal with real-time bidirectional constraint handling.
                             </p>
                             
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                 <div className="space-y-6">
-                                    <h3 className="text-xl font-medium text-zinc-200">Standard Range Component</h3>
-                                    <div className="p-8 bg-zinc-900/50 border border-zinc-800 space-y-6">
-                                        <div className="space-y-3">
-                                            <div className="flex justify-between items-center">
-                                                <label className="text-sm font-medium text-zinc-200">Connection Distance</label>
-                                                <span className="text-xs font-mono text-primary bg-primary/10 px-2 py-0.5 rounded-xl">3.0x</span>
-                                            </div>
-                                            <input
-                                                type="range"
-                                                min="1"
-                                                max="5"
-                                                step="0.1"
-                                                defaultValue="3"
-                                                className="w-full h-2 bg-zinc-700 rounded-xl appearance-none cursor-pointer accent-primary hover:accent-primary/80"
-                                            />
-                                            <div className="flex justify-between text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">
-                                                <span>Tight</span>
-                                                <span>Loose</span>
-                                            </div>
-                                        </div>
-                                    </div>
+                                    <h3 className="text-xl font-medium text-zinc-200">Dual-Thumb Range Component</h3>
+                                    <DualThumbRangeSliderDemo />
                                 </div>
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Visual Specification</h3>
-                                    <div className="space-y-4">
+                                    <div className="space-y-6">
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Track (Tokens)</h4>
-                                            <p className="text-sm text-zinc-400">Uses <strong>bg-zinc-700</strong> with a height of <strong>8px</strong> (h-2). Ends are <strong>rounded-xl</strong>. Value feedback via primary highlight.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Dual-Thumb Track &amp; Highlight</h4>
+                                            <p className="text-sm text-zinc-400">Uses <strong className="text-zinc-200">bg-zinc-950</strong> container with <strong className="text-zinc-200">border border-zinc-800</strong> at a height of <strong className="text-zinc-200">6px</strong> (<code>h-1.5</code>). Active sub-range is highlighted with <strong className="text-primary font-mono">bg-primary</strong>, falling back to <strong className="text-zinc-400 font-mono">bg-zinc-600/50</strong> when idle.</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Thumb (Tokens)</h4>
-                                            <p className="text-sm text-zinc-400">Powered by <strong>accent-primary</strong>. Uses system-native range handler for maximum responsiveness and low latency physics tuning.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Solid Yellow Thumbs</h4>
+                                            <p className="text-sm text-zinc-400">Both WebKit and Gecko thumbs use a solid <strong className="text-primary font-mono">bg-primary</strong> fill without borders (<code>w-3.5 h-3.5 rounded-full shadow-md cursor-grab</code>). Concentrically centered on the track.</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Focus States</h4>
-                                            <p className="text-sm text-zinc-400">Active state applies <strong>hover:accent-primary/80</strong>. Legend caps use <strong>zinc-500</strong> for secondary labels.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Stacking &amp; Z-Index Layering</h4>
+                                            <p className="text-sm text-zinc-400">To prevent thumb entrapment at the upper bound, the minimum thumb dynamically elevates its stacking order (<code>style=&#123;&#123; zIndex: minVal &gt; maxBound - 5 ? 5 : 3 &#125;&#125;</code>) while the maximum thumb resides at <code>z-[4]</code>.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -2192,9 +3434,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     <section id="toasts">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Toasts</h2>
                         <div className="flex justify-center p-12 bg-zinc-950 rounded-xl border border-zinc-800">
-                             <div className="bg-brand-black text-primary px-6 py-3 rounded-xl shadow-2xl flex items-center justify-center gap-3 border border-primary/50">
-                                <span className="material-symbols-outlined !text-[20px]">check_circle</span>
-                                <span className="text-sm font-semibold tracking-tight">Artist seed registered in the curation queue</span>
+                             <div className="bg-brand-black text-primary px-4 py-3 rounded-xl shadow-2xl flex items-center justify-between gap-3 border border-primary/50 w-full max-w-sm">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined !text-[20px]">check_circle</span>
+                                    <span className="text-sm font-semibold tracking-tight pr-2">Artist seed registered in the curation queue</span>
+                                </div>
+                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center transition-opacity leading-none opacity-60 hover:opacity-100">
+                                    <span className="material-symbols-outlined !text-[16px]">close</span>
+                                </button>
                              </div>
                         </div>
                     </section>
@@ -2208,14 +3455,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                  <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-xl flex flex-col items-center gap-4">
-                                    <span className="h-8 w-8 rounded-lg flex items-center justify-center text-sm font-semibold border-2 bg-brand-black text-primary border-primary/50 shadow-[0_0_12px_rgba(246,228,104,0.3)]">12</span>
+                                    <span className="h-8 w-8 rounded-lg flex items-center justify-center text-sm font-semibold border-2 bg-zinc-900 text-white border-white/20">12</span>
                                     <div className="text-center">
                                         <p className="text-sm font-medium text-white">Large (32px)</p>
                                         <p className="text-xs text-zinc-500 mt-1">Action State</p>
                                     </div>
                                  </div>
                                  <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-xl flex flex-col items-center gap-4">
-                                    <span className="h-5 w-5 rounded-lg flex items-center justify-center text-[9px] font-semibold border bg-brand-black text-primary border-primary/50">8</span>
+                                    <span className="h-5 w-5 rounded-lg flex items-center justify-center text-[9px] font-semibold border bg-zinc-900 text-white border-white/20">8</span>
                                     <div className="text-center">
                                         <p className="text-sm font-medium text-white">Medium (20px)</p>
                                         <p className="text-xs text-zinc-500 mt-1">Action State</p>
@@ -2234,8 +3481,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest mb-4">Implementation Logic</h4>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-2">
-                                        <p className="text-sm text-primary font-semibold">Action State</p>
-                                        <p className="text-xs text-zinc-400 leading-relaxed">Used when new data is available or the user needs to take a primary action (e.g., Update Zcene, Unread Deep Cut cards). Uses high-contrast yellow.</p>
+                                        <p className="text-sm text-white font-semibold">Action State</p>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">Used when new data is available or the user needs to take a primary action (e.g., Update Zcene, Unread Deep Cut cards). Uses high-contrast monochrome tones.</p>
                                     </div>
                                     <div className="space-y-2">
                                         <p className="text-sm text-zinc-500 font-semibold">Passive State</p>
@@ -2259,34 +3506,35 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200">Visual Anatomy</h3>
                                     <div className="p-8 bg-zinc-950 rounded-xl border border-zinc-800 flex flex-col items-center justify-center gap-6">
                                         <div className="flex justify-between items-center w-full max-w-sm px-4 py-2 border border-zinc-700/50 bg-zinc-900 rounded-xl gap-3">
-                                            {/* Left-Aligned Cluster */}
-                                            <div className="flex items-center space-x-3 overflow-hidden">
-                                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
-                                                    <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
-                                                </button>
-                                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
-                                                    <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
-                                                </button>
-                                                
-                                                {/* Dots Track Wrapper with Clamped Width and Right Edge Fade */}
-                                                <div className="relative flex items-center max-w-[80px] overflow-hidden flex-shrink-0">
-                                                    <div className="flex items-center gap-1 flex-nowrap pr-4 overflow-hidden">
-                                                        <div className="h-1 w-4 bg-primary transition-all rounded-full flex-shrink-0" />
-                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
-                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
-                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
-                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
-                                                        <div className="h-1 w-1 bg-zinc-600 transition-all rounded-full flex-shrink-0" />
+                                            <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
+                                                <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
+                                            </button>
+                                            
+                                            {/* Dots Track Wrapper */}
+                                            <div className="flex-1 flex justify-center items-center overflow-hidden px-4">
+                                                <div className="relative flex items-center overflow-hidden w-full h-6 max-w-[140px] md:max-w-[200px] lg:max-w-[260px]">
+                                                    <div className="flex items-center justify-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1">
+                                                        <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
+                                                            <div className="h-1 w-4 bg-primary transition-all rounded-full flex-shrink-0" />
+                                                        </div>
+                                                        <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
+                                                            <div className="h-1 w-1 bg-zinc-600 group-hover:bg-zinc-400 transition-all rounded-full flex-shrink-0" />
+                                                        </div>
+                                                        <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
+                                                            <div className="h-1 w-1 bg-zinc-600 group-hover:bg-zinc-400 transition-all rounded-full flex-shrink-0" />
+                                                        </div>
+                                                        <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
+                                                            <div className="h-1 w-1 bg-zinc-600 group-hover:bg-zinc-400 transition-all rounded-full flex-shrink-0" />
+                                                        </div>
+                                                        <div className="flex items-center justify-center h-full px-[2px] cursor-pointer group">
+                                                            <div className="h-1 w-1 bg-zinc-600 group-hover:bg-zinc-400 transition-all rounded-full flex-shrink-0" />
+                                                        </div>
                                                     </div>
-                                                    {/* Fade Overlay */}
-                                                    <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-r from-transparent to-zinc-900 pointer-events-none" />
                                                 </div>
                                             </div>
 
-                                            {/* Right-Aligned Magazine Trigger Mock */}
-                                            <button className="flex items-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-all text-xs font-medium shrink-0 leading-none">
-                                                <span className="material-symbols-outlined !text-[16px]">auto_stories</span>
-                                                <span>Magazine View</span>
+                                            <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-xl transition-colors">
+                                                <span className="material-symbols-outlined !text-[18px]">chevron_right</span>
                                             </button>
                                         </div>
                                     </div>
@@ -2296,7 +3544,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Alignment & Layout</h4>
-                                            <p className="text-sm text-zinc-400">Uses a split-flex row with <strong>flex justify-between items-center w-full px-4 py-2 bg-zinc-900</strong>. Left cluster groups navigation chevrons and indicators; right cluster pins the Magazine toggle.</p>
+                                            <p className="text-sm text-zinc-400">Uses a symmetrical flex layout with <strong>flex justify-between items-center w-full px-4 py-2 bg-zinc-900</strong>. The back arrow sits on the left, the forward arrow on the right, and the dot progression track is centered symmetrically between them.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Responsive Clamping & Edge Fade</h4>
@@ -2304,7 +3552,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Control Elements</h4>
-                                            <p className="text-sm text-zinc-400">Active indicator: <strong>w-4 bg-primary</strong>. Control buttons use <strong>w-8 h-8</strong> dimensions. The Magazine button is styled with a subtle border and <strong>auto_stories</strong> icon.</p>
+                                            <p className="text-sm text-zinc-400">Active indicator: <strong>w-4 bg-primary</strong>. Control buttons use <strong>w-8 h-8</strong> dimensions.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -2329,7 +3577,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             subtext="Mapping your Zcene connections... This usually takes a minute or two to find the best musical paths."
                                         />
                                     </div>
-                                    <p className="text-sm text-zinc-500 leading-relaxed">Used during the primary spiderweb generation when high-volume relational data is being structured.</p>
+                                    <p className="text-sm text-zinc-500 leading-relaxed">Used during the primary connections graph generation when high-volume relational data is being structured.</p>
                                 </div>
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">In-Panel Detail Loader</h3>
@@ -2350,30 +3598,61 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Dialogs</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Dialogs follow a strict modal pattern to ensure focus during critical user actions or configuration changes. All dialog containers use a **hard edge (0px)** radius to signify structural permanence.
+                                Dialogs utilize a viewport-aware responsive architecture. On mobile viewports, modals render as an ergonomic, bottom-anchored slide-up sheet with rounded top corners (rounded-t-2xl). On desktop viewports, they render as centered, smoothly rounded dialogs (rounded-2xl) that float comfortably above the atmospheric backdrop.
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Visual Anatomy</h3>
-                                    <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800">
-                                        <div className="bg-background-dark border border-zinc-600 rounded-none overflow-hidden shadow-2xl">
-                                            <header className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
-                                                    <h3 className="font-medium text-white text-base">Modal Title</h3>
+                                    <div className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 space-y-8">
+                                        <div>
+                                            <h4 className="text-sm font-medium text-zinc-400 mb-3">Desktop (Centered)</h4>
+                                            <div className="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800 flex items-center justify-center min-h-[200px]">
+                                                <div className="bg-background-dark border border-zinc-600 rounded-2xl overflow-hidden relative w-full max-w-[300px]">
+                                                    <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
+                                                            <h3 className="font-medium text-white text-base">Modal Title</h3>
+                                                        </div>
+                                                        <span className="material-symbols-outlined text-zinc-500 !text-[18px]">close</span>
+                                                    </div>
+                                                    <div className="p-4 text-sm text-zinc-400">
+                                                        Desktop content description area. Components inside match the zinc-900/60 utility style.
+                                                    </div>
+                                                    <div className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+                                                        <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
+                                                        <button className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
+                                                            <span className="material-symbols-outlined !text-[16px]">check</span>
+                                                            Action
+                                                        </button>
+                                                    </div>
                                                 </div>
-                                                <span className="material-symbols-outlined text-zinc-500 !text-[18px]">close</span>
-                                            </header>
-                                            <div className="p-4 text-sm text-zinc-400">
-                                                Dialog content description area. Components inside match the zinc-900/60 utility style.
                                             </div>
-                                            <footer className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
-                                                <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
-                                                <button className="px-4 py-1.5 bg-primary text-brand-black rounded-xl font-medium text-sm flex items-center gap-2">
-                                                    <span className="material-symbols-outlined !text-[16px]">check</span>
-                                                    Action
-                                                </button>
-                                            </footer>
+                                        </div>
+
+                                        <div>
+                                            <h4 className="text-sm font-medium text-zinc-400 mb-3">Mobile (Bottom Sheet)</h4>
+                                            <div className="bg-zinc-900/50 rounded-lg border border-zinc-800 flex flex-col justify-end min-h-[250px] relative overflow-hidden max-w-[350px] mx-auto">
+                                                <div className="absolute inset-0 bg-black/60" />
+                                                <div className="bg-background-dark border border-zinc-600 border-b-0 rounded-t-2xl overflow-hidden relative w-full">
+                                                    <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
+                                                            <h3 className="font-medium text-white text-base">Modal Title</h3>
+                                                        </div>
+                                                        <span className="material-symbols-outlined text-zinc-500 !text-[18px]">close</span>
+                                                    </div>
+                                                    <div className="p-4 text-sm text-zinc-400">
+                                                        Mobile bottom-anchored content. Uses <code>rounded-t-2xl</code> and safe-area footer padding.
+                                                    </div>
+                                                    <div className="p-3 pb-6 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
+                                                        <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
+                                                        <button className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
+                                                            <span className="material-symbols-outlined !text-[16px]">check</span>
+                                                            Action
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2382,11 +3661,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Backdrop</h4>
-                                            <code className="text-xs bg-zinc-950 text-primary px-2 py-1 rounded-xl border border-zinc-800 block w-fit">fixed inset-0 bg-black/60 z-[100]</code>
+                                            <p className="text-sm text-zinc-400">Wraps content in <code>&lt;ModalBackdrop&gt;</code>. Handles safe-area padding and <code>animate-slide-up-sheet</code> on mobile.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Container</h4>
-                                            <p className="text-sm text-zinc-400">Sized as <strong>max-w-md</strong> (alerts) or <strong>max-w-2xl</strong> (complex lists). Uses <strong>bg-background-dark</strong> and <strong>rounded-none</strong> (0px).</p>
+                                            <p className="text-sm text-zinc-400">Wraps content in <code>&lt;ModalContainer&gt;</code>. Responsive classes standardize on <strong>rounded-t-2xl</strong> (mobile) and <strong>rounded-2xl</strong> (desktop) with strict overflow-hidden clipping.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Header/Footer</h4>
@@ -2405,16 +3684,54 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
 
                             <div className="pt-8 border-t border-zinc-800">
+                                <h3 className="text-xl font-medium text-zinc-200 mb-4">Tabbed Profile Manager</h3>
+                                <p className="text-sm text-zinc-400 max-w-3xl leading-relaxed mb-8">
+                                    The Taste Profile modal utilizes a horizontal tab bar allowing up to 5 distinct musical contexts to be saved and quickly toggled.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                                    <div className="space-y-4">
+                                        <div className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 flex items-center justify-center min-h-[120px]">
+                                            <div className="bg-zinc-900/50 border border-zinc-800 px-3 py-2 flex flex-wrap items-center gap-1.5 w-full">
+                                                <button className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors bg-zinc-800 text-white border border-zinc-600">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                                                        Hardcore
+                                                    </div>
+                                                </button>
+                                                <button className="px-3 py-1.5 rounded-lg text-xs font-medium transition-colors text-zinc-400 hover:text-zinc-200 hover:bg-zinc-800/50 border border-transparent">
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="w-2 h-2 rounded-full bg-amber-500 opacity-30" />
+                                                        Soft Rock
+                                                    </div>
+                                                </button>
+                                                <button className="px-2 py-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors flex items-center border border-transparent">
+                                                    <span className="material-symbols-outlined !text-[16px]">add</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Specifications</h4>
+                                        <ul className="text-sm text-zinc-400 list-disc list-outside pl-4 space-y-3">
+                                            <li><strong>Tab Layout:</strong> Uses <code className="text-zinc-400">flex-wrap</code> to cleanly wrap up to 5 profile tabs on narrow viewports without clipping.</li>
+                                            <li><strong>Active State:</strong> The selected tab uses a solid <code className="text-zinc-400">bg-zinc-800</code> fill and a subtle <code className="text-zinc-400">border-zinc-600</code>.</li>
+                                            <li><strong>Color Swatches:</strong> Each profile is mapped to a semantic brand color (Purple, Emerald, Amber, Rose, Cyan) indicated by a small <code className="text-zinc-400">w-2 h-2</code> dot next to the name. Inactive profiles fade this dot to <code className="text-zinc-400">opacity-30</code>.</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-8 border-t border-zinc-800 mt-12">
                                 <h3 className="text-xl font-medium text-zinc-200 mb-4">Interactive Candidate Card (Disambiguation Pattern)</h3>
                                 <p className="text-sm text-zinc-400 mb-6 leading-relaxed max-w-3xl">
-                                    Used inside search disambiguation dialogs when presenting an instant cache hit or live AI verified entity. Features a refined thin primary border (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">border border-primary/80</code>) with a soft focus glow (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">shadow-[0_0_15px_rgba(246,228,104,0.15)]</code>) that intensifies on hover, ensuring frictionless hero selection without visual heaviness.
+                                    Used inside search disambiguation dialogs when presenting an instant cache hit or live AI verified entity. Features a refined thin secondary border (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">border border-zinc-700 hover:border-primary/50</code>) that illuminates cleanly on hover, ensuring frictionless hero selection without visual heaviness when multiple candidates are stacked.
                                 </p>
                                 <div className="max-w-md bg-zinc-950 p-6 rounded-xl border border-zinc-800">
                                     <button
                                         type="button"
-                                        className="w-full text-left p-5 bg-zinc-900 hover:bg-primary/10 border border-primary/80 hover:border-primary transition-all duration-200 flex items-center gap-4 group rounded-xl shadow-[0_0_15px_rgba(246,228,104,0.15)] hover:shadow-[0_0_20px_rgba(246,228,104,0.25)] cursor-pointer"
+                                        className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex items-center gap-4 group rounded-xl cursor-pointer"
                                     >
-                                        <span className="material-symbols-outlined text-primary group-hover:scale-110 transition-transform text-2xl flex-shrink-0">check_circle</span>
+                                        <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary group-hover:scale-110 transition-all text-2xl flex-shrink-0">check_circle</span>
                                         <div className="flex flex-col gap-0.5 min-w-0">
                                             <span className="text-white group-hover:text-primary font-medium transition-colors text-base truncate">
                                                 Spaced
@@ -2445,7 +3762,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Unified Dropdown Anatomy</h3>
                                     <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex justify-center">
-                                        <div className="w-56 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl">
+                                        <div className="w-56 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1">
                                             <div className="px-3 py-2.5 border-b border-white/5">
                                                 <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Authenticated Account</p>
                                                 <p className="text-xs font-medium text-zinc-200 truncate">user@example.com</p>
@@ -2482,6 +3799,30 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                         </div>
                                     </div>
+
+                                    <h3 className="text-xl font-medium text-zinc-200 mt-12 mb-6">Multi-Select Filter Dropdown</h3>
+                                    <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex justify-center">
+                                        <div className="w-56 rounded-xl border border-zinc-700 bg-zinc-950 flex flex-col relative z-20">
+                                            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 rounded-t-xl">
+                                                <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Filter by Genre</span>
+                                                <button className="text-[10px] font-semibold text-zinc-400 hover:text-primary transition-colors uppercase tracking-widest">Clear</button>
+                                            </div>
+                                            <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5 rounded-b-xl bg-zinc-950">
+                                                <label className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors hover:bg-zinc-800/80">
+                                                    <span className="material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors text-zinc-600">check_box_outline_blank</span>
+                                                    <span className="text-xs select-none truncate text-zinc-300">acoustic</span>
+                                                </label>
+                                                <label className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors bg-primary/10">
+                                                    <span className="material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors text-primary">check_box</span>
+                                                    <span className="text-xs select-none truncate text-white font-medium">emo</span>
+                                                </label>
+                                                <label className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors hover:bg-zinc-800/80">
+                                                    <span className="material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors text-zinc-600">check_box_outline_blank</span>
+                                                    <span className="text-xs select-none truncate text-zinc-300">punk</span>
+                                                </label>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Design Guidelines</h3>
@@ -2492,15 +3833,31 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Border Radius</h4>
-                                            <p className="text-sm text-zinc-400">Dropdown containers use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl</code> (12px) as functional interactive signifiers, separating them visually from hard-edged structural panels.</p>
+                                            <p className="text-sm text-zinc-400">Dropdown containers use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl</code> (12px) as functional interactive signifiers, harmonizing with the surrounding softened structural panels.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Typography & Smoothing</h4>
                                             <p className="text-sm text-zinc-400">Labels use compact <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-xs font-medium</code> styling to match high-density UI constraints, with metadata labels in tiny caps (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-[9px] font-bold uppercase</code>) like GUEST ACCOUNT. The container uses <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">antialiased</code> font smoothing to keep small sizes thin and readable.</p>
                                         </div>
                                         <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Icon Hover States</h4>
+                                            <p className="text-sm text-zinc-400">Context menu icons MUST remain neutral gray (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-zinc-500</code>) on hover. Hover states should only trigger subtle row background/text changes (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">hover:bg-zinc-800 hover:text-zinc-200</code>) without altering icon color.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Item Ordering</h4>
+                                            <p className="text-sm text-zinc-400">Menu items follow a strict hierarchy: Primary Action (e.g. Edit) &rarr; Secondary Action (e.g. Share) &rarr; Destructive Action (e.g. Delete, using <code className="text-xs bg-zinc-950 text-[#ef4444] px-1.5 py-0.5 font-mono">text-[#ef4444]</code>).</p>
+                                        </div>
+                                        <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Sign-In Action CTA</h4>
                                             <p className="text-sm text-zinc-400">Unauthenticated dropdowns feature a prominent primary CTA button (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-primary text-black rounded-xl px-4 py-2 text-xs font-semibold</code>) to bridge guest journeys immediately.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Multi-Select Filtering</h4>
+                                            <p className="text-sm text-zinc-400">Use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-primary/10</code> and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-primary</code> for checked states to provide clear visual feedback without overwhelming the dark theme.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Stacking Context & Rendering</h4>
+                                            <p className="text-sm text-zinc-400">To prevent WebKit GPU clipping bugs, <strong>never use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">overflow-hidden</code> on an absolute container</strong> that holds a nested scrollable element. Instead, apply <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-t-xl</code> and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-b-xl</code> explicitly to the top and bottom inner children. Always wrap the trigger in <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">relative z-10</code> to elevate the stacking context safely above adjacent flex/scroll layers.</p>
                                         </div>
                                     </div>
                                 </div>
@@ -2525,9 +3882,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         title: 'Add Artists',
                                         trigger: 'On Entry',
                                         position: 'bottom',
-                                        anchor: 'artistInputRef (Add Seed Artists Input)',
-                                        content: 'Add your seed artists to start your Zcene. These are your starting points, you can type them or select from your library.',
-                                        description: 'Instructs the user where to enter seed artists to start the visualization workflow.'
+                                        anchor: 'artistInputRef (Add Seeds Input)',
+                                        content: 'Add your seeds to start your Zcene. These are your starting points, you can type them or select from your library.',
+                                        description: 'Instructs the user where to enter seeds to start the visualization workflow.'
                                     },
                                     {
                                         id: 'step2',
@@ -2537,7 +3894,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         position: 'top',
                                         anchor: 'createZceneBtnRef (Create Zcene Button)',
                                         content: 'Click here to create your Zcene from your selected artists and see the connections visually.',
-                                        description: 'Appears once the user adds at least one seed artist, drawing their attention to the primary CTA button for graph generation.'
+                                        description: 'Appears once the user adds at least one seed, drawing their attention to the primary CTA button for graph generation.'
                                     },
                                     {
                                         id: 'step3',
@@ -2545,8 +3902,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         title: 'Filtering',
                                         trigger: 'Post-Graph',
                                         position: 'bottom (or top on mobile)',
-                                        anchor: 'desktopLegendAreaRef / mobileLegendAreaRef (Spiderweb Legend Area)',
-                                        content: 'Drag, zoom and toggle node types to focus on what matters most: Seed Artists, AI Artists, Genres, Labels, Origins, Founded.',
+                                        anchor: 'desktopLegendAreaRef / mobileLegendAreaRef (Connections Legend Area)',
+                                        content: 'Drag, zoom and toggle node types to focus on what matters most: Seeds, Artists, Genres, Labels, Origins, Founded.',
                                         description: 'Introduces interactive navigation (pan/zoom) and node filtering capabilities in the central graph canvas.'
                                     },
                                     {
@@ -2617,11 +3974,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             {/* Visual Mockup Container (7 cols) */}
                                             <div className="lg:col-span-7 bg-zinc-950 rounded-none border border-zinc-800 p-8 min-h-[260px] flex items-center justify-center relative overflow-hidden">
                                                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(246,228,104,0.03),transparent_60%)]"></div>
-                                                <div className="relative w-72 bg-primary text-brand-black p-4 rounded-xl shadow-2xl z-10 transition-all duration-300">
+                                                <div className="relative w-72 bg-primary text-brand-black p-4 rounded-xl z-10 transition-all duration-300">
                                                     <div className="text-sm font-medium leading-relaxed">
                                                         {step.content}
                                                     </div>
-                                                    <div className="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-xl bg-zinc-800 text-white shadow-lg border border-zinc-700">
+                                                    <div className="absolute -top-2 -right-2 w-6 h-6 flex items-center justify-center rounded-xl bg-zinc-800 text-white border border-zinc-700">
                                                         <span className="material-symbols-outlined !text-[14px]">close</span>
                                                     </div>
                                                     <div className={`absolute w-0 h-0 border-[6px] border-transparent ${arrowClass}`}></div>
@@ -2760,7 +4117,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Global Error Overlay</h3>
                                     <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 flex items-center justify-center">
-                                        <div className="w-full bg-red-900 border border-red-600 text-red-200 px-4 py-3 rounded-xl shadow-2xl flex items-start justify-between gap-4">
+                                        <div className="w-full bg-red-900 border border-red-600 text-red-200 px-4 py-3 rounded-xl flex items-start justify-between gap-4">
                                             <div className="flex-grow min-w-0 break-all sm:break-words pt-2.5">
                                                 <strong className="font-medium text-red-100">Error: </strong>
                                                 <span>Operational limits exceeded. The curation engine is temporarily saturated. Retrying in a moment.</span>
@@ -2827,9 +4184,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                      <h3 className="text-xl font-medium text-zinc-200">Desktop (lg+)</h3>
                                     <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 aspect-video relative flex gap-2">
-                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Artists</div>
+                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Roots</div>
                                         <div className="flex-grow h-full bg-zinc-900 border border-zinc-800 rounded-xl flex flex-col">
-                                            <div className="flex-grow flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Spiderweb</div>
+                                            <div className="flex-grow flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Connections</div>
                                             <div className="h-8 bg-zinc-800 border-t border-zinc-700 mx-2 mb-2 rounded-xl flex items-center justify-center text-[8px] text-zinc-500">Ad Space</div>
                                         </div>
                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Deep Cut</div>
@@ -2851,7 +4208,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="h-6 bg-zinc-800 border-t border-zinc-700 mt-2 rounded-xl flex items-center justify-center text-[8px] text-zinc-500">Fixed Footer Ad</div>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Stacked navigation using a high-fidelity tab system. Panels occupy 100% of the viewport width with a persistent flex-shrink ad footer pinned to the bottom. Dynamic landing routing defaults to the 'SPIDERWEB' tab if project seeds exist.
+                                        Stacked navigation using a high-fidelity tab system. Panels occupy 100% of the viewport width with a persistent flex-shrink ad footer pinned to the bottom. Dynamic landing routing defaults to the 'CONNECTIONS' tab if project seeds exist.
                                     </p>
                                 </div>
                             </div>
@@ -2946,7 +4303,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <p className="text-sm text-zinc-400 leading-relaxed">
                                             <strong>Trigger:</strong> Click 2 (desktop) or Tap 2 (mobile) on the already peeked node (or Deep Cut pagination selection).
                                             <br /><br />
-                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter and opens the sidebar Details Panel (which now houses the standard square <code>Explore</code> icon button with a compass icon and node removal controls in its header, keeping the spiderweb canvas pristine). All 1st-degree yellow connection lines remain illuminated to maintain visual context.
+                                            <strong>Behavior:</strong> Automatically dismisses/hides the floating hover box to reduce visual clutter and opens the sidebar Details Panel (which now houses the standard square <code>Explore</code> icon button with a compass icon and node removal controls in its header, keeping the connections canvas pristine). All 1st-degree yellow connection lines remain illuminated to maintain visual context.
                                         </p>
                                     </div>
                                 </div>
@@ -2973,7 +4330,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(246,228,104,0.6)]"></div>
+                                            <div className="h-2 w-2 rounded-full bg-primary"></div>
                                             <h4 className="text-base font-medium text-zinc-200">Global Layer</h4>
                                         </div>
                                         <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800 space-y-4">
@@ -2995,7 +4352,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                                     <div className="space-y-4">
                                         <div className="flex items-center gap-3">
-                                            <div className="h-2 w-2 rounded-full bg-primary shadow-[0_0_8px_rgba(246,228,104,0.6)]"></div>
+                                            <div className="h-2 w-2 rounded-full bg-primary"></div>
                                             <h4 className="text-base font-medium text-zinc-200">Carousel Layer</h4>
                                         </div>
                                         <div className="bg-zinc-950 p-5 rounded-xl border border-zinc-800 space-y-4">
@@ -3021,50 +4378,49 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                     {/* 24. BORDER RADIUS */}
                     <section id="border-radius">
-                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Border Radius</h2>
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Border Radius & Structural Geometry</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Zcene uses a hybrid border radius system to capture a 90s aesthetic while maintaining a premium interactive experience.
+                                Zcene uses a balanced, 4-tier concentric border radius system that pairs modern softened geometry with raw retro audio texture and monospace telemetry.
                             </p>
                             
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-none flex flex-col gap-4">
-                                    <div className="h-16 w-16 bg-primary rounded-none flex items-center justify-center text-brand-black font-semibold">0px</div>
+                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-2xl flex flex-col gap-4">
+                                    <div className="h-16 w-16 bg-primary rounded-2xl flex items-center justify-center text-brand-black font-semibold">16px</div>
                                     <div>
-                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Hard (rounded-none)</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">Used for all <strong>Structural Containers</strong> (cards, panels, dialogs) and <strong>Decorative Elements</strong> (icon boxes). This captures the raw, technical 90s Zcene aesthetic.</p>
+                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Structural (rounded-2xl)</h4>
+                                        <p className="text-xs text-zinc-500 mt-1">Used for all <strong>Primary Layout Panels</strong> (Roots, Connections, Deep Cuts), <strong>Dialog Windows</strong>, and <strong>Project Cards</strong>. Encloses the workspace in a soft, modern architectural silhouette.</p>
                                         <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
-                                            <li>Main application windows</li>
-                                            <li>Structural dividers and panels</li>
-                                            <li>Decorative icon boxes</li>
-                                            <li>Data grid headers</li>
+                                            <li>Three main layout panel wrappers</li>
+                                            <li>Modal and dialog window containers</li>
+                                            <li>Dashboard project grid cards</li>
+                                            <li>Telemetry and analytics cards</li>
                                         </ul>
                                     </div>
                                 </div>
-                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-none flex flex-col gap-4">
+                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-2xl flex flex-col gap-4">
+                                    <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-brand-black font-semibold">12px</div>
+                                    <div>
+                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Tactile Interactive (rounded-xl)</h4>
+                                        <p className="text-xs text-zinc-500 mt-1">Used for <strong>Clickable Controls</strong> (buttons, inputs, search fields, toggles). Creates concentric visual harmony inside parent containers.</p>
+                                        <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
+                                            <li>Primary and secondary action buttons</li>
+                                            <li>Search inputs and form controls</li>
+                                            <li>Canvas floating toolbars & ribbon</li>
+                                            <li>Dropdown menus and tooltips</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-2xl flex flex-col gap-4">
                                     <div className="h-16 w-16 bg-primary rounded-lg flex items-center justify-center text-brand-black font-semibold">6px / 8px</div>
                                     <div>
                                         <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Concentric Inner (6px / 8px)</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">Used for custom <strong>Interaction Sets</strong> (inner button frames and sliding indicators) to establish concentric geometry and softer touch indicators.</p>
+                                        <p className="text-xs text-zinc-500 mt-1">Used for custom <strong>Nested Controls</strong> (inner button frames, sliding badges, and item selection indicators) to maintain optical concentric rhythm.</p>
                                         <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
-                                            <li>ViewToggle outer container (12px / rounded-xl)</li>
-                                            <li>ViewToggle inner button frames (8px / rounded-lg)</li>
-                                            <li>Concentric nested active badge (6px / rounded-[6px])</li>
-                                            <li>Tactile selection controls</li>
-                                        </ul>
-                                    </div>
-                                </div>
-                                <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-none flex flex-col gap-4">
-                                    <div className="h-16 w-16 bg-primary rounded-xl flex items-center justify-center text-brand-black font-semibold">12px</div>
-                                    <div>
-                                        <h4 className="text-sm font-semibold text-white uppercase tracking-widest">Standard (rounded-xl)</h4>
-                                        <p className="text-xs text-zinc-500 mt-1">Used exclusively for <strong>Clickable UI</strong> (buttons, inputs, sliders) and dashboard controls. This ensures a premium, soft-curved feel for interactive elements.</p>
-                                        <ul className="text-[10px] text-zinc-600 mt-2 space-y-1 list-disc pl-3 uppercase tracking-wider font-semibold">
-                                            <li>Dashboard view switcher containers</li>
-                                            <li>Buttons and clickable icons</li>
-                                            <li>Form inputs and textareas</li>
-                                            <li>Interactive list items</li>
-                                            <li>Dropdown menus and tooltips</li>
+                                            <li>ViewToggle inner button frames (8px)</li>
+                                            <li>Sliding active status badges (6px)</li>
+                                            <li>List item hover states (8px)</li>
+                                            <li>Status counters & micro badges</li>
                                         </ul>
                                     </div>
                                 </div>
@@ -3087,7 +4443,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-md space-y-3">
                                     <h4 className="text-lg font-medium text-white">Immersive & Visual</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        We use metaphors of sight and space. We "uncover," "map," and "explore" the Spiderweb. We don't just show lists; we build connections and offer a Deep Cut into the artists you love. The dark UI is reflected in a mood that feels like a late-night record store session.
+                                        We use metaphors of sight and space. We "uncover," "map," and "explore" Connections. We don't just show lists; we build connections and offer a Deep Cut into the artists you love. The dark UI is reflected in a mood that feels like a late-night record store session.
                                     </p>
                                 </div>
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-md space-y-3">
@@ -3109,9 +4465,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </p>
                                 </div>
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3 md:col-span-2">
-                                    <h4 className="text-lg font-medium text-white">UK English (Standard)</h4>
+                                    <h4 className="text-lg font-medium text-white">US English (Standard)</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Zcene uses UK English grammar and spelling as its default verbal identity. This includes the use of "s" instead of "z" in words like <strong>analysing</strong> or <strong>organising</strong>, and keeping the "u" in words like <strong>colour</strong>. This maintains brand consistency with our technical implementation and visual metaphors.
+                                        Zcene uses US English grammar and spelling as its default verbal identity. This includes the use of "z" instead of "s" in words like <strong>analyzing</strong> or <strong>organizing</strong>, and omitting the "u" in words like <strong>color</strong>. This maintains brand consistency with our technical implementation and visual metaphors.
                                     </p>
                                 </div>
                             </div>
@@ -3154,7 +4510,22 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
 
                                 <div className="space-y-6">
-                                    <h3 className="text-xl font-medium text-zinc-200">Spiderweb Feature Visual</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Artwork Containers</h3>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        Artwork containers rendered against dynamic background glows must use an ultra-dark drop shadow and an inset subtle white highlight to separate cleanly without looking "boxed-in". We avoid outer black strokes.
+                                    </p>
+                                    <div className="space-y-4 pt-2">
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Floating Artwork Classes</p>
+                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
+                                                ring-1 ring-white/10 ring-inset
+                                            </code>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="space-y-6">
+                                    <h3 className="text-xl font-medium text-zinc-200">Connections Feature Visual</h3>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
                                         The core interactive experience. This visual uses a live, simplified D3 simulation to show real-time physics, node categorization symbols, and the floating legend UI.
                                     </p>
@@ -3200,8 +4571,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
                             
                             <div className="rounded-xl overflow-hidden border border-zinc-800">
-                                 <img src="https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg" alt="Graph Background" className="w-full h-48 object-cover opacity-60" />
-                                 <div className="p-4 bg-zinc-900 text-xs font-mono text-zinc-500">Texture: Organic Grid Overlays</div>
+                                 <div 
+                                    className="w-full h-48"
+                                    style={{
+                                      backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
+                                      backgroundSize: 'cover',
+                                      backgroundPosition: 'center'
+                                    }}
+                                 />
+                                 <div className="p-4 bg-zinc-900 text-xs font-mono text-zinc-500">Texture: Organic Grid Overlays (with 80% dark wash overlay)</div>
                             </div>
                         </div>
                     </section>
@@ -3232,7 +4610,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="space-y-2">
                                             <label className="text-xs font-semibold text-zinc-500 uppercase tracking-widest">Origin / Location</label>
                                             <div className="relative">
-                                                <input 
+                                                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                     type="text" 
                                                     placeholder="e.g. London, UK" 
                                                     className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white focus:ring-1 focus:ring-primary outline-none" 
@@ -3262,6 +4640,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
                         </div>
                     </section>
+
 
                     {/* 27.5. TELEMETRY BLOCKS */}
                     <section id="telemetry-blocks">
@@ -3297,18 +4676,36 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="space-y-6">
                                 <h3 className="text-xl font-medium text-zinc-200">Hover-Tooltip KPI Cards</h3>
                                 <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
-                                    Overview summary cards illustrating aggregate telemetry metrics. Incorporates the hover-activated micro-explanation tooltips.
+                                    Executive P&amp;L summary cards illustrating earned token revenue, real Gemini API expenditure, gross margin, and cache hit efficiency with hover-activated micro-explanation tooltips.
                                 </p>
                                 <div className="space-y-6">
                                     <div className="p-8 bg-zinc-900/40 border border-zinc-850">
                                         <TelemetryOverviewCards
                                             aggregateMetrics={{
-                                                overallEfficiency: 73.3,
-                                                totalCacheHits: 88,
-                                                totalLiveQueries: 32,
-                                                totalProjects: 12,
-                                                totalCosts: 0.0480,
-                                                totalSavings: 0.1320
+                                                customerTokensSpent: 65,
+                                                customerEarnedGbp: 6.50,
+                                                customerEarnedUsd: 8.45,
+                                                customerGrossPurchasedTokens: 100,
+                                                customerGrossPurchasedGbp: 10.00,
+                                                customerGrossPurchasedUsd: 13.00,
+                                                customerUnspentFloatTokens: 35,
+                                                customerUnspentFloatGbp: 3.50,
+                                                customerUnspentFloatUsd: 4.55,
+                                                totalPlatformAiCostUsd: 1.4776,
+                                                totalPlatformAiCostGbp: 1.14,
+                                                customerAiCostUsd: 1.1816,
+                                                adminAiCostUsd: 0.2931,
+                                                jitAiCostUsd: 0.0029,
+                                                customerNetProfitUsd: 7.2684,
+                                                customerGrossMarginPct: 86.0,
+                                                platformNetProfitUsd: 6.9724,
+                                                platformNetMarginPct: 82.5,
+                                                avgColdCurationCostUsd: 0.29,
+                                                coldCurationCount: 5,
+                                                totalCurations: 13,
+                                                directHitCurations: 7,
+                                                directHitRatePct: 53.8,
+                                                estimatedDirectHitSavingsUsd: 2.03
                                             }}
                                             isNormalUserView={false}
                                         />
@@ -3316,7 +4713,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-500 leading-relaxed">
                                         <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
                                         <p className="mt-2">
-                                            Cards render structural brutalist frames (0px borders via <code>RADIUS_TOKENS.frame</code>) and utilize inline-block triggers to reveal absolute-positioned tooltip overlay details when hovering over the info icons.
+                                            Cards render softened structural frames (rounded-2xl via <code>RADIUS_TOKENS.frame</code>) and utilize inline-block triggers to reveal absolute-positioned tooltip overlay details when hovering over the info icons.
                                         </p>
                                     </div>
                                 </div>
@@ -3326,7 +4723,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="space-y-6">
                                 <h3 className="text-xl font-medium text-zinc-200">Collapsible Ledger Table</h3>
                                 <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
-                                    High-density tabular layout presenting author-centric metrics. Click rows to test the expanding drawer sub-grids containing curation metrics, onboarding steps, and top search frequencies.
+                                    High-density tabular layout presenting author-centric P&amp;L metrics. Click rows to test the expanding drawer sub-grids containing curation actions, top artist discoveries, unified token &amp; curation receipts, and Deep Connections logs.
                                 </p>
                                 <div className="space-y-6">
                                     <div className="p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl">
@@ -3348,7 +4745,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     },
                                                     cacheEfficiency: { liveQueries: 10, cacheHits: 22 },
                                                     deepCutsOpened: 15,
-                                                    onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true }
+                                                    onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true },
+                                                    exactCost: 0.87,
+                                                    hasExactCost: true,
+                                                    tokenBalance: 60,
+                                                    lifetimeTokensPurchased: 100,
+                                                    lifetimeTokensSpent: 40,
+                                                    projects: []
                                                 },
                                                 {
                                                     email: 'explorer.beta@zcene.online',
@@ -3365,7 +4768,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     },
                                                     cacheEfficiency: { liveQueries: 8, cacheHits: 8 },
                                                     deepCutsOpened: 5,
-                                                    onboardingProgress: { step1: true, step2: true, step3: true, step4: false, step5: false }
+                                                    onboardingProgress: { step1: true, step2: true, step3: true, step4: false, step5: false },
+                                                    exactCost: 0.29,
+                                                    hasExactCost: true,
+                                                    tokenBalance: 30,
+                                                    lifetimeTokensPurchased: 50,
+                                                    lifetimeTokensSpent: 20,
+                                                    projects: []
                                                 }
                                             ]}
                                             expandedRow={demoExpandedRow}
@@ -3409,7 +4818,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4">
                                     <h4 className="text-lg font-medium text-white">Mobile Footer Standard</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Mobile viewports employ a persistent footer to house advertisements. This ensures the unit remains visible regardless of the active dashboard tab (Artists, Spiderweb, or Deep Cut). To maintain the immersive feel, vertical spacing is kept to a strict minimum.
+                                        Mobile viewports employ a persistent footer to house advertisements. This ensures the unit remains visible regardless of the active dashboard tab (Roots, Connections, or Deep Cut). To maintain the immersive feel, vertical spacing is kept to a strict minimum.
                                     </p>
                                     <div className="grid grid-cols-2 gap-4 pt-2">
                                         <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
@@ -3430,7 +4839,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Desktop Placement</h4>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            On Desktop, the advertisement container is anchored to the bottom of the central column (Spiderweb view). It is separated from the interactive map by a 2-pixel gap and is contained within its own <strong>bg-zinc-900 rounded-none</strong> box.
+                                            On Desktop, the advertisement container is anchored to the bottom of the central column (Connections view). It is separated from the interactive map by a 2-pixel gap and is contained within its own <strong>bg-zinc-900 rounded-none</strong> box.
                                         </p>
                                         <ul className="list-disc list-outside pl-4 text-xs text-zinc-500 space-y-1">
                                             <li>Resizing sidebars triggers an immediate ad swap if width cross-threshold occurs.</li>

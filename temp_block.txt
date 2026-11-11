@@ -1,0 +1,47 @@
+      // 2. Visual Confirmation (ConsolidatedValidationModal)
+      if (!bypassDisambiguation && cacheCandidatesPerSeed.length > 0) {
+          const confirmed = await new Promise<boolean>((resolve) => {
+            setConsolidatedValidationDialog({
+              isOpen: true,
+              seeds: cacheCandidatesPerSeed,
+              onConfirm: () => { setConsolidatedValidationDialog(null); resolve(true); },
+              onCancel: () => { setConsolidatedValidationDialog(null); resolve(false); }
+            });
+          });
+
+          if (!confirmed) {
+            sessionTokenApprovedRef.current = false;
+            setActiveNodeIds(prevActiveNodeIds);
+            setSeedArtists(prevSeedArtists);
+            return;
+          }
+      }
+
+      // Re-hydrate singleCacheResolvedSearchId into artistList if single seed redirect
+      if (hasFullCacheHitForSingle && singleCacheResolvedSearchId && singleCacheResolvedSearchId !== artistList[0]) {
+          setSeedArtists(singleCacheResolvedSearchId);
+          artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
+      }
+
+      // Determine quota requirements
+      const requiresLiveSynthesis = isLiveSynthesis || isLiveSynthesisTemp;
+      const hasMisses = cacheCandidatesPerSeed.some(s => !s.isKnownCacheHit);
+      
+      let tokenType = 'generation';
+      if (requiresLiveSynthesis) tokenType = 'live_synthesis';
+      else if (needsCacheUpgrade) tokenType = 'cache_upgrade';
+      
+      const requiresQuota = requiresLiveSynthesis || hasMisses || needsCacheUpgrade;
+
+      // 3. Financial Confirmation (Token Quota)
+      if (requiresQuota && !bypassTokenConfirmation && !sessionTokenApprovedRef.current) {
+          const confirmedToken = await confirmTokenUsage(tokenType as any, [], artistList, undefined, false);
+          if (!confirmedToken || confirmedToken === 'back') {
+            sessionTokenApprovedRef.current = false;
+            setActiveNodeIds(prevActiveNodeIds);
+            setSeedArtists(prevSeedArtists);
+            return;
+          }
+          sessionTokenApprovedRef.current = true;
+      }
+

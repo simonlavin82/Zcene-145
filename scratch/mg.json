@@ -1,0 +1,285 @@
+{
+  "name": "projects/zcene-production/databases/(default)/documents/artists/militarie-gun-usa",
+  "fields": {
+    "cacheVersion": {
+      "integerValue": "4"
+    },
+    "detailsCache": {
+      "mapValue": {
+        "fields": {
+          "summary": {
+            "stringValue": "Militarie Gun is an American alternative rock band that originated in Los Angeles in 2020. The project began as a solo endeavor by vocalist Ian Shelton during the COVID-19 pandemic, following a hiatus from his previous band, Regional Justice Center.\n\nThe band quickly gained recognition for its prolific output and a sound that masterfully blends aggressive hardcore punk with melodic elements of noise-pop, post-hardcore, and indie rock. Their music is characterized by a dynamic interplay of combative energy and accessibility, featuring distorted guitar riffs, driving rhythms, and Shelton's distinctive caustic-yet-tuneful vocals.\n\nKey elements of Militarie Gun's style include:\n*   **Aggressive yet melodic sound:** A unique fusion of hardcore punk with noise-pop and indie rock sensibilities.\n*   **Dynamic vocals:** Ian Shelton's recognizable vocal delivery, balancing harshness with tunefulness.\n*   **Confessional lyricism:** Themes often explore self-destruction, personal growth, and insightful observations on modern life.\n*   **Restless creativity:** A commitment to evolving their sound and pushing musical boundaries."
+          },
+          "youtubeSearchQuery": {
+            "stringValue": "Militarie Gun hardcore punk official music video"
+          },
+          "discography": {
+            "arrayValue": {
+              "values": [{
+                "mapValue": {
+                  "fields": {
+                    "albumName": {
+                      "stringValue": "God Save the Gun"
+                    },
+                    "releaseYear": {
+                      "stringValue": "2025"
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "albumName": {
+                      "stringValue": "Life Under the Gun"
+                    },
+                    "releaseYear": {
+                      "stringValue": "2023"
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "albumName": {
+                      "stringValue": "All Roads Lead to the Gun (Deluxe)"
+                    },
+                    "releaseYear": {
+                      "stringValue": "2022"
+                    }
+                  }
+                }
+              }]
+            }
+          },
+          "imageUrl": {
+            "stringValue": ""
+          },
+          "members": {
+            "arrayValue": {
+              "values": [{
+                "stringValue": "Ian Shelton (Lead Vocals)"
+              }, {
+                "stringValue": "William Acuña (Rhythm Guitar)"
+              }, {
+                "stringValue": "Waylon Trim (Bass, Backing Vocals)"
+              }, {
+                "stringValue": "David Stalsworth (Drums)"
+              }, {
+                "stringValue": "Kevin Kiley (Lead Guitar, Backing Vocals)"
+              }]
+            }
+          },
+          "groundingLinks": {
+            "arrayValue": {
+              "values": [{
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "wikipedia.org"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGKh5BecNR7ktasGmD6yjOaMBzhJ-OnkeDfmIHnKsrl1aUa882ekj-qx3VMEkcGymSYI4vIjVuZR4518_wvYt451vG8J3QZ9s8TQlqcCIwkKPBT4TAui3R27wQLQACY_Ogo3Mr6yA=="
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "allmusic.com"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQG-PY2YDpBRax0mhn5sjzOXx9TY0S1i2oc6I7gQOVjgi6R-cJHvujLMlFFYcM2pD9ffg2Ri334mpWChP-ZdWHZN2iiM9jThC0Ho5wi6wvsceBbeyzFuNzJ4Lro7B8pHEAsLAxjGsgKmVwFzaMWJrvMx-ApMHA=="
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "fandom.com"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGTM02l9kUD2I7_AkO016kKC_rQK0bdSrDPVP0kaHJHPQe9i8rvDlHmDThDM4RGvfACqD7x5g82hy2IruqBuNmAKKp6HBbouq2xtRJpnGVil5xNDtEktjRtvXtGszHm99m5TM70mQ=="
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "creativeloafing.com"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEzaEITSJnsF_4MGEcvEqyzZYXpmuOAZLHYsZ83XsmJs2-4vitZjhELJRJTt-_cDH7GhEDTebP4G-CcB2zafNRd7fhJwbqM2sOMBnw2h1bytA2iDnC1BDGSoyzrDpQztkQbNPcyXvD1Xn880V_8UdaePwGoieKUabu8zJs-rrbV"
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "newnoisemagazine.com"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF_qUkHBYD2Mp5DJj2a6UJqwbQm893qPbV3jZi3XfN6rrmOY0Y5dvuqotta7Gk-uIRT7KxvBQnUNJ3JBNdGCvb2hUPmRZHVOSbAzf7HzynXyzDK7zRizjiyZvzygwkLA897QovUmHIeLea52X4BhyUjiU94itoaLNRkH8kiaN0PYw21fzqxALjJpeJyIExJf_hTivy9ld8zQ7fvuWaWUCVW7Q=="
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "last.fm"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHcA3Y3ZkMiWUKi9408Z5278CppRnNoPJC9F2OELEOSvA6PkRYJSEazqbK4OTAp8C99tOBzi2sDeGc6tz5En-wjUqzZXZjBcypJoNCeCZs5t7QGFONryDzEH2Ve2XVZZ1Yw"
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "equipboard.com"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFLkJifg28PImekdxUf14eAaithG4xEZuqHxPhCO3fB4x0mIsfqjbwZP50tEJP-KJ4ww4jlA9ABHUHUsjRVdzNoXX9uzugyaBXZpJIsH1dt5bIq_Ved4kSyDo87RRWyPtZohek="
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "codamusic.me"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQFlKgZtNdfWbijxyk010F4iAav_9vmErIDnkPERgUXJREWk25tGcEkHxsFMtQlfASNKCtPdEBh9vohCm4nZMQiIKrVEJo8eKJZBfnQrFywhDiBspSiTweXiWHm1xSh4ThvZ7oJd4w=="
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "masqueradeatlanta.com"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQEGpqlxwLn1cCiGvYoeUWasAp8-O6MDxFbhOryQ3VnkB0lN6Hwb2D4PZgC9IGLS3huuT745PMNLNrAbl5m0GOH_LzDVlUWVzDfUhbnN_kwLCYouZaWpK7vwNqXbyBI9Pvao7kDPM8BL5n4PBe-nlrd8w5bY1OM="
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "latimes.com"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQGeDw6CiFmK8fL0y5RgB2Xelv7ppt_doRz9wVKz1NJQsB8BgCJ4zoygNGDvzuyW_-_AHr6UvJ6amOddqQVVnHTud9PSlx4N2sbFIuSaPAKAP9UXQ800pL4DyGIqdU20yO7UUKYOGe7J3zwr3Osa89dEoUowqFspZ2-7CRNCs0GnFLRJwG_rdtPrFQmfHXNBsFg4E5G5SgWvCYyVIbMQNyCptdQZZjxZpgpjNfeEU7wn"
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "thepopmanifesto.com"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQHIDEjXvaBcVhTgkowBFMR2Nrromo2_pq-fspcOGkf_onAcZ6lMKOzUWSE2f5QKktbUfc00WpEQAp7FNINRP8J7_EPCokrFwv4quuaP2K7B4Yk1kQfczUpCnnBbkH9hVbF8ElRBP4in-7txtepGOw=="
+                    }
+                  }
+                }
+              }, {
+                "mapValue": {
+                  "fields": {
+                    "title": {
+                      "stringValue": "concord.com"
+                    },
+                    "url": {
+                      "stringValue": "https://vertexaisearch.cloud.google.com/grounding-api-redirect/AUZIYQF-mH2Mllu59zkp3-Ld6FInKr05jGfj7p3jJg2elNAgr3TQ3pikE8QR9tC4N20SAFGtytb7V38cN-YhE3MHGi4q5aZuldLT0KEz_NAOAdd9Li0PfH_cqxeiv6a4XQF14BrvY7I="
+                    }
+                  }
+                }
+              }]
+            }
+          },
+          "links": {
+            "arrayValue": {
+              "values": [{
+                "mapValue": {
+                  "fields": {
+                    "site": {
+                      "stringValue": "Wikipedia"
+                    },
+                    "url": {
+                      "stringValue": "https://en.wikipedia.org/wiki/Militarie_Gun"
+                    }
+                  }
+                }
+              }]
+            }
+          },
+          "details": {
+            "mapValue": {
+              "fields": {
+                "artist": {
+                  "stringValue": "Militarie Gun Usa"
+                },
+                "origin": {
+                  "stringValue": "Los Angeles, USA"
+                },
+                "founded": {
+                  "stringValue": "2020"
+                },
+                "genre": {
+                  "stringValue": "Hardcore Punk, Alternative Rock, Melodic Hardcore"
+                },
+                "notableArtists": {
+                  "arrayValue": {
+                    "values": [{
+                      "stringValue": "Drug Church"
+                    }, {
+                      "stringValue": "Fiddlehead"
+                    }, {
+                      "stringValue": "Touché Amoré"
+                    }]
+                  }
+                }
+              }
+            }
+          },
+          "recommendationReason": {
+            "stringValue": "Militarie Gun is crucial to the modern punk and alternative scene for their ability to seamlessly blend aggressive hardcore with undeniably catchy indie-rock melodies. Their dynamic sound and confessional lyrics resonate widely, making them a significant and evolving force."
+          },
+          "synthesisRationale": {
+            "stringValue": "[Single-Seed Analysis]\n- Acoustic & Sonics: Resolved core musical properties and stylistic lineage.\n- Scene Context: Mapped direct influences, record label history, and geographic background.\n- Overlap Insights: Unified structural connections and surrounding chronological relationships."
+          }
+        }
+      }
+    },
+    "cacheKey": {
+      "stringValue": "militarie-gun-usa"
+    },
+    "isDeep": {
+      "booleanValue": true
+    },
+    "cachedAt": {
+      "mapValue": {
+      }
+    },
+    "artistId": {
+      "stringValue": "militarie-gun-usa"
+    },
+    "seedArtists": {
+      "stringValue": "Militarie Gun Usa"
+    },
+    "redirectTo": {
+      "stringValue": "militarie-gun-usa"
+    }
+  },
+  "createTime": "2026-08-16T15:36:48.070493Z",
+  "updateTime": "2026-08-16T15:36:48.455784Z"
+}

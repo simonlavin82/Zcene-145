@@ -1,4 +1,5 @@
-import { db } from './firebase';
+import { db, functions } from './firebase';
+import { httpsCallable } from 'firebase/functions';
 import {
   doc,
   getDoc,
@@ -6,9 +7,73 @@ import {
   updateDoc,
   increment,
   serverTimestamp,
+  FieldValue,
+  Timestamp,
   DocumentSnapshot,
 } from 'firebase/firestore';
 import { GraphData, Node, Link, ArtistCacheEntry, DiscoveryFilters, NodeDetails } from '../types';
+import {
+  extractCountrySlug as extractIsoCountrySlug,
+  extractTrailingCountryIso,
+  stripCountrySlug,
+  ISO_TO_COUNTRY_NAME,
+} from '../shared/isoCountries';
+import { stripSceneNamespace } from '../shared/multiSceneUtils';
+import { sanitizeNotableArtists, sanitizeAlbumName } from './geminiService';
+
+// ─── JIT ASSET HEALER DEDUPLICATION & COOLDOWN (V22) ──────────────────────────
+const healingInFlight = new Set<string>();
+const healingCooldown = new Map<string, number>(); // 5-minute negative cache cooldown
+
+/**
+ * Triggers lightweight JIT Asset Healing via Cloud Function without blocking UI rendering.
+ */
+export const triggerAssetHealing = async (
+  rawId: string,
+  entityType: 'artist' | 'label',
+  displayName?: string,
+  projectId?: string | null,
+  projectName?: string | null
+): Promise<any | null> => {
+  let normId = entityType === 'label'
+    ? normalizeLabelId(displayName || rawId)
+    : normalizeArtistId(rawId);
+  if (entityType === 'label' && normId === 'century') {
+    normId = 'century-media';
+  }
+  const cacheKey = `${entityType}:${normId}`;
+  const now = Date.now();
+
+  // Deduplication lock: skip if healing is already in-flight
+  if (healingInFlight.has(cacheKey)) return null;
+
+  // Negative cache cooldown: skip if recently failed within 5 minutes
+  const lastFailed = healingCooldown.get(cacheKey);
+  if (lastFailed && now - lastFailed < 300_000) return null;
+
+  healingInFlight.add(cacheKey);
+
+  try {
+    const inferredCountrySlug = entityType === 'artist' ? extractTrailingCountryIso(normId) : null;
+    const healCallable = httpsCallable(functions, 'healOrphanedAsset');
+    const result: any = await healCallable({
+      entityId: normId,
+      entityType,
+      displayName: displayName || stripCountrySlug(normId),
+      ...(inferredCountrySlug ? { countrySlug: inferredCountrySlug } : {}),
+      ...(projectId ? { projectId } : {}),
+      ...(projectName ? { projectName } : {})
+    });
+
+    healingInFlight.delete(cacheKey);
+    return result?.data;
+  } catch (err) {
+    healingInFlight.delete(cacheKey);
+    healingCooldown.set(cacheKey, now);
+    console.warn(`[JIT Healer] Background dispatch failed for ${cacheKey}:`, err);
+    throw err;
+  }
+};
 
 // ─── UTILITIES ────────────────────────────────────────────────────────────────
 
@@ -16,8 +81,10 @@ import { GraphData, Node, Link, ArtistCacheEntry, DiscoveryFilters, NodeDetails 
  * Produces a stable, Firestore-safe document ID for a single artist name.
  * e.g. "End It" → "end-it", "blink-182" → "blink-182", "Radiohead" → "radiohead"
  */
-export const normalizeArtistId = (name: string): string =>
-  name
+export const normalizeArtistId = (name: string): string => {
+  if (!name || typeof name !== 'string') return '';
+  const clean = stripSceneNamespace(name);
+  return clean
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/['’]/g, "") // Strip straight and curly apostrophes
@@ -26,14 +93,53 @@ export const normalizeArtistId = (name: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .substring(0, 256);
+};
+
+export const normalizeLabelId = (name: string): string => {
+  let id = normalizeArtistId(name);
+  id = id.replace(/(?:-(?:records|recordings|music|company|recording-company|entertainment|group|productions|inc|ltd))+$/, '');
+  if (id === 'century') id = 'century-media';
+  return id;
+};
+
+export const isArtistIdMatch = (a: string, b: string): boolean => {
+  if (!a || !b) return false;
+  const na = normalizeArtistId(a);
+  const nb = normalizeArtistId(b);
+  if (na === nb) return true;
+  if (na.startsWith(nb + '-')) return true;
+  if (nb.startsWith(na + '-')) return true;
+  return false;
+};
+
+/**
+ * Helper to identify Firestore Sentinel values (FieldValue transforms like serverTimestamp(),
+ * deleteField(), increment(), and Timestamp objects) across both Client and Admin SDKs.
+ */
+function isFirestoreSentinel(obj: any): boolean {
+  if (!obj || typeof obj !== 'object') return false;
+  if (obj instanceof FieldValue || obj instanceof Timestamp) return true;
+  const cName = obj.constructor ? obj.constructor.name : '';
+  if (cName.includes('FieldValue') || cName.includes('Timestamp') || cName.includes('Transform')) return true;
+  if (typeof obj.isEqual === 'function' && (obj.methodName || obj._methodName || obj.nanoseconds !== undefined)) return true;
+  return false;
+}
 
 /**
  * Recursively removes any property whose value is strictly `undefined` from an object or array.
  * Required before passing objects to Firestore SDK (`setDoc`, `updateDoc`, `addDoc`) which
  * throws synchronous validation exceptions on `undefined` values.
+ *
+ * CRITICAL (FieldValue / Timestamp Preservation):
+ * Must explicitly preserve Firestore Sentinel values (FieldValue transforms like serverTimestamp(),
+ * deleteField(), increment(), and Timestamp objects). Stripping or traversing them as generic objects
+ * removes their prototype/metadata and flattens them into empty objects ({}), corrupting timestamps into empty maps.
  */
 export const stripUndefinedProperties = <T>(obj: T): T => {
   if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (isFirestoreSentinel(obj)) {
     return obj;
   }
   if (Array.isArray(obj)) {
@@ -74,6 +180,12 @@ export const buildCompositeCacheKey = (artistId: string, filters?: DiscoveryFilt
     const sorted = [...filters.includeGenres].map(s => s.trim().toLowerCase()).sort();
     parts.push(`inc_genres:${sorted.join(',')}`);
   }
+  if (filters.anchorLabels && filters.anchorLabels.length > 0) {
+    const sorted = [...filters.anchorLabels].map(s => normalizeLabelId(s)).filter(Boolean).sort();
+    if (sorted.length > 0) {
+      parts.push(`inc_labels:${sorted.join(',')}`);
+    }
+  }
   
   if (parts.length === 1) return artistId;
   
@@ -81,22 +193,58 @@ export const buildCompositeCacheKey = (artistId: string, filters?: DiscoveryFilt
 };
 
 /**
- * Extracts a clean, normalized country slug from origin strings.
- * e.g. "San Diego, CA, United States" -> "united-states"
- * e.g. "London, England, United Kingdom" -> "united-kingdom"
- * e.g. "Italy" -> "italy"
+ * INTEGRITY GATE — Staging → Verified Protocol.
+ *
+ * Returns true only if the cache document is safe to serve as a global gold-standard.
+ *
+ * Rules:
+ *   - 'verified'                   → ✅ trusted.
+ *   - 'in_progress' (< 15 min old) → ❌ cache miss — Cloud Function still running.
+ *   - 'in_progress' (> 15 min old) → ✅ stale lock from crashed CF; treat as legacy trust.
+ *   - 'failed'                     → ❌ cache miss — corrupt document.
+ *   - undefined (legacy doc)        → ✅ trusted for backward compatibility.
+ *
+ * REGRESSION PREVENTION: Every cache-hit branch in this service must call this
+ * function before treating a Firestore document as a valid result. Skipping this
+ * gate allows partially-written staging docs to be served globally.
  */
-export const extractCountrySlug = (originStr?: string): string => {
-  if (!originStr || typeof originStr !== 'string' || originStr.trim().length === 0) {
-    return 'global';
+export const isCacheDocumentVerified = (data: Record<string, any>): boolean => {
+  const status: string | undefined = data?.dataIntegrityStatus;
+
+  // Legacy document — no integrity field — trust it for backward compat.
+  if (!status) return true;
+
+  if (status === 'verified') return true;
+
+  if (status === 'failed') {
+    console.warn('[Integrity Gate] Document has dataIntegrityStatus: failed — treating as cache miss.');
+    return false;
   }
 
-  const parts = originStr.split(',').map(s => s.trim()).filter(Boolean);
-  const rawCountry = parts.length > 0 ? parts[parts.length - 1] : originStr;
-  const slug = normalizeArtistId(rawCountry);
+  if (status === 'in_progress') {
+    // Stale-lock fallback: if the Cloud Function crashed > 15 minutes ago, treat as legacy trust.
+    const lockedAt: string | undefined = data?.integrityLockedAt;
+    if (lockedAt) {
+      const lockedMs = Date.parse(lockedAt);
+      const STALE_LOCK_MS = 15 * 60 * 1000; // 15 minutes
+      if (!isNaN(lockedMs) && Date.now() - lockedMs > STALE_LOCK_MS) {
+        console.warn(`[Integrity Gate] Stale in_progress lock (locked at ${lockedAt}) — treating as legacy trust.`);
+        return true;
+      }
+    }
+    console.warn('[Integrity Gate] Document has dataIntegrityStatus: in_progress — treating as cache miss.');
+    return false;
+  }
 
-  return slug || 'global';
+  // Unknown status value — trust it to avoid blocking future schema extensions.
+  return true;
 };
+
+/**
+ * Extracts a clean, normalized 2-letter ISO-3166-1 alpha-2 country slug from origin strings
+ * (backed by `shared/isoCountries.ts`). Never falls back to full country words like "thailand".
+ */
+export const extractCountrySlug = extractIsoCountrySlug;
 
 
 /**
@@ -122,27 +270,42 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
   const trimmed = rawIdOrName.trim();
   if (!trimmed) return '';
 
-  // 1. Known common country routing suffixes and slugs in display or kebab case
-  const countrySuffixes = [
-    'united states', 'united kingdom', 'global', 'australia', 'canada', 'germany', 'france',
-    'japan', 'sweden', 'italy', 'spain', 'brazil', 'mexico', 'netherlands', 'belgium',
-    'norway', 'finland', 'denmark', 'ireland', 'new zealand', 'poland', 'austria',
-    'switzerland', 'uk', 'usa', 'us'
-  ];
+  // Multi-seed / Composite Bypass: If this is a multi-seed or composite title (e.g. "Spaced + Buggin", "VOD +Will Haven"),
+  // return immediately to avoid incorrectly flattening or stripping country routing suffixes from custom composite names.
+  if (/\+/.test(trimmed)) return trimmed;
 
-  let cleaned = trimmed;
-  // If kebab/snake case, convert to spaced words first for suffix checking
-  const spaced = trimmed.replace(/[-_]+/g, ' ').trim();
-  const lowerSpaced = spaced.toLowerCase();
 
-  for (const suffix of countrySuffixes) {
-    if (lowerSpaced.endsWith(` ${suffix}`)) {
-      // Strip the suffix and any preceding hyphen/space
-      const suffixLen = suffix.length;
-      const baseSpaced = spaced.slice(0, spaced.length - suffixLen).trim().replace(/[-_]$/, '').trim();
-      if (baseSpaced.length > 0) {
-        cleaned = baseSpaced;
-        break;
+  // 1. Strip hyphen/underscore country routing suffixes via the unified 249-country ISO registry
+  let cleaned = stripCountrySlug(trimmed);
+  if (cleaned === trimmed) {
+    // Also check spaced full-word country routing suffixes (e.g. "Buggin United States", "Klear Thailand", "Klear - TH")
+    const spaced = trimmed.replace(/[-_]+/g, ' ').trim();
+    const lowerSpaced = spaced.toLowerCase();
+    const lowerTrimmed = trimmed.toLowerCase();
+    const fullCountryNames = [
+      'global', 'united states', 'united kingdom', 'northern ireland', 'great britain',
+      'england', 'scotland', 'wales', 'usa', 'uk',
+      ...Object.values(ISO_TO_COUNTRY_NAME).map(c => c.toLowerCase()),
+      ...Object.keys(ISO_TO_COUNTRY_NAME)
+    ].sort((a, b) => b.length - a.length);
+
+    for (const suffix of fullCountryNames) {
+      if (lowerSpaced.endsWith(` ${suffix}`)) {
+        // BOUNDARY CHECK: Prevent erroneously stripping short words like "It" from normal titles like "End It"
+        const isShortCode = suffix.length <= 3;
+        const originalEndsWithHyphenSuffix =
+          lowerTrimmed.endsWith(`-${suffix}`) ||
+          lowerTrimmed.endsWith(`_${suffix}`) ||
+          lowerTrimmed.endsWith(` - ${suffix}`);
+        if (isShortCode && !originalEndsWithHyphenSuffix) {
+          continue;
+        }
+        const suffixLen = suffix.length;
+        const baseSpaced = spaced.slice(0, spaced.length - suffixLen).trim().replace(/[-_]$/, '').trim();
+        if (baseSpaced.length > 0) {
+          cleaned = baseSpaced;
+          break;
+        }
       }
     }
   }
@@ -155,12 +318,72 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
     }
   }
 
-  // If the result is purely lowercase or was kebab case, apply titleCaseArtistId
-  if (cleaned === cleaned.toLowerCase() || cleaned.includes('-') || cleaned.includes('_')) {
+  // If the result contains kebab-case or snake-case slug delimiters, format it
+  if (cleaned.includes('-') || cleaned.includes('_')) {
+    return titleCaseArtistId(cleaned);
+  }
+
+  // If a country routing suffix was stripped or the string is purely lowercase, title-case it so raw slugs do not leak
+  if (cleaned !== trimmed || (cleaned === cleaned.toLowerCase() && /[a-z]/.test(cleaned))) {
     return titleCaseArtistId(cleaned);
   }
 
   return cleaned;
+};
+
+/**
+ * Safely resolves a project's display title without stripping technical suffixes
+ * from user-defined titles (preserving symbols, hyphens, and custom descriptors).
+ */
+export const getProjectDisplayTitle = (
+  project?: { name?: string | null; seedArtists?: string | null } | null,
+  graphNodes?: Node[] | null
+): string => {
+  if (!project) return 'Untitled Zcene';
+  if (project.name && project.name.trim()) {
+    return project.name.trim();
+  }
+  if (project.seedArtists) {
+    const seeds = project.seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+    if (seeds.length > 1) {
+      return seeds.map(s => cleanArtistDisplayName(s, graphNodes)).join(' + ');
+    }
+    if (seeds.length === 1) {
+      return cleanArtistDisplayName(seeds[0], graphNodes);
+    }
+  }
+  return 'Untitled Zcene';
+};
+
+/**
+ * Normalizes a label display name for UI dropdowns, chips, inspector, and graph canvas
+ * by cleaning routing suffixes, stripping trailing structural suffixes like "Records" / "Recordings",
+ * and guaranteeing proper title casing for database slugs (e.g., "atlantic" -> "Atlantic", "sparrow" -> "Sparrow").
+ */
+export const cleanLabelDisplayName = (rawIdOrName?: string | null, graphNodes?: Node[] | null): string => {
+  if (!rawIdOrName || typeof rawIdOrName !== 'string') return '';
+  const trimmed = rawIdOrName.trim();
+  if (!trimmed) return '';
+
+  const base = cleanArtistDisplayName(trimmed, graphNodes);
+  if (!base) return '';
+
+  const stripped = base
+    .replace(/(?:[-_\s]+(?:records|recordings))+$/i, '')
+    .trim();
+
+  const candidate = stripped || base;
+
+  // Guarantee title casing for lowercase database IDs / slugs (e.g. "atlantic" -> "Atlantic")
+  if (/^[a-z0-9\s-_]+$/.test(candidate) && !/[A-Z]/.test(candidate)) {
+    return titleCaseArtistId(candidate);
+  }
+
+  if (candidate.includes('-') || candidate.includes('_')) {
+    return titleCaseArtistId(candidate);
+  }
+
+  return candidate;
 };
 
 /**
@@ -170,17 +393,34 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
  */
 export const isNodeInSeedList = (nodeIdOrLabel?: string | null, seedList?: string[] | null): boolean => {
   if (!nodeIdOrLabel || !seedList || !Array.isArray(seedList) || seedList.length === 0) return false;
-  const targetNorm = normalizeArtistId(nodeIdOrLabel);
-  const targetClean = cleanArtistDisplayName(nodeIdOrLabel).toLowerCase();
+  
+  const cleanNodeTarget = stripSceneNamespace(nodeIdOrLabel);
+  const targetNorm = normalizeArtistId(cleanNodeTarget);
+  // Explicitly strip country routing suffixes via the global 249-country ISO registry
+  const strippedTargetNorm = stripCountrySlug(targetNorm);
+  
+  const targetClean = cleanArtistDisplayName(cleanNodeTarget).toLowerCase();
 
   return seedList.some(seed => {
     if (!seed || typeof seed !== 'string') return false;
-    if (seed === nodeIdOrLabel) return true;
-    const seedNorm = normalizeArtistId(seed);
+    const cleanSeed = stripSceneNamespace(seed);
+    if (seed === nodeIdOrLabel || cleanSeed === cleanNodeTarget) return true;
+    
+    const seedNorm = normalizeArtistId(cleanSeed);
+    const strippedSeedNorm = stripCountrySlug(seedNorm);
+
+    // Direct and alias comparisons
     if (seedNorm === targetNorm) return true;
-    if (seed.toLowerCase() === nodeIdOrLabel.toLowerCase() || cleanArtistDisplayName(seed).toLowerCase() === targetClean) return true;
+    if (strippedSeedNorm === strippedTargetNorm) return true;
+    if (strippedSeedNorm === targetNorm) return true;
+    if (seedNorm === strippedTargetNorm) return true;
+    
+    if (cleanSeed.toLowerCase() === cleanNodeTarget.toLowerCase() || cleanArtistDisplayName(cleanSeed).toLowerCase() === targetClean) return true;
+    
+    // Legacy defensive checks
     if (seedNorm.startsWith(`${targetNorm}-`) || targetNorm.startsWith(`${seedNorm}-`)) return true;
     if (seedNorm.includes(`-${targetNorm}-`) || seedNorm.endsWith(`-${targetNorm}`) || targetNorm.includes(`-${seedNorm}-`) || targetNorm.endsWith(`-${seedNorm}`)) return true;
+    
     return false;
   });
 };
@@ -203,7 +443,9 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     const originalId = node.id;
     let normalizedId = originalId.trim();
     
-    if (node.type === 'artist' || node.type === 'label') {
+    if (node.type === 'label') {
+      normalizedId = normalizeLabelId(node.label || originalId);
+    } else if (node.type === 'artist') {
       normalizedId = normalizeArtistId(originalId);
     } else {
       normalizedId = normalizedId.toLowerCase();
@@ -213,15 +455,19 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     idMap.set(originalId.toLowerCase(), normalizedId); // fallback
     idMap.set(normalizeArtistId(originalId), normalizedId); // accent-insensitive fallback
 
-    let label = node.label || originalId.trim();
-    if (node.type === 'artist' || node.type === 'label') {
-      label = titleCaseArtistId(label);
+    let label: string;
+    if (node.type === 'label') {
+      label = cleanLabelDisplayName(node.label || originalId, graph.nodes);
+    } else {
+      label = node.label ? cleanArtistDisplayName(node.label) : titleCaseArtistId(cleanArtistDisplayName(originalId.trim()));
     }
 
     return {
       ...node,
       id: normalizedId,
-      label
+      label,
+      isPending: false,
+      isLoading: false
     };
   });
 
@@ -279,12 +525,6 @@ export const extractArtistSubGraph = (
   const seedsNorm = new Set(allSeeds.map(s => normalizeArtistId(s)));
   // Make sure the target artist itself is not in the other seeds set we want to exclude
   seedsNorm.delete(artistNameNorm);
-
-  const isArtistIdMatch = (a: string, b: string) => {
-    const na = normalizeArtistId(a);
-    const nb = normalizeArtistId(b);
-    return na === nb || na.startsWith(nb + '-') || nb.startsWith(na + '-');
-  };
 
   // Find the canonical artist node from the full graph
   const artistNode = fullGraph.nodes.find(
@@ -413,7 +653,9 @@ export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEn
       if (graph && graph.nodes) {
         graph.nodes.forEach((n: any) => {
           if (n.type === 'artist' || n.type === 'label') {
-            n.label = titleCaseArtistId(n.label || n.id);
+            if (!n.label) {
+              n.label = titleCaseArtistId(n.id);
+            }
           }
         });
         entry.graphData = JSON.stringify(graph);
@@ -429,10 +671,12 @@ export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEn
       const processDetails = (details: any) => {
         if (details) {
           if (details.details) {
-            details.details.artist = titleCaseArtistId(details.details.artist || details.name || "");
+            if (!details.details.artist) {
+              details.details.artist = details.name || "";
+            }
           }
-          if (details.name) {
-            details.name = titleCaseArtistId(details.name);
+          if (!details.name && details.details?.artist) {
+            details.name = details.details.artist;
           }
         }
       };
@@ -450,7 +694,7 @@ export const eagerNormalizeCacheEntry = (entry: ArtistCacheEntry): ArtistCacheEn
   return entry;
 };
 
-// ─── READ ─────────────────────────────────────────────────────────────────────
+// ─── READ ────────────────────────────────────────────────────────────────     
 
 /**
  * Concurrently reads individual Firestore documents for each requested artist.
@@ -486,16 +730,17 @@ export const readArtistCacheMany = async (
       const artistId = normalizeArtistId(name);
       const compositeId = buildCompositeCacheKey(artistId, filters);
       try {
-        let snap = await getArtistDocWithRedirect(compositeId);
-        if (!snap.exists()) {
-          const labelSnap = await getLabelDocWithRedirect(compositeId);
-          if (labelSnap.exists()) {
-            snap = labelSnap;
-          }
-        }
+        // Strict artist-only cache check
+        const snap = await getArtistDocWithRedirect(compositeId);
         if (snap.exists()) {
+          const rawData = snap.data() as ArtistCacheEntry;
+          // INTEGRITY GATE: skip staging or failed docs — treat as cache miss
+          if (!isCacheDocumentVerified(rawData)) {
+            console.log(`[ArtistCache] INTEGRITY MISS (not verified): ${compositeId}`);
+            return { name, entry: null };
+          }
           console.log(`[ArtistCache] HIT (Resolved): ${compositeId}`);
-          return { name, entry: snap.data() as ArtistCacheEntry };
+          return { name, entry: rawData };
         } else {
           console.log(`[ArtistCache] MISS: ${compositeId}`);
           return { name, entry: null };
@@ -528,7 +773,74 @@ export const readArtistCacheMany = async (
   return { cached, missing };
 };
 
-// ─── WRITE ────────────────────────────────────────────────────────────────────
+/**
+ * Concurrently reads individual Firestore documents for each requested label.
+ * Returns a split result:
+ *   - `cached`:  Map of labelName → ArtistCacheEntry for every doc that exists
+ *   - `missing`: Array of label names for which no document was found
+ *
+ * Strict label-only cache check, ensuring labels are never checked against the artists collection.
+ */
+export const readLabelCacheMany = async (
+  labelNames: string[],
+  activeUserId?: string | null,
+  filters?: DiscoveryFilters
+): Promise<{ cached: Map<string, ArtistCacheEntry>; missing: string[] }> => {
+  const cached = new Map<string, ArtistCacheEntry>();
+  const missing: string[] = [];
+
+  if (!labelNames || labelNames.length === 0) {
+    return { cached, missing };
+  }
+
+  const results = await Promise.allSettled(
+    labelNames.map(async name => {
+      const labelId = normalizeArtistId(name);
+      const compositeId = buildCompositeCacheKey(labelId, filters);
+      try {
+        // Strict label-only cache check
+        const snap = await getLabelDocWithRedirect(compositeId);
+        if (snap.exists()) {
+          const rawData = snap.data() as ArtistCacheEntry;
+          if (!isCacheDocumentVerified(rawData)) {
+            console.log(`[LabelCache] INTEGRITY MISS (not verified): ${compositeId}`);
+            return { name, entry: null };
+          }
+          console.log(`[LabelCache] HIT (Resolved): ${compositeId}`);
+          return { name, entry: rawData };
+        } else {
+          console.log(`[LabelCache] MISS: ${compositeId}`);
+          return { name, entry: null };
+        }
+      } catch (e) {
+        console.warn(`[LabelCache] Read failed for ${compositeId} (non-critical):`, e);
+        return { name, entry: null };
+      }
+    })
+  );
+
+  results.forEach(result => {
+    if (result.status === 'fulfilled' && result.value) {
+      const { name, entry } = result.value;
+      if (entry) {
+        const normalizedEntry = eagerNormalizeCacheEntry(entry);
+        cached.set(name, normalizedEntry);
+        cached.set(name.toLowerCase(), normalizedEntry);
+        const entityId = (normalizedEntry as any).labelId || normalizedEntry.artistId || normalizedEntry.cacheKey;
+        if (entityId) {
+          cached.set(entityId, normalizedEntry);
+          cached.set(entityId.toLowerCase(), normalizedEntry);
+        }
+      } else {
+        missing.push(name);
+      }
+    }
+  });
+
+  return { cached, missing };
+};
+
+// ─── WRITE ────────────────────────────────────────────────────────────────    
 
 /**
  * Writes each artist's isolated sub-graph as an individual Firestore document.
@@ -655,8 +967,9 @@ export const writeArtistCacheMany = async (
           graphData: (isLabel || !isPrimarySeed) ? null : JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
           synthesisRationale: (isLabel || !isPrimarySeed) ? null : (normalizedGraph.synthesisRationale || null),
           filters: filters || {},
-          cacheVersion: 2,
-          cachedAt: serverTimestamp(),
+          cacheVersion: 4,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
           hitCount: 0,
           isDeep: preserveFullGraph || false,
           isPrimarySeed: isPrimarySeed && !isLabel,
@@ -684,13 +997,15 @@ export const writeArtistCacheMany = async (
         const incomingArtistCount = nodes.filter(n => n.type === 'artist' || n.type === 'label').length;
         const isRicherGraph = incomingArtistCount > existingArtistCount;
 
-        if (!isPrimarySeed) {
+        if (existing && existing.redirectTo) {
+          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Skipping canonical update for "${compositeCanonicalId}" because it is a redirect alias to ${existing.redirectTo}.`);
+        } else if (!isPrimarySeed) {
           // Recommendation / Deep Cut: strictly perform telemetry/details write-back without overwriting graph topology or seed status!
           if (artistDetails) {
             const updatePayload: any = {
               detailsCache: isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails),
-              cachedAt: serverTimestamp(),
-              cacheVersion: 2,
+              updatedAt: serverTimestamp(),
+              cacheVersion: 4,
               [idFieldKey]: canonicalId,
               cacheKey: compositeCanonicalId,
               isDeep: preserveFullGraph || false,
@@ -700,7 +1015,7 @@ export const writeArtistCacheMany = async (
           } else {
             console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Skipping deep cut update for "${compositeCanonicalId}" — no detailsCache to write.`);
           }
-        } else if (forceOverwrite || isRicherGraph || (existing && (!existing.cacheVersion || existing.cacheVersion < 2 || (preserveFullGraph && existing.isDeep !== true)))) {
+        } else if (forceOverwrite || isRicherGraph || (existing && (!existing.cacheVersion || existing.cacheVersion < 4 || (preserveFullGraph && existing.isDeep !== true)))) {
           // ── UPGRADE PATH (Primary Seed) ─────────────────────────────────────────
           const updatePayload: any = {
             cacheKey: compositeCanonicalId,
@@ -709,8 +1024,9 @@ export const writeArtistCacheMany = async (
             graphData: isLabel ? null : JSON.stringify({ nodes, links, synthesisRationale: normalizedGraph.synthesisRationale }),
             synthesisRationale: normalizedGraph.synthesisRationale || null,
             filters: filters || {},
-            cacheVersion: 2,
-            cachedAt: serverTimestamp(),
+            cacheVersion: 4,
+            hitCount: (existing.hitCount || 0) + 1,
+            updatedAt: serverTimestamp(),
             isDeep: preserveFullGraph || false,
             isPrimarySeed: !isLabel,
             hasUniqueSpiderweb: !isLabel,
@@ -720,13 +1036,13 @@ export const writeArtistCacheMany = async (
           }
           if (!isLabel) enforceArtistCacheSchema(updatePayload);
           await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
-          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 2 (incoming: ${incomingArtistCount} entities, existing: ${existingArtistCount} entities)`);
+          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Upgraded/Overwritten Canonical doc: ${compositeCanonicalId} → cacheVersion 4 (incoming: ${incomingArtistCount} entities, existing: ${existingArtistCount} entities)`);
         } else if (artistDetails) {
           // Update detailsCache if it was missing or stale
           const updatePayload: any = {
             detailsCache: isLabel ? sanitizeLabelProfile(artistDetails) : (typeof artistDetails === 'string' ? JSON.parse(artistDetails) : artistDetails),
-            cachedAt: serverTimestamp(),
-            cacheVersion: 2,
+            updatedAt: serverTimestamp(),
+            cacheVersion: 4,
             [idFieldKey]: canonicalId,
             cacheKey: compositeCanonicalId,
             isDeep: preserveFullGraph || false,
@@ -734,7 +1050,7 @@ export const writeArtistCacheMany = async (
           await updateDoc(canonicalDocRef, stripUndefinedProperties(updatePayload));
           console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Updated detailsCache for canonical doc: ${compositeCanonicalId}`);
         } else {
-          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 2}.`);
+          console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Skipping write for Canonical "${compositeCanonicalId}" — doc already at v${existing?.cacheVersion || 3}.`);
         }
       }
 
@@ -742,23 +1058,19 @@ export const writeArtistCacheMany = async (
       const bareArtistIdRef = doc(db, collName, artistId);
       const bareSnap = await getDoc(bareArtistIdRef);
       const bareData = bareSnap.exists() ? bareSnap.data() : null;
-      const idFieldKey = isLabel ? 'labelId' : 'artistId';
+      const idFieldKeyLocal = isLabel ? 'labelId' : 'artistId';
 
-      if (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId)) {
+      if (artistId !== compositeCanonicalId && (!bareSnap.exists() || (bareData && !bareData.redirectTo && bareSnap.id !== compositeCanonicalId))) {
         await setDoc(bareArtistIdRef, stripUndefinedProperties({
           cacheKey: artistId,
-          [idFieldKey]: artistId,
+          [idFieldKeyLocal]: artistId,
           seedArtists: name,
-          graphData: isLabel ? null : JSON.stringify({ nodes: [], links: [] }),
-          filters: {},
-          cacheVersion: 2,
-          cachedAt: serverTimestamp(),
-          hitCount: 0,
-          redirectTo: compositeCanonicalId,
-          isPrimarySeed: isPrimarySeed && !isLabel,
-          hasUniqueSpiderweb: false
+          cacheVersion: 4,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          redirectTo: compositeCanonicalId
         }));
-        console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created/Healed Bare Alias Pointer: ${artistId} -> ${compositeCanonicalId}`);
+        console.log(`[${isLabel ? 'LabelCache' : 'ArtistCache'}] Created/Healed Bare Alias Pointer Stub: ${artistId} -> ${compositeCanonicalId}`);
       }
       } catch (e: any) {
         console.warn(`[ArtistCache] Write failed for "${compositeArtistId}" (${e.code ?? 'unknown'}): ${e.message}`);
@@ -896,6 +1208,11 @@ export const readLegacyArtistCache = async (
     const snap = await getDoc(doc(db, collName, cacheKey));
     if (snap.exists()) {
       const data = snap.data();
+      // INTEGRITY GATE: skip staging or failed docs — treat as legacy cache miss
+      if (!isCacheDocumentVerified(data)) {
+        console.log(`[ArtistCache] Legacy INTEGRITY MISS (not verified): ${cacheKey}`);
+        return null;
+      }
       console.log(`[ArtistCache] Legacy HIT: ${cacheKey}`);
       let graphDataStr = data.graphData ?? '{"nodes":[],"links":[]}';
       let detailsCacheStr = data.detailsCache ?? '[]';
@@ -904,7 +1221,9 @@ export const readLegacyArtistCache = async (
         if (graph && graph.nodes) {
           graph.nodes.forEach((n: any) => {
             if (n.type === 'artist' || n.type === 'label') {
-              n.label = titleCaseArtistId(n.label || n.id);
+              if (!n.label) {
+                n.label = titleCaseArtistId(n.id);
+              }
             }
           });
           graphDataStr = JSON.stringify(graph);
@@ -916,10 +1235,12 @@ export const readLegacyArtistCache = async (
         const processDetails = (details: any) => {
           if (details) {
             if (details.details) {
-              details.details.artist = titleCaseArtistId(details.details.artist || details.name || "");
+              if (!details.details.artist) {
+                details.details.artist = details.name || "";
+              }
             }
-            if (details.name) {
-              details.name = titleCaseArtistId(details.name);
+            if (!details.name && details.details?.artist) {
+              details.name = details.details.artist;
             }
           }
         };
@@ -945,27 +1266,72 @@ export const readLegacyArtistCache = async (
 };
 
 /**
- * Checks if the cachedAt timestamp is older than 365 days (1 year).
+ * Checks if the document's biographical data is older than 365 days (1 year).
+ * 
+ * V33 Data Lifecycle Rule (Rule 42):
+ * Expiration is calculated STRICTLY against `createdAt`.
+ * `updatedAt` mutations (e.g., appending a spiderweb, promoting a stub to a primary seed,
+ * or self-healing missing fields) DO NOT reset the 365-day biographical lifespan.
+ * 
+ * Edge-case safety:
+ * - If a document object lacks a valid `createdAt`, it fails safe and evaluates to expired (`true`).
+ * - Supports Firestore Admin Timestamps (_seconds), Client Timestamps (seconds, toDate()),
+ *   native Date instances, ISO date strings, and numeric epoch milliseconds.
+ * - Accepts direct scalar timestamps for backward compatibility.
  */
-export const isCacheExpired = (cachedAt: any): boolean => {
-  if (!cachedAt) return true;
-  let date: Date;
-  if (typeof cachedAt.toDate === 'function') {
-    date = cachedAt.toDate();
-  } else if (cachedAt instanceof Date) {
-    date = cachedAt;
-  } else if (typeof cachedAt === 'string') {
-    date = new Date(cachedAt);
-  } else if (cachedAt.seconds) {
-    date = new Date(cachedAt.seconds * 1000);
-  } else if (typeof cachedAt === 'number') {
-    date = new Date(cachedAt);
-  } else if (cachedAt.nanoseconds && typeof cachedAt.seconds === 'number') {
-    date = new Date(cachedAt.seconds * 1000);
+export const isCacheExpired = (dataOrTimestamp: any): boolean => {
+  if (!dataOrTimestamp) return true;
+
+  let ts: any;
+
+  // 1. Distinguish document object vs. scalar timestamp
+  if (typeof dataOrTimestamp === 'object' && dataOrTimestamp !== null && !(dataOrTimestamp instanceof Date)) {
+    if ('createdAt' in dataOrTimestamp) {
+      // Document object: calculate strictly from createdAt; ignore updatedAt completely
+      ts = dataOrTimestamp.createdAt;
+    } else if (
+      typeof dataOrTimestamp.toDate === 'function' ||
+      typeof dataOrTimestamp.seconds === 'number' ||
+      typeof dataOrTimestamp._seconds === 'number'
+    ) {
+      // Direct Firestore Timestamp scalar (backward compatibility)
+      ts = dataOrTimestamp;
+    } else {
+      // Document object missing createdAt -> fail safe expired
+      return true;
+    }
   } else {
+    // Direct scalar: Date instance, ISO date string, epoch millisecond number
+    ts = dataOrTimestamp;
+  }
+
+  if (!ts) return true;
+
+  // 2. Parse timestamp across all supported SDK & runtime variants
+  let date: Date;
+  if (typeof ts.toDate === 'function') {
+    date = ts.toDate();
+  } else if (ts instanceof Date) {
+    date = ts;
+  } else if (typeof ts === 'string') {
+    date = new Date(ts);
+  } else if (typeof ts.seconds === 'number') {
+    date = new Date(ts.seconds * 1000);
+  } else if (typeof ts._seconds === 'number') {
+    date = new Date(ts._seconds * 1000);
+  } else if (typeof ts === 'number') {
+    date = new Date(ts);
+  } else {
+    // Corrupted field (e.g. empty object `{}` from legacy serialization bug)
     return true;
   }
-  
+
+  // 3. Reject invalid dates (e.g. new Date('invalid string'))
+  if (isNaN(date.getTime())) {
+    return true;
+  }
+
+  // 4. Strict 365-day evaluation
   const oneYearMs = 365 * 24 * 60 * 60 * 1000;
   return (Date.now() - date.getTime()) > oneYearMs;
 };
@@ -986,46 +1352,51 @@ export const getEntityDocWithRedirect = async (
     const url = `${apiPath}${entityId}`;
     const response = await fetch(url);
     if (!response.ok) {
-      // Fallback to client-side direct read if proxy endpoint fails or returns 404
-      const docRef = doc(db, collName, entityId);
-      const snap = await getDoc(docRef);
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data && data.redirectTo && depth < 3) {
-          let targetId = data.redirectTo.trim();
-          const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
-          if (match) {
-            console.log(`[Redirect Suffix Cleaner] Normalized redirect: ${targetId} -> ${match[1]}`);
-            targetId = match[1];
-          }
-          console.log(`[Client-Side Redirect] Redirecting ${entityId} -> ${targetId}`);
-          return getEntityDocWithRedirect(targetId, entityType, depth + 1);
-        }
-        return snap;
-      }
-
-      // Prefix match lookup fallback: check if any document has a cacheKey starting with entityId
-      if (depth === 0) {
-        const { collection, query, where, getDocs } = await import('firebase/firestore');
-        const q = query(
-          collection(db, collName),
-          where('cacheKey', '>=', entityId),
-          where('cacheKey', '<=', entityId + '\uf8ff')
-        );
-        const qSnap = await getDocs(q);
-        const validDocs = qSnap.docs.filter(d => !d.data().redirectTo);
-        if (validDocs.length > 0) {
-          console.log(`[Client-Side Prefix Match] Resolved ${entityId} -> ${validDocs[0].id}`);
-          return validDocs[0];
-        }
-      }
-      return snap;
+      console.warn(`[Proxy Fetch] HTTP error (${response.status}) for ${entityId}, returning safe fallback to prevent UI crash.`);
+      return {
+        exists: () => true,
+        data: () => ({ imageUrl: "", bio: "", cacheKey: entityId, _isStub: true }),
+        id: entityId,
+        metadata: {} as any,
+        ref: {} as any,
+        get: (fieldPath: string) => null,
+      } as unknown as DocumentSnapshot;
     }
     
     const data = await response.json();
-    if (data && data.redirectTo && depth < 3) {
-      let targetId = data.redirectTo.trim();
-      const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
+    
+    if (data && data.found === false) {
+      // Fix 3 — Suffix Fallback: If the country-disambiguated ID (e.g. 'korn-usa')
+      // returns a cache miss, the doc may only exist as a bare ID alias with a redirectTo pointer
+      // (e.g. 'korn'). Strip the last country-suffix segment and retry once so the
+      // redirect chain can resolve correctly. This eliminates the miss waterfall on page
+      // load for graph nodes whose IDs include an origin suffix.
+      if (depth === 0) {
+        // Match both full country name suffixes (e.g. -thailand, -japan, -germany) AND
+        // ISO 3166-1 alpha-2 two-letter country codes across all 249 countries via stripCountrySlug.
+        const bareId = stripCountrySlug(entityId);
+        if (bareId && bareId !== entityId) {
+          console.log(`[Proxy Fetch] Cache miss for ${entityId} — retrying with bare ID: ${bareId}`);
+          return getEntityDocWithRedirect(bareId, entityType, depth + 1);
+        }
+      }
+      
+      console.warn(`[Proxy Fetch] Expected cache miss for ${entityId}, returning proper miss fallback.`);
+      return {
+        exists: () => false,
+        data: () => undefined,
+        id: entityId,
+        metadata: {} as any,
+        ref: {} as any,
+        get: (fieldPath: string) => null,
+      } as unknown as DocumentSnapshot;
+    }
+
+    if (data && data._isStub && (data.isAmbiguous || (Array.isArray(data.candidates) && data.candidates.length > 1))) {
+      console.log(`[Client-Side Redirect Proxy] Ambiguous stub detected for ${entityId}, stopping redirect traversal.`);
+    } else if (data && data.redirectTo && depth < 3) {
+      let targetId = data.redirectTo.trim().replace(/-(after|before|genre|inc_genres|exc_origins|inc_origins|label|inc_labels|anchor_labels):[^\s]+/gi, '');
+      const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea|thailand))-.+$/i);
       if (match) {
         console.log(`[Redirect Suffix Cleaner Proxy] Normalized redirect: ${targetId} -> ${match[1]}`);
         targetId = match[1];
@@ -1049,44 +1420,15 @@ export const getEntityDocWithRedirect = async (
       get: (fieldPath: string) => (data as any)[fieldPath],
     } as unknown as DocumentSnapshot;
   } catch (error) {
-    console.warn(`[Proxy Fetch] Failed for ${entityId}, falling back to direct Firestore read:`, error);
-    const docRef = doc(db, collName, entityId);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      const data = snap.data();
-      if (data && data.redirectTo && depth < 3) {
-        let targetId = data.redirectTo.trim();
-        const match = targetId.match(/^([a-z0-9\-]+-(?:united-states|united-kingdom|canada|australia|germany|france|sweden|norway|italy|spain|brazil|mexico|japan|south-korea))-.+$/i);
-        if (match) {
-          console.log(`[Redirect Suffix Cleaner Catch] Normalized redirect: ${targetId} -> ${match[1]}`);
-          targetId = match[1];
-        }
-        console.log(`[Client-Side Redirect] Redirecting ${entityId} -> ${targetId}`);
-        return getEntityDocWithRedirect(targetId, entityType, depth + 1);
-      }
-      return snap;
-    }
-
-    // Prefix match lookup fallback: check if any document has a cacheKey starting with entityId
-    if (depth === 0) {
-      try {
-        const { collection, query, where, getDocs } = await import('firebase/firestore');
-        const q = query(
-          collection(db, collName),
-          where('cacheKey', '>=', entityId),
-          where('cacheKey', '<=', entityId + '\uf8ff')
-        );
-        const qSnap = await getDocs(q);
-        const validDocs = qSnap.docs.filter(d => !d.data().redirectTo);
-        if (validDocs.length > 0) {
-          console.log(`[Client-Side Prefix Match (Catch)] Resolved ${entityId} -> ${validDocs[0].id}`);
-          return validDocs[0];
-        }
-      } catch (innerErr) {
-        console.warn(`[Client-Side Prefix Match (Catch)] Failed query:`, innerErr);
-      }
-    }
-    return snap;
+    console.warn(`[Proxy Fetch] Failed for ${entityId}, returning safe fallback to prevent UI crash:`, error);
+    return {
+      exists: () => true,
+      data: () => ({ imageUrl: "", bio: "", cacheKey: entityId, _isStub: true }),
+      id: entityId,
+      metadata: {} as any,
+      ref: {} as any,
+      get: (fieldPath: string) => null,
+    } as unknown as DocumentSnapshot;
   }
 };
 
@@ -1136,9 +1478,9 @@ export const findCanonicalNodeForArtist = (name: string, nodes: Node[]): Node | 
     const checkPair = (a: string, b: string) => {
       if (!a || !b) return false;
       if (a === b) return true;
-      if (a.startsWith(`${b}-`) || b.startsWith(`${a}-`)) return true;
-      if (a.includes(`-${b}-`) || a.endsWith(`-${b}`) || b.includes(`-${a}-`) || b.endsWith(`-${a}`)) return true;
-      return false;
+      const bareA = stripCountrySlug(a);
+      const bareB = stripCountrySlug(b);
+      return Boolean(bareA && bareB && bareA === bareB);
     };
     return checkPair(normSearch, normId) || (normLabel ? checkPair(normSearch, normLabel) : false);
   });
@@ -1184,14 +1526,20 @@ export const sanitizeLabelProfile = (details: any): any => {
     genre: parsed.details?.genre || null,
     origin: parsed.details?.origin || null,
     founded: parsed.details?.founded || null,
-    notableArtists: parsed.details?.notableArtists || [],
+    notableArtists: sanitizeNotableArtists(parsed.details?.notableArtists),
   };
   return {
     summary: parsed.summary || parsed.bio || parsed.description || "",
-    imageUrl: parsed.imageUrl || parsed.image || null,
+    imageUrl: null,
     details: cleanDetails,
-    discography: Array.isArray(parsed.discography) ? parsed.discography : [],
+    discography: Array.isArray(parsed.discography)
+      ? parsed.discography.map((album: any) => ({
+          albumName: sanitizeAlbumName(album?.albumName, cleanDetails.notableArtists),
+          releaseYear: typeof album?.releaseYear === 'string' ? album.releaseYear.trim() : String(album?.releaseYear || '')
+        }))
+      : [],
     links: Array.isArray(parsed.links) ? parsed.links : [],
+    recommendationReason: parsed.recommendationReason || "",
   };
 };
 
@@ -1202,6 +1550,23 @@ export const sanitizeLabelProfile = (details: any): any => {
 export const enforceArtistCacheSchema = (payload: any): void => {
   if (!payload) return;
   if (payload.redirectTo) return;
+
+  const isLabel = payload.type === 'label' || !!payload.labelId || (typeof payload.cacheKey === 'string' && payload.cacheKey.startsWith('label:'));
+  if (isLabel) {
+    payload.imageUrl = null;
+    if (payload.detailsCache) {
+      try {
+        const parsed = typeof payload.detailsCache === 'string' ? JSON.parse(payload.detailsCache) : payload.detailsCache;
+        if (parsed && typeof parsed === 'object') {
+          parsed.imageUrl = null;
+          payload.detailsCache = typeof payload.detailsCache === 'string' ? JSON.stringify(parsed) : parsed;
+        }
+      } catch (e) {
+        // Ignore parse error on malformed label cache
+      }
+    }
+    return;
+  }
 
   const isDeep = payload.isDeep === true;
 
@@ -1225,31 +1590,37 @@ export const enforceArtistCacheSchema = (payload: any): void => {
       
       // Check for biography or summary
       const bio = parsed.summary || parsed.bio || parsed.description || parsed.text;
-      if (!bio || typeof bio !== 'string' || bio.trim().length < 2) {
-        throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text.");
+      if (!bio || typeof bio !== 'string' || bio.trim().length <= 50) {
+        throw new Error("[Schema Enforcement] detailsCache is missing biography/summary text (>50 chars required).");
       }
       
       // Check details object
       if (!parsed.details || typeof parsed.details !== 'object') {
         throw new Error("[Schema Enforcement] detailsCache is missing or has invalid details object.");
       }
-      const { genre, origin, founded, notableArtists } = parsed.details;
-      if (genre === undefined || genre === null || typeof genre !== 'string') {
+      const { genre, origin, founded, style, notableArtists } = parsed.details;
+      if (genre === undefined || genre === null || typeof genre !== 'string' || !genre.trim()) {
         throw new Error("[Schema Enforcement] detailsCache.details is missing genre.");
       }
-      if (origin === undefined || origin === null || typeof origin !== 'string') {
+      if (style === undefined || style === null || typeof style !== 'string' || !style.trim()) {
+        throw new Error("[Schema Enforcement] detailsCache.details is missing style.");
+      }
+      if (origin === undefined || origin === null || typeof origin !== 'string' || !origin.trim()) {
         throw new Error("[Schema Enforcement] detailsCache.details is missing origin.");
       }
-      if (founded === undefined || founded === null || typeof founded !== 'string') {
+      if (founded === undefined || founded === null || typeof founded !== 'string' || !founded.trim()) {
         throw new Error("[Schema Enforcement] detailsCache.details is missing founded year.");
       }
-      if (notableArtists && !Array.isArray(notableArtists)) {
-        throw new Error("[Schema Enforcement] detailsCache.details has invalid notableArtists array.");
+      if (notableArtists) {
+        if (!Array.isArray(notableArtists)) {
+          throw new Error("[Schema Enforcement] detailsCache.details has invalid notableArtists array.");
+        }
+        parsed.details.notableArtists = sanitizeNotableArtists(notableArtists);
       }
 
-      // Check for discography array
-      if (parsed.discography && !Array.isArray(parsed.discography)) {
-        throw new Error("[Schema Enforcement] detailsCache has invalid discography array.");
+      // Check for discography array (Rule 40: must be non-empty for artists)
+      if (!Array.isArray(parsed.discography) || parsed.discography.length === 0) {
+        throw new Error("[Schema Enforcement] detailsCache must have a non-empty discography array.");
       }
       if (Array.isArray(parsed.discography)) {
         for (let i = 0; i < parsed.discography.length; i++) {
@@ -1260,9 +1631,12 @@ export const enforceArtistCacheSchema = (payload: any): void => {
         }
       }
 
-      // Check recommendationReason (allow empty string for primary seeds)
-      if (parsed.recommendationReason === undefined || parsed.recommendationReason === null || typeof parsed.recommendationReason !== 'string') {
+      // Check recommendationReason (Rule 40: reject prose-fallback boilerplate)
+      if (parsed.recommendationReason === undefined || parsed.recommendationReason === null || typeof parsed.recommendationReason !== 'string' || !parsed.recommendationReason.trim()) {
         throw new Error("[Schema Enforcement] detailsCache is missing recommendationReason.");
+      }
+      if (parsed.recommendationReason.toLowerCase().includes('synthesised from live cultural archives')) {
+        throw new Error("[Schema Enforcement] detailsCache contains prose-fallback boilerplate in recommendationReason.");
       }
 
       // Check youtubeSearchQuery (allow empty string)

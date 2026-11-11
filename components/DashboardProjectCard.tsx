@@ -1,0 +1,306 @@
+import React, { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Project } from '../types';
+import { getProjectDisplayTitle, cleanArtistDisplayName, isNodeInSeedList } from '../services/artistCacheService';
+import { formatSystemTimestamp, generateDeterministicGradient, extractInitials } from '../utils/formatters';
+import { useSeedImages } from '../hooks/useSeedImages';
+import { useDominantColor } from '../hooks/useDominantColor';
+import { computeProjectCardMetrics } from '../shared/multiSceneUtils';
+
+interface DashboardProjectCardProps {
+  project: Project;
+  onSelectProject: (id: string) => void;
+  activeMenuId: string | null;
+  setActiveMenuId: (id: string | null) => void;
+  handleRenameClick: (project: Project) => void;
+  setProjectToDelete: (id: string) => void;
+  onShareProject?: (project: Project) => void;
+  onDuplicateProject?: (project: Project) => void;
+  onRestoreProject?: (id: string) => void;
+  setProjectToPurge?: (id: string) => void;
+}
+
+export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
+  project,
+  onSelectProject,
+  activeMenuId,
+  setActiveMenuId,
+  handleRenameClick,
+  setProjectToDelete,
+  onShareProject,
+  onDuplicateProject,
+  onRestoreProject,
+  setProjectToPurge
+}) => {
+  const [imgError, setImgError] = useState(false);
+  const isTrashed = project.status === 'trashed';
+  const purgeMs = project.purgeAt?.toMillis
+    ? project.purgeAt.toMillis()
+    : project.purgeAt?.toDate
+    ? project.purgeAt.toDate().getTime()
+    : project.purgeAt?.seconds
+    ? project.purgeAt.seconds * 1000
+    : typeof project.purgeAt === 'string' || typeof project.purgeAt === 'number'
+    ? new Date(project.purgeAt).getTime()
+    : project.trashedAt
+    ? (project.trashedAt?.toMillis ? project.trashedAt.toMillis() : new Date(project.trashedAt).getTime()) + 30 * 24 * 60 * 60 * 1000
+    : null;
+  const daysLeft = purgeMs ? Math.max(0, Math.ceil((purgeMs - Date.now()) / (24 * 60 * 60 * 1000))) : 30;
+  const {
+    sceneCount,
+    seedList,
+    rootArtistsCount,
+    recommendedCount,
+    labelCount,
+    deepCutsCount,
+  } = computeProjectCardMetrics(project);
+  const displayTitle = getProjectDisplayTitle(project);
+  const isUnmapped = project.status !== 'completed' && project.status !== 'trashed' && project.status !== 'curating' && project.status !== 'pending' && project.status !== 'failed' && !project.seedArtists;
+  
+  const imageUrls = useSeedImages(project.seedArtists, project.detailsCache, project.graphData, project.seedImageUrl, project.seedImageUrls, project.scenes);
+  const hasArtwork = Boolean(imageUrls.length > 0 && imageUrls[0] && imageUrls[0] !== 'not-found' && !imgError);
+  const dominantColor = useDominantColor(hasArtwork ? imageUrls[0] : undefined);
+  const hasAccentColor = Boolean(hasArtwork && dominantColor && dominantColor !== 'transparent');
+
+  return (
+    <motion.div
+      onClick={() => onSelectProject(project.id)}
+      className={`group relative border border-transparent hover:border-primary rounded-2xl p-5 transition-all cursor-pointer flex flex-col justify-between w-full md:w-[350px] h-[180px] shadow-[0_0_40px_rgba(0,0,0,0.7)] ${activeMenuId === project.id ? 'z-50' : 'overflow-hidden z-0'}`}
+      style={{
+        ...(hasAccentColor ? {
+          '--scene-accent': dominantColor,
+          // Blend scene accent toward white for bright legible title color
+          '--scene-accent-title': `color-mix(in oklch, ${dominantColor} 25%, white)`,
+        } : {}),
+      } as React.CSSProperties}
+    >
+      
+      {/* Background Layer: Smart Fallback cascade (0 images = monogram, 1 image = full bleed, 2+ images = split card) */}
+      <div className="absolute inset-0 z-0 rounded-2xl overflow-hidden pointer-events-none bg-zinc-950">
+        {imageUrls.length >= 2 ? (
+          <>
+            {/* Left artist: anchored left, cross-fades out across the right half */}
+            <div
+              className="absolute inset-0"
+              style={{
+                WebkitMaskImage: 'linear-gradient(to right, black 30%, transparent 75%)',
+                maskImage: 'linear-gradient(to right, black 30%, transparent 75%)',
+              }}
+            >
+              <img 
+                src={imageUrls[0]} 
+                alt={displayTitle} 
+                className="absolute inset-0 w-full h-full object-cover object-left" 
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+            {/* Right artist: anchored right, cross-fades out across the left half */}
+            <div
+              className="absolute inset-0"
+              style={{
+                WebkitMaskImage: 'linear-gradient(to left, black 30%, transparent 75%)',
+                maskImage: 'linear-gradient(to left, black 30%, transparent 75%)',
+              }}
+            >
+              <img 
+                src={imageUrls[1]} 
+                alt={displayTitle} 
+                className="absolute inset-0 w-full h-full object-cover object-right" 
+                loading="lazy"
+                decoding="async"
+              />
+            </div>
+          </>
+        ) : (imageUrls.length === 1 && !imgError) ? (
+          <div className="absolute inset-0 w-full h-full">
+            <img 
+              src={imageUrls[0]} 
+              alt={displayTitle} 
+              className="absolute inset-0 w-full h-full object-cover" 
+              loading="lazy"
+              decoding="async"
+              onError={() => setImgError(true)}
+            />
+          </div>
+        ) : (
+          <div className="absolute inset-0 w-full h-full bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 relative overflow-hidden">
+             {/* Monogram for missing images */}
+             <div className="absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] text-white/10 font-black text-8xl uppercase select-none leading-none">
+               {extractInitials(displayTitle)}
+             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Uniform scrim: even 55% dark backdrop — artwork shows through evenly with no directional patches */}
+      <div className="absolute inset-0 z-10 bg-zinc-950/55 rounded-2xl" />
+
+      {/* Content Container (z-20) */}
+      <div className="relative z-20 flex flex-col h-full justify-between">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-row items-center gap-4 flex-1 min-w-0">
+              <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                <h3 
+                  className="text-base font-medium line-clamp-2 pr-2 transition-colors text-zinc-100" 
+                  style={hasAccentColor ? { color: 'var(--scene-accent-title, white)' } : undefined}
+                >
+                  {displayTitle}
+                </h3>
+                <p className="font-mono text-[10px] font-normal truncate uppercase tracking-widest text-zinc-400">
+                  {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
+                </p>
+                {isTrashed ? (
+                  <span className="text-[9px] uppercase tracking-wide text-amber-300 font-bold px-1.5 py-0.5 bg-amber-950/60 rounded-md border border-amber-500/40 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
+                    {daysLeft} {daysLeft === 1 ? 'DAY' : 'DAYS'} LEFT
+                  </span>
+                ) : project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
+                  <span className="text-[9px] uppercase tracking-wider text-amber-500/80 font-bold px-1.5 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse backdrop-blur-sm w-fit mt-0.5">
+                    Mapping...
+                  </span>
+                ) : project.status === 'failed' ? (
+                  <span className="text-[9px] uppercase tracking-wider text-red-500/80 font-bold px-1.5 py-0.5 bg-red-500/10 rounded-md border border-red-500/10 whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
+                    Failed
+                  </span>
+                ) : project.status === 'completed' ? (
+                  null
+                ) : (
+                  <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800/80 rounded-md border border-zinc-700/60 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
+                    Unmapped
+                  </span>
+                )}
+              </div>
+            </div>
+            
+            <div
+              className={`relative flex-shrink-0 transition-opacity duration-150 opacity-100`}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button
+                onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
+                className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-all cursor-pointer flex items-center justify-center drop-shadow-md"
+              >
+                <span className="material-symbols-outlined !text-xl">more_vert</span>
+              </button>
+              
+              {activeMenuId === project.id && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
+                  <div className="absolute right-0 mt-2 w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
+                    {isTrashed ? (
+                      <>
+                        {onRestoreProject && (
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              onRestoreProject(project.id);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-emerald-400">restore</span>
+                            Restore (0T)
+                          </button>
+                        )}
+                        <div className="border-t border-zinc-800/80 my-1" />
+                        <button
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            if (setProjectToPurge) {
+                              setProjectToPurge(project.id);
+                            } else {
+                              setProjectToDelete(project.id);
+                            }
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete_forever</span>
+                          Delete Forever
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            handleRenameClick(project);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                        >
+                          <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
+                          Rename
+                        </button>
+                        {onShareProject && (
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              onShareProject(project);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
+                            Share
+                          </button>
+                        )}
+                        {onDuplicateProject && (
+                          <button
+                            onClick={() => {
+                              setActiveMenuId(null);
+                              onDuplicateProject(project);
+                            }}
+                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                          >
+                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">content_copy</span>
+                            Duplicate
+                          </button>
+                        )}
+                        <div className="border-t border-zinc-800/80 my-1" />
+                        <button
+                          onClick={() => {
+                            setActiveMenuId(null);
+                            setProjectToDelete(project.id);
+                          }}
+                          className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                        >
+                          <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete</span>
+                          Move to Trash
+                        </button>
+                      </>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        </div>
+        {!isUnmapped && (
+          <div className="mt-3 flex items-center">
+            <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
+              <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                SCENES: {sceneCount || 1}
+              </span>
+              <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                ROOT ARTISTS: {rootArtistsCount}
+              </span>
+              {(project.status === 'completed' || isTrashed) && (
+                <>
+                  <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                    ARTISTS: {recommendedCount}
+                  </span>
+                  {labelCount > 0 && (
+                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                      LABELS: {labelCount}
+                    </span>
+                  )}
+                  <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
+                    DEEP CUTS: {deepCutsCount}
+                  </span>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};

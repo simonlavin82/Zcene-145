@@ -4,8 +4,9 @@ import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, '.', '');
+  const env = loadEnv(mode, process.cwd(), '');
   return {
+    base: '/',
     server: {
       port: 3000,
       host: '0.0.0.0',
@@ -15,23 +16,43 @@ export default defineConfig(({ mode }) => {
       ],
       proxy: {
         '/api': {
-          target: 'http://localhost:8080',
+          target: 'https://zcene.online',
           changeOrigin: true,
+          timeout: 60000,
+          proxyTimeout: 60000,
           configure: (proxy) => {
             proxy.on('proxyReq', (proxyReq, req) => {
+              if (env.GEMINI_API_KEY) {
+                proxyReq.setHeader('x-goog-api-key', env.GEMINI_API_KEY);
+              }
               console.log(`[Proxy Request] Path: ${req.url} -> Target: ${proxyReq.path}`);
             });
             proxy.on('proxyRes', (proxyRes, req) => {
               console.log(`[Proxy Response] Status: ${proxyRes.statusCode} for ${req.url}`);
             });
-            proxy.on('error', (err, req) => {
-              console.error(`[Proxy Error] ${err.message} for ${req.url}`);
+            proxy.on('error', (err: any, req, res) => {
+              if (err.code === 'ECONNREFUSED') {
+                // Silently handle missing backend, application will fallback to Firebase direct reads
+                if (res && typeof (res as any).writeHead === 'function') {
+                    (res as any).writeHead(503, { 'Content-Type': 'application/json' });
+                    (res as any).end(JSON.stringify({ error: 'Backend service unavailable (falling back to local cache)' }));
+                }
+              } else {
+                console.error(`[Proxy Error] ${err.message} for ${req.url}`);
+              }
             });
           }
         }
       }
     },
     plugins: [react(), tailwindcss()],
+    test: {
+      globals: true,
+      environment: 'jsdom',
+      setupFiles: './tests/setup.ts',
+      include: ['**/*.test.{ts,tsx}'],
+      exclude: ['**/*.spec.{ts,tsx}', 'node_modules/**/*']
+    },
     define: {
       'process.env.API_KEY': env.GEMINI_API_KEY ? JSON.stringify(env.GEMINI_API_KEY) : 'window.GEMINI_API_KEY',
       'process.env.GEMINI_API_KEY': env.GEMINI_API_KEY ? JSON.stringify(env.GEMINI_API_KEY) : 'window.GEMINI_API_KEY'

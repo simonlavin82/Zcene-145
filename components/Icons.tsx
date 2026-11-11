@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import * as d3 from 'd3';
+import { motion } from 'motion/react';
 
 export const ZceneLogo: React.FC<{ className?: string }> = ({ className }) => (
   <svg className={className} width="255" height="90" viewBox="0 0 255 90" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -39,7 +40,7 @@ export const StackIcon: React.FC<{ className?: string }> = ({ className }) => (
 );
 
 export const LibraryIcon: React.FC<{ className?: string }> = ({ className }) => (
-  <span className={`material-symbols-outlined select-none ${className}`} style={{ fontSize: 'inherit' }}>library_music</span>
+  <span className={`material-symbols-outlined select-none ${className}`} style={{ fontSize: 'inherit' }}>queue_music</span>
 );
 
 export const VisibilityIcon: React.FC<{ className?: string }> = ({ className }) => (
@@ -59,7 +60,7 @@ export const VisibilityOffIcon: React.FC<{ className?: string }> = ({ className 
 );
 
 export const GRAPH_THINKING_STEPS = [
-    "Analysing seed artists...",
+    "Analyzing seeds...",
     "Identifying core genres and influences...",
     "Searching for related artists...",
     "Mapping connections to record labels...",
@@ -107,7 +108,7 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     }, [steps]);
 
     return (
-        <div className="flex flex-col items-center justify-center gap-4 text-center">
+        <div data-testid="active-loader" className="flex flex-col items-center justify-center gap-4 text-center">
             <div className="w-12 h-12 border-4 border-zinc-500 border-t-primary animate-spin rounded-full"></div>
             <div className="flex flex-col items-center gap-1.5">
                 <div className="h-6 flex items-center justify-center">
@@ -147,11 +148,17 @@ export const InstagramIcon: React.FC<{ className?: string }> = ({ className }) =
   </svg>
 );
 
-export const LegendSymbol: React.FC<{ symbol: d3.SymbolType; size?: number; className?: string; }> = ({ symbol, size = 64, className }) => {
+export const LegendSymbol: React.FC<{ symbol: d3.SymbolType; size?: number; className?: string; style?: React.CSSProperties; }> = ({ symbol, size = 64, className, style }) => {
     const path = d3.symbol().type(symbol).size(size)();
+    
+    let transform = "";
+    if (symbol === d3.symbolTriangle) transform = "translate(0, 2)";
+    else if (symbol === d3.symbolStar) transform = "translate(0, 1)";
+    else if (symbol === d3.symbolSquare) transform = "translate(0, 0)";
+
     return (
-        <svg width="14" height="14" viewBox="-15 -15 30 30" className={className} preserveAspectRatio="xMidYMid meet">
-            <path d={path || ''} fill="currentColor" />
+        <svg width="14" height="14" viewBox="-15 -15 30 30" className={className} style={style} preserveAspectRatio="xMidYMid meet">
+            <path d={path || ''} fill="currentColor" transform={transform} />
         </svg>
     );
 };
@@ -164,29 +171,49 @@ interface SortControlsProps {
 }
 
 export const SortControls: React.FC<SortControlsProps> = ({ sortConfig, onSortChange }) => {
-  const sortButtons: { label: string; key: SortKey }[] = [
-    { label: 'Name', key: 'name' },
-    { label: 'Date', key: 'dateAdded' },
-    { label: 'Selected', key: 'selected' },
+  const sortButtons: { label: string; key: SortKey; icon: string }[] = [
+    { label: 'Sort by Recent', key: 'dateAdded', icon: 'schedule' },
+    { label: 'Sort Alphabetically', key: 'name', icon: 'sort_by_alpha' },
+    { label: 'Sort by Selected', key: 'selected', icon: 'task_alt' },
   ];
   
+  const activeIndex = sortButtons.findIndex(btn => btn.key === sortConfig.key);
+
   return (
-    <div className="flex flex-wrap items-center gap-2">
+    <div className="flex items-center bg-zinc-950 border border-zinc-700/80 rounded-xl relative h-[38px] shrink-0 overflow-hidden">
+        {/* Square Sliding Active Badge */}
+        <motion.div
+            className="absolute top-0 left-0 w-9 h-9 bg-zinc-800"
+            initial={false}
+            animate={{ 
+                x: activeIndex * 36,
+                borderRadius: activeIndex === 0 ? "11px 0px 0px 11px" : activeIndex === 2 ? "0px 11px 11px 0px" : "0px"
+            }}
+            transition={{ type: 'spring', stiffness: 480, damping: 38 }}
+        />
         {sortButtons.map(btn => {
             const isActive = sortConfig.key === btn.key;
-            const icon = sortConfig.direction === 'asc' ? 'arrow_upward' : 'arrow_downward';
             
             return (
                 <button
                     key={btn.key}
                     onClick={() => onSortChange(btn.key)}
-                    className={`flex items-center gap-1 text-sm px-4 py-2 rounded-xl transition-colors ${isActive ? 'bg-zinc-300 text-brand-black font-medium' : 'bg-zinc-700/80 text-zinc-300 hover:bg-zinc-700'}`}
+                    className={`flex items-center justify-center w-9 h-9 transition-colors relative z-10 active:scale-95 ${
+                        isActive ? 'text-white' : 'text-zinc-500 hover:text-zinc-300'
+                    }`}
+                    title={btn.label}
+                    aria-label={btn.label}
                 >
-                    <span>{btn.label}</span>
-                    {isActive && <span className="material-symbols-outlined !text-[18px]">{icon}</span>}
+                    <span className="material-symbols-outlined !text-[18px]">{btn.icon}</span>
                 </button>
             );
         })}
     </div>
   );
 };
+
+export const BandcampIcon: React.FC<{ className?: string }> = ({ className }) => (
+  <svg className={className} viewBox="0 0 800 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M708.375 214.2L537.079 586.554L91.6621 584.804L262.462 213.458L708.375 214.2Z" stroke="currentColor" strokeWidth="50" strokeMiterlimit="15" strokeLinecap="round" strokeLinejoin="round"/>
+  </svg>
+);

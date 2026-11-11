@@ -1,0 +1,3954 @@
+<USER_REQUEST>
+Task: Read-Only Architectural Audit & Cost Investigation
+
+Context: We successfully executed a net-new Root Generation pipeline for "Limp Bizkit." The pipeline worked perfectly, mapping 38 nodes and hydrating 27 entities. However, we have a massive discrepancy in cost reporting:
+
+The internal Zcene Projects Ledger calculated the run at exactly $0.1497.
+
+The Google AI Studio Billing Dashboard showed a spike of £3.68 (though we suspect this may be delayed batch aggregation from previous days).
+
+Goal: We need absolute certainty on the true API cost of a Root Generation and must identify any hidden inefficiencies.
+
+Strict Directive: This is a purely diagnostic trace. DO NOT MODIFY ANY CODE. The pipeline is delicate and functioning perfectly. You are only to read, analyze, and report.
+
+Investigation Vectors:
+
+Log Analysis: Review the provided downloaded-logs-20260906-150401_2.json. Trace the exact execution path and token payloads for executeCurationPipeline and processCurationJob. Calculate the true cost using standard 2026 Gemini API token rates (e.g., Gemini 3.1 Pro and Gemini 3.5 Flash).
+
+Inefficiency Hunt (The 404 Loop): The logs show over a dozen rapid GET requests to api/artist/limp-bizkit on the proxy resulting in 404s. Trace where this frontend polling originates. Does this loop trigger any hidden, repetitive LLM calls, or is it strictly a harmless (but noisy) UI polling mechanism?
+
+Hidden Retries: Are there any silent Firebase retry policies or recursive loops in the background worker that could be artificially inflating token usage beyond what the final database payload reports?
+
+Ledger Accuracy: Briefly audit the calculateTelemetryForUser logic. Why did it output $0.1497 when the raw token counts suggest a different total?
+
+Please return a comprehensive diagnostic report outlining exactly what the system is doing, what the true cost is, and where the inefficiencies lie. Do not write any patch code yet.
+
+Logs:
+[
+  {
+    "insertId": "6a9d7120000738bf789f29ac",
+    "httpRequest": {
+      "requestMethod": "OPTIONS",
+      "requestUrl": "https://us-central1-zcene-production.cloudfunctions.net/validateSeedOriginCallable",
+      "requestSize": "744",
+      "status": 204,
+      "responseSize": "257",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "2a01:4b00:b80b:4e00:684f:8e92:30cb:3e1a",
+      "referer": "https://zcene.online/",
+      "serverIp": "2001:4860:4802:36::36",
+      "latency": "1.735571099s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "revision_name": "validateseedorigincallable-00038-lig",
+        "configuration_name": "validateseedorigincallable",
+        "service_name": "validateseedorigincallable"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:46.473763Z",
+    "severity": "INFO",
+    "labels": {
+      "instanceId": "00a41e8c1d1aa7d9a538ea8c73cd97f5935725063691ad7165c9b643bba39c5aaead5154547d71aaf6acf9199d228924c277a51d71cedbbee549c0892711bc5c4fb498caa1c30a7ece69e055a947d0",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "validateseedorigincallable",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "deployment-callable": "true",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/0c19c9ad3ad67470fdd46064f3c3a96b",
+    "receiveTimestamp": "2026-09-06T13:56:48.480446791Z",
+    "spanId": "57561f6d64c3730e",
+    "traceSampled": true
+  },
+  {
+    "textPayload": "Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.",
+    "insertId": "6a9d711e0007d94bbb8029d1",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "validateseedorigincallable",
+        "location": "us-central1",
+        "revision_name": "validateseedorigincallable-00038-lig",
+        "configuration_name": "validateseedorigincallable",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:46.514379Z",
+    "severity": "INFO",
+    "labels": {
+      "deployment-callable": "true",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "scaling_reason": "AUTOSCALING",
+      "goog-drz-cloudfunctions-id": "validateseedorigincallable",
+      "instanceId": "00a41e8c1d1aa7d9a538ea8c73cd97f5935725063691ad7165c9b643bba39c5aaead5154547d71aaf6acf9199d228924c277a51d71cedbbee549c0892711bc5c4fb498caa1c30a7ece69e055a947d0",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2026-09-06T13:56:46.521699615Z"
+  },
+  {
+    "textPayload": "Default STARTUP TCP probe succeeded after 1 attempt for container \"worker\" on port 8080.",
+    "insertId": "6a9d71200006994da43e4c18",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "validateseedorigincallable",
+        "project_id": "zcene-production",
+        "revision_name": "validateseedorigincallable-00038-lig",
+        "configuration_name": "validateseedorigincallable"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:48.432461Z",
+    "severity": "INFO",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "instanceId": "00a41e8c1d1aa7d9a538ea8c73cd97f5935725063691ad7165c9b643bba39c5aaead5154547d71aaf6acf9199d228924c277a51d71cedbbee549c0892711bc5c4fb498caa1c30a7ece69e055a947d0",
+      "goog-drz-cloudfunctions-id": "validateseedorigincallable",
+      "deployment-callable": "true"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2026-09-06T13:56:48.521640240Z"
+  },
+  {
+    "insertId": "6a9d7122000bf6bf7ea74862",
+    "httpRequest": {
+      "requestMethod": "POST",
+      "requestUrl": "https://us-central1-zcene-production.cloudfunctions.net/validateSeedOriginCallable",
+      "requestSize": "2054",
+      "status": 200,
+      "responseSize": "278",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "2a01:4b00:b80b:4e00:684f:8e92:30cb:3e1a",
+      "referer": "https://zcene.online/",
+      "serverIp": "2001:4860:4802:36::36",
+      "latency": "2.165405204s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "configuration_name": "validateseedorigincallable",
+        "service_name": "validateseedorigincallable",
+        "revision_name": "validateseedorigincallable-00038-lig",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:48.616030Z",
+    "severity": "INFO",
+    "labels": {
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "instanceId": "00a41e8c1d1aa7d9a538ea8c73cd97f5935725063691ad7165c9b643bba39c5aaead5154547d71aaf6acf9199d228924c277a51d71cedbbee549c0892711bc5c4fb498caa1c30a7ece69e055a947d0",
+      "goog-drz-cloudfunctions-id": "validateseedorigincallable",
+      "goog-managed-by": "cloudfunctions",
+      "deployment-callable": "true",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/5e1802313ddbde2afdd46064f3c3af7e",
+    "receiveTimestamp": "2026-09-06T13:56:50.812381093Z",
+    "spanId": "ae41b2ce4275bd7f"
+  },
+  {
+    "insertId": "6a9d7120000a984ad089f4c1",
+    "jsonPayload": {
+      "message": "Callable request verification passed",
+      "verifications": {
+        "app": "MISSING",
+        "auth": "VALID"
+      }
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "validateseedorigincallable",
+        "project_id": "zcene-production",
+        "configuration_name": "validateseedorigincallable",
+        "revision_name": "validateseedorigincallable-00038-lig",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:48.694346Z",
+    "severity": "DEBUG",
+    "labels": {
+      "firebase-log-type": "callable-request-verification",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "execution_id": "pvl6kgl5pcmf",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "deployment-callable": "true",
+      "instanceId": "00a41e8c1d1aa7d9a538ea8c73cd97f5935725063691ad7165c9b643bba39c5aaead5154547d71aaf6acf9199d228924c277a51d71cedbbee549c0892711bc5c4fb498caa1c30a7ece69e055a947d0",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "validateseedorigincallable",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "trace": "projects/zcene-production/traces/5e1802313ddbde2afdd46064f3c3af7e",
+    "receiveTimestamp": "2026-09-06T13:56:48.703984469Z",
+    "spanId": "12556513835033673087"
+  },
+  {
+    "insertId": "6a9d7125000a4707bd254019",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1537",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.200",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.75.2",
+      "latency": "0.065976002s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "project_id": "zcene-production",
+        "configuration_name": "zcene-backend-proxy"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:53.598410Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/5bc3c848a2dd860c88cd901d14bc755a",
+    "receiveTimestamp": "2026-09-06T13:56:53.679021229Z",
+    "spanId": "a0cd432c8cda9923",
+    "traceSampled": true
+  },
+  {
+    "insertId": "6a9d7125000dbd2a76a8b409",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1412",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.70",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.76.2",
+      "latency": "0.023613263s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "service_name": "zcene-backend-proxy",
+        "configuration_name": "zcene-backend-proxy",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:53.874526Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/32e3f58d5b4827e986a73a76f02d82cf",
+    "receiveTimestamp": "2026-09-06T13:56:54.012517291Z",
+    "spanId": "a42e62673f761bd8"
+  },
+  {
+    "insertId": "6a9d712800043abe311fd681",
+    "httpRequest": {
+      "requestMethod": "OPTIONS",
+      "requestUrl": "https://us-central1-zcene-production.cloudfunctions.net/executeCurationPipeline",
+      "requestSize": "741",
+      "status": 204,
+      "responseSize": "257",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "2a01:4b00:b80b:4e00:684f:8e92:30cb:3e1a",
+      "referer": "https://zcene.online/",
+      "serverIp": "2001:4860:4802:36::36",
+      "latency": "1.944851492s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "executecurationpipeline",
+        "configuration_name": "executecurationpipeline",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "revision_name": "executecurationpipeline-00049-dol"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.089223Z",
+    "severity": "INFO",
+    "labels": {
+      "deployment-callable": "true",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/55f69d9f4807b18a1ddb99296102d032",
+    "receiveTimestamp": "2026-09-06T13:56:56.283660518Z",
+    "spanId": "2c8b3aa71eace630",
+    "traceSampled": true
+  },
+  {
+    "insertId": "6a9d712600021a29c8ed2607",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1412",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.97",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.74.2",
+      "latency": "0.033727483s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "zcene-backend-proxy",
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "project_id": "zcene-production",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.101797Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/db834795d7822e42353e3c872759e455",
+    "receiveTimestamp": "2026-09-06T13:56:54.345450292Z",
+    "spanId": "4d2da5d6e5dd7fd6"
+  },
+  {
+    "textPayload": "Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.",
+    "insertId": "6a9d71260001f0ff72828ac8",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "executecurationpipeline",
+        "location": "us-central1",
+        "service_name": "executecurationpipeline",
+        "project_id": "zcene-production",
+        "revision_name": "executecurationpipeline-00049-dol"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.127231Z",
+    "severity": "INFO",
+    "labels": {
+      "scaling_reason": "AUTOSCALING",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "deployment-callable": "true",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2026-09-06T13:56:54.136387557Z"
+  },
+  {
+    "insertId": "6a9d71260004a55c445cca2a",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1412",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "142.250.32.9",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.77.2",
+      "latency": "0.025230276s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.277328Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/d65ce70dc3d92f2335e2d8b788e67c79",
+    "receiveTimestamp": "2026-09-06T13:56:54.345450292Z",
+    "spanId": "c93b83d005d35567"
+  },
+  {
+    "insertId": "6a9d712600072a5e7f36dd22",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1412",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.7",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.74.2",
+      "latency": "0.022599536s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "project_id": "zcene-production",
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.444731Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/5931ed5f33ba67aaf535a490c7f555bf",
+    "receiveTimestamp": "2026-09-06T13:56:54.677482604Z",
+    "spanId": "9d1f3e2e9c55d51b"
+  },
+  {
+    "insertId": "6a9d7126000a284c2772e836",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1412",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.131",
+      "referer": "https://zcene.online/p/FqZkQsHyIS74TLk4LRgT",
+      "serverIp": "34.143.77.2",
+      "latency": "0.025251564s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:54.638387Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/9ff5a30ca9c8c527b16ba479ced26aad",
+    "receiveTimestamp": "2026-09-06T13:56:54.677482604Z",
+    "spanId": "49e57ccbf7b9e06f"
+  },
+  {
+    "textPayload": "Default STARTUP TCP probe succeeded after 1 attempt for container \"worker\" on port 8080.",
+    "insertId": "6a9d7128000341288241a8ab",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "executecurationpipeline",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "configuration_name": "executecurationpipeline",
+        "project_id": "zcene-production",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.213288Z",
+    "severity": "INFO",
+    "labels": {
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "deployment-callable": "true",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2026-09-06T13:56:56.466044842Z"
+  },
+  {
+    "insertId": "6a9d716500085b119c2231d9",
+    "httpRequest": {
+      "requestMethod": "POST",
+      "requestUrl": "https://us-central1-zcene-production.cloudfunctions.net/executeCurationPipeline",
+      "requestSize": "2247",
+      "status": 200,
+      "responseSize": "10119",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "2a01:4b00:b80b:4e00:684f:8e92:30cb:3e1a",
+      "referer": "https://zcene.online/",
+      "serverIp": "2001:4860:4802:36::36",
+      "latency": "61.143844195s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "configuration_name": "executecurationpipeline",
+        "location": "us-central1",
+        "service_name": "executecurationpipeline"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.396034Z",
+    "severity": "INFO",
+    "labels": {
+      "deployment-callable": "true",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/73180df5db9698791ddb99296102d551",
+    "receiveTimestamp": "2026-09-06T13:57:57.553964173Z",
+    "spanId": "b49a0ad190411fbd"
+  },
+  {
+    "insertId": "6a9d712800076092e9faa8d8",
+    "jsonPayload": {
+      "message": "Callable request verification passed",
+      "verifications": {
+        "app": "MISSING",
+        "auth": "VALID"
+      }
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "executecurationpipeline",
+        "location": "us-central1",
+        "configuration_name": "executecurationpipeline",
+        "project_id": "zcene-production",
+        "revision_name": "executecurationpipeline-00049-dol"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.483474Z",
+    "severity": "DEBUG",
+    "labels": {
+      "deployment-callable": "true",
+      "execution_id": "pvlckkxayyqc",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "firebase-log-type": "callable-request-verification",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "trace": "projects/zcene-production/traces/73180df5db9698791ddb99296102d551",
+    "receiveTimestamp": "2026-09-06T13:56:56.493916558Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "textPayload": "[Curation Backend] Executing executeCurationPipeline with payload: {\n  artists: 'limp-bizkit',\n  filters: {},\n  userId: '9FBuWDALnNfUAjxV0pRe3RnKwJy1',\n  projectId: 'FqZkQsHyIS74TLk4LRgT',\n  jobId: 'job-1788703013482-p18sswa7w',\n  disambiguationHints: { 'limp-bizkit': 'USA' },\n  isSandboxMode: false,\n  password: 'Zcenester'\n}\n",
+    "insertId": "6a9d7128000768cae1e82e04",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "project_id": "zcene-production",
+        "service_name": "executecurationpipeline",
+        "configuration_name": "executecurationpipeline"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.485578Z",
+    "labels": {
+      "execution_id": "pvlckkxayyqc",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "deployment-callable": "true",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:56:56.824790455Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "textPayload": "[Pipeline Diamond] -> Cache Lookup: Checking seeds: limp-bizkit\n",
+    "insertId": "6a9d71280007698b9e751e91",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "configuration_name": "executecurationpipeline",
+        "service_name": "executecurationpipeline",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.485771Z",
+    "labels": {
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvlckkxayyqc",
+      "goog-managed-by": "cloudfunctions",
+      "deployment-callable": "true",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:56:56.824790455Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "textPayload": "[Pipeline Diamond] -> Is Hit? No -> Flash-Lite Origin Validation: limp-bizkit\n",
+    "insertId": "6a9d7128000f1e3b22e86ac7",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "executecurationpipeline",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "project_id": "zcene-production",
+        "configuration_name": "executecurationpipeline",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.990779Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "deployment-callable": "true",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvlckkxayyqc",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:56:57.156945094Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "textPayload": "[Pipeline Diamond] -> Seed Slugging: limp-bizkit -> limp-bizkit-us\n",
+    "insertId": "6a9d7128000f20d03de26358",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "configuration_name": "executecurationpipeline",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "location": "us-central1",
+        "service_name": "executecurationpipeline"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.991440Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "deployment-callable": "true",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "execution_id": "pvlckkxayyqc",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:56:57.156945094Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "textPayload": "[Pipeline Diamond] -> 3.1 Pro Topology Generation\n",
+    "insertId": "6a9d7128000f2169de16a5ae",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "executecurationpipeline-00049-dol",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "service_name": "executecurationpipeline",
+        "configuration_name": "executecurationpipeline"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:56.991593Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvlckkxayyqc",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "deployment-callable": "true"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:56:57.156945094Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "insertId": "6a9d712a00051d26677eab4c",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1398",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.102",
+      "referer": "https://zcene.online/dashboard",
+      "serverIp": "34.143.77.2",
+      "latency": "0.024663533s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:58.308427Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/6c08c198e73647d49652a1784049f57d",
+    "receiveTimestamp": "2026-09-06T13:56:58.343441736Z",
+    "spanId": "62e6a33e26c97b46"
+  },
+  {
+    "insertId": "6a9d712a0007b54632d08066",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1399",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.162",
+      "referer": "https://zcene.online/dashboard",
+      "serverIp": "34.143.79.2",
+      "latency": "0.026932434s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:58.476146Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/e386af89e150e87f4d2fafd976405949",
+    "receiveTimestamp": "2026-09-06T13:56:58.675084473Z",
+    "spanId": "7660c058328d0284"
+  },
+  {
+    "insertId": "6a9d712a000a3c7660b01cfa",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1399",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.226",
+      "referer": "https://zcene.online/dashboard",
+      "serverIp": "34.143.75.2",
+      "latency": "0.015886804s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "service_name": "zcene-backend-proxy"
+      }
+    },
+    "timestamp": "2026-09-06T13:56:58.652918Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/262d6341fa51494c10d5f89b890001d2",
+    "receiveTimestamp": "2026-09-06T13:56:59.009270934Z",
+    "spanId": "b22a39838122b0f5"
+  },
+  {
+    "textPayload": "[Pipeline Diamond] -> Skipping synchronous hydration (Delegated to processCurationJob)\n",
+    "insertId": "6a9d7165000448acb76fa055",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "service_name": "executecurationpipeline",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "configuration_name": "executecurationpipeline"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:57.280748Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "deployment-callable": "true",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "execution_id": "pvlckkxayyqc",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:57:57.286009980Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "textPayload": "[Pipeline Diamond] -> Initiating Curation Pipeline for FqZkQsHyIS74TLk4LRgT with type: Root Generation\n",
+    "insertId": "6a9d71650004498eecfdd5c7",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "configuration_name": "executecurationpipeline",
+        "location": "us-central1",
+        "service_name": "executecurationpipeline"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:57.280974Z",
+    "labels": {
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "goog-managed-by": "cloudfunctions",
+      "deployment-callable": "true",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "execution_id": "pvlckkxayyqc",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:57:57.620315194Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "textPayload": "[Pipeline Diamond] -> Successfully updated project FqZkQsHyIS74TLk4LRgT graphData via Admin SDK\n",
+    "insertId": "6a9d716500061c9e4755c623",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "configuration_name": "executecurationpipeline",
+        "location": "us-central1",
+        "service_name": "executecurationpipeline"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:57.400542Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "deployment-callable": "true",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvlckkxayyqc"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:57:57.620315194Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "textPayload": "[Pipeline Diamond] -> Created curation job job-1788703013482-p18sswa7w for background hydration\n",
+    "insertId": "6a9d71650007c903504a68da",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "executecurationpipeline-00049-dol",
+        "location": "us-central1",
+        "service_name": "executecurationpipeline",
+        "project_id": "zcene-production",
+        "configuration_name": "executecurationpipeline"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:57.510211Z",
+    "labels": {
+      "deployment-callable": "true",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvlckkxayyqc",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:57:57.620315194Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "textPayload": "[Pipeline Diamond] -> Curation Phase 1 Complete, returning structural payload to client\n",
+    "insertId": "6a9d716500084ad0f63be8c3",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "configuration_name": "executecurationpipeline",
+        "revision_name": "executecurationpipeline-00049-dol",
+        "service_name": "executecurationpipeline",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:57.543440Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "executecurationpipeline",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "8074d8e987c9bf8b46e28cc1add2ab67b5be14d4",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvlckkxayyqc",
+      "deployment-callable": "true",
+      "instanceId": "00a41e8c1dd0ed35edef820afcc3fe4b0ffaecb8bfcb03f4245c0f851112587aac3481afc317a6bfdfe0467c2a584a4ac89a7079e7116ddfb212438df2c7ea8d82534d76bae1adab3b523f0661ef"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:57:57.620315194Z",
+    "spanId": "13013725968425099197"
+  },
+  {
+    "insertId": "6a9d71650009a875901e65b4",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1522",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "142.250.32.8",
+      "referer": "https://zcene.online/dashboard",
+      "serverIp": "34.143.77.2",
+      "latency": "0.021666654s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "project_id": "zcene-production",
+        "service_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "configuration_name": "zcene-backend-proxy"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:57.604236Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/0ebdb7c10a21aac9daec6d089b44773e",
+    "receiveTimestamp": "2026-09-06T13:57:57.641070126Z",
+    "spanId": "af47f49cf97ef4cd",
+    "traceSampled": true
+  },
+  {
+    "insertId": "6a9d7165000c40a5b7b0ca90",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1399",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.232",
+      "referer": "https://zcene.online/dashboard",
+      "serverIp": "34.143.76.2",
+      "latency": "0.029346590s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "location": "us-central1",
+        "configuration_name": "zcene-backend-proxy",
+        "service_name": "zcene-backend-proxy"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:57.771672Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/b2bf7029b56976bd2e7358f3aca063cd",
+    "receiveTimestamp": "2026-09-06T13:57:57.972851251Z",
+    "spanId": "8bfd75ced3d62553"
+  },
+  {
+    "insertId": "6a9d7165000edc826a7c47bc",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1398",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.41",
+      "referer": "https://zcene.online/dashboard",
+      "serverIp": "34.143.77.2",
+      "latency": "0.030457836s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "zcene-backend-proxy",
+        "service_name": "zcene-backend-proxy",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "location": "us-central1",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:57.941434Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/3cc5a88dd45f4ce6d51a90bd4a800542",
+    "receiveTimestamp": "2026-09-06T13:57:58.307448312Z",
+    "spanId": "c2ad2a9667e63f82"
+  },
+  {
+    "insertId": "6a9d716600024a82451aa209",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1399",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "66.249.93.161",
+      "referer": "https://zcene.online/dashboard",
+      "serverIp": "34.143.74.2",
+      "latency": "0.032074828s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "zcene-backend-proxy",
+        "project_id": "zcene-production",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:58.116073Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/0378102d1eeefc5b93b736de11e9d878",
+    "receiveTimestamp": "2026-09-06T13:57:58.307448312Z",
+    "spanId": "72d89adaf591e68a"
+  },
+  {
+    "insertId": "6a9d72ac00015e87576ee37c",
+    "httpRequest": {
+      "requestMethod": "POST",
+      "requestUrl": "https://processcurationjob-mjldlues7a-uc.a.run.app/?__GCP_CloudEventsMode=CE_PUBSUB_BINDING",
+      "requestSize": "18481",
+      "status": 200,
+      "responseSize": "82",
+      "userAgent": "APIs-Google; (+https://developers.google.com/webmasters/APIs-Google.html)",
+      "remoteIp": "66.102.6.68",
+      "serverIp": "34.143.78.2",
+      "latency": "325.420274834s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:58.218997Z",
+    "severity": "INFO",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/cloud_event_id": "7039ac63-8318-4564-888b-2f89e8fe31bc",
+      "run.googleapis.com/cloud_event_source": "//firestore.googleapis.com/projects/zcene-production/databases/(default)",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/803556bd8cfb732f8f2d8e2354b5b5ce",
+    "receiveTimestamp": "2026-09-06T14:03:24.095402276Z",
+    "spanId": "67ce3c2452b5d2f8",
+    "traceSampled": true
+  },
+  {
+    "textPayload": "Starting new instance. Reason: AUTOSCALING - Instance started due to configured scaling factors (e.g. CPU utilization, request throughput, etc.) or no existing capacity for current traffic.",
+    "insertId": "6a9d716600045b0408940efc",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:57:58.285444Z",
+    "severity": "INFO",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "scaling_reason": "AUTOSCALING",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2026-09-06T13:57:58.290572250Z"
+  },
+  {
+    "textPayload": "Default STARTUP TCP probe succeeded after 1 attempt for container \"worker\" on port 8080.",
+    "insertId": "6a9d71680001d052a1df1e5c",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:00.118866Z",
+    "severity": "INFO",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fvarlog%2Fsystem",
+    "receiveTimestamp": "2026-09-06T13:58:00.291300430Z"
+  },
+  {
+    "textPayload": "[Curation Backend] Processing job job-1788703013482-p18sswa7w with status: pending\n",
+    "insertId": "6a9d7168000371e409d29651",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:00.225764Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:00.248945099Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Project FqZkQsHyIS74TLk4LRgT status updated successfully: { status: 'curating' }\n",
+    "insertId": "6a9d7168000a2e02d1136bc3",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:00.667138Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:00.899312520Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Executing graph_generation for user 9FBuWDALnNfUAjxV0pRe3RnKwJy1 with payload: {\n  artists: 'limp-bizkit',\n  filters: {},\n  userId: '9FBuWDALnNfUAjxV0pRe3RnKwJy1',\n  projectId: 'FqZkQsHyIS74TLk4LRgT',\n  jobId: 'job-1788703013482-p18sswa7w',\n  disambiguationHints: { 'limp-bizkit': 'USA' },\n  isSandboxMode: false,\n  password: 'Zcenester',\n  baseGraph: {\n    nodes: [\n      [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object],\n      [Object], [Object]\n    ],\n    links: [\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object],\n      [Object], [Object], [Object], [Object], [Object]\n    ]\n  },\n  generationType: 'Root Generation',\n  foregroundApiUsage: {\n    'gemini-3.1-pro-preview': { prompt: 1113, candidates: 4885, total: 10197 }\n  }\n}\n",
+    "insertId": "6a9d7168000a336902f5f2c4",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:00.668521Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:00.899312520Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Phase 1: Global Cache Routing] Checking seeds: limp-bizkit\n",
+    "insertId": "6a9d7168000a33ee3c5e5dc2",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:00.668654Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:00.899312520Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Fix A] Seed slug resolved: \"limp-bizkit\" → \"limp-bizkit\"\n",
+    "insertId": "6a9d7168000b47280b483128",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:00.739112Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:00.899312520Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Phase 1] Cache Miss for seed: limp-bizkit. Routing to Phase 2 (Flash-Lite).\n",
+    "insertId": "6a9d7168000c1260d26114b7",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:00.791136Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:00.899312520Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "insertId": "6a9d7168000d2f7ff0643dea",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1399",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "142.250.32.71",
+      "referer": "https://zcene.online/dashboard",
+      "serverIp": "34.143.77.2",
+      "latency": "0.039717625s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "service_name": "zcene-backend-proxy",
+        "configuration_name": "zcene-backend-proxy",
+        "location": "us-central1",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:00.822484Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/316bb3d5a2c5029a8d804889b963a7c2",
+    "receiveTimestamp": "2026-09-06T13:58:00.971548798Z",
+    "spanId": "4c2909701f98dc41"
+  },
+  {
+    "insertId": "6a9d71690000c2d725d487f9",
+    "httpRequest": {
+      "requestMethod": "GET",
+      "requestUrl": "https://zcene-backend-proxy-mjldlues7a-uc.a.run.app/api/artist/limp-bizkit",
+      "requestSize": "1399",
+      "status": 404,
+      "responseSize": "303",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/152.0.0.0 Safari/537.36",
+      "remoteIp": "142.250.32.70",
+      "referer": "https://zcene.online/dashboard",
+      "serverIp": "34.143.77.2",
+      "latency": "0.043802228s",
+      "protocol": "HTTP/1.1"
+    },
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "revision_name": "zcene-backend-proxy-00062-qbr",
+        "location": "us-central1",
+        "configuration_name": "zcene-backend-proxy",
+        "service_name": "zcene-backend-proxy"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:01.003698Z",
+    "severity": "WARNING",
+    "labels": {
+      "instanceId": "00a41e8c1df9cd9ab821a7f4c9f62b5e4b7559f41d52692d5797c9cc7ab507aed47d81812898eb3490c0c472534cd608b86b7366309a45b2adfc24877fbc46c7488ecedd773a73969c387634a5"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Frequests",
+    "trace": "projects/zcene-production/traces/047c883423bc40dd76637edd08d99339",
+    "receiveTimestamp": "2026-09-06T13:58:01.302122387Z",
+    "spanId": "257715dece1e10cd"
+  },
+  {
+    "textPayload": "[Phase 3: The Aggregator Gate] Resolved Seed Array: [\n  {\n    id: 'limp-bizkit',\n    name: 'Limp Bizkit',\n    origin: 'USA',\n    genre: 'Nu Metal',\n    isCacheHit: false\n  }\n]\n",
+    "insertId": "6a9d716a000e3fc0e69bb625",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:02.933824Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:03.234630208Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Step 2: Hydration Loop Started] Hydrating details for 27 entities in the graph: [\n  'Limp Bizkit (artist)',\n  'Korn (artist)',\n  'Deftones (artist)',\n  'Slipknot (artist)',\n  'System Of A Down (artist)',\n  'Papa Roach (artist)',\n  'Linkin Park (artist)',\n  'Staind (artist)',\n  'Mudvayne (artist)',\n  'Static X (artist)',\n  'Coal Chamber (artist)',\n  'Sevendust (artist)',\n  'P.O.D. (artist)',\n  'Drowning Pool (artist)',\n  'Incubus (artist)',\n  'Flip Records (label)',\n  'Interscope Records (label)',\n  'Immortal Records (label)',\n  'Maverick Records (label)',\n  'Roadrunner Records (label)',\n  'American Recordings (label)',\n  'DreamWorks Records (label)',\n  'Warner Bros. Records (label)',\n  'Epic Records (label)',\n  'TVT Records (label)',\n  'Atlantic Records (label)',\n  'Wind Up Records (label)'\n]\n",
+    "insertId": "6a9d716a000e42a198bb2f41",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:02.934561Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:03.234630208Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydrating batch 1 of 9 (3 entities)...\n",
+    "insertId": "6a9d716a000e431729ff60ff",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:02.934679Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:03.234630208Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Limp Bizkit...\n",
+    "insertId": "6a9d716b0000b8270a78c01e",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:03.047143Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:03.234630208Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Korn...\n",
+    "insertId": "6a9d716c000143b75f4ee044",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:04.082871Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:04.232153461Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Deftones...\n",
+    "insertId": "6a9d716d00015018f2b13bc8",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:05.086040Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:05.229500495Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Deftones\n",
+    "insertId": "6a9d7185000bb85f63fc8a8d",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:29.768095Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:29.773733252Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: deftones-us\n",
+    "insertId": "6a9d7185000bb8d6cb419fc5",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:29.768214Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:30.108552804Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Korn\n",
+    "insertId": "6a9d7186000495af1d63582f",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:30.300463Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:30.440082671Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: korn-us\n",
+    "insertId": "6a9d7186000495fc7b3ecff8",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:30.300540Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "execution_id": "pvmpsm5xax0u"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:30.440082671Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Limp Bizkit\n",
+    "insertId": "6a9d7186000ddb04cbb84536",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:30.908036Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:31.108689099Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: limp-bizkit-us\n",
+    "insertId": "6a9d7186000ddb65138ff386",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:30.908133Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:31.108689099Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing 3 entities to Firestore cache...\n",
+    "insertId": "6a9d7186000ddbb000a01aaf",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:30.908208Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:31.108689099Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Batch complete (28s active). Rate-limit window already elapsed — skipping cooldown.\n",
+    "insertId": "6a9d7186000ddd9ef44031d8",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:30.908702Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:31.108689099Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydrating batch 2 of 9 (3 entities)...\n",
+    "insertId": "6a9d7186000ddde892fd0485",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:30.908776Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:31.108689099Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Slipknot...\n",
+    "insertId": "6a9d7186000f1fa4adf239e7",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:30.991140Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:31.108689099Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: System Of A Down...\n",
+    "insertId": "6a9d71880000324827be0f76",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:32.012872Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:32.105287204Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Papa Roach...\n",
+    "insertId": "6a9d71890000296c2bf5787f",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:33.010604Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:33.104803726Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for System Of A Down\n",
+    "insertId": "6a9d719800048c5f2e518779",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:48.298079Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:48.305955244Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: system-of-a-down-us\n",
+    "insertId": "6a9d719800048cda287e62a3",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:48.298202Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:48.637354204Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Slipknot\n",
+    "insertId": "6a9d719b00011342d1b0f27b",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:51.070466Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:51.302431580Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: slipknot-us\n",
+    "insertId": "6a9d719b00011394f85167d0",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:58:51.070548Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:58:51.302431580Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Papa Roach\n",
+    "insertId": "6a9d71ae00074f0c7680ed25",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:10.478988Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:10.484222685Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: papa-roach-us\n",
+    "insertId": "6a9d71ae00074f49dadd1fea",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:10.479049Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:10.484222685Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing 3 entities to Firestore cache...\n",
+    "insertId": "6a9d71ae00074f94639bc74e",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:10.479124Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:10.819717389Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Batch complete (40s active). Rate-limit window already elapsed — skipping cooldown.\n",
+    "insertId": "6a9d71ae0007505c88e2d0bd",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:10.479324Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:10.819717389Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydrating batch 3 of 9 (3 entities)...\n",
+    "insertId": "6a9d71ae00075086216c8169",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:10.479366Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:10.819717389Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Linkin Park...\n",
+    "insertId": "6a9d71ae000a7998019a45d0",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:10.686488Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:10.819717389Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Staind...\n",
+    "insertId": "6a9d71af000a74143c4a5606",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:11.685076Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "execution_id": "pvmpsm5xax0u"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:11.817402765Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Mudvayne...\n",
+    "insertId": "6a9d71b00008f7ed7fd225b1",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:12.587757Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:12.816642721Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Linkin Park\n",
+    "insertId": "6a9d71c0000f2d986da4e193",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:28.994712Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:29.002576022Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: linkin-park-us\n",
+    "insertId": "6a9d71c0000f2df8da3c1d23",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:28.994808Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:29.334803567Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Mudvayne\n",
+    "insertId": "6a9d71c100085d2245ec6fba",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:29.548130Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:29.668239749Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: mudvayne-us\n",
+    "insertId": "6a9d71c100085d81602476de",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:29.548225Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:29.668239749Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Staind\n",
+    "insertId": "6a9d71cf000627f116c358d7",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:43.403441Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:43.411316454Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: staind-us\n",
+    "insertId": "6a9d71cf00062847037db8ff",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:43.403527Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:43.742744046Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing 3 entities to Firestore cache...\n",
+    "insertId": "6a9d71cf00062966d48c92c7",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:43.403814Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:43.742744046Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Batch complete (33s active). Rate-limit window already elapsed — skipping cooldown.\n",
+    "insertId": "6a9d71cf00062a1ba9f780cb",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:43.403995Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:43.742744046Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydrating batch 4 of 9 (3 entities)...\n",
+    "insertId": "6a9d71cf00062a5eff9eb37a",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:43.404062Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:43.742744046Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Static X...\n",
+    "insertId": "6a9d71cf00078fa6b42b0b51",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:43.495526Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:43.742744046Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Coal Chamber...\n",
+    "insertId": "6a9d71d00007b906e2d7a6b0",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:44.506118Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:44.740295384Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Sevendust...\n",
+    "insertId": "6a9d71d10007c36e0560843d",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T13:59:45.508782Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T13:59:45.741453101Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Coal Chamber\n",
+    "insertId": "6a9d71ea0000b3e37ea12883",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:10.046051Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:10.060451861Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: coal-chamber-us\n",
+    "insertId": "6a9d71ea0000b51018cae79b",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:10.046352Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:10.388464621Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] iTunes validation blocked for Static X. No strict genre overlap found, aborting.\n",
+    "insertId": "6a9d71eb000eaa27fd7fcaeb",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:11.961063Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstderr",
+    "receiveTimestamp": "2026-09-06T14:00:11.966966655Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Image Scraper] No image found for Static X.\n",
+    "insertId": "6a9d71eb000eaa9720d41cba",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:11.961175Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstderr",
+    "receiveTimestamp": "2026-09-06T14:00:12.302426436Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: static-x-us\n",
+    "insertId": "6a9d71eb000eaae6b2b65717",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:11.961254Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:12.053208180Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Sevendust\n",
+    "insertId": "6a9d71f6000b43f42d634540",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:22.738292Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:23.039620960Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: sevendust-us\n",
+    "insertId": "6a9d71f6000b44425f43108e",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:22.738370Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:23.039620960Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing 3 entities to Firestore cache...\n",
+    "insertId": "6a9d71f6000b44893ec322b4",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:22.738441Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:23.039620960Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Batch complete (39s active). Rate-limit window already elapsed — skipping cooldown.\n",
+    "insertId": "6a9d71f6000b455be7b9cbc2",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:22.738651Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:23.039620960Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydrating batch 5 of 9 (3 entities)...\n",
+    "insertId": "6a9d71f6000b459a7f92ba4d",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:22.738714Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:23.039620960Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: P.O.D....\n",
+    "insertId": "6a9d71f70002a05d13e62845",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:23.172125Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:23.370143017Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Drowning Pool...\n",
+    "insertId": "6a9d71f80006cfba8082fdb1",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:24.446394Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:24.711182783Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for artist: Incubus...\n",
+    "insertId": "6a9d71f90002a16d461477cd",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:25.172397Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:25.370750431Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Incubus\n",
+    "insertId": "6a9d720d000cb9a8604ef59f",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:45.833960Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:45.841151219Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: incubus-us\n",
+    "insertId": "6a9d720d000cba095f09f43f",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:45.834057Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:46.189667205Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for Drowning Pool\n",
+    "insertId": "6a9d720f000a739dbbb63e3b",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:47.684957Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:47.840475768Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: drowning-pool-us\n",
+    "insertId": "6a9d720f000a74072d6be21e",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:47.685063Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:47.840475768Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[scrapeImageUrlBackend] Deterministic iTunes success for P.O.D.\n",
+    "insertId": "6a9d7212000535485ee2dc16",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:50.341320Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:50.504981864Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: p-o-d-us\n",
+    "insertId": "6a9d7212000535c2c264a2ea",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:50.341442Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:50.504981864Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing 3 entities to Firestore cache...\n",
+    "insertId": "6a9d72120005366cefc279b9",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:50.341612Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:50.504981864Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Batch complete (28s active). Rate-limit window already elapsed — skipping cooldown.\n",
+    "insertId": "6a9d721200053853d0db942d",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:50.342099Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:50.504981864Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydrating batch 6 of 9 (3 entities)...\n",
+    "insertId": "6a9d7212000538944f463a45",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:50.342164Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:50.504981864Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: Flip Records...\n",
+    "insertId": "6a9d72120006302bb0b5baf1",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:50.405547Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:50.504981864Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: Interscope Records...\n",
+    "insertId": "6a9d721300061d1de1512d07",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:51.400669Z",
+    "labels": {
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:51.502702553Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: Immortal Records...\n",
+    "insertId": "6a9d721400061ddec4fdc07a",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:00:52.400862Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:00:52.501190086Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: flip-records\n",
+    "insertId": "6a9d722900033d76d005f6ad",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:13.212342Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:13.218798148Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: interscope-records\n",
+    "insertId": "6a9d7231000317908dd39123",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:21.202640Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:21.218359477Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: immortal-records\n",
+    "insertId": "6a9d72380008055df587ce54",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:28.525661Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:28.538596684Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing 3 entities to Firestore cache...\n",
+    "insertId": "6a9d72380008066622cafb5c",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:28.525926Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:28.538596684Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Batch complete (38s active). Rate-limit window already elapsed — skipping cooldown.\n",
+    "insertId": "6a9d7238000807919f189bbe",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:28.526225Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:28.538596684Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydrating batch 7 of 9 (3 entities)...\n",
+    "insertId": "6a9d7238000807db8911e0ee",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:28.526299Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:28.538596684Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: Maverick Records...\n",
+    "insertId": "6a9d723800088f6507b99c01",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:28.560997Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:28.872437872Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Direct cache hit (complete) for details of: roadrunner-records\n",
+    "insertId": "6a9d72380008c3c7dee2c8f3",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:28.574407Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:28.872437872Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: roadrunner-records\n",
+    "insertId": "6a9d72380008c41ef4e78e5f",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:28.574494Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:28.872437872Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: American Recordings...\n",
+    "insertId": "6a9d723a0008aa4f4b3a25c2",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:30.567887Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:30.870293362Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: american-recordings\n",
+    "insertId": "6a9d724d0000827e2a2406fb",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:49.033406Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:49.042269462Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: maverick-records\n",
+    "insertId": "6a9d7251000e13920e850e99",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:53.922514Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:54.035115108Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing 3 entities to Firestore cache...\n",
+    "insertId": "6a9d7251000e13dc8505a18e",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:53.922588Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:54.035115108Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Batch complete (25s active). Rate-limit window already elapsed — skipping cooldown.\n",
+    "insertId": "6a9d7251000e150505d3be0c",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:53.922885Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:54.035115108Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydrating batch 8 of 9 (3 entities)...\n",
+    "insertId": "6a9d7251000e154d96016450",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:53.922957Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:54.035115108Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: DreamWorks Records...\n",
+    "insertId": "6a9d7251000efe837127f413",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:53.982659Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:54.035115108Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: Warner Bros. Records...\n",
+    "insertId": "6a9d7252000ef9e3a9e39e3d",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:54.981475Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:55.037767698Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: Epic Records...\n",
+    "insertId": "6a9d7253000eff7f1e88af37",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:01:55.982911Z",
+    "labels": {
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-managed-by": "cloudfunctions",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:01:56.034337391Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: epic-records\n",
+    "insertId": "6a9d726c000ab7a7960be575",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:02:20.702375Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:02:20.707508914Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: warner-bros-records\n",
+    "insertId": "6a9d7270000377c5448580b9",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "configuration_name": "processcurationjob",
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T14:02:24.227269Z",
+    "labels": {
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:02:24.374760638Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydration successful for: dreamworks-records\n",
+    "insertId": "6a9d727300058af185336847",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "revision_name": "processcurationjob-00070-rab",
+        "configuration_name": "processcurationjob",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:02:27.363249Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:02:27.703107124Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing 3 entities to Firestore cache...\n",
+    "insertId": "6a9d727300058b5a4b1e3d9b",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T14:02:27.363354Z",
+    "labels": {
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:02:27.703107124Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Batch complete (33s active). Rate-limit window already elapsed — skipping cooldown.\n",
+    "insertId": "6a9d727300058c9e8d2187ea",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "service_name": "processcurationjob",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab"
+      }
+    },
+    "timestamp": "2026-09-06T14:02:27.363678Z",
+    "labels": {
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "goog-drz-cloudfunctions-id": "processcurationjob"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:02:27.703107124Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Hydrating batch 9 of 9 (3 entities)...\n",
+    "insertId": "6a9d727300058cce066ea2c7",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "location": "us-central1",
+        "project_id": "zcene-production",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "service_name": "processcurationjob"
+      }
+    },
+    "timestamp": "2026-09-06T14:02:27.363726Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "execution_id": "pvmpsm5xax0u",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-location": "us-central1"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:02:27.703107124Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: TVT Records...\n",
+    "insertId": "6a9d7273000617b1a69132de",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "service_name": "processcurationjob",
+        "location": "us-central1",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "project_id": "zcene-production"
+      }
+    },
+    "timestamp": "2026-09-06T14:02:27.399281Z",
+    "labels": {
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "execution_id": "pvmpsm5xax0u",
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:02:27.703107124Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: Atlantic Records...\n",
+    "insertId": "6a9d727400068bca8b2464aa",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zcene-production",
+        "service_name": "processcurationjob",
+        "configuration_name": "processcurationjob",
+        "revision_name": "processcurationjob-00070-rab",
+        "location": "us-central1"
+      }
+    },
+    "timestamp": "2026-09-06T14:02:28.429002Z",
+    "labels": {
+      "goog-managed-by": "cloudfunctions",
+      "instanceId": "00a41e8c1d854920e8102afbf21eb2e8fb22b013cb75e6c063409979992daf8b44e6d4d501a8ceca9561cd449aa5b58f56ab88c64d8e1a10d7dc4f25c143777b1018691bded930fcb60cd4857147",
+      "goog-drz-cloudfunctions-id": "processcurationjob",
+      "run.googleapis.com/base_image_versions": "us-docker.pkg.dev/serverless-runtimes/google-22-full/runtimes/nodejs22:nodejs22_20260819_22_23_2_RC00",
+      "firebase-functions-hash": "afc254a525caa022111dca4ec269478bf5ed7f13",
+      "goog-drz-cloudfunctions-location": "us-central1",
+      "execution_id": "pvmpsm5xax0u"
+    },
+    "logName": "projects/zcene-production/logs/run.googleapis.com%2Fstdout",
+    "receiveTimestamp": "2026-09-06T14:02:28.700072258Z",
+    "spanId": "7479982157813109496"
+  },
+  {
+    "textPayload": "[Curation Backend] Cache miss (or missing text). Hydrating details for label: Wind Up Records...\n",
+    "insertId": "6a9d72750005f495e6d54763",
+    "resource": {
+      "type": "cloud_run_revision",
+      "labels": {
+        "project_id": "zce
+<truncated 77954 bytes>
+
+NOTE: The output was truncated because it was too long. Use a more targeted query or a smaller range to get the information you need.

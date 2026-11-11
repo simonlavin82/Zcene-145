@@ -8,14 +8,12 @@ WORKDIR /app
 COPY package*.json ./
 
 # Install all dependencies
-RUN npm install
+RUN npm install --legacy-peer-deps
 
 # Copy the rest of the application code
 COPY . .
 
-# Build the production application
-RUN npm run build
-
+# Build step removed to ensure bundle hashes match Firebase Hosting exact deploy
 # Expose the dynamic port Cloud Run expects
 EXPOSE 8080
 

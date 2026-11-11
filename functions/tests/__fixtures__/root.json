@@ -1,0 +1,9 @@
+{
+  "nodes": [
+    { "id": "nirvana-usa", "label": "Nirvana", "type": "artist", "origin": "USA", "genres": ["Grunge"] },
+    { "id": "foo-fighters-usa", "label": "Foo Fighters", "type": "artist", "origin": "USA", "genres": ["Alternative Rock"] }
+  ],
+  "links": [
+    { "source": "nirvana-usa", "target": "foo-fighters-usa" }
+  ]
+}

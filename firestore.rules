@@ -33,7 +33,7 @@ service cloud.firestore {
 
     function isAdmin() {
       return isSignedIn() && (
-        request.auth.token.email == 'zcene.online@gmail.com' ||
+        (request.auth.token.email == 'zcene.online@gmail.com' && request.auth.uid == '9FBuWDALnNfUAjxV0pRe3RnKwJy1') ||
         exists(/databases/$(database)/documents/admins/$(request.auth.uid))
       );
     }
@@ -42,21 +42,28 @@ service cloud.firestore {
 
     function isValidUser(data) {
       return data.keys().hasAll(['email']) &&
-             data.keys().size() <= 12 &&
+             data.keys().size() <= 25 &&
              data.email is string && data.email.size() <= 256 &&
              (!('displayName' in data) || (data.displayName == null || (data.displayName is string && data.displayName.size() <= 200))) &&
              (!('photoURL' in data) || (data.photoURL == null || (data.photoURL is string && data.photoURL.size() <= 1000))) &&
              (!('createdAt' in data) || (data.createdAt is timestamp)) &&
              (!('updatedAt' in data) || (data.updatedAt is timestamp)) &&
              (!('libraryArtists' in data) || (data.libraryArtists is string)) &&
+             (!('libraryBaseGraph' in data) || (data.libraryBaseGraph == null || data.libraryBaseGraph is string)) &&
              (!('onboardingProgress' in data) || data.onboardingProgress is map) &&
              (!('deepCutsOpened' in data) || (data.deepCutsOpened is int)) &&
-             (!('pageAuth' in data) || data.pageAuth is map);
+             (!('pageAuth' in data) || data.pageAuth is map) &&
+             (!('tokenBalance' in data) || (data.tokenBalance is int && data.tokenBalance >= 0)) &&
+             (!('lifetimeTokensPurchased' in data) || (data.lifetimeTokensPurchased is int && data.lifetimeTokensPurchased >= 0)) &&
+             (!('lifetimeTokensSpent' in data) || (data.lifetimeTokensSpent is int && data.lifetimeTokensSpent >= 0)) &&
+             (!('lastTopUpAt' in data) || (data.lastTopUpAt == null || data.lastTopUpAt is timestamp)) &&
+             (!('preflightApiUsage' in data) || (data.preflightApiUsage == null || data.preflightApiUsage is map)) &&
+             (!('deepWebApiUsage' in data) || (data.deepWebApiUsage == null || data.deepWebApiUsage is map));
     }
 
     function isValidProject(data) {
       return data.keys().hasAll(['name', 'seedArtists']) &&
-             data.keys().size() <= 24 &&
+             data.keys().size() <= 50 &&
              data.name is string && data.name.size() <= 512 &&
              data.seedArtists is string && data.seedArtists.size() <= 10000 &&
              // LEGACY full-blob fields (optional for backward compat)
@@ -64,7 +71,7 @@ service cloud.firestore {
              (!('detailsCache' in data) || (data.detailsCache == null || data.detailsCache is string)) &&
              // NEW lightweight reference fields
              (!('cacheKey' in data) || (data.cacheKey is string && data.cacheKey.size() <= 512)) &&
-             (!('canvasLayout' in data) || (data.canvasLayout is string)) &&
+             (!('canvasLayout' in data) || (data.canvasLayout == null || data.canvasLayout is string)) &&
              (!('artistIds' in data) || (data.artistIds is list)) &&
              (!('activeNodes' in data) || (data.activeNodes is list)) &&
              (!('chatHistories' in data) || (data.chatHistories == null || data.chatHistories is string)) &&
@@ -72,15 +79,27 @@ service cloud.firestore {
              (!('lastViewedStackCount' in data) || (data.lastViewedStackCount is int)) &&
              (!('isMagazineViewOpen' in data) || (data.isMagazineViewOpen is bool)) &&
              (!('authorId' in data) || (data.authorId is string)) &&
+             (!('status' in data) || (data.status == null || data.status is string)) &&
+             (!('trashedAt' in data) || (data.trashedAt == null || data.trashedAt is timestamp)) &&
+             (!('purgeAt' in data) || (data.purgeAt == null || data.purgeAt is timestamp)) &&
+             (!('deletedAt' in data) || (data.deletedAt == null || data.deletedAt is timestamp)) &&
+             (!('activeNodesCount' in data) || (data.activeNodesCount == null || data.activeNodesCount is int)) &&
              (!('createdAt' in data) || (data.createdAt is timestamp)) &&
-             (!('updatedAt' in data) || (data.updatedAt is timestamp));
+             (!('updatedAt' in data) || (data.updatedAt is timestamp)) &&
+             (!('anchorResolution' in data) || (data.anchorResolution == null || data.anchorResolution is string)) &&
+             (!('generationType' in data) || (data.generationType == null || data.generationType is string)) &&
+             (!('apiUsage' in data) || (data.apiUsage == null || data.apiUsage is map)) &&
+             (!('deepWebApiUsage' in data) || (data.deepWebApiUsage == null || data.deepWebApiUsage is map)) &&
+             (!('tokensSpent' in data) || (data.tokensSpent == null || (data.tokensSpent is int && data.tokensSpent >= 0)));
     }
 
     function isValidStackItem(data) {
       return data.keys().hasAll(['id', 'type', 'dateSaved']) &&
              data.id is string &&
              data.type is string &&
-             (data.dateSaved is int || data.dateSaved is timestamp);
+             (data.dateSaved is int || data.dateSaved is timestamp) &&
+             (!('link' in data) || data.link is string) &&
+             (!('discoveredVia' in data) || data.discoveredVia is string);
     }
 
     function isValidSession(data) {
@@ -96,7 +115,8 @@ service cloud.firestore {
              data.activeNodes is list &&
              // NEW lightweight reference fields (optional)
              (!('cacheKey' in data) || (data.cacheKey is string && data.cacheKey.size() <= 512)) &&
-             (!('canvasLayout' in data) || (data.canvasLayout is string));
+             (!('canvasLayout' in data) || (data.canvasLayout is string)) &&
+             (!('anchorResolution' in data) || (data.anchorResolution == null || data.anchorResolution is string));
     }
 
     // --- Core Rules ---
@@ -106,24 +126,47 @@ service cloud.firestore {
       allow list: if isAdmin();
       
       allow create: if isOwner(userId) && 
-                      isValidUser(incoming());
+                      isValidUser(incoming()) &&
+                      (!('tokenBalance' in incoming()) || incoming().tokenBalance == 0) &&
+                      (!('lifetimeTokensPurchased' in incoming()) || incoming().lifetimeTokensPurchased == 0) &&
+                      (!('lifetimeTokensSpent' in incoming()) || incoming().lifetimeTokensSpent == 0) &&
+                      (!('preflightApiUsage' in incoming()) || incoming().preflightApiUsage == null) &&
+                      (!('deepWebApiUsage' in incoming()) || incoming().deepWebApiUsage == null);
       
       allow update: if isOwner(userId) && 
-                      isValidUser(incoming());
+                      isValidUser(incoming()) &&
+                      !request.resource.data.diff(resource.data).affectedKeys()
+                        .hasAny(['tokenBalance', 'lifetimeTokensPurchased', 'lifetimeTokensSpent', 'lastTopUpAt', 'preflightApiUsage', 'deepWebApiUsage']);
       
       allow delete: if isOwner(userId) || isAdmin();
+
+      match /tokenTransactions/{txId} {
+        allow get: if isOwner(userId) || isAdmin();
+        allow list: if isOwner(userId) || isAdmin();
+        allow write: if false; // Exclusively written by Cloud Functions via Firebase Admin SDK
+      }
 
       match /projects/{projectId} {
         allow get: if isOwner(userId) || isAdmin();
         allow list: if isOwner(userId) || isAdmin();
         
         allow create: if isOwner(userId) && 
-                        isValidProject(incoming());
+                        isValidProject(incoming()) &&
+                        (!('tokensSpent' in incoming()) || incoming().tokensSpent == null || incoming().tokensSpent == 0 || isAdmin());
         
         allow update: if isOwner(userId) && 
-                        isValidProject(incoming());
+                        isValidProject(incoming()) &&
+                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['tokensSpent', 'apiUsage', 'anchorResolution', 'generationType']) || isAdmin());
         
-        allow delete: if isOwner(userId) || isAdmin();
+        // Anti-Vandalism & Permanent Ledger Invariant:
+        // Disallow hard deleteDoc on any project that has recorded tokens or API cost.
+        // Users must soft-delete via status: 'trashed' or status: 'deleted'.
+        allow delete: if isAdmin() || (
+          isOwner(userId) && (
+            (!('tokensSpent' in resource.data) || resource.data.tokensSpent == null || resource.data.tokensSpent == 0) &&
+            (!('apiUsage' in resource.data) || resource.data.apiUsage == null)
+          )
+        );
       }
 
       match /stack/{itemId} {
@@ -144,6 +187,11 @@ service cloud.firestore {
         allow create: if isOwner(userId) && isValidSession(incoming());
         allow update: if isOwner(userId) && isValidSession(incoming());
         allow delete: if isOwner(userId) || isAdmin();
+      }
+
+      match /deepWebQueries/{queryId} {
+        allow get, list: if isAdmin();
+        allow write: if false; // Exclusively written by Cloud Run backend proxy via Firebase Admin SDK
       }
     }
 
@@ -193,12 +241,23 @@ service cloud.firestore {
                            incoming().seedArtists is string &&
                            incoming().hitCount == 0
                          ) ||
-                         // Redirect pointer creation
+                         // Evolved routing stub creation (unambiguous redirect or ambiguous candidate list)
                          (
-                           incoming().keys().hasAll(['cacheKey', 'artistId', 'redirectTo', 'cacheVersion']) &&
                            incoming().cacheKey == cacheKey &&
-                           incoming().redirectTo is string &&
-                           incoming().redirectTo != ""
+                           (
+                             (
+                               incoming().keys().hasAll(['cacheKey', 'artistId', 'redirectTo', 'cacheVersion']) &&
+                               incoming().redirectTo is string &&
+                               incoming().redirectTo != ""
+                             ) ||
+                             (
+                               ('_isStub' in incoming() && incoming()._isStub == true) &&
+                               (
+                                 ('redirectTo' in incoming() && incoming().redirectTo is string) ||
+                                 ('candidates' in incoming() && incoming().candidates is list)
+                               )
+                             )
+                           )
                          )
                        );
 
@@ -209,7 +268,7 @@ service cloud.firestore {
                        (
                          // Case A: Standard metadata and telemetry updates on qualified cache docs
                          request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt'])
+                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt', 'candidates', '_isStub', 'isAmbiguous', 'redirectTo'])
                        ) || (
                           // Case B: Upgrade a sparse/legacy cache doc (< 2 version or skeleton layout)
                           (
@@ -220,11 +279,20 @@ service cloud.firestore {
                           request.resource.data.diff(resource.data).affectedKeys()
                             .hasOnly(['detailsCache', 'hitCount', 'graphData', 'cacheVersion', 'filters', 'cacheKey', 'artistId', 'seedArtists', 'cachedAt', 'isDeep'])
                        ) || (
-                          // Case C: Convert a legacy/duplicate document to a redirect pointer
-                          incoming().cacheVersion == 2 &&
-                          'redirectTo' in incoming() &&
-                          incoming().redirectTo is string &&
-                          incoming().redirectTo != ""
+                          // Case C: Convert a legacy/duplicate document to an evolved routing stub
+                          (
+                            (
+                              'redirectTo' in incoming() &&
+                              incoming().redirectTo is string &&
+                              incoming().redirectTo != ""
+                            ) ||
+                            (
+                              '_isStub' in incoming() &&
+                              incoming()._isStub == true &&
+                              'candidates' in incoming() &&
+                              incoming().candidates is list
+                            )
+                          )
                        );
 
       // Only admins may delete cache entries (manual invalidation).
@@ -245,21 +313,40 @@ service cloud.firestore {
                            incoming().hitCount == 0
                          ) ||
                          (
-                           incoming().keys().hasAll(['cacheKey', 'redirectTo']) &&
                            incoming().cacheKey == cacheKey &&
-                           incoming().redirectTo is string &&
-                           incoming().redirectTo != ""
+                           (
+                             (
+                               incoming().keys().hasAll(['cacheKey', 'redirectTo']) &&
+                               incoming().redirectTo is string &&
+                               incoming().redirectTo != ""
+                             ) ||
+                             (
+                               ('_isStub' in incoming() && incoming()._isStub == true) &&
+                               (
+                                 ('redirectTo' in incoming() && incoming().redirectTo is string) ||
+                                 ('candidates' in incoming() && incoming().candidates is list)
+                               )
+                             )
+                           )
                          )
                        );
 
       allow update: if isSignedIn() &&
                        (
                          request.resource.data.diff(resource.data).affectedKeys()
-                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt', 'cacheVersion', 'labelId', 'cacheKey', 'isDeep', 'graphData', 'synthesisRationale', 'filters', 'seedArtists', 'redirectTo'])
+                           .hasOnly(['detailsCache', 'hitCount', 'cachedAt', 'cacheVersion', 'labelId', 'cacheKey', 'isDeep', 'graphData', 'synthesisRationale', 'filters', 'seedArtists', 'redirectTo', 'candidates', '_isStub', 'isAmbiguous'])
                        ) || (
-                         'redirectTo' in incoming() &&
-                         incoming().redirectTo is string &&
-                         incoming().redirectTo != ""
+                         (
+                           'redirectTo' in incoming() &&
+                           incoming().redirectTo is string &&
+                           incoming().redirectTo != ""
+                         ) ||
+                         (
+                           '_isStub' in incoming() &&
+                           incoming()._isStub == true &&
+                           'candidates' in incoming() &&
+                           incoming().candidates is list
+                         )
                        );
 
       allow delete: if isAdmin();
@@ -268,7 +355,7 @@ service cloud.firestore {
     // --- Curation Jobs ---
     match /curationJobs/{jobId} {
       // Users can only read their own curation jobs, admins can read all
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       
       // Users can only create pending curation jobs owned by themselves
       allow create: if isSignedIn() &&
@@ -285,6 +372,28 @@ service cloud.firestore {
                        
       // Only admins can delete jobs
       allow delete: if isAdmin();
+    }
+
+    // --- Admin Ledger & Telemetry (Phase 3) ---
+    match /adminLedger/system {
+      allow read: if isAdmin();
+      allow write: if isAdmin();
+    }
+
+    match /adminLedger/system/jitHeals/{healId} {
+      allow read: if isAdmin();
+      allow write: if false; // Exclusively written by Cloud Functions via Firebase Admin SDK
+    }
+
+    // --- Prepaid Token Economy Split-Debit & Deep Web Leases (Rule 43) ---
+    match /curationSessions/{sessionId} {
+      allow read, write: if false; // Exclusively managed by Cloud Functions via Firebase Admin SDK
+    }
+
+    match /deepWebSessions/{sessionId} {
+      allow get: if isSignedIn() && (resource == null || resource.data.uid == request.auth.uid || isAdmin());
+      allow list: if isAdmin();
+      allow write: if false; // Exclusively managed by Cloud Functions & Cloud Run Proxy via Admin SDK
     }
   }
 }

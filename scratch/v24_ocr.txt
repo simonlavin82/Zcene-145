@@ -1,0 +1,16 @@
+0.101,0.969: Zcene Execution Pathways
+0.101,0.907: Architecture
+0.118,0.869: 1. Submit Seed Artist(s) (+Filter(s)
+0.123,0.710: 5. Active Loader Gate (LOCKEI
+0.115,0.192: The Duplication Pathway
+0.142,0.179: User Click 'Duplicate
+0.052,0.129: Data LItecycle
+0.060,0.112: E TIER T: GLOBAL ASSETS
+0.277,0.888: [ COLUMN 2: HTTP FAST-TRACK ]
+0.430,0.888: [ COLUMN 3: BACKGROUND WORKER ]
+0.290,0.817: IngesThinking level: minima ayload
+0.304,0.740: s kobab-case-arist-iso-code for
+0.293,0.706: 5. Create curationJobs do
+0.458,0.705: (status
+0.474,0.703: tus remains: curating')
+0.353,0.270: URL) & Identisting ID (Sam
