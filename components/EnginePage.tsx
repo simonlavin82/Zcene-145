@@ -42,7 +42,7 @@ export const ARCHITECTURE_RULES = [
     { 
         id: 2, 
         title: "Slugging Reasoning", 
-        desc: "Prevents namespace collisions. Enforces global 249-country ISO-3166-1 alpha-2 mapping via shared/isoCountries.ts (e.g., Scotland → GB, Thailand → TH) with pre-slugging country-link origin inference (inferNodeOriginsFromCountryLinks) and scene-aware/ambiguity-safe deep-cut slug deduplication; full-country-name suffixes (-thailand) and cross-country homonym hijacking are strictly forbidden." 
+        desc: "Prevents namespace collisions. Enforces global 249-country ISO-3166-1 alpha-2 mapping via shared/isoCountries.ts (e.g., Scotland → GB, Thailand → TH) with pre-slugging country-link origin inference (inferNodeOriginsFromCountryLinks) and scene-aware/ambiguity-safe deep-cut slug deduplication; full-country-name suffixes (-thailand) and cross-country homonym hijacking are strictly forbidden. Base-to-Suffixed ISO Parity Inoculation (isEntitySeedMatch: strippedC === rawS || strippedS === rawC) guarantees that artists whose names end in 2-letter tokens matching ISO codes (e.g., Vein.fm → vein-fm, End It → end-it) match their suffixed forms (vein-fm-us, end-it-us) without being falsely rejected as foreign homonyms." 
     },
     { 
         id: 3, 
@@ -212,7 +212,7 @@ export const ARCHITECTURE_RULES = [
     { 
         id: 36, 
         title: "Entity Taxonomy Normalization", 
-        desc: "The extraction pipeline MUST algorithmically enforce pure root IDs for all global assets. Artists require strict 2-letter kebab-case-artist-iso-code formatting via the unified 249-country ISO registry (never full-word suffixes). To future-proof against homonyms, bare IDs (e.g., 'gunmoll') are strictly reserved as routing stubs and must never hold entity payloads. All verified entities, whether seeds or deep cuts, must resolve to their geographically suffixed ID. Label taxonomy normalizations (normalizeLabelId) strip structural suffixes (-records, -music, -recordings, -discos, -platen, -label, etc.) down to pure root IDs across hydration, idRewriteMap, labelIds, and Level 3 anchorLabels. Canonical stylized display names synthesized by the AI (e.g., intentional lowercase or special characters) must bypass forced Title Case formatters and be preserved as the absolute UI truth." 
+        desc: "The extraction pipeline MUST algorithmically enforce pure root IDs for all global assets. Artists require strict 2-letter kebab-case-artist-iso-code formatting via the unified 249-country ISO registry (never full-word suffixes). To future-proof against homonyms, bare IDs (e.g., 'gunmoll') are strictly reserved as routing stubs and must never hold entity payloads. All verified entities, whether seeds or deep cuts, must resolve to their geographically suffixed ID. Bare router stub keys are derived strictly from normalized artist names (or single-stripped origin suffixes) and are never double-stripped, preserving artists like Vein.fm as artists/vein-fm → vein-fm-us and End It as artists/end-it → end-it-us (never stripping down to vein or end). Label taxonomy normalizations (normalizeLabelId) strip structural suffixes (-records, -music, -recordings, -discos, -platen, -label, etc.) down to pure root IDs across hydration, idRewriteMap, labelIds, and Level 3 anchorLabels. Canonical stylized display names synthesized by the AI (e.g., intentional lowercase or special characters) must bypass forced Title Case formatters and be preserved as the absolute UI truth." 
     },
     { 
         id: 37, 

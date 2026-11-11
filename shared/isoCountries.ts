@@ -865,8 +865,9 @@ export const isCanonicalCountrySlugOrCode = (slug?: string | null): boolean => {
   return CANONICAL_COUNTRY_NODE_SLUGS.has(slug.trim().toLowerCase());
 };
 
-const normalizeEntitySlugInternal = (name: string): string =>
-  (name || '')
+const normalizeEntitySlugInternal = (name: string): string => {
+  const clean = (name || '').replace(/^(?:scene-[1-5]::|scene-[1-5]-)/i, '');
+  return clean
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/['’]/g, '')
@@ -875,6 +876,54 @@ const normalizeEntitySlugInternal = (name: string): string =>
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .substring(0, 256);
+};
+
+/**
+ * Robust matching helper to reconcile disambiguated seed strings (e.g., "vein-fm-us", "klear-th")
+ * with canonical AI node IDs, bare names, or search queries (e.g., "vein-fm", "klear").
+ *
+ * Architecture V41.5 / V43 [Rule 2, Rule 36]:
+ * Base-to-Suffixed ISO Parity Inoculation:
+ * If one slug is literally the country-suffixed version of the other base slug
+ * (e.g. rawC="vein-fm-us" and rawS="vein-fm", or rawC="end-it-us" and rawS="end-it"),
+ * they represent the exact same entity. The trailing 2 letters on the shorter base slug
+ * (e.g. -fm, -it) are part of the band's identity, NOT a conflicting country routing code.
+ */
+export function isEntitySeedMatch(seedNorm: string, candidateNorm: string): boolean {
+  if (!seedNorm || !candidateNorm) return false;
+  const rawS = normalizeEntitySlugInternal(seedNorm);
+  const rawC = normalizeEntitySlugInternal(candidateNorm);
+  if (rawS === rawC) return true;
+
+  const strippedS = stripCountrySlug(rawS);
+  const strippedC = stripCountrySlug(rawC);
+
+  // Base-to-Suffixed ISO Parity Inoculation ([Rule 2], [Rule 36]):
+  // If one is literally the country-suffixed version of the other base slug
+  // (e.g. rawC="vein-fm-us" and rawS="vein-fm", or rawC="end-it-us" and rawS="end-it"),
+  // they are the exact same artist entity with/without country routing suffix!
+  if (strippedC === rawS || strippedS === rawC) {
+    return true;
+  }
+
+  const sIso = extractTrailingCountryIso(rawS);
+  const cIso = extractTrailingCountryIso(rawC);
+  if (sIso && cIso && !areCountryIsosCompatible(sIso, cIso)) {
+    return false;
+  }
+
+  if (strippedS === strippedC) return true;
+  if (strippedS.startsWith(`${strippedC}-`) || strippedC.startsWith(`${strippedS}-`)) return true;
+  if (
+    strippedS.includes(`-${strippedC}-`) ||
+    strippedS.endsWith(`-${strippedC}`) ||
+    strippedC.includes(`-${strippedS}-`) ||
+    strippedC.endsWith(`-${strippedS}`)
+  ) {
+    return true;
+  }
+  return false;
+}
 
 /**
  * Canonicalizes an artist slug with an origin hint ([Rule 2] & [Rule 36]):

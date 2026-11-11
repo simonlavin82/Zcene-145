@@ -23,28 +23,6 @@ try {
 catch (e) {
     // Ignore if already set by another function module
 }
-function isEntitySeedMatch(seedNorm, candidateNorm) {
-    if (!seedNorm || !candidateNorm)
-        return false;
-    const rawS = (0, curatorService_1.normalizeArtistId)(seedNorm);
-    const rawC = (0, curatorService_1.normalizeArtistId)(candidateNorm);
-    if (rawS === rawC)
-        return true;
-    const sIso = (0, isoCountries_1.extractTrailingCountryIso)(rawS);
-    const cIso = (0, isoCountries_1.extractTrailingCountryIso)(rawC);
-    if (sIso && cIso && !(0, isoCountries_1.areCountryIsosCompatible)(sIso, cIso)) {
-        return false;
-    }
-    const s = (0, isoCountries_1.stripCountrySlug)(rawS);
-    const c = (0, isoCountries_1.stripCountrySlug)(rawC);
-    if (s === c)
-        return true;
-    if (rawS.startsWith(`${rawC}-`) || rawC.startsWith(`${rawS}-`))
-        return true;
-    if (rawS.includes(`-${rawC}-`) || rawS.endsWith(`-${rawC}`) || rawS.includes(`-${rawS}-`) || rawS.endsWith(`-${rawS}`))
-        return true;
-    return false;
-}
 exports.stripCountrySlug = isoCountries_1.stripCountrySlug;
 exports.validateSeedOriginCallable = (0, https_1.onCall)({
     secrets: ["GEMINI_API_KEY"],
@@ -462,7 +440,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 }
                 const originalNormId = (0, curatorService_1.normalizeArtistId)(n.id);
                 let newId = originalNormId;
-                const seedMatch = resolvedSeedArray.find(s => isEntitySeedMatch(s.id, originalNormId));
+                const seedMatch = resolvedSeedArray.find(s => (0, isoCountries_1.isEntitySeedMatch)(s.id, originalNormId));
                 if (seedMatch) {
                     if (seedMatch.origin) {
                         n.origin = seedMatch.origin;
@@ -500,9 +478,9 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             }
             for (const seed of artistList) {
                 const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
-                const resolvedSeed = resolvedSeedArray.find(r => isEntitySeedMatch(r.id, seedNorm) || (0, curatorService_1.normalizeArtistId)(r.name) === seedNorm || r.id === seedNorm);
+                const resolvedSeed = resolvedSeedArray.find(r => (0, isoCountries_1.isEntitySeedMatch)(r.id, seedNorm) || (0, curatorService_1.normalizeArtistId)(r.name) === seedNorm || r.id === seedNorm);
                 const sluggedSeedNorm = resolvedSeed ? resolvedSeed.id : seedNorm;
-                const seedNode = finalGraph.nodes.find((n) => isEntitySeedMatch(sluggedSeedNorm, n.id) || isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
+                const seedNode = finalGraph.nodes.find((n) => (0, isoCountries_1.isEntitySeedMatch)(sluggedSeedNorm, n.id) || (0, isoCountries_1.isEntitySeedMatch)(seedNorm, n.id) || (0, isoCountries_1.isEntitySeedMatch)(seedNorm, n.label || ''));
                 if (seedNode && seedNode.id !== sluggedSeedNorm) {
                     const oldId = seedNode.id;
                     seedNode.id = sluggedSeedNorm;
@@ -530,9 +508,9 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         }));
         for (const seed of artistList) {
             const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
-            const resolvedSeed = resolvedSeedArray.find(r => isEntitySeedMatch(r.id, seedNorm) || (0, curatorService_1.normalizeArtistId)(r.name) === seedNorm);
+            const resolvedSeed = resolvedSeedArray.find(r => (0, isoCountries_1.isEntitySeedMatch)(r.id, seedNorm) || (0, curatorService_1.normalizeArtistId)(r.name) === seedNorm);
             const targetSeedId = resolvedSeed ? resolvedSeed.id : seed;
-            const exists = recommendedEntities.some((e) => isEntitySeedMatch(targetSeedId, e.id) || isEntitySeedMatch(seedNorm, e.name));
+            const exists = recommendedEntities.some((e) => (0, isoCountries_1.isEntitySeedMatch)(targetSeedId, e.id) || (0, isoCountries_1.isEntitySeedMatch)(seedNorm, e.name));
             if (!exists) {
                 recommendedEntities.unshift({
                     id: targetSeedId,

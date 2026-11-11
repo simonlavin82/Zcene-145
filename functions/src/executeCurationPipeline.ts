@@ -21,6 +21,7 @@ import {
   shouldAdoptCanonicalSlugCandidate,
   inspectSlugDedupAmbiguity,
   inferNodeOriginsFromCountryLinks,
+  isEntitySeedMatch,
 } from "./shared/isoCountries";
 import { upsertBareRouterStub } from "./services/routerStubService";
 import { computeBaseProjectTokenCost } from "./shared/tokenEconomy";
@@ -50,24 +51,6 @@ try {
   db.settings({ ignoreUndefinedProperties: true });
 } catch (e) {
   // Ignore if already set by another function module
-}
-
-function isEntitySeedMatch(seedNorm: string, candidateNorm: string): boolean {
-  if (!seedNorm || !candidateNorm) return false;
-  const rawS = normalizeArtistId(seedNorm);
-  const rawC = normalizeArtistId(candidateNorm);
-  if (rawS === rawC) return true;
-  const sIso = extractTrailingCountryIso(rawS);
-  const cIso = extractTrailingCountryIso(rawC);
-  if (sIso && cIso && !areCountryIsosCompatible(sIso, cIso)) {
-    return false;
-  }
-  const s = stripIsoCountrySlug(rawS);
-  const c = stripIsoCountrySlug(rawC);
-  if (s === c) return true;
-  if (rawS.startsWith(`${rawC}-`) || rawC.startsWith(`${rawS}-`)) return true;
-  if (rawS.includes(`-${rawC}-`) || rawS.endsWith(`-${rawC}`) || rawS.includes(`-${rawS}-`) || rawS.endsWith(`-${rawS}`)) return true;
-  return false;
 }
 
 export const stripCountrySlug = stripIsoCountrySlug;

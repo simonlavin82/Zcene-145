@@ -10,6 +10,7 @@ import {
   shouldAdoptCanonicalSlugCandidate,
   inferNodeOriginsFromCountryLinks,
   inspectSlugDedupAmbiguity,
+  isEntitySeedMatch,
 } from '../../shared/isoCountries';
 import {
   buildDisambiguationSnippet,
@@ -102,6 +103,24 @@ describe('Architecture V42: Global 249-Country ISO-3166 Registry & End-to-End Di
       expect(canonicalizeArtistSlugWithOrigin('klear', 'Thailand')).toBe('klear-th');
       expect(canonicalizeArtistSlugWithOrigin('klear-thailand', 'Bangkok, Thailand')).toBe('klear-th');
       expect(canonicalizeArtistSlugWithOrigin('architects-uk', 'Brighton, UK')).toBe('architects-gb');
+    });
+
+    it('isEntitySeedMatch Base-to-Suffixed ISO Parity Inoculation protects bands ending in ISO-like tokens (Vein.fm, End It) while rejecting conflicting country homonyms', () => {
+      // Base-to-Suffixed parity ([Rule 2] & [Rule 36]):
+      expect(isEntitySeedMatch('vein-fm', 'vein-fm-us')).toBe(true);
+      expect(isEntitySeedMatch('Vein.fm', 'vein-fm-us')).toBe(true);
+      expect(isEntitySeedMatch('vein-fm-us', 'vein-fm')).toBe(true);
+      expect(isEntitySeedMatch('end-it', 'end-it-us')).toBe(true);
+      expect(isEntitySeedMatch('End It', 'end-it-us')).toBe(true);
+      expect(isEntitySeedMatch('end-it-us', 'end-it')).toBe(true);
+      expect(isEntitySeedMatch('klear', 'klear-th')).toBe(true);
+      expect(isEntitySeedMatch('klear-th', 'klear')).toBe(true);
+
+      // Conflicting country homonyms are strictly rejected:
+      expect(isEntitySeedMatch('klear-th', 'klear-us')).toBe(false);
+      expect(isEntitySeedMatch('drain-us', 'drain-se')).toBe(false);
+      expect(isEntitySeedMatch('paradox-th', 'paradox-de')).toBe(false);
+      expect(isEntitySeedMatch('kala-th', 'kala-hr')).toBe(false);
     });
   });
 

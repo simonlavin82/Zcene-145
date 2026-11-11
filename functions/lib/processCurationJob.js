@@ -167,32 +167,6 @@ function sanitizeLabelProfile(details) {
     };
 }
 /**
- * Robust matching helper to reconcile disambiguated seed strings (e.g., "buggin-united-states")
- * with canonical AI node IDs or names (e.g., "buggin"). Supports prefix/suffix stripping.
- */
-function isEntitySeedMatch(seedNorm, candidateNorm) {
-    if (!seedNorm || !candidateNorm)
-        return false;
-    const rawS = (0, curatorService_1.normalizeArtistId)(seedNorm);
-    const rawC = (0, curatorService_1.normalizeArtistId)(candidateNorm);
-    if (rawS === rawC)
-        return true;
-    const sIso = (0, isoCountries_1.extractTrailingCountryIso)(rawS);
-    const cIso = (0, isoCountries_1.extractTrailingCountryIso)(rawC);
-    if (sIso && cIso && !(0, isoCountries_1.areCountryIsosCompatible)(sIso, cIso)) {
-        return false;
-    }
-    const s = (0, isoCountries_1.stripCountrySlug)(rawS);
-    const c = (0, isoCountries_1.stripCountrySlug)(rawC);
-    if (s === c)
-        return true;
-    if (s.startsWith(`${c}-`) || c.startsWith(`${s}-`))
-        return true;
-    if (s.includes(`-${c}-`) || s.endsWith(`-${c}`) || c.includes(`-${s}-`) || c.endsWith(`-${s}`))
-        return true;
-    return false;
-}
-/**
  * Stateful Project UX Upgrade: Update the user's project document status
  * to reflect in-progress background curation and write back completed graphData.
  */
@@ -584,7 +558,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const cleanName = n.type === 'label'
                         ? (0, curatorService_1.cleanLabelDisplayName)(n.label || n.id)
                         : (seedNamesMap[canonical] || seedNamesMap[norm] || seedNamesMap[n.id] || (n.label ? (0, curatorService_1.cleanArtistDisplayName)(n.label) : n.id));
-                    const isSeed = n.type !== 'label' && artistList.some((s) => isEntitySeedMatch(s, n.id));
+                    const isSeed = n.type !== 'label' && artistList.some((s) => (0, isoCountries_1.isEntitySeedMatch)(s, n.id));
                     const nodeSeedLock = isSeed ? (getSeedLock(n.id) || getSeedLock(canonical)) : null;
                     return {
                         id: n.id,
@@ -603,7 +577,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
                     const cleanName = seedNamesMap[canonicalSeedId] || seedNamesMap[seedNorm] || (0, isoCountries_1.stripCountrySlug)(seed);
                     const missingSeedLock = getSeedLock(canonicalSeedId) || getSeedLock(seed);
-                    const exists = recommendedEntities.some((e) => isEntitySeedMatch(seedNorm, e.id) || isEntitySeedMatch(seedNorm, e.name));
+                    const exists = recommendedEntities.some((e) => (0, isoCountries_1.isEntitySeedMatch)(seedNorm, e.id) || (0, isoCountries_1.isEntitySeedMatch)(seedNorm, e.name));
                     if (!exists) {
                         recommendedEntities.unshift({
                             id: canonicalSeedId,
@@ -640,7 +614,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         }
                         entityObj.id = artistNormId; // Keep entityObj.id in sync so hydration result at line 700 is clean
                         // ── Slug Deduplication Guard (Cross-Homonym Protected) ─────────────────
-                        const isSeedEntity = !isLabel && artistList.some((s) => isEntitySeedMatch(s, artistNormId));
+                        const isSeedEntity = !isLabel && artistList.some((s) => (0, isoCountries_1.isEntitySeedMatch)(s, artistNormId));
                         const entitySeedLock = isSeedEntity ? (getSeedLock(artistNormId) || getSeedLock(rawName)) : null;
                         let expectedNodeIso = !isLabel
                             ? (entitySeedLock?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(artistNormId) || (entityObj.origin ? (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(entityObj.origin)) : null))
@@ -916,7 +890,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     console.log(`[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing ${chunkResults.length} entities to Firestore cache...`);
                     for (const res of chunkResults) {
                         if (res) {
-                            const existingIndex = detailsCacheEntries.findIndex((entry) => isEntitySeedMatch((0, curatorService_1.normalizeArtistId)(res[0]), entry[0]));
+                            const existingIndex = detailsCacheEntries.findIndex((entry) => entry[0] === res[0] || (0, isoCountries_1.isEntitySeedMatch)((0, curatorService_1.normalizeArtistId)(res[0]), entry[0]));
                             if (existingIndex !== -1) {
                                 detailsCacheEntries[existingIndex] = res;
                             }
@@ -952,7 +926,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 // Identifies any nodes that failed hydration (null result) and logs a warning.
                 // This provides operational visibility for monitoring the zero-miss hydration mandate.
                 const failedHydrationIds = recommendedEntities
-                    .filter((e) => !detailsCacheEntries.some(entry => isEntitySeedMatch((0, curatorService_1.normalizeArtistId)(e.name), entry[0])))
+                    .filter((e) => !detailsCacheEntries.some(entry => entry[0] === e.id || (0, isoCountries_1.isEntitySeedMatch)((0, curatorService_1.normalizeArtistId)(e.name), entry[0])))
                     .map((e) => e.name);
                 console.log(`[Curation Backend] Hydration complete. Success: ${detailsCacheEntries.length}/${recommendedEntities.length} entities.`);
                 if (failedHydrationIds.length > 0) {
@@ -975,8 +949,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         const nodeNorm = (0, curatorService_1.normalizeArtistId)(node.id);
                         const typeLower = (node.type || 'artist').toLowerCase();
                         const isStructural = !['artist', 'label'].includes(typeLower);
-                        const isSeedNode = Array.from(seedNormSet).some((s) => isEntitySeedMatch(s, nodeNorm));
-                        const isHydrated = Array.from(hydratedNorms).some((h) => isEntitySeedMatch(nodeNorm, h));
+                        const isSeedNode = Array.from(seedNormSet).some((s) => (0, isoCountries_1.isEntitySeedMatch)(s, nodeNorm));
+                        const isHydrated = Array.from(hydratedNorms).some((h) => h === nodeNorm || (0, isoCountries_1.isEntitySeedMatch)(nodeNorm, h));
                         if (!isHydrated && !isSeedNode && !isStructural) {
                             console.warn(`[Quality Baseline] Surgically pruning unhydratable node from graph topology: ${node.id}`);
                             prunedIds.add(node.id);
@@ -1021,7 +995,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         const normId = (0, curatorService_1.normalizeArtistId)(nodeId);
                         if (protectedSeeds.has(nodeId) || protectedSeeds.has(normId))
                             return true;
-                        return seedNorms.some((s) => isEntitySeedMatch(s, normId));
+                        return seedNorms.some((s) => (0, isoCountries_1.isEntitySeedMatch)(s, normId));
                     };
                     const level2Violators = new Set();
                     const level2ViolatorNorms = new Set();
@@ -1031,8 +1005,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         const nodeNorm = (0, curatorService_1.normalizeArtistId)(node.id);
                         const nodeLabelNorm = (0, curatorService_1.normalizeArtistId)(node.label || node.id);
                         const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id ||
-                            isEntitySeedMatch(nodeNorm, entry[0]) ||
-                            isEntitySeedMatch(nodeLabelNorm, entry[0]));
+                            (0, isoCountries_1.isEntitySeedMatch)(nodeNorm, entry[0]) ||
+                            (0, isoCountries_1.isEntitySeedMatch)(nodeLabelNorm, entry[0]));
                         const meta = detailsEntry?.[1]?.details || {};
                         // Check hydrated founded year only if explicitly present in hydrated detailsEntry (avoid pruning unhydrated nodes)
                         const rawFounded = meta.founded ? String(meta.founded) : '';
@@ -1079,7 +1053,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             for (let i = detailsCacheEntries.length - 1; i >= 0; i--) {
                                 const entryKey = String(detailsCacheEntries[i]?.[0] || '');
                                 const isViolatorEntry = level2Violators.has(entryKey) ||
-                                    Array.from(level2ViolatorNorms).some((vNorm) => isEntitySeedMatch(vNorm, entryKey));
+                                    Array.from(level2ViolatorNorms).some((vNorm) => (0, isoCountries_1.isEntitySeedMatch)(vNorm, entryKey));
                                 if (isViolatorEntry) {
                                     detailsCacheEntries.splice(i, 1);
                                 }
@@ -1149,8 +1123,10 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     for (const entityObj of recommendedEntities) {
                         const isLabel = entityObj.type === 'label';
                         const recNorm = isLabel ? (0, curatorService_1.normalizeLabelId)(entityObj.name) : (0, curatorService_1.normalizeArtistId)(entityObj.name);
-                        const matchingSeedNorm = seedNorms.find((s) => isEntitySeedMatch(s, recNorm));
-                        const recDetailsEntry = detailsCacheEntries.find((entry) => isEntitySeedMatch(recNorm, entry[0]) || (isLabel && (0, curatorService_1.normalizeLabelId)(entry[0]) === recNorm));
+                        const matchingSeedNorm = seedNorms.find((s) => (0, isoCountries_1.isEntitySeedMatch)(s, recNorm));
+                        const recDetailsEntry = detailsCacheEntries.find((entry) => entry[0] === entityObj.id ||
+                            (0, isoCountries_1.isEntitySeedMatch)(recNorm, entry[0]) ||
+                            (isLabel && (0, curatorService_1.normalizeLabelId)(entry[0]) === recNorm));
                         let disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
                         if (isLabel) {
                             disambiguatedCanonicalId = (0, curatorService_1.normalizeLabelId)(disambiguatedCanonicalId);
@@ -1290,7 +1266,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         const artistNodesSnapshot = finalGraph.nodes.filter((n) => n.type === 'artist');
                         artistNodesSnapshot.forEach((node) => {
                             // Resolve metadata from detailsCacheEntries or node properties
-                            const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id || isEntitySeedMatch(node.id, entry[0]));
+                            const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id || (0, isoCountries_1.isEntitySeedMatch)(node.id, entry[0]));
                             const meta = detailsEntry?.[1]?.details || {};
                             const rawOrigin = node.origin || meta.origin;
                             // Gate D / Rule 40: Prioritize canonical ISO suffix on node.id across all 249 ISO countries (e.g. "klear-th" -> "th", "nasty-be" -> "be")
@@ -1488,13 +1464,13 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             const isProtectedSeed = (nodeId) => {
                                 if (protectedSeeds.has(nodeId))
                                     return true;
-                                return seedNorms.some((s) => isEntitySeedMatch(s, nodeId));
+                                return seedNorms.some((s) => (0, isoCountries_1.isEntitySeedMatch)(s, nodeId));
                             };
                             const level2Violators = new Set();
                             for (const node of finalGraph.nodes) {
                                 if (node.type !== 'artist' || isProtectedSeed(node.id))
                                     continue;
-                                const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id || isEntitySeedMatch(node.id, entry[0]));
+                                const detailsEntry = detailsCacheEntries.find((entry) => entry[0] === node.id || (0, isoCountries_1.isEntitySeedMatch)(node.id, entry[0]));
                                 const meta = detailsEntry?.[1]?.details || {};
                                 // Check hydrated founded year only if explicitly present in hydrated detailsEntry (avoid pruning unhydrated nodes)
                                 const rawFounded = meta.founded ? String(meta.founded) : '';
@@ -1819,11 +1795,13 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const recArtist = entityObj.name;
                     const isLabel = entityObj.type === 'label';
                     const recNorm = isLabel ? (0, curatorService_1.normalizeLabelId)(recArtist) : (0, curatorService_1.normalizeArtistId)(recArtist);
-                    const matchingSeedNorm = seedNorms.find((s) => isEntitySeedMatch(s, recNorm));
+                    const matchingSeedNorm = seedNorms.find((s) => (0, isoCountries_1.isEntitySeedMatch)(s, recNorm));
                     if (matchingSeedNorm) {
                         // Do NOT continue here. Let the seed fall through so it can be evaluated for partial hydration or missing assets during a cache upgrade.
                     }
-                    const recDetailsEntry = detailsCacheEntries.find((entry) => isEntitySeedMatch(recNorm, entry[0]) || (isLabel && (0, curatorService_1.normalizeLabelId)(entry[0]) === recNorm));
+                    const recDetailsEntry = detailsCacheEntries.find((entry) => entry[0] === entityObj.id ||
+                        (0, isoCountries_1.isEntitySeedMatch)(recNorm, entry[0]) ||
+                        (isLabel && (0, curatorService_1.normalizeLabelId)(entry[0]) === recNorm));
                     let recDetails = recDetailsEntry ? recDetailsEntry[1] : null;
                     if (isLabel && !recDetails) {
                         console.warn(`[Curation Backend] Label cache write skipped for "${recNorm}" — missing detailsCache.`);
@@ -2198,7 +2176,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
                             const match = parsedCache.find((item) => {
                                 const key = (0, curatorService_1.normalizeArtistId)(item[0]);
-                                return isEntitySeedMatch(seedNorm, key) || key === seedNorm || key.startsWith(seedNorm + '-') || seedNorm.startsWith(key + '-');
+                                return (0, isoCountries_1.isEntitySeedMatch)(seedNorm, key) || key === seedNorm || key.startsWith(seedNorm + '-') || seedNorm.startsWith(key + '-');
                             });
                             let url = null;
                             if (match && match[1]) {

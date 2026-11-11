@@ -36,6 +36,7 @@ import {
   ISO_TO_COUNTRY_NAME,
   inferNodeOriginsFromCountryLinks,
   inspectSlugDedupAmbiguity,
+  isEntitySeedMatch,
 } from "./shared/isoCountries";
 import {
   shouldAdoptCanonicalSlugCandidate,
@@ -214,29 +215,6 @@ function sanitizeLabelProfile(details: any): any {
     recommendationReason: parsed.recommendationReason || "",
   };
 }
-
-/**
- * Robust matching helper to reconcile disambiguated seed strings (e.g., "buggin-united-states")
- * with canonical AI node IDs or names (e.g., "buggin"). Supports prefix/suffix stripping.
- */
-function isEntitySeedMatch(seedNorm: string, candidateNorm: string): boolean {
-  if (!seedNorm || !candidateNorm) return false;
-  const rawS = normalizeArtistId(seedNorm);
-  const rawC = normalizeArtistId(candidateNorm);
-  if (rawS === rawC) return true;
-  const sIso = extractTrailingCountryIso(rawS);
-  const cIso = extractTrailingCountryIso(rawC);
-  if (sIso && cIso && !areCountryIsosCompatible(sIso, cIso)) {
-    return false;
-  }
-  const s = stripCountrySlug(rawS);
-  const c = stripCountrySlug(rawC);
-  if (s === c) return true;
-  if (s.startsWith(`${c}-`) || c.startsWith(`${s}-`)) return true;
-  if (s.includes(`-${c}-`) || s.endsWith(`-${c}`) || c.includes(`-${s}-`) || c.endsWith(`-${s}`)) return true;
-  return false;
-}
-
 
 /**
  * Stateful Project UX Upgrade: Update the user's project document status
@@ -1036,7 +1014,7 @@ export const processCurationJob = onDocumentCreated({
 
           for (const res of chunkResults) {
             if (res) {
-              const existingIndex = detailsCacheEntries.findIndex((entry: any) => isEntitySeedMatch(normalizeArtistId(res[0]), entry[0]));
+              const existingIndex = detailsCacheEntries.findIndex((entry: any) => entry[0] === res[0] || isEntitySeedMatch(normalizeArtistId(res[0]), entry[0]));
               if (existingIndex !== -1) {
                 detailsCacheEntries[existingIndex] = res;
               } else {
@@ -1071,7 +1049,7 @@ export const processCurationJob = onDocumentCreated({
         // Identifies any nodes that failed hydration (null result) and logs a warning.
         // This provides operational visibility for monitoring the zero-miss hydration mandate.
         const failedHydrationIds = recommendedEntities
-          .filter((e: any) => !detailsCacheEntries.some(entry => isEntitySeedMatch(normalizeArtistId(e.name), entry[0])))
+          .filter((e: any) => !detailsCacheEntries.some(entry => entry[0] === e.id || isEntitySeedMatch(normalizeArtistId(e.name), entry[0])))
           .map((e: any) => e.name);
 
         console.log(`[Curation Backend] Hydration complete. Success: ${detailsCacheEntries.length}/${recommendedEntities.length} entities.`);
@@ -1099,7 +1077,7 @@ export const processCurationJob = onDocumentCreated({
             const typeLower = (node.type || 'artist').toLowerCase();
             const isStructural = !['artist', 'label'].includes(typeLower);
             const isSeedNode = Array.from(seedNormSet).some((s: string) => isEntitySeedMatch(s, nodeNorm));
-            const isHydrated = Array.from(hydratedNorms).some((h: string) => isEntitySeedMatch(nodeNorm, h));
+            const isHydrated = Array.from(hydratedNorms).some((h: string) => h === nodeNorm || isEntitySeedMatch(nodeNorm, h));
             if (!isHydrated && !isSeedNode && !isStructural) {
               console.warn(`[Quality Baseline] Surgically pruning unhydratable node from graph topology: ${node.id}`);
               prunedIds.add(node.id);
@@ -1298,7 +1276,11 @@ export const processCurationJob = onDocumentCreated({
             const isLabel = entityObj.type === 'label';
             const recNorm = isLabel ? normalizeLabelId(entityObj.name) : normalizeArtistId(entityObj.name);
             const matchingSeedNorm = seedNorms.find((s: string) => isEntitySeedMatch(s, recNorm));
-            const recDetailsEntry = detailsCacheEntries.find((entry: any) => isEntitySeedMatch(recNorm, entry[0]) || (isLabel && normalizeLabelId(entry[0]) === recNorm));
+            const recDetailsEntry = detailsCacheEntries.find((entry: any) =>
+              entry[0] === entityObj.id ||
+              isEntitySeedMatch(recNorm, entry[0]) ||
+              (isLabel && normalizeLabelId(entry[0]) === recNorm)
+            );
 
             let disambiguatedCanonicalId = recDetailsEntry ? (recDetailsEntry as any)[0] : recNorm;
             if (isLabel) {
@@ -2028,7 +2010,11 @@ export const processCurationJob = onDocumentCreated({
             // Do NOT continue here. Let the seed fall through so it can be evaluated for partial hydration or missing assets during a cache upgrade.
           }
 
-          const recDetailsEntry = detailsCacheEntries.find((entry: any) => isEntitySeedMatch(recNorm, entry[0]) || (isLabel && normalizeLabelId(entry[0]) === recNorm));
+          const recDetailsEntry = detailsCacheEntries.find((entry: any) =>
+            entry[0] === entityObj.id ||
+            isEntitySeedMatch(recNorm, entry[0]) ||
+            (isLabel && normalizeLabelId(entry[0]) === recNorm)
+          );
           let recDetails = recDetailsEntry ? (recDetailsEntry as any)[1] : null;
 
           if (isLabel && !recDetails) {
