@@ -997,10 +997,21 @@ describe('DetailsPanel', () => {
                     />
                 );
 
+                // Section header badges in Zine view
                 expect(screen.getAllByText('SCENE 1').length).toBeGreaterThan(0);
                 expect(screen.getAllByText('SCENE 2').length).toBeGreaterThan(0);
                 expect(screen.getAllByText('SCENE 3').length).toBeGreaterThan(0);
                 expect(screen.getByText('SCENE 1 & 2')).toBeInTheDocument();
+
+                // Verify exact ARTIST / LABEL matching styling on card pill (bg-zinc-800/50, no extra border)
+                const cardPills = screen.getAllByText('SCENE 1').filter(el => el.classList.contains('bg-zinc-800/50'));
+                expect(cardPills.length).toBeGreaterThan(0);
+                expect(cardPills[0]).toHaveClass('bg-zinc-800/50');
+                expect(cardPills[0]).toHaveClass('text-zinc-300');
+                expect(cardPills[0]).not.toHaveClass('border');
+
+                // Verify leftmost (first) positioning before entity type (ARTIST)
+                expect(cardPills[0].parentElement?.children[0]).toBe(cardPills[0]);
             });
 
             it('renders ROOT badge for seed artists across all scenes (multi-scene ROOT badge parity)', () => {

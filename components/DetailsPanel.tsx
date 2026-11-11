@@ -1208,14 +1208,14 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             </div>
                             <div className={`flex flex-wrap items-center gap-2 transition-all duration-300 overflow-hidden ${isHeaderStuck ? 'max-h-0 opacity-0 mt-0' : 'max-h-10 opacity-100 mt-1'}`}>
-                                <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl">{node.type}</span>
-                                {isSeedArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-xl">ROOT</span>}
-                                {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl">LIBRARY</span>}
                                 {sceneMembershipLabel && (
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/60 border border-zinc-700/50 px-2 py-0.5 rounded-xl">
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl">
                                         {sceneMembershipLabel}
                                     </span>
                                 )}
+                                <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl">{node.type}</span>
+                                {isSeedArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-yellow-500/20 text-yellow-300 px-2 py-0.5 rounded-xl">ROOT</span>}
+                                {isLibraryArtist && <span className="text-[10px] font-semibold uppercase tracking-widest bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-xl">LIBRARY</span>}
                             </div>
                         </div>
                     </div>

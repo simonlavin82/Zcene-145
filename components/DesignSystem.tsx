@@ -2628,19 +2628,19 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             />
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/60 border border-zinc-700/50 px-2 py-0.5 rounded-xl w-fit">SCENE 1</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl w-fit">SCENE 1</span>
                                 }
                                 title="Scene (Single)"
-                                description="Identifies scene origin in a multi-scene constellation (SCENE 1, SCENE 2, SCENE 3). Gated to projects with >= 2 populated scenes."
-                                implementation="text-zinc-300 bg-zinc-800/60 border border-zinc-700/50"
+                                description="Identifies scene origin in a multi-scene constellation (SCENE 1, SCENE 2, SCENE 3). Positioned first (leftmost) before entity type. Gated to projects with >= 2 populated scenes."
+                                implementation="text-zinc-300 bg-zinc-800/50"
                             />
                             <BadgeDisplay 
                                 badge={
-                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/60 border border-zinc-700/50 px-2 py-0.5 rounded-xl w-fit">SCENE 1 & 2</span>
+                                    <span className="text-[10px] font-semibold uppercase tracking-widest text-zinc-300 bg-zinc-800/50 px-2 py-0.5 rounded-xl w-fit">SCENE 1 & 2</span>
                                 }
                                 title="Scene (Shared / Bridge)"
-                                description="Identifies an entity bridging multiple scenes in ascending sequence joined by ampersand (e.g. SCENE 1 & 2, SCENE 1, 2 & 3)."
-                                implementation="text-zinc-300 bg-zinc-800/60 border border-zinc-700/50"
+                                description="Identifies an entity bridging multiple scenes in ascending sequence joined by ampersand (e.g. SCENE 1 & 2, SCENE 1, 2 & 3). Positioned first (leftmost) before entity type."
+                                implementation="text-zinc-300 bg-zinc-800/50"
                             />
                         </div>
 
