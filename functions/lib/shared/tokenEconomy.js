@@ -9,7 +9,7 @@ exports.usdToGbp = usdToGbp;
 exports.computeBaseProjectTokenCost = computeBaseProjectTokenCost;
 exports.computeRemainingSettlementTokens = computeRemainingSettlementTokens;
 // --- Official Support & Brand Contacts (Single Source of Truth) ---
-exports.ZCENE_SUPPORT_EMAIL = 'zcene.online@gmail.com';
+exports.ZCENE_SUPPORT_EMAIL = 'support@zcene.online';
 exports.ZCENE_SUPPORT_MAILTO = `mailto:${exports.ZCENE_SUPPORT_EMAIL}?subject=Zcene%20Support%20Inquiry`;
 exports.ZCENE_TSHIRT_MAILTO = `mailto:${exports.ZCENE_SUPPORT_EMAIL}?subject=Zcene%20T-Shirt%20Order&body=${encodeURIComponent(`Hi Zcene team,\n\nI would like to order an official Zcene T-shirt.\n\n- Color (Black/White): \n- Size (S/M/L/XL/XXL): \n- Delivery City & Country: \n\nThank you!`)}`;
 exports.ZCENE_INSTAGRAM_URL = 'https://www.instagram.com/zcene.online/';

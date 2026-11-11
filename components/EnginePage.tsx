@@ -201,8 +201,8 @@ export const ARCHITECTURE_RULES = [
     },
     { 
         id: 34, 
-        title: "Cognitive Tiering, Orchestration Stability & Split-Debit Settlement", 
-        desc: "All 7 AI touchpoints strictly operate on categorical thinking_level mapping (minimal to high) via the legacy generateContent API. Flash-tier touchpoints dynamically resolve to GEMINI_FLASH_MODEL (target: gemini-3.6-flash). Custom sampling parameters (temperature, top_p, top_k, thinking_budget) are strictly prohibited. Admin Discovery Ledger accounting is permanently pegged to standard list prices ($1.50/1M input, $7.50/1M output), while Column 2 enforces atomic Split-Debit remainder settlement and automatic error refunds." 
+        title: "Cognitive Tiering, Orchestration Stability & Dual-Lock Admin Identity", 
+        desc: "All 7 AI touchpoints strictly operate on categorical thinking_level mapping (minimal to high) via the legacy generateContent API. Flash-tier touchpoints dynamically resolve to GEMINI_FLASH_MODEL (target: gemini-3.6-flash). Custom sampling parameters (temperature, top_p, top_k, thinking_budget) are strictly prohibited. Admin Discovery Ledger accounting is permanently pegged to standard list prices ($1.50/1M input, $7.50/1M output), while Column 2 enforces atomic Split-Debit remainder settlement and automatic error refunds. Admin verification is strictly dual-locked to both ADMIN_EMAIL (zcene.online@gmail.com) and ADMIN_UID (9FBuWDALnNfUAjxV0pRe3RnKwJy1), decoupled from public customer support contacts (ZCENE_SUPPORT_EMAIL = support@zcene.online). <GlobalWall> wraps <App/> at the application root (index.tsx) using a cryptographic SHA-256 HMAC verification token to prevent pre-gate listener mounting and profile creation." 
     },
     { 
         id: 35, 

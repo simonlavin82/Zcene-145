@@ -16,8 +16,8 @@ import * as backendTokenEconomy from '../functions/src/shared/tokenEconomy';
 
 describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & Support Integration', () => {
   it('1. Centralizes contact and brand constants in shared/tokenEconomy.ts and mirrors to backend', () => {
-    expect(ZCENE_SUPPORT_EMAIL).toBe('zcene.online@gmail.com');
-    expect(ZCENE_SUPPORT_MAILTO).toContain('mailto:zcene.online@gmail.com');
+    expect(ZCENE_SUPPORT_EMAIL).toBe('support@zcene.online');
+    expect(ZCENE_SUPPORT_MAILTO).toContain('mailto:support@zcene.online');
     expect(ZCENE_TSHIRT_MAILTO).toContain('subject=Zcene%20T-Shirt%20Order');
     expect(ZCENE_TSHIRT_MAILTO).toContain('Color');
     expect(ZCENE_TSHIRT_MAILTO).toContain('Size');
@@ -25,7 +25,7 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     expect(ZCENE_INSTAGRAM_URL).toBe('https://www.instagram.com/zcene.online/');
     expect(ZCENE_INSTAGRAM_HANDLE).toBe('@zcene.online');
     expect(ZCENE_BUYMEACOFFEE_URL).toBe('https://buymeacoffee.com/zcene');
-    expect(ADMIN_EMAIL).toBe(ZCENE_SUPPORT_EMAIL);
+    expect(ADMIN_EMAIL).toBe('zcene.online@gmail.com');
 
     // Backend parity
     expect(backendTokenEconomy.ZCENE_SUPPORT_EMAIL).toBe(ZCENE_SUPPORT_EMAIL);
