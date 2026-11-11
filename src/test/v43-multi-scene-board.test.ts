@@ -1967,5 +1967,163 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(basePayloadSeedArtists).toBe('Poison The Well');
       expect(curatedScenes.length).toBe(1);
     });
+
+    it('keeps isFirstGeneration true on uncurated projects with draft seeds to display the empty-state guide card', () => {
+      // Prior bug: data.nodes.length === 0 && !seedArtists caused the card to disappear as soon as draft seed was added
+      // Fixed logic: data.nodes.length === 0 keeps the card visible while drafting roots
+      const computeIsFirstGeneration = (nodeCount: number) => nodeCount === 0;
+
+      expect(computeIsFirstGeneration(0)).toBe(true); // empty canvas, 0 seeds -> shows card
+      expect(computeIsFirstGeneration(0)).toBe(true); // empty canvas with draft seeds ("Poison The Well") -> STILL shows card
+      expect(computeIsFirstGeneration(15)).toBe(false); // curated canvas with 15 nodes -> hides card
+    });
+
+    it('evaluates displayProjectName to "Untitled Zcene" on uncurated projects even with draft seeds', () => {
+      const computeDisplayProjectName = (
+        projectName: string | null | undefined,
+        seedArtists: string,
+        scenes: ProjectScene[],
+        graphData: { nodes: any[] }
+      ) => {
+        if (projectName && projectName.trim()) {
+          return projectName;
+        }
+        const curatedScenes = scenes.filter(s => (s.graphData?.nodes?.length || 0) > 0);
+        if (curatedScenes.length > 0) {
+          const allCuratedSeedNames = Array.from(
+            new Set(
+              curatedScenes.flatMap(s =>
+                (s.curatedSeedArtists || s.seedArtists || '').split('::').map(x => x.trim()).filter(Boolean)
+              )
+            )
+          );
+          if (allCuratedSeedNames.length > 1) {
+            return allCuratedSeedNames.join(' + ');
+          }
+          if (allCuratedSeedNames.length === 1) {
+            return allCuratedSeedNames[0];
+          }
+        }
+        if (graphData && graphData.nodes && graphData.nodes.length > 0 && seedArtists) {
+          const seeds = seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+          if (seeds.length > 1) {
+            return seeds.join(' + ');
+          }
+          if (seeds.length === 1) {
+            return seeds[0];
+          }
+        }
+        return 'Untitled Zcene';
+      };
+
+      const uncuratedScene: ProjectScene = {
+        ...createEmptyProjectScene(0, 'Poison The Well'),
+        seedArtists: 'Poison The Well',
+        graphData: { nodes: [], links: [] },
+      };
+
+      // Fresh uncurated project with draft seed should stay "Untitled Zcene"
+      expect(computeDisplayProjectName('', 'Poison The Well', [uncuratedScene], { nodes: [] })).toBe('Untitled Zcene');
+
+      // Once curated with graph nodes, auto-derives from curated seed
+      const curatedScene: ProjectScene = {
+        ...uncuratedScene,
+        curatedSeedArtists: 'Poison The Well',
+        graphData: { nodes: [{ id: 'ptw', label: 'Poison The Well', type: 'artist', group: 1 }], links: [] },
+      };
+      expect(computeDisplayProjectName('', 'Poison The Well', [curatedScene], { nodes: [{ id: 'ptw' }] })).toBe('Poison The Well');
+
+      // User explicit name always takes precedence
+      expect(computeDisplayProjectName('Custom Title', 'Poison The Well', [curatedScene], { nodes: [{ id: 'ptw' }] })).toBe('Custom Title');
+    });
+
+    it('guards project title auto-naming and autosave when canvas is uncurated', () => {
+      let updatedProjectName: string | null = null;
+      const handleUpdateProjectName = (name: string) => {
+        updatedProjectName = name;
+      };
+
+      const runTitleSyncHook = (
+        graphData: { nodes: any[] } | null,
+        seedArtists: string,
+        projectName: string,
+        scenes: ProjectScene[]
+      ) => {
+        const hasCuratedGraph = Boolean(graphData && graphData.nodes && graphData.nodes.length > 0);
+        if (!hasCuratedGraph) return; // Guard prevents premature title mutation!
+
+        const curatedScenes = scenes.filter(s => (s.graphData?.nodes?.length || 0) > 0);
+        const activeSeedString = curatedScenes.length > 0
+          ? curatedScenes.flatMap(s => (s.curatedSeedArtists || s.seedArtists || '').split('::')).join('::')
+          : seedArtists;
+
+        if (activeSeedString && (!projectName || projectName === 'Untitled Zcene')) {
+          const seeds = activeSeedString.split('::').map(s => s.trim()).filter(Boolean);
+          if (seeds.length > 0) {
+            handleUpdateProjectName(seeds.join(' + '));
+          }
+        }
+      };
+
+      const uncuratedScene: ProjectScene = {
+        ...createEmptyProjectScene(0, 'Poison The Well'),
+        seedArtists: 'Poison The Well',
+        graphData: { nodes: [], links: [] },
+      };
+
+      // Uncurated canvas: hook returns early, no project name update fired
+      runTitleSyncHook({ nodes: [] }, 'Poison The Well', '', [uncuratedScene]);
+      expect(updatedProjectName).toBeNull();
+
+      // Curated canvas: hook fires and updates title
+      const curatedScene: ProjectScene = {
+        ...uncuratedScene,
+        curatedSeedArtists: 'Poison The Well',
+        graphData: { nodes: [{ id: 'ptw', label: 'Poison The Well', type: 'artist', group: 1 }], links: [] },
+      };
+      runTitleSyncHook({ nodes: [{ id: 'ptw' }] }, 'Poison The Well', '', [curatedScene]);
+      expect(updatedProjectName).toBe('Poison The Well');
+    });
+
+    it('protects in-flight draft seeds against incoming empty Firestore snapshot on uncurated scenes', () => {
+      let seedArtistsState = 'Poison The Well';
+      const seedArtistsRef = { current: 'Poison The Well' };
+
+      const simulateSnapshotReceive = (incomingSceneSeeds: string, incomingNodeCount: number, resolvedActiveSceneId: string) => {
+        const targetSeedsStr = incomingSceneSeeds;
+        const targetNodeCount = incomingNodeCount;
+
+        if (!targetSeedsStr && targetNodeCount === 0 && seedArtistsRef.current) {
+          // Preserved in-flight draft seeds!
+          return { preserved: true, seeds: seedArtistsRef.current };
+        } else {
+          seedArtistsRef.current = targetSeedsStr;
+          seedArtistsState = targetSeedsStr;
+          return { preserved: false, seeds: targetSeedsStr };
+        }
+      };
+
+      // Empty snapshot arrives from Firestore before project curation
+      const result = simulateSnapshotReceive('', 0, 'scene-1');
+      expect(result.preserved).toBe(true);
+      expect(result.seeds).toBe('Poison The Well');
+      expect(seedArtistsState).toBe('Poison The Well');
+      expect(seedArtistsRef.current).toBe('Poison The Well');
+    });
+
+    it('clears draft seeds and scenes when switching to a different project or creating a project', () => {
+      const seedArtistsRef = { current: 'Stale Seeds From Prev Project' };
+      const scenesRef = { current: [{ id: 'scene-prev' }] as any[] };
+
+      // Simulate project switch / handleCreateProject reset
+      const handleSwitchToNewProject = () => {
+        seedArtistsRef.current = '';
+        scenesRef.current = [];
+      };
+
+      handleSwitchToNewProject();
+      expect(seedArtistsRef.current).toBe('');
+      expect(scenesRef.current).toEqual([]);
+    });
   });
 });

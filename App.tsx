@@ -2133,6 +2133,7 @@ const App: React.FC = () => {
     lastHydratedProjectFingerprintRef.current = '';
     setGraphData({ nodes: [], links: [] });
     setSeedArtists('');
+    seedArtistsRef.current = '';
     setActiveNodeIds([]);
     setDetailsCache(new Map());
     setChatHistories(new Map());
@@ -2500,14 +2501,30 @@ const App: React.FC = () => {
     if (projectName && projectName.trim()) {
       return projectName;
     }
-    const allSeedNames = scenes.length > 0
-      ? Array.from(new Set(scenes.flatMap(s => (s.seedArtists || '').split('::').map(x => x.trim()).filter(Boolean))))
-      : seedArtists.split('::').map(s => s.trim()).filter(Boolean);
-    if (allSeedNames.length > 1) {
-      return allSeedNames.map(s => cleanArtistDisplayName(s, graphData?.nodes)).join(' + ');
+    const curatedScenes = scenes.filter(s => (s.graphData?.nodes?.length || 0) > 0);
+    if (curatedScenes.length > 0) {
+      const allCuratedSeedNames: string[] = Array.from(
+        new Set(
+          curatedScenes.flatMap(s =>
+            (s.curatedSeedArtists || s.seedArtists || '').split('::').map(x => x.trim()).filter(Boolean)
+          )
+        )
+      );
+      if (allCuratedSeedNames.length > 1) {
+        return allCuratedSeedNames.map(s => cleanArtistDisplayName(s, graphData?.nodes)).join(' + ');
+      }
+      if (allCuratedSeedNames.length === 1) {
+        return cleanArtistDisplayName(allCuratedSeedNames[0], graphData?.nodes);
+      }
     }
-    if (allSeedNames.length === 1) {
-      return cleanArtistDisplayName(allSeedNames[0], graphData?.nodes);
+    if (graphData && graphData.nodes && graphData.nodes.length > 0 && seedArtists) {
+      const seeds = seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+      if (seeds.length > 1) {
+        return seeds.map(s => cleanArtistDisplayName(s, graphData?.nodes)).join(' + ');
+      }
+      if (seeds.length === 1) {
+        return cleanArtistDisplayName(seeds[0], graphData?.nodes);
+      }
     }
     return 'Untitled Zcene';
   }, [projectName, seedArtists, scenes, graphData]);
@@ -2521,8 +2538,16 @@ const App: React.FC = () => {
   }, [displayProjectName]);
 
   useEffect(() => {
-    if (seedArtists && (!projectName || projectName === 'Untitled Zcene')) {
-      const seeds = seedArtists.split('::').map(s => s.trim()).filter(Boolean);
+    const hasCuratedGraph = Boolean(graphData && graphData.nodes && graphData.nodes.length > 0);
+    if (!hasCuratedGraph) return;
+
+    const curatedScenes = scenes.filter(s => (s.graphData?.nodes?.length || 0) > 0);
+    const activeSeedString = curatedScenes.length > 0
+      ? curatedScenes.flatMap(s => (s.curatedSeedArtists || s.seedArtists || '').split('::')).join('::')
+      : seedArtists;
+
+    if (activeSeedString && (!projectName || projectName === 'Untitled Zcene')) {
+      const seeds = activeSeedString.split('::').map(s => s.trim()).filter(Boolean);
       if (seeds.length > 0) {
         if (seeds.length > 1) {
           const formattedSeeds = seeds.map(s => cleanArtistDisplayName(s, graphData?.nodes));
@@ -2533,7 +2558,7 @@ const App: React.FC = () => {
         }
       }
     }
-  }, [seedArtists, projectName, handleUpdateProjectName, graphData]);
+  }, [seedArtists, projectName, handleUpdateProjectName, graphData, scenes]);
 
   const handleUpdateProfile = useCallback(async (updates: any) => {
     if (!user) return;
@@ -6745,19 +6770,31 @@ const App: React.FC = () => {
         try {
           const parsedScenes: ProjectScene[] = parseProjectScenes(data.scenes);
           if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
-            scenesRef.current = parsedScenes;
-            setScenes(parsedScenes);
             const resolvedActiveSceneId = data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId)
               ? data.activeSceneId
               : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
             activeSceneIdRef.current = resolvedActiveSceneId;
             setActiveSceneId(resolvedActiveSceneId);
-            const targetScene = parsedScenes.find(s => (s.sceneId || s.id) === resolvedActiveSceneId) || parsedScenes[0];
+            const activeIdxInParsed = parsedScenes.findIndex(s => (s.sceneId || s.id) === resolvedActiveSceneId);
+            const targetScene = activeIdxInParsed !== -1 ? parsedScenes[activeIdxInParsed] : parsedScenes[0];
             if (targetScene?.seedArtists !== undefined) {
               const targetSeedsStr = toSeedArtistsString(targetScene.seedArtists);
-              seedArtistsRef.current = targetSeedsStr;
-              setSeedArtists((prev: any) => prev === targetSeedsStr ? prev : targetSeedsStr);
+              const targetNodeCount = targetScene.graphData?.nodes?.length ?? 0;
+
+              if (!targetSeedsStr && targetNodeCount === 0 && seedArtistsRef.current) {
+                console.log(`[ProjectLoader] Preserving in-flight draft seeds "${seedArtistsRef.current}" against empty snapshot for scene ${resolvedActiveSceneId}`);
+                if (activeIdxInParsed !== -1) {
+                  parsedScenes[activeIdxInParsed].seedArtists = seedArtistsRef.current;
+                  parsedScenes[activeIdxInParsed].seedIds = toSeedArtistsArray(seedArtistsRef.current).map(s => normalizeArtistId(s));
+                  parsedScenes[activeIdxInParsed].seedArtistIds = parsedScenes[activeIdxInParsed].seedIds;
+                }
+              } else {
+                seedArtistsRef.current = targetSeedsStr;
+                setSeedArtists((prev: any) => prev === targetSeedsStr ? prev : targetSeedsStr);
+              }
             }
+            scenesRef.current = parsedScenes;
+            setScenes(parsedScenes);
             if (targetScene?.discoveryFilters) {
               setDiscoveryFilters((prev: any) => JSON.stringify(prev) === JSON.stringify(targetScene.discoveryFilters) ? prev : targetScene.discoveryFilters);
               const isTargetCurated = (targetScene.graphData?.nodes?.length ?? 0) > 0;
@@ -7747,7 +7784,9 @@ const App: React.FC = () => {
                 const localProj = projects.find(p => p.id === projectId);
                 if (localProj) {
                   console.log(`[Router] Pre-populating context for project ${projectId} from dashboard data:`, localProj.seedArtists);
-                  setSeedArtists(localProj.seedArtists || '');
+                  const initialSeeds = localProj.seedArtists || '';
+                  seedArtistsRef.current = initialSeeds;
+                  setSeedArtists(initialSeeds);
                   setProjectName(localProj.name || '');
                   setProjectStatus(localProj.status || null);
                   setActiveJobId(localProj.activeJobId || null);
@@ -7755,6 +7794,8 @@ const App: React.FC = () => {
                     setIsLoading(true);
                   }
                 } else {
+                  seedArtistsRef.current = '';
+                  scenesRef.current = [];
                   setSeedArtists('');
                   setProjectName('');
                   setProjectStatus(null);

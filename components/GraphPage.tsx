@@ -1768,7 +1768,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const unreadDetailsCount = useMemo(() => activeNodes.filter(n => !readNodeIds.has(n.id.trim().toLowerCase())).length, [activeNodes, readNodeIds]);
   const artistIndicatorStyles = useMemo(() => isArtistPending ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700', [isArtistPending]);
   
-  const isFirstGeneration = useMemo(() => data.nodes.length === 0 && !seedArtists, [data.nodes.length, seedArtists]);
+  const isFirstGeneration = useMemo(() => data.nodes.length === 0, [data.nodes.length]);
   // Guardrail 2: The overwrite intercept gate applies ONLY when the active scene itself
   // is already curated (overwriting existing connections). Uncurated scenes (Scene 2..5)
   // curate directly via onRegenerate / preflight without popping up the overwrite intercept modal.
