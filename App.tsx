@@ -1285,6 +1285,9 @@ const App: React.FC = () => {
     onConfirm: (updatedSeeds?: PreFlightSeed[]) => void;
     onCancel: () => void;
   } | null>(null);
+  const [isPreFlightChecking, setIsPreFlightChecking] = useState<boolean>(false);
+  const validationRunIdRef = useRef<number>(0);
+  const attemptedMissIdsRef = useRef<Set<string>>(new Set());
     const [filterGuidanceState, setFilterGuidanceState] = useState<{
     isOpen: boolean;
     seedArtists: string[];
@@ -3811,11 +3814,15 @@ const App: React.FC = () => {
       artists = await resolveContextualEntityIds(rawArtists, activeDiscoveryFilters);
     }
 
-    isHydratingSessionRef.current = true;
-    isProjectLoadingRef.current = true;
-    setIsLoading(true);
-    projectStatusRef.current = 'curating';
-    setProjectStatus('curating');
+    if (bypassDisambiguation) {
+      isHydratingSessionRef.current = true;
+      isProjectLoadingRef.current = true;
+      setIsLoading(true);
+      projectStatusRef.current = 'curating';
+      setProjectStatus('curating');
+    } else {
+      setIsPreFlightChecking(true);
+    }
     if (abortControllerRef.current) abortControllerRef.current.abort();
     let controller = new AbortController();
     abortControllerRef.current = controller;
@@ -3826,6 +3833,8 @@ const App: React.FC = () => {
     const prevSelectedNode = selectedNode;
 
     const resetAbortedPreFlightState = () => {
+      setIsPreFlightChecking(false);
+      validationRunIdRef.current++;
       sessionTokenApprovedRef.current = false;
       curationSessionIdRef.current = null;
       setActiveNodeIds(prevActiveNodeIds);
@@ -3855,6 +3864,7 @@ const App: React.FC = () => {
     }
 
     if (!user && (isRegeneration || !window.location.search)) {
+      setIsPreFlightChecking(false);
       isHydratingSessionRef.current = false;
       isProjectLoadingRef.current = false;
       setIsLoading(false);
@@ -3869,6 +3879,7 @@ const App: React.FC = () => {
     
     const artistList = artists.split('::').map(a => normalizeArtistId(a)).filter(Boolean);
     if (artistList.length > 25) {
+      setIsPreFlightChecking(false);
       isHydratingSessionRef.current = false;
       isProjectLoadingRef.current = false;
       setIsLoading(false);
@@ -4024,72 +4035,189 @@ const App: React.FC = () => {
           projectTokenCost
         );
         if (!confirmedToken || confirmedToken === 'back') {
+          setIsPreFlightChecking(false);
           resetAbortedPreFlightState();
           return;
         }
         sessionTokenApprovedRef.current = true;
       }
 
-      // Phase 1.5: Pre-Flight Flash Lookup (Non-refundable -1T fee for uncached misses; cached & ambiguous stubs bypass at 0T)
-      if (!bypassDisambiguation && !skipCacheLookup && cacheCandidatesPerSeed.some(s => !s.isKnownCacheHit)) {
-        const validate = httpsCallable(functions, 'validateSeedOriginCallable');
+      // Box 4: Visual Confirmation & Inline Artist Origin Verification (ConsolidatedValidationModal)
+      if (!bypassDisambiguation && cacheCandidatesPerSeed.length > 0) {
+        const currentRunId = ++validationRunIdRef.current;
+        const initialModalSeeds: PreFlightSeed[] = cacheCandidatesPerSeed.map(s => ({
+          ...s,
+          isVerifyingOrigin: !s.isKnownCacheHit && !(s.isAmbiguous && s.candidates && s.candidates.length > 0)
+        }));
 
-        for (let s of cacheCandidatesPerSeed) {
-          if (!s.isKnownCacheHit) {
-            if (s.isAmbiguous && s.candidates && s.candidates.length > 0) {
-              // Ambiguous candidates already retrieved from database evolved stub (0T bypass)
-              continue;
-            }
-            try {
-              const result = await validate({
-                seed: s.query,
-                curationSessionId: curationSessionIdRef.current || undefined,
-                mode: 'initial_preflight',
-                expectedProjectCost: projectTokenCost,
-              });
-              const data = result.data as any;
-              if (data && data.isValid) {
-                if (data.hasCollision && Array.isArray(data.candidates) && data.candidates.length > 1) {
-                  s.isAmbiguous = true;
-                  s.candidates = data.candidates;
-                  s.selectedCandidateId = data.candidates[0].id;
-                  s.candidateId = data.candidates[0].id;
-                  s.predictedOrigin = data.candidates[0].origin || '';
-                  s.genre = data.candidates[0].genre || '';
-                } else {
-                  s.predictedOrigin = data.origin || '';
-                  s.genre = data.genre || '';
-                  if (data.candidates && data.candidates.length === 1) {
-                    s.candidateId = data.candidates[0].id;
+        // Phase 1.5: Pre-Flight Flash Lookup running concurrently inside ConsolidatedValidationModal
+        const uncachedSeeds = initialModalSeeds.filter(s => s.isVerifyingOrigin);
+        if (!skipCacheLookup && uncachedSeeds.length > 0) {
+          (async () => {
+            const validate = httpsCallable(functions, 'validateSeedOriginCallable');
+            for (let s of uncachedSeeds) {
+              if (validationRunIdRef.current !== currentRunId) return;
+              try {
+                const result = await validate({
+                  seed: s.query,
+                  curationSessionId: curationSessionIdRef.current || undefined,
+                  mode: 'initial_preflight',
+                  expectedProjectCost: projectTokenCost,
+                });
+                if (validationRunIdRef.current !== currentRunId) return;
+                const data = result.data as any;
+                if (data && data.isValid) {
+                  let isAmbiguous = false;
+                  let candidates = undefined;
+                  let selectedCandidateId = undefined;
+                  let candidateId = undefined;
+                  let predictedOrigin = data.origin || '';
+                  let genre = data.genre || '';
+                  let isCorrected = false;
+                  let correctedQuery = undefined;
+                  let originalQuery = undefined;
+                  let isKnownCacheHit = false;
+
+                  if (data.hasCollision && Array.isArray(data.candidates) && data.candidates.length > 1) {
+                    isAmbiguous = true;
+                    candidates = data.candidates;
+                    selectedCandidateId = data.candidates[0].id;
+                    candidateId = data.candidates[0].id;
+                    predictedOrigin = data.candidates[0].origin || '';
+                    genre = data.candidates[0].genre || '';
+                  } else if (data.candidates && data.candidates.length === 1) {
+                    candidateId = data.candidates[0].id;
                   }
-                }
-                
-                if (data.correctedInput && data.id && data.id !== s.query) {
-                  s.isCorrected = true;
-                  s.correctedQuery = data.id;
-                  s.originalQuery = s.query;
-                  
-                  if (!s.isAmbiguous) {
-                    const interceptCandidates = await searchDisambiguationCandidates(data.id);
-                    if (interceptCandidates.length > 0) {
-                      s.predictedOrigin = interceptCandidates[0].origin || s.predictedOrigin;
-                      s.genre = interceptCandidates[0].genre || s.genre;
-                      s.isKnownCacheHit = true;
-                      s.candidateId = interceptCandidates[0].id;
+
+                  if (data.correctedInput && data.id && data.id !== s.query) {
+                    s.isCorrected = true;
+                    correctedQuery = data.id;
+                    originalQuery = s.query;
+
+                    if (!isAmbiguous) {
+                      const interceptCandidates = await searchDisambiguationCandidates(data.id);
+                      if (interceptCandidates.length > 0) {
+                        predictedOrigin = interceptCandidates[0].origin || predictedOrigin;
+                        genre = interceptCandidates[0].genre || genre;
+                        isKnownCacheHit = true;
+                        candidateId = interceptCandidates[0].id;
+                      }
                     }
                   }
+
+                  const updatedSeed: PreFlightSeed = {
+                    ...s,
+                    isVerifyingOrigin: false,
+                    predictedOrigin,
+                    genre,
+                    isAmbiguous,
+                    candidates,
+                    selectedCandidateId,
+                    candidateId,
+                    isCorrected,
+                    correctedQuery,
+                    originalQuery,
+                    isKnownCacheHit,
+                  };
+
+                  const idx = cacheCandidatesPerSeed.findIndex(item => item.id === s.id);
+                  if (idx !== -1) cacheCandidatesPerSeed[idx] = updatedSeed;
+
+                  setConsolidatedValidationDialog(prev => {
+                    if (!prev || validationRunIdRef.current !== currentRunId) return prev;
+                    return {
+                      ...prev,
+                      seeds: prev.seeds.map(item => item.id === s.id ? updatedSeed : item)
+                    };
+                  });
+                } else {
+                  const updatedSeed: PreFlightSeed = {
+                    ...s,
+                    isVerifyingOrigin: false,
+                    predictedOrigin: '',
+                    genre: ''
+                  };
+                  const idx = cacheCandidatesPerSeed.findIndex(item => item.id === s.id);
+                  if (idx !== -1) cacheCandidatesPerSeed[idx] = updatedSeed;
+
+                  setConsolidatedValidationDialog(prev => {
+                    if (!prev || validationRunIdRef.current !== currentRunId) return prev;
+                    return {
+                      ...prev,
+                      seeds: prev.seeds.map(item => item.id === s.id ? updatedSeed : item)
+                    };
+                  });
                 }
-              }
-            } catch (e: any) {
-              console.warn("Origin validation failed for " + s.query + ":", e);
-              if (e?.message?.includes('INSUFFICIENT_TOKENS')) {
-                showToast('Please top up your Zcene wallet to continue.');
-                resetAbortedPreFlightState();
-                return;
+              } catch (e: any) {
+                console.warn("Origin validation failed for " + s.query + ":", e);
+                if (validationRunIdRef.current !== currentRunId) return;
+                if (e?.message?.includes('INSUFFICIENT_TOKENS')) {
+                  showToast('Please top up your Zcene wallet to continue.');
+                  validationRunIdRef.current++;
+                  setConsolidatedValidationDialog(null);
+                  setIsPreFlightChecking(false);
+                  resetAbortedPreFlightState();
+                  return;
+                }
+                const updatedSeed: PreFlightSeed = {
+                  ...s,
+                  isVerifyingOrigin: false,
+                  predictedOrigin: '',
+                  genre: ''
+                };
+                const idx = cacheCandidatesPerSeed.findIndex(item => item.id === s.id);
+                if (idx !== -1) cacheCandidatesPerSeed[idx] = updatedSeed;
+
+                setConsolidatedValidationDialog(prev => {
+                  if (!prev || validationRunIdRef.current !== currentRunId) return prev;
+                  return {
+                    ...prev,
+                    seeds: prev.seeds.map(item => item.id === s.id ? updatedSeed : item)
+                  };
+                });
               }
             }
-          }
+          })();
         }
+
+        const confirmed = await new Promise<boolean>((resolve) => {
+          setConsolidatedValidationDialog({
+            isOpen: true,
+            seeds: initialModalSeeds,
+            onConfirm: (updatedSeeds) => {
+              if (updatedSeeds) {
+                for (let idx = 0; idx < updatedSeeds.length; idx++) {
+                  cacheCandidatesPerSeed[idx] = updatedSeeds[idx];
+                }
+              }
+              setConsolidatedValidationDialog(null);
+              resolve(true);
+            },
+            onCancel: () => {
+              validationRunIdRef.current++;
+              setConsolidatedValidationDialog(null);
+              resolve(false);
+            }
+          });
+        });
+
+        setIsPreFlightChecking(false);
+
+        if (!confirmed) {
+          // Rule 43: On Box 4 Cancel, 0T spent if cached; non-refundable 1T Flash fee retained if Flash ran.
+          resetAbortedPreFlightState();
+          return;
+        }
+
+        // Only after user clicks Confirm & Generate: flip to CONNECTIONS on mobile & start full loader
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('switch-to-connections-tab'));
+        }
+        isHydratingSessionRef.current = true;
+        isProjectLoadingRef.current = true;
+        setIsLoading(true);
+        projectStatusRef.current = 'curating';
+        setProjectStatus('curating');
       }
 
       // Secondary safeguard for bypassDisambiguation=true callers that didn't yet confirm tokens
@@ -4100,32 +4228,6 @@ const App: React.FC = () => {
             return;
           }
           sessionTokenApprovedRef.current = true;
-      }
-
-      // Box 4: Visual Confirmation (ConsolidatedValidationModal)
-      if (!bypassDisambiguation && cacheCandidatesPerSeed.length > 0) {
-          const confirmed = await new Promise<boolean>((resolve) => {
-            setConsolidatedValidationDialog({
-              isOpen: true,
-              seeds: cacheCandidatesPerSeed,
-              onConfirm: (updatedSeeds) => {
-                if (updatedSeeds) {
-                  for (let idx = 0; idx < updatedSeeds.length; idx++) {
-                    cacheCandidatesPerSeed[idx] = updatedSeeds[idx];
-                  }
-                }
-                setConsolidatedValidationDialog(null);
-                resolve(true);
-              },
-              onCancel: () => { setConsolidatedValidationDialog(null); resolve(false); }
-            });
-          });
-
-          if (!confirmed) {
-            // Rule 43: On Box 4 Cancel, 0T spent if cached; non-refundable 1T Flash fee retained if Flash ran.
-            resetAbortedPreFlightState();
-            return;
-          }
       }
 
 
@@ -6692,7 +6794,11 @@ const App: React.FC = () => {
         // from scenes[]/graphData and NEVER fall through to legacy Phase 1 artistIds hydration.
         const curatingWithSettledScenes =
           incomingStatus === 'curating' &&
-          (scenesRef.current || []).some(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+          (scenesRef.current || []).some(
+            s => (s.sceneId || s.id) !== data.activeSceneId &&
+                 s.status === 'completed' &&
+                 s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+          );
 
         const populatedScenesFromDoc = (scenesRef.current || []).filter(
           s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
@@ -6787,12 +6893,14 @@ const App: React.FC = () => {
             const isInitialHydration = isProjectLoadingRef.current;
             if (isInitialHydration) setIsLoading(true);
             try {
-              await batchHydrateDetailsCache(g.nodes, g.links);
+              if (incomingStatus !== 'curating') {
+                await batchHydrateDetailsCache(g.nodes, g.links);
+              }
             } finally {
               // Keep the mapping loader up while another scene is still curating.
               if (isInitialHydration && incomingStatus !== 'curating') setIsLoading(false);
             }
-            hydratedNodes = g.nodes;
+            hydratedNodes = incomingStatus === 'completed' ? g.nodes : [];
 
             // Restore active nodes — with fallback for stale documents where activeNodes was empty
             if (data.activeNodes && Array.isArray(data.activeNodes) && data.activeNodes.length > 0) {
@@ -7061,7 +7169,7 @@ const App: React.FC = () => {
         }
 
         // Deterministic seed selection for Deep Cut routing on project load
-        if (hydratedNodes.length > 0) {
+        if (hydratedNodes.length > 0 && incomingStatus === 'completed') {
           const searchParams = new URLSearchParams(window.location.search);
           const urlSelected = searchParams.get('selected');
           if (!urlSelected && hasAutoSelectedRef.current !== currentProjectId) {
@@ -7928,6 +8036,10 @@ const App: React.FC = () => {
     healedDetailsCacheRef.current.delete(nodeId.toLowerCase());
     healedDetailsCacheRef.current.delete(cacheId);
 
+    attemptedMissIdsRef.current.delete(nodeId);
+    attemptedMissIdsRef.current.delete(nodeId.toLowerCase());
+    attemptedMissIdsRef.current.delete(cacheId);
+
     // 2. Clear bio/details from selectedNode so that the details queue runs and does not hit hasHydratedBio
     setSelectedNode(prev => {
       if (prev && (normalizeArtistId(prev.id) === cacheId || prev.id.toLowerCase() === nodeId.toLowerCase())) {
@@ -8142,11 +8254,28 @@ const App: React.FC = () => {
   useEffect(() => {
     isFetchingDetailsRef.current = false;
     fetchingNodeIdsRef.current.clear();
+    attemptedMissIdsRef.current.clear();
     setLoadingNodeIds(new Set());
   }, [currentProjectId]);
 
   useEffect(() => {
-    if (isLoading || isProjectLoadingRef.current || isViewingShare) return;
+    if (projectStatus === 'completed') {
+      attemptedMissIdsRef.current.clear();
+    }
+  }, [projectStatus]);
+
+  useEffect(() => {
+    if (
+      isLoading ||
+      isProjectLoadingRef.current ||
+      isViewingShare ||
+      projectStatus === 'curating' ||
+      projectStatusRef.current === 'curating' ||
+      Boolean(activeJobId) ||
+      Boolean(activeJobIdRef.current)
+    ) {
+      return;
+    }
     const fetch = async () => {
       // 1. Block Automated Background Fetches: ✦
       // ONLY process the actively selected node to prevent neighbor chain-fetching
@@ -8230,7 +8359,14 @@ const App: React.FC = () => {
                          detailsCache.has(disambiguatedCacheId) || 
                          (detailsCache.has(n.id.toLowerCase()) && !isSimpleKeyMismatched);
 
+        const isAttemptedMiss =
+          attemptedMissIdsRef.current.has(n.id) ||
+          attemptedMissIdsRef.current.has(n.id.toLowerCase()) ||
+          attemptedMissIdsRef.current.has(simpleId) ||
+          attemptedMissIdsRef.current.has(disambiguatedCacheId);
+
         return !isLocked &&
+               !isAttemptedMiss &&
                (!isCached || isCorruptOrStale) &&
                !hasBeenHealed &&
                !fetchingNodeIdsRef.current.has(n.id) &&
@@ -8277,6 +8413,14 @@ const App: React.FC = () => {
           const isCached = detailsCache.has(node.id) || detailsCache.has(node.id.toLowerCase()) || detailsCache.has(disambiguatedCacheId);
 
           if (isCached && !isCorruptOrStale) continue;
+          if (
+            attemptedMissIdsRef.current.has(node.id) ||
+            attemptedMissIdsRef.current.has(node.id.toLowerCase()) ||
+            attemptedMissIdsRef.current.has(disambiguatedCacheId) ||
+            attemptedMissIdsRef.current.has(simpleId)
+          ) {
+            continue;
+          }
           if (fetchingNodeIdsRef.current.has(node.id)) continue;
 
           fetchingNodeIdsRef.current.add(node.id);
@@ -8408,6 +8552,10 @@ const App: React.FC = () => {
                      triggerBackgroundRevalidation(node, disambiguatedCacheId);
                    } else {
                      console.log(`[Queue] Node ${node.id} requires synthesis. The background queue does not perform automated live synthesis. Skipping API fetch.`);
+                     attemptedMissIdsRef.current.add(node.id);
+                     attemptedMissIdsRef.current.add(node.id.toLowerCase());
+                     attemptedMissIdsRef.current.add(disambiguatedCacheId);
+                     attemptedMissIdsRef.current.add(simpleId);
                    }
                    fetchingNodeIdsRef.current.delete(node.id);
                    fetchingNodeIdsRef.current.delete(node.id.toLowerCase());
@@ -8496,17 +8644,11 @@ const App: React.FC = () => {
 
                 incrementDeepCutsOpenedCount();
 
-                // Fix 3: Race-safe details write-back.
-                // Previously guarded by `if (!fallbackDetails)`, which caused the write to be skipped
-                // entirely when the queue read a stale-but-undeletable document (delete is admin-only).
-                // Fix: always attempt updateDoc when the doc exists, so cachedAt is refreshed
-                // regardless of whether the data came from a live Gemini call or the Firestore fallback.
-                // JIT creation (setDoc) is only attempted when the document does not yet exist.
+                // Local state reconciliation for aliases and selected node metadata.
+                // Global collections (/artists, /labels) are server-write-only (Rule 19 & Rule 40).
                 {
                   const cacheId = disambiguatedCacheId;
                   try {
-                    const existingSnap = await getArtistDocWithRedirect(cacheId);
-                    
                     const canonicalNameFromDetails = details.details?.artist;
                     
                     const freshCountries = connectedCountries.length > 0 
@@ -8564,124 +8706,8 @@ const App: React.FC = () => {
                       }
                       return prev;
                     });
-
-                    const simpleArtistId = normalizeArtistId(stripSceneNamespace(node.canonicalId || node.id));
-
-                    let targetDocId = cacheId;
-                    let docExists = existingSnap.exists();
-
-                    const collName = node.type === 'label' ? 'labels' : 'artists';
-                    // If we have a disambiguated ID (e.g. "needtobreathe-united-states"), we should check if
-                    // there is an existing legacy or simple record at "needtobreathe" and merge it.
-                    if (cacheId !== simpleArtistId) {
-                      try {
-                        const simpleDocRef = doc(db, collName, simpleArtistId);
-                        const simpleSnap = await getDoc(simpleDocRef);
-                        if (simpleSnap.exists()) {
-                          const simpleData = simpleSnap.data();
-                          if (simpleData && !simpleData.redirectTo) {
-                            console.log(`[Reconciliation] Found legacy base document for "${simpleArtistId}". Merging into "${cacheId}".`);
-                            // Merge detailsCache from base doc if we don't have fallbackDetails already
-                            if (simpleData.detailsCache && !fallbackDetails) {
-                              try {
-                                const parsed = parseDetailsCacheSafely(simpleData.detailsCache);
-                                if (parsed && (parsed.bio || parsed.summary)) {
-                                  fallbackDetails = {
-                                    summary: parsed.summary || parsed.bio || "",
-                                    imageUrl: parsed.imageUrl || "",
-                                    details: parsed.details || { genre: "", style: "", origin: "", founded: "", notableArtists: [] },
-                                    members: parsed.members || [],
-                                    links: parsed.links || [],
-                                    discography: parsed.discography || [],
-                                    tourInfo: parsed.tourInfo || "",
-                                    recommendationReason: parsed.recommendationReason || "",
-                                    groundingLinks: parsed.groundingLinks || [],
-                                    youtubeVideoId: parsed.youtubeVideoId || null,
-                                    youtubeSearchQuery: typeof parsed.youtubeSearchQuery === 'string' && parsed.youtubeSearchQuery.trim()
-                                      ? parsed.youtubeSearchQuery.trim()
-                                      : `${parsed.details?.artist || ''} ${parsed.details?.genre || ''} official music video`.trim(),
-                                    itunesArtistId: parsed?.itunesArtistId ? Number(parsed.itunesArtistId) : undefined,
-                                    previewUrl: typeof parsed?.previewUrl === 'string' && parsed.previewUrl.trim().length > 0 ? parsed.previewUrl.trim() : undefined,
-                                    previewTrackName: typeof parsed?.previewTrackName === 'string' && parsed.previewTrackName.trim().length > 0 ? parsed.previewTrackName.trim() : undefined
-                                  };
-                                  details = fallbackDetails;
-                                  console.log(`[Reconciliation] Merging detailsCache from legacy base doc.`);
-                                }
-                              } catch (pe) {
-                                console.warn("Failed parsing legacy detailsCache during merge", pe);
-                              }
-                            }
-                            
-                            // Convert the base document into a redirect to the disambiguated document
-                            await setDoc(simpleDocRef, stripUndefinedProperties({
-                              artistId: simpleArtistId,
-                              cacheKey: simpleArtistId,
-                              redirectTo: cacheId,
-                              cacheVersion: 4,
-                              createdAt: serverTimestamp(),
-                              updatedAt: serverTimestamp()
-                            }));
-                            console.log(`[Reconciliation] Converted base document "${simpleArtistId}" into a redirect to "${cacheId}".`);
-                          }
-                        }
-                      } catch (err) {
-                        console.warn("[Reconciliation] Failed base document check/migration:", err);
-                      }
-                    }
-
-                    if (docExists) {
-                      const updatePayload = {
-                        detailsCache: details,
-                        updatedAt: serverTimestamp(),
-                        synthesisRationale: details.synthesisRationale || null
-                      };
-                      enforceArtistCacheSchema(updatePayload);
-                      await updateDoc(doc(db, collName, targetDocId), stripUndefinedProperties(updatePayload));
-                      console.log(`[Deep Cut Queue] Write-back: Successfully updated detailsCache + cachedAt for: ${targetDocId}`);
-                    } else if (!fallbackDetails) {
-                      const normalizedGraph = normalizeGraphData(graphData);
-                      const canonicalNode = normalizedGraph.nodes.find(
-                        n => (n.type === 'artist' || n.type === 'label') && (n.id.trim().toLowerCase() === node.id.trim().toLowerCase() || normalizeArtistId(n.id) === targetDocId)
-                      );
-                      const canonicalName = canonicalNode?.label ?? canonicalNode?.id ?? node.id;
-
-                      const setPayload = {
-                        cacheKey: targetDocId,
-                        artistId: simpleArtistId,
-                        seedArtists: canonicalNameFromDetails || canonicalName,
-                        graphData: JSON.stringify(normalizedGraph),
-                        filters: discoveryFiltersRef.current || {},
-                        cacheVersion: 4,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp(),
-                        hitCount: 0,
-                        isDeep: true,
-                        detailsCache: details,
-                        synthesisRationale: details.synthesisRationale || null
-                      };
-                      enforceArtistCacheSchema(setPayload);
-                      await setDoc(doc(db, collName, targetDocId), stripUndefinedProperties(setPayload));
-                      console.log(`[Deep Cut Queue] JIT cached Canonical node (full context): ${targetDocId}`);
-                    }
-                      
-                    if (isAlias) {
-                      const aliasDocRef = doc(db, collName, cacheId);
-                      await setDoc(aliasDocRef, stripUndefinedProperties({
-                        cacheKey: cacheId,
-                        artistId: cacheId,
-                        redirectTo: canonicalId,
-                        cacheVersion: 4,
-                        createdAt: serverTimestamp(),
-                        updatedAt: serverTimestamp()
-                      }));
-                      console.log(`[Deep Cut Queue] Created Alias Redirect: ${cacheId} -> ${canonicalId}`);
-                    }
                   } catch (e: any) {
-                    console.error(
-                        `[PERMISSIONS] write-back failed for artists/${cacheId}:`,
-                        `code=${(e as any)?.code}`,
-                        `message=${e.message}`
-                    );
+                    console.warn(`[Deep Cut Queue] Alias reconciliation failed for ${cacheId}:`, e);
                   }
                 }
 
@@ -9207,6 +9233,7 @@ const App: React.FC = () => {
                 handleGenerateGraph(n, false, null);
               }}
               isLoading={isLoading || isCurrentlyCurating} isHydrating={isProjectLoadingRef.current || (isCurrentlyCurating && !!activeJobId)}
+              isPreFlightChecking={isPreFlightChecking}
               onCancelGeneration={handleCancel} onFileUpload={(f) => {
                 const r = new FileReader(); r.onload = (e) => {
                   const t = e.target?.result as string;

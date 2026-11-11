@@ -2041,6 +2041,8 @@ export interface PreFlightSeed {
   isAmbiguous?: boolean;
   candidates?: DisambiguationCandidateStub[];
   selectedCandidateId?: string;
+  /** True while background origin validation is running for uncached seeds inside ConsolidatedValidationModal */
+  isVerifyingOrigin?: boolean;
 }
 
 export interface DisambiguationRadioProps {
@@ -2294,14 +2296,19 @@ export function ConsolidatedValidationModal({
     </div>
   );
 
+  const hasVerifyingSeeds = localSeeds.some(seed => seed.isVerifyingOrigin);
+
   const hasInvalidSeeds = localSeeds.some(seed => {
+    if (seed.isVerifyingOrigin) {
+      return true;
+    }
     if (seed.isAmbiguous) {
       return !seed.selectedCandidateId;
     }
     return !seed.predictedOrigin || seed.predictedOrigin.trim() === '' || seed.predictedOrigin === 'Unknown Origin';
   });
 
-  const isConfirmDisabled = hasInvalidSeeds || !!editingSeedId || isVerifying || isSubmitting;
+  const isConfirmDisabled = hasInvalidSeeds || hasVerifyingSeeds || !!editingSeedId || isVerifying || isSubmitting;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2334,7 +2341,9 @@ export function ConsolidatedValidationModal({
           </ModalHeader>
           <ModalBody className="p-5 flex flex-col gap-4 !overflow-visible max-h-[70vh] overflow-y-auto">
             <p className="text-sm font-light text-zinc-400 leading-relaxed">
-              Please verify the regional origins and exact acts for your selected artists.
+              {hasVerifyingSeeds
+                ? "Verifying your selected artists... You will confirm in a moment."
+                : "Please verify the regional origins and exact acts for your selected artists."}
             </p>
             <div className="flex flex-col gap-4">
               {localSeeds.map(seed => {
@@ -2397,7 +2406,12 @@ export function ConsolidatedValidationModal({
                         )}
                       </div>
                       
-                      {!isEditing ? (
+                      {seed.isVerifyingOrigin ? (
+                        <div className="flex items-center gap-1.5 mt-1.5 text-xs text-zinc-400 font-light">
+                          <span className="material-symbols-outlined !text-[13px] animate-spin text-amber-500">progress_activity</span>
+                          <span>Searching artist origin & genre...</span>
+                        </div>
+                      ) : !isEditing ? (
                         <>
                           <span data-testid="validation-origin-text" className="text-xs text-zinc-400 font-light truncate mt-0.5">
                             {seed.predictedOrigin || 'Unknown Origin'}{seed.genre ? ` • ${seed.genre}` : ''}
@@ -2426,7 +2440,7 @@ export function ConsolidatedValidationModal({
                       )}
                     </div>
 
-                    {(!seed.predictedOrigin || seed.predictedOrigin.trim() === '') && !isEditing && (
+                    {(!seed.predictedOrigin || seed.predictedOrigin.trim() === '') && !isEditing && !seed.isVerifyingOrigin && (
                       <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-2.5 mt-1 flex items-start gap-2">
                         <span className="material-symbols-outlined text-amber-500 !text-[16px] mt-0.5">warning</span>
                         <p className="text-xs text-amber-200/90 leading-relaxed">
@@ -2458,6 +2472,11 @@ export function ConsolidatedValidationModal({
                 <>
                   <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
                   <span>Generating...</span>
+                </>
+              ) : hasVerifyingSeeds ? (
+                <>
+                  <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
+                  <span>Verifying Artists...</span>
                 </>
               ) : (
                 <span>Confirm & Generate</span>

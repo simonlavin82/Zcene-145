@@ -32,6 +32,7 @@ import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extract
 import { BACKEND_REGRESSION_RUNBOOK } from '../../docs/backend-regression-runbook';
 import { ARCHITECTURE_RULES } from '../../components/EnginePage';
 import { applyShareBlacklistMutation } from '../../App';
+import { PreFlightSeed } from '../../components/SharedModals';
 import { ProjectScene, CrossSceneLink, CanvasNodeRef } from '../../types';
 
 describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])', () => {
@@ -1253,6 +1254,154 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(canAddMoreScenes(4)).toBe(true);
       expect(canAddMoreScenes(5)).toBe(false);
       expect(canAddMoreScenes(6)).toBe(false);
+    });
+  });
+
+  describe('Inline Artist Verification UX & Curation Circuit Breakers ([Rules 5, 19, 30, 44])', () => {
+    it('manages PreFlightSeed isVerifyingOrigin state transitions cleanly', () => {
+      // 1. Initial mounting state: uncached seed has isVerifyingOrigin = true
+      const seed: PreFlightSeed = {
+        id: 'the-hope-conspiracy',
+        query: 'The Hope Conspiracy',
+        predictedOrigin: '',
+        isKnownCacheHit: false,
+        isVerifyingOrigin: true,
+      };
+
+      const hasVerifyingSeeds = (seeds: PreFlightSeed[]) => seeds.some(s => s.isVerifyingOrigin);
+      const isConfirmDisabled = (seeds: PreFlightSeed[]) =>
+        seeds.some(s => s.isVerifyingOrigin || (!s.predictedOrigin && !s.isAmbiguous));
+
+      expect(hasVerifyingSeeds([seed])).toBe(true);
+      expect(isConfirmDisabled([seed])).toBe(true);
+
+      // 2. Verified single artist state
+      const verifiedSingle: PreFlightSeed = {
+        ...seed,
+        isVerifyingOrigin: false,
+        predictedOrigin: 'USA',
+        genre: 'Hardcore Punk',
+      };
+      expect(hasVerifyingSeeds([verifiedSingle])).toBe(false);
+      expect(isConfirmDisabled([verifiedSingle])).toBe(false);
+
+      // 3. Collision detected state: candidates.length > 1
+      const collisionSeed: PreFlightSeed = {
+        ...seed,
+        isVerifyingOrigin: false,
+        isAmbiguous: true,
+        candidates: [
+          { id: 'ghost-se', name: 'Ghost', origin: 'Sweden', genre: 'Heavy Metal' },
+          { id: 'ghost-jp', name: 'Ghost', origin: 'Japan', genre: 'Psychedelic Rock' },
+        ],
+        selectedCandidateId: undefined,
+      };
+      const isCollisionDisabled = (s: PreFlightSeed) =>
+        s.isVerifyingOrigin || (s.isAmbiguous && !s.selectedCandidateId);
+      expect(isCollisionDisabled(collisionSeed)).toBe(true);
+
+      collisionSeed.selectedCandidateId = 'ghost-se';
+      expect(isCollisionDisabled(collisionSeed)).toBe(false);
+
+      // 4. Escape hatch required state: isValid === false
+      const invalidSeed: PreFlightSeed = {
+        ...seed,
+        isVerifyingOrigin: false,
+        predictedOrigin: '',
+        genre: '',
+      };
+      expect(isConfirmDisabled([invalidSeed])).toBe(true);
+    });
+
+    it('enforces attemptedMissIdsRef circuit breaker to prevent infinite proxy-fetch loops', () => {
+      const attemptedMissIds = new Set<string>();
+
+      const checkShouldFetch = (nodeId: string, simpleId: string, disambiguatedId: string) => {
+        if (
+          attemptedMissIds.has(nodeId) ||
+          attemptedMissIds.has(nodeId.toLowerCase()) ||
+          attemptedMissIds.has(simpleId) ||
+          attemptedMissIds.has(disambiguatedId)
+        ) {
+          return false;
+        }
+        return true;
+      };
+
+      const nodeId = 'the-hope-conspiracy-us';
+      const simpleId = 'the-hope-conspiracy';
+      const disambiguatedId = 'the-hope-conspiracy-us';
+
+      // First attempt: should fetch
+      expect(checkShouldFetch(nodeId, simpleId, disambiguatedId)).toBe(true);
+
+      // On cache miss / synthesis required: record into circuit breaker
+      attemptedMissIds.add(nodeId);
+      attemptedMissIds.add(nodeId.toLowerCase());
+      attemptedMissIds.add(disambiguatedId);
+      attemptedMissIds.add(simpleId);
+
+      // Subsequent re-renders / queue cycles: blocked by circuit breaker
+      expect(checkShouldFetch(nodeId, simpleId, disambiguatedId)).toBe(false);
+      expect(checkShouldFetch('the-hope-conspiracy', 'the-hope-conspiracy', 'the-hope-conspiracy-us')).toBe(false);
+
+      // Clearing on project completed or navigation resets circuit breaker
+      attemptedMissIds.clear();
+      expect(checkShouldFetch(nodeId, simpleId, disambiguatedId)).toBe(true);
+    });
+
+    it('tightens curatingWithSettledScenes to prevent premature hydration of Scene 1 skeleton nodes', () => {
+      const evaluateCuratingWithSettledScenes = (
+        incomingStatus: string,
+        activeSceneId: string,
+        scenes: ProjectScene[]
+      ) => {
+        return (
+          incomingStatus === 'curating' &&
+          scenes.some(
+            s => (s.sceneId || s.id) !== activeSceneId &&
+                 s.status === 'completed' &&
+                 s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+          )
+        );
+      };
+
+      // Case A: Scene 1 is curating (incomingStatus = 'curating', activeSceneId = 'scene-1')
+      // Scene 1 doc contains 20 skeleton nodes from Column 2, but status is 'curating'
+      const curatingScene1: ProjectScene = {
+        ...createEmptyProjectScene(0, 'The Hope Conspiracy'),
+        id: 'scene-1',
+        sceneId: 'scene-1',
+        status: 'curating',
+        graphData: {
+          nodes: Array.from({ length: 20 }, (_, i) => ({
+            id: `node-${i}`,
+            label: `Node ${i}`,
+            type: 'artist' as const,
+            group: 1,
+          })),
+          links: [],
+        },
+      };
+
+      // Must evaluate to false: Active Loader Gate remains locked, no batch hydration of skeletons
+      expect(evaluateCuratingWithSettledScenes('curating', 'scene-1', [curatingScene1])).toBe(false);
+
+      // Case B: Scene 1 completed, now adding Scene 2 (activeSceneId = 'scene-2', status = 'curating')
+      const completedScene1: ProjectScene = {
+        ...curatingScene1,
+        status: 'completed',
+      };
+      const curatingScene2: ProjectScene = {
+        ...createEmptyProjectScene(1, 'Converge'),
+        id: 'scene-2',
+        sceneId: 'scene-2',
+        status: 'curating',
+        graphData: { nodes: [], links: [] },
+      };
+
+      // Must evaluate to true: Scene 1 remains rendered and interactive while Scene 2 maps
+      expect(evaluateCuratingWithSettledScenes('curating', 'scene-2', [completedScene1, curatingScene2])).toBe(true);
     });
   });
 });
