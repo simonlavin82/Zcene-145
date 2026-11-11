@@ -2289,11 +2289,17 @@ export const processCurationJob = onDocumentCreated({
         const humanSeedList = artistList.map((a: string) => {
           const norm = normalizeArtistId(a);
           const canonical = resolvedSeedNormMap.get(norm) ?? norm;
+          const matchingNode = (finalGraph.nodes || []).find((n: any) =>
+            n && (n.id === a || n.id === canonical || n.id === norm || normalizeArtistId(n.id) === norm || (n.label && normalizeArtistId(n.label) === norm))
+          );
+          if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
+            const candidate = matchingNode.label.trim();
+            if (!candidate.includes('-us') && !candidate.includes('-gb')) {
+              return candidate;
+            }
+          }
           const nameFromMap = seedNamesMap[canonical] || seedNamesMap[norm];
           if (nameFromMap) return nameFromMap;
-          const matchingNode = (finalGraph.nodes || []).find((n: any) =>
-            n && (n.id === a || n.id === canonical || n.id === norm || normalizeArtistId(n.id) === norm)
-          );
           if (matchingNode && matchingNode.label) return matchingNode.label.trim();
           return stripCountrySlug(a);
         });

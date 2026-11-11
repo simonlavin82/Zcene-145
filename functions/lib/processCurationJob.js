@@ -2056,10 +2056,16 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 const humanSeedList = artistList.map((a) => {
                     const norm = (0, curatorService_1.normalizeArtistId)(a);
                     const canonical = resolvedSeedNormMap.get(norm) ?? norm;
+                    const matchingNode = (finalGraph.nodes || []).find((n) => n && (n.id === a || n.id === canonical || n.id === norm || (0, curatorService_1.normalizeArtistId)(n.id) === norm || (n.label && (0, curatorService_1.normalizeArtistId)(n.label) === norm)));
+                    if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
+                        const candidate = matchingNode.label.trim();
+                        if (!candidate.includes('-us') && !candidate.includes('-gb')) {
+                            return candidate;
+                        }
+                    }
                     const nameFromMap = seedNamesMap[canonical] || seedNamesMap[norm];
                     if (nameFromMap)
                         return nameFromMap;
-                    const matchingNode = (finalGraph.nodes || []).find((n) => n && (n.id === a || n.id === canonical || n.id === norm || (0, curatorService_1.normalizeArtistId)(n.id) === norm));
                     if (matchingNode && matchingNode.label)
                         return matchingNode.label.trim();
                     return (0, isoCountries_1.stripCountrySlug)(a);

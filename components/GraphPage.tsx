@@ -1801,6 +1801,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
     [isSceneCurated]
   );
 
+  // Step 1: Button wording gate. Once ANY scene across the project is mapped on canvas,
+  // the button wording becomes "Update Zcene" (or "Add & Update Zcene" / "Verifying...").
+  // "Create Zcene" appears only on a brand new project with 0 mapped scenes across all scenes.
+  const hasAnyMappedScene = useMemo(() => {
+    return data.nodes.length > 0 || scenes.some(s => (s.graphData?.nodes?.length ?? 0) > 0);
+  }, [data.nodes.length, scenes]);
+
   const handleApplyChanges = () => {
     if (!user) {
       onLogin();
@@ -2129,14 +2136,14 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const createButtonLabel = useMemo(() => {
     if (isPreFlightChecking) {
-      return hasExistingProjectGraph ? 'Verifying...' : 'Checking...';
+      return hasAnyMappedScene ? 'Verifying...' : 'Checking...';
     }
     const hasSearch = searchTerm.trim().length > 0;
     if (hasSearch) {
-        return hasExistingProjectGraph ? 'Add & Update Zcene' : 'Add & Create Zcene';
+        return hasAnyMappedScene ? 'Add & Update Zcene' : 'Add & Create Zcene';
     }
-    return hasExistingProjectGraph ? 'Update Zcene' : 'Create Zcene';
-  }, [searchTerm, hasExistingProjectGraph, isPreFlightChecking]);
+    return hasAnyMappedScene ? 'Update Zcene' : 'Create Zcene';
+  }, [searchTerm, hasAnyMappedScene, isPreFlightChecking]);
 
   const ArtistsPanelContent = (
     <div className="flex flex-col flex-1 bg-zinc-900 overflow-hidden relative">

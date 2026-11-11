@@ -1507,7 +1507,7 @@ export function generateProjectTitleFromScenes(
   const titleParts: string[] = [];
 
   for (const scene of scenes) {
-    const rawSeeds = toSeedArtistsArray(scene.seedArtists);
+    const rawSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
     for (const seed of rawSeeds) {
       if (!seed || typeof seed !== 'string') continue;
       const strippedSeed = stripSceneNamespace(seed).trim();
@@ -1523,13 +1523,40 @@ export function generateProjectTitleFromScenes(
       if (!canonNorm || seenCanonicalIds.has(canonNorm)) continue;
       seenCanonicalIds.add(canonNorm);
 
-      // Attempt to resolve display name from detailsCache
       let displayName: string | null = null;
-      if (cacheMap) {
-        const entry = cacheMap.get(strippedSeed) ||
-                      cacheMap.get(canonNorm) ||
-                      cacheMap.get(strippedSeed.toLowerCase()) ||
-                      cacheMap.get(bareSlug);
+
+      // 1. Check scene graphData.nodes for matching root artist node
+      const sceneNodes = scene.graphData?.nodes || [];
+      const matchingNode = sceneNodes.find((n: any) => {
+        if (!n || n.type === 'label') return false;
+        const nNorm = normalizeCanonicalEntityId(n.canonicalId || n.id);
+        const nLabelNorm = n.label ? normalizeCanonicalEntityId(n.label) : '';
+        const bareNode = stripCountrySlug(nNorm);
+        return nNorm === canonNorm || nLabelNorm === canonNorm || bareNode === canonNorm;
+      });
+      if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
+        const candidateLabel = matchingNode.label.trim();
+        // Ensure it's not a raw country-suffixed slug
+        if (!candidateLabel.includes('-us') && !candidateLabel.includes('-gb')) {
+          displayName = candidateLabel;
+        }
+      }
+
+      // 2. Attempt to resolve display name from detailsCache
+      if (!displayName && cacheMap) {
+        let entry = cacheMap.get(strippedSeed) ||
+                    cacheMap.get(canonNorm) ||
+                    cacheMap.get(strippedSeed.toLowerCase()) ||
+                    cacheMap.get(bareSlug);
+        if (!entry) {
+          for (const [k, v] of cacheMap.entries()) {
+            const strippedK = stripCountrySlug(normalizeCanonicalEntityId(k));
+            if (strippedK === canonNorm) {
+              entry = v;
+              break;
+            }
+          }
+        }
         if (entry) {
           displayName = entry.details?.artist || entry.artist || entry.name || entry.title || null;
         }

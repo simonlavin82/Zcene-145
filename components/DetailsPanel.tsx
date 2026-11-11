@@ -2700,33 +2700,33 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         <div className="relative flex items-center overflow-hidden w-full h-6 max-w-[240px] lg:max-w-[280px]">
                                             <div 
                                                 ref={trackRef}
-                                                className={`flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full px-1 ${
-                                                    filteredAndSortedNodes.length > 18 ? 'justify-start' : 'justify-center'
-                                                }`}
+                                                className="relative flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full"
                                             >
-                                                {filteredAndSortedNodes.map((node, i) => {
-                                                    const isLoading = loadingNodeIds.has(node.id) || jitLoadingIds.has(normalizeArtistId(node.id));
-                                                    const isActive = i === viewedIndex;
-                                                    return (
-                                                        <div 
-                                                            key={node.id}
-                                                            ref={isActive ? activeDotRef : null} 
-                                                            onClick={() => { setViewedIndex(i); onNodeClick(node, true); }}
-                                                            className="flex items-center justify-center h-full px-[2px] cursor-pointer group"
-                                                            title={`${node.type === 'label' ? cleanLabelDisplayName(node.label || node.id) : cleanArtistDisplayName(node.label || node.id)}${isLoading ? ' (Generating...)' : ''}`}
-                                                        >
+                                                <div className="flex items-center flex-nowrap m-auto px-1">
+                                                    {filteredAndSortedNodes.map((node, i) => {
+                                                        const isLoading = loadingNodeIds.has(node.id) || jitLoadingIds.has(normalizeArtistId(node.id));
+                                                        const isActive = i === viewedIndex;
+                                                        return (
                                                             <div 
-                                                                className={`transition-all flex-shrink-0 rounded-full ${
-                                                                    isActive 
-                                                                        ? 'w-4 h-1 bg-primary' 
-                                                                        : isLoading 
-                                                                            ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse' 
-                                                                            : 'w-1 h-1 bg-zinc-600 group-hover:bg-zinc-400'
-                                                                }`}
-                                                            />
-                                                        </div>
-                                                    );
-                                                })}
+                                                                key={node.id}
+                                                                ref={isActive ? activeDotRef : null} 
+                                                                onClick={() => { setViewedIndex(i); onNodeClick(node, true); }}
+                                                                className="flex items-center justify-center h-full px-[2px] cursor-pointer group"
+                                                                title={`${node.type === 'label' ? cleanLabelDisplayName(node.label || node.id) : cleanArtistDisplayName(node.label || node.id)}${isLoading ? ' (Generating...)' : ''}`}
+                                                            >
+                                                                <div 
+                                                                    className={`transition-all flex-shrink-0 rounded-full ${
+                                                                        isActive 
+                                                                            ? 'w-4 h-1 bg-primary' 
+                                                                            : isLoading 
+                                                                                ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse' 
+                                                                                : 'w-1 h-1 bg-zinc-600 group-hover:bg-zinc-400'
+                                                                    }`}
+                                                                />
+                                                            </div>
+                                                        );
+                                                    })}
+                                                </div>
                                             </div>
                                             
                                             {/* Gradient fades for the edges */}

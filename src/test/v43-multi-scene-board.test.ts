@@ -26,7 +26,7 @@ import {
   resolveSceneNodeOverlaps,
   MAX_SCENES_PER_PROJECT,
 } from '../../shared/multiSceneUtils';
-import { normalizeArtistId, stripCountrySlug } from '../../services/artistCacheService';
+import { normalizeArtistId, stripCountrySlug, cleanArtistDisplayName } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
 import { BACKEND_REGRESSION_RUNBOOK } from '../../docs/backend-regression-runbook';
@@ -1064,12 +1064,21 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(mockConnections[1].targetName).toBe('Sense Field');
     });
 
-    it('verifies pagination dot track switches alignment from justify-center to justify-start when nodes > 18 and clamps scrollTarget >= 0', () => {
-      const getAlignmentClass = (nodeCount: number) => (nodeCount > 18 ? 'justify-start' : 'justify-center');
-      expect(getAlignmentClass(12)).toBe('justify-center');
-      expect(getAlignmentClass(18)).toBe('justify-center');
-      expect(getAlignmentClass(19)).toBe('justify-start');
-      expect(getAlignmentClass(50)).toBe('justify-start');
+    it('verifies pagination dot track dynamic centering via m-auto and clamps scrollTarget >= 0', () => {
+      // Dynamic m-auto centering mechanics:
+      // When content width fits within container, auto margin centers dots.
+      // When content overflows, auto margin evaluates to 0, aligning flush without left clipping.
+      const computeDotMargins = (contentWidth: number, containerWidth: number) => {
+        const freeSpace = containerWidth - contentWidth;
+        return freeSpace > 0 ? freeSpace / 2 : 0;
+      };
+
+      // 21 items (~180px content in 240px container) -> centered with 30px auto margins
+      expect(computeDotMargins(180, 240)).toBe(30);
+      // 12 items (~100px content in 240px container) -> centered with 70px auto margins
+      expect(computeDotMargins(100, 240)).toBe(70);
+      // 58 items (~476px content in 240px container) -> auto margin collapses to 0 (flush left)
+      expect(computeDotMargins(476, 240)).toBe(0);
 
       // Clamping scrollTarget at >= 0 so dot 0 never scrolls negative
       const computeScrollTarget = (dotOffsetLeft: number, trackWidth: number, dotWidth: number) => {
@@ -2253,6 +2262,91 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
 
       // Curated project with nodes -> Allowed
       expect(shouldRunAutosave({ nodes: [{ id: 'ptw' }] }, [{ graphData: { nodes: [{ id: 'ptw' }] } }], 'completed')).toBe(true);
+    });
+
+    it('always shows Update Zcene button once >= 1 scene is mapped (hasAnyMappedScene)', () => {
+      const getCreateButtonLabel = (
+        hasAnyMappedScene: boolean,
+        hasSearch: boolean,
+        isPreFlightChecking: boolean
+      ) => {
+        if (isPreFlightChecking) {
+          return hasAnyMappedScene ? 'Verifying...' : 'Checking...';
+        }
+        if (hasSearch) {
+          return hasAnyMappedScene ? 'Add & Update Zcene' : 'Add & Create Zcene';
+        }
+        return hasAnyMappedScene ? 'Update Zcene' : 'Create Zcene';
+      };
+
+      // Brand new project: 0 nodes on canvas, 0 scenes mapped
+      expect(getCreateButtonLabel(false, false, false)).toBe('Create Zcene');
+      expect(getCreateButtonLabel(false, true, false)).toBe('Add & Create Zcene');
+      expect(getCreateButtonLabel(false, false, true)).toBe('Checking...');
+
+      // Project with Scene 1 mapped: active scene is uncurated Scene 2 (0 nodes)
+      // hasAnyMappedScene is true because Scene 1 has mapped nodes
+      expect(getCreateButtonLabel(true, false, false)).toBe('Update Zcene');
+      expect(getCreateButtonLabel(true, true, false)).toBe('Add & Update Zcene');
+      expect(getCreateButtonLabel(true, false, true)).toBe('Verifying...');
+    });
+
+    it('syncs canonical artist punctuation across multi-seed titles via cleanArtistDisplayName', () => {
+      const mockGraphNodes = [
+        { id: 'scene-1::poison-the-well-us', label: 'Poison The Well', type: 'artist' as const, group: 1 },
+        { id: 'scene-2::harms-way-us', label: "Harm's Way", type: 'artist' as const, group: 1 }
+      ];
+
+      // Unpunctuated user input "Harms Way" resolves to canonical "Harm's Way" against graphNodes
+      expect(cleanArtistDisplayName('Harms Way', mockGraphNodes)).toBe("Harm's Way");
+
+      // Composite multi-seed title "Poison The Well + Harms Way" splits and resolves canonical punctuation
+      expect(cleanArtistDisplayName('Poison The Well + Harms Way', mockGraphNodes)).toBe("Poison The Well + Harm's Way");
+
+      // Multi-scene 3-artist title with mixed punctuation
+      const mockThreeNodes = [
+        ...mockGraphNodes,
+        { id: 'scene-3::to-kill-it', label: 'To Kill', type: 'artist' as const, group: 1 }
+      ];
+      expect(cleanArtistDisplayName('Poison The Well + To Kill + Harms Way', mockThreeNodes)).toBe("Poison The Well + To Kill + Harm's Way");
+
+      // Non-delimiter band name with + (like +44) remains atomic
+      expect(cleanArtistDisplayName('+44', mockGraphNodes)).toBe('+44');
+
+      // Custom project title not matching artist nodes is preserved unchanged
+      expect(cleanArtistDisplayName('90s Hardcore Favorites', mockGraphNodes)).toBe('90s Hardcore Favorites');
+    });
+
+    it('generateProjectTitleFromScenes resolves canonical punctuation from scene.graphData.nodes', () => {
+      const scenes = [
+        normalizeProjectScene({
+          sceneIndex: 0,
+          title: 'Poison The Well',
+          seedArtists: 'Poison The Well',
+          curatedSeedArtists: 'Poison The Well',
+          graphData: {
+            nodes: [
+              { id: 'scene-1::poison-the-well-us', label: 'Poison The Well', type: 'artist', isSeed: true }
+            ],
+            links: []
+          }
+        }, 0),
+        normalizeProjectScene({
+          sceneIndex: 1,
+          title: 'Harms Way',
+          seedArtists: 'Harms Way',
+          curatedSeedArtists: '',
+          graphData: {
+            nodes: [
+              { id: 'scene-2::harms-way-us', label: "Harm's Way", type: 'artist', isSeed: true }
+            ],
+            links: []
+          }
+        }, 1)
+      ];
+
+      const generatedTitle = generateProjectTitleFromScenes(scenes);
+      expect(generatedTitle).toBe("Poison The Well + Harm's Way");
     });
   });
 });

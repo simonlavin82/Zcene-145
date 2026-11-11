@@ -2508,7 +2508,7 @@ const App: React.FC = () => {
 
   const displayProjectName = useMemo(() => {
     if (projectName && projectName.trim()) {
-      return projectName;
+      return cleanArtistDisplayName(projectName, graphData?.nodes);
     }
     const curatedScenes = scenes.filter(s => (s.graphData?.nodes?.length || 0) > 0);
     if (curatedScenes.length > 0) {

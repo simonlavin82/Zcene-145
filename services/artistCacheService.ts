@@ -271,9 +271,15 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
   const trimmed = rawIdOrName.trim();
   if (!trimmed) return '';
 
-  // Multi-seed / Composite Bypass: If this is a multi-seed or composite title (e.g. "Spaced + Buggin", "VOD +Will Haven"),
-  // return immediately to avoid incorrectly flattening or stripping country routing suffixes from custom composite names.
-  if (/\+/.test(trimmed)) return trimmed;
+  // Multi-seed / Composite: If this is a multi-seed or composite title (e.g. "Poison The Well + Harms Way", "VOD + Will Haven"),
+  // split on ' + ', clean each component against graphNodes, and re-join with ' + '.
+  // We require \s+\+\s+ so non-delimiter band names like "+44" remain atomic.
+  if (/\+/.test(trimmed)) {
+    const parts = trimmed.split(/\s+\+\s+/);
+    if (parts.length > 1 && parts.every(p => p.trim().length > 0)) {
+      return parts.map(p => cleanArtistDisplayName(p.trim(), graphNodes)).join(' + ');
+    }
+  }
 
 
   // 1. Strip hyphen/underscore country routing suffixes via the unified 249-country ISO registry
@@ -342,7 +348,7 @@ export const getProjectDisplayTitle = (
 ): string => {
   if (!project) return 'Untitled Zcene';
   if (project.name && project.name.trim()) {
-    return project.name.trim();
+    return cleanArtistDisplayName(project.name.trim(), graphNodes);
   }
   if (project.seedArtists) {
     const seeds = project.seedArtists.split('::').map(s => s.trim()).filter(Boolean);
