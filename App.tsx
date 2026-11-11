@@ -1790,10 +1790,13 @@ const App: React.FC = () => {
     const seedStr = toSeedArtistsString(targetScene.seedArtists);
     setSeedArtists(seedStr);
     seedArtistsRef.current = seedStr;
+    // Guardrail 3: lastAppliedFilters reflects target scene's curated baseline filters (or {} if uncurated)
+    const isTargetCurated = (targetScene.graphData?.nodes?.length ?? 0) > 0;
+    const targetCuratedFilters = targetScene.curatedDiscoveryFilters || (isTargetCurated ? targetScene.discoveryFilters : {});
     const nextFilters = targetScene.discoveryFilters || {};
     setDiscoveryFilters(nextFilters);
     discoveryFiltersRef.current = nextFilters;
-    setLastAppliedFilters(nextFilters);
+    setLastAppliedFilters(targetCuratedFilters || {});
   }, []);
 
   const handleAddScene = useCallback(() => {
@@ -3169,14 +3172,27 @@ const App: React.FC = () => {
 
     // Architecture V29 + V43.1: Seed Image URLs Resolution across ALL scenes' Root Artists.
     // Top-level `seedArtists` / `seedImageUrls` are project-scoped (every scene), while each
-    // ProjectScene.seedArtists stores only that scene's seeds. This prevents Scene 2 mapping
-    // from overwriting Scene 1's seeds or cover artwork.
+    // ProjectScene.seedArtists stores only that scene's seeds.
+    // Step 3 & Guardrail 1: Strictly aggregate top-level seeds from CURATED scenes ((s.graphData?.nodes?.length || 0) > 0)
+    // so uncurated draft scenes (Scene 2, Scene 3 with 0 nodes) never pollute top-level seedArtists or project title.
+    const curatedScenes = (scenesRef.current || []).filter(s => (s.graphData?.nodes?.length || 0) > 0);
     const allProjectSeedList: string[] = (() => {
       const byNorm = new Map<string, string>();
-      [...toSeedArtistsArray(getAllProjectSeedArtistsString(scenesRef.current)), ...seedList].forEach(name => {
-        const norm = normalizeArtistId(name);
-        if (norm && !byNorm.has(norm)) byNorm.set(norm, name);
-      });
+      if (curatedScenes.length > 0) {
+        curatedScenes.forEach(scene => {
+          const sceneSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+          sceneSeeds.forEach(name => {
+            const norm = normalizeArtistId(name);
+            if (norm && !byNorm.has(norm)) byNorm.set(norm, name);
+          });
+        });
+      } else {
+        // Pre-curation initial creation or single-scene legacy fallback
+        seedList.forEach(name => {
+          const norm = normalizeArtistId(name);
+          if (norm && !byNorm.has(norm)) byNorm.set(norm, name);
+        });
+      }
       return Array.from(byNorm.values());
     })();
     const extractedSeedImageUrls: (string | null)[] = resolveMultiSceneSeedImageUrls(
@@ -3217,8 +3233,8 @@ const App: React.FC = () => {
         .map((n: any) => normalizeLabelId(n.label || stripSceneNamespace(n.canonicalId || n.id)))
     ));
     const normalizedIds = seedList.map((name: string) => normalizeArtistId(name));
-    const allSeedIds = scenesRef.current.length > 0
-      ? Array.from(new Set(scenesRef.current.flatMap(s => s.seedArtistIds || (s.seedArtists || '').split('::').map(x => normalizeArtistId(x.trim())).filter(Boolean))))
+    const allSeedIds = curatedScenes.length > 0
+      ? Array.from(new Set(curatedScenes.flatMap(s => s.seedArtistIds || (s.curatedSeedArtists || s.seedArtists || '').split('::').map(x => normalizeArtistId(x.trim())).filter(Boolean))))
       : normalizedIds;
 
     // Rule 29 & 43 & 44: Server-owned telemetry and billing fields (generationType, apiUsage, deepWebApiUsage, anchorResolution, tokensSpent)
@@ -3226,7 +3242,7 @@ const App: React.FC = () => {
     const basePayload: Record<string, any> = {
       name: (projectName && projectName.trim()) 
         ? projectName 
-        : (actualDisplayName || (seedArtists ? seedList[0] : 'Untitled Zcene')),
+        : (actualDisplayName || (allProjectSeedList.length > 0 ? allProjectSeedList[0] : (seedArtists ? seedList[0] : 'Untitled Zcene'))),
       seedArtists: allProjectSeedList.length > 0 ? allProjectSeedList.join('::') : seedArtists,
       seedArtistIds: allSeedIds,
       activeNodes: hoistedSaveActiveNodes.map(id => stripSceneNamespace(id)),
@@ -3261,7 +3277,7 @@ const App: React.FC = () => {
     }
 
     return basePayload;
-  }, [graphData, seedArtists, activeNodeIds, pinnedNodes, chatHistories, discoveryFilters, lastViewedStackCount, projectName, detailsCache, user, currentCacheKey]);
+  }, [graphData, activeNodeIds, pinnedNodes, chatHistories, lastViewedStackCount, projectName, detailsCache, user, currentCacheKey]);
 
   const handleSaveToDashboard = useCallback(async () => {
     if (!user) {
@@ -3520,9 +3536,11 @@ const App: React.FC = () => {
       title: currentScenesList[targetSceneIdx]?.title || currentScenesList[targetSceneIdx]?.name || `Scene ${targetSceneIdx + 1}`,
       name: currentScenesList[targetSceneIdx]?.name || currentScenesList[targetSceneIdx]?.title || `Scene ${targetSceneIdx + 1}`,
       seedArtists: artistsString,
+      curatedSeedArtists: artistsString,
       seedIds: normSeedIds,
       seedArtistIds: normSeedIds,
       discoveryFilters: discoveryFiltersRef.current || {},
+      curatedDiscoveryFilters: discoveryFiltersRef.current || {},
       graphData: normalizedGraph,
       synthesisRationale: normalizedGraph.synthesisRationale || rationaleVal || '',
       activeNodes: sceneActiveNodeIds,
@@ -6742,7 +6760,9 @@ const App: React.FC = () => {
             }
             if (targetScene?.discoveryFilters) {
               setDiscoveryFilters((prev: any) => JSON.stringify(prev) === JSON.stringify(targetScene.discoveryFilters) ? prev : targetScene.discoveryFilters);
-              setLastAppliedFilters(targetScene.discoveryFilters);
+              const isTargetCurated = (targetScene.graphData?.nodes?.length ?? 0) > 0;
+              const targetCuratedFilters = targetScene.curatedDiscoveryFilters || (isTargetCurated ? targetScene.discoveryFilters : {});
+              setLastAppliedFilters(targetCuratedFilters || {});
             }
           }
         } catch (e) {
@@ -7572,7 +7592,7 @@ const App: React.FC = () => {
     }, 3000);
 
     return () => clearTimeout(timer);
-  }, [user, isFirebaseReady, isAuthInitialized, currentProjectId, graphData, seedArtists, discoveryFilters, activeNodes, isMagazineViewOpen, chatHistories, lastViewedStackCount, currentCacheKey, pinnedNodes, buildBaseProjectPayload, projectStatus]);
+  }, [user, isFirebaseReady, isAuthInitialized, currentProjectId, graphData, activeNodes, isMagazineViewOpen, chatHistories, lastViewedStackCount, currentCacheKey, pinnedNodes, buildBaseProjectPayload, projectStatus]);
 
   // Phase A — Coordinate Memory
   // Receives the settled artist/label canvas layout from MusicGraph.simulation.on("end")

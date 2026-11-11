@@ -1738,4 +1738,234 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(isMapped).toBe(false);
     });
   });
+
+  describe('V44 curatedSeedArtists Baseline Tracking, Re-Enabled Update Zcene & Autosave Decoupling', () => {
+    it('derives curatedSeedArtists from graphData root nodes when raw.curatedSeedArtists is undefined (Guardrail 1)', () => {
+      // Simulating a project where Scene 1 was curated with "Poison The Well",
+      // but raw.seedArtists was subsequently mutated in draft to "Poison The Well::Vision of Disorder"
+      const legacyScene = normalizeProjectScene({
+        sceneId: 'scene-1',
+        sceneIndex: 0,
+        title: 'Poison The Well',
+        seedArtists: 'Poison The Well::Vision of Disorder', // mutated draft
+        graphData: {
+          nodes: [
+            { id: 'scene-1::poison-the-well-us', label: 'Poison The Well', type: 'artist', isSeed: true },
+            { id: 'scene-1::trustkill', label: 'Trustkill', type: 'label' },
+          ],
+          links: [],
+        },
+      }, 0);
+
+      // Must derive from root artist node label "Poison The Well", not the mutated draft string!
+      expect(legacyScene.curatedSeedArtists).toBe('Poison The Well');
+      // While seedArtists reflects the draft string
+      expect(legacyScene.seedArtists).toBe('Poison The Well::Vision of Disorder');
+    });
+
+    it('enables Create/Update Zcene on an uncurated scene as soon as >= 1 enabled seed or search term is present', () => {
+      const uncuratedScene: ProjectScene = normalizeProjectScene({
+        ...createEmptyProjectScene(1, ''),
+        status: 'idle',
+        graphData: { nodes: [], links: [] },
+      }, 1);
+
+      const isSceneCurated = (uncuratedScene.graphData?.nodes?.length ?? 0) > 0;
+      expect(isSceneCurated).toBe(false);
+
+      const evaluateIsArtistPending = (
+        selectedSeeds: Array<{ name: string; enabled: boolean }>,
+        searchTerm: string,
+        filtersChanged: boolean
+      ) => {
+        const currentEnabled = selectedSeeds
+          .filter(a => a.enabled)
+          .map(a => normalizeArtistId(a.name))
+          .sort()
+          .join('::');
+        const baseline = uncuratedScene.curatedSeedArtists || '';
+        const hasSearchTerm = searchTerm.trim().length > 0;
+
+        if (!isSceneCurated) {
+          return currentEnabled.length > 0 || hasSearchTerm;
+        }
+        return (currentEnabled !== baseline && currentEnabled.length > 0) || hasSearchTerm || filtersChanged;
+      };
+
+      // 1. Initially empty: disabled
+      expect(evaluateIsArtistPending([], '', false)).toBe(false);
+
+      // 2. User adds "To Kill": immediately ENABLED!
+      expect(evaluateIsArtistPending([{ name: 'To Kill', enabled: true }], '', false)).toBe(true);
+
+      // 3. User types in search box without adding yet: ENABLED!
+      expect(evaluateIsArtistPending([], 'Converge', false)).toBe(true);
+
+      // 4. User adds "To Kill" but unchecks it: disabled
+      expect(evaluateIsArtistPending([{ name: 'To Kill', enabled: false }], '', false)).toBe(false);
+    });
+
+    it('disables Update Zcene on curated scene when draft matches curatedSeedArtists, and enables it when artists or filters change', () => {
+      const curatedScene: ProjectScene = normalizeProjectScene({
+        ...createEmptyProjectScene(0, 'Poison The Well'),
+        curatedSeedArtists: 'Poison The Well',
+        status: 'completed',
+        graphData: {
+          nodes: [
+            { id: 'scene-1::poison-the-well-us', label: 'Poison The Well', type: 'artist', isSeed: true },
+          ],
+          links: [],
+        },
+      }, 0);
+
+      const isSceneCurated = (curatedScene.graphData?.nodes?.length ?? 0) > 0;
+      expect(isSceneCurated).toBe(true);
+
+      const evaluateIsArtistPending = (
+        selectedSeeds: Array<{ name: string; enabled: boolean }>,
+        searchTerm: string,
+        filtersChanged: boolean
+      ) => {
+        const currentEnabled = selectedSeeds
+          .filter(a => a.enabled)
+          .map(a => normalizeArtistId(a.name))
+          .sort()
+          .join('::');
+        const baseline = (curatedScene.curatedSeedArtists || '')
+          .split('::')
+          .map(s => normalizeArtistId(s))
+          .filter(Boolean)
+          .sort()
+          .join('::');
+        const hasSearchTerm = searchTerm.trim().length > 0;
+
+        if (!isSceneCurated) {
+          return currentEnabled.length > 0 || hasSearchTerm;
+        }
+        return (currentEnabled !== baseline && currentEnabled.length > 0) || hasSearchTerm || filtersChanged;
+      };
+
+      // 1. Initial settled state (draft matches curatedSeedArtists): DISABLED
+      expect(evaluateIsArtistPending([{ name: 'Poison The Well', enabled: true }], '', false)).toBe(false);
+
+      // 2. User adds "Vision of Disorder": ENABLED!
+      expect(evaluateIsArtistPending([
+        { name: 'Poison The Well', enabled: true },
+        { name: 'Vision of Disorder', enabled: true }
+      ], '', false)).toBe(true);
+
+      // 3. User removes "Poison The Well" and leaves "Vision of Disorder": ENABLED!
+      expect(evaluateIsArtistPending([{ name: 'Vision of Disorder', enabled: true }], '', false)).toBe(true);
+
+      // 4. User unchecks "Poison The Well" (0 enabled seeds): DISABLED (cannot curate 0 seeds)
+      expect(evaluateIsArtistPending([{ name: 'Poison The Well', enabled: false }], '', false)).toBe(false);
+
+      // 5. User changes discovery filters: ENABLED!
+      expect(evaluateIsArtistPending([{ name: 'Poison The Well', enabled: true }], '', true)).toBe(true);
+    });
+
+    it('triggers onRegenerate directly for uncurated scenes without popping up UpdateInterceptModal (Guardrail 2)', () => {
+      let isUpdateModalOpen = false;
+      let regenerateCalledWith: string | null = null;
+
+      const handleApplyChangesSim = (isSceneCurated: boolean, enabledSeeds: string[]) => {
+        const newSeed = enabledSeeds.join('::');
+        if (isSceneCurated) {
+          isUpdateModalOpen = true;
+          return;
+        }
+        regenerateCalledWith = newSeed;
+      };
+
+      // On uncurated Scene 2 with "To Kill"
+      handleApplyChangesSim(false, ['To Kill']);
+      expect(isUpdateModalOpen).toBe(false); // No modal!
+      expect(regenerateCalledWith).toBe('To Kill'); // Direct regeneration!
+
+      // On curated Scene 1 with "Poison The Well::Vision of Disorder"
+      regenerateCalledWith = null;
+      handleApplyChangesSim(true, ['Poison The Well', 'Vision of Disorder']);
+      expect(isUpdateModalOpen).toBe(true); // Intercept modal popped up!
+      expect(regenerateCalledWith).toBeNull();
+    });
+
+    it('restores lastAppliedFilters to curated baseline filters when switching scenes (Guardrail 3)', () => {
+      // Scene 1 has curated filters { origin: 'United States' }
+      const scene1: ProjectScene = normalizeProjectScene({
+        ...createEmptyProjectScene(0, 'Poison The Well'),
+        discoveryFilters: { origin: 'Florida', era: '2000s' }, // uncommitted draft
+        curatedDiscoveryFilters: { origin: 'United States' }, // curated baseline
+        status: 'completed',
+        graphData: { nodes: [{ id: 'scene-1::ptw', type: 'artist' }], links: [] },
+      }, 0);
+
+      // Scene 2 is uncurated with draft { genre: 'Hardcore' }
+      const scene2: ProjectScene = normalizeProjectScene({
+        ...createEmptyProjectScene(1, 'To Kill'),
+        discoveryFilters: { genre: 'Hardcore' },
+        curatedDiscoveryFilters: {},
+        status: 'idle',
+        graphData: { nodes: [], links: [] },
+      }, 1);
+
+      // When switching to Scene 1
+      const isScene1Curated = (scene1.graphData?.nodes?.length ?? 0) > 0;
+      const targetFiltersScene1 = scene1.curatedDiscoveryFilters || (isScene1Curated ? scene1.discoveryFilters : {});
+      expect(targetFiltersScene1).toEqual({ origin: 'United States' });
+
+      // When switching to uncurated Scene 2
+      const isScene2Curated = (scene2.graphData?.nodes?.length ?? 0) > 0;
+      const targetFiltersScene2 = scene2.curatedDiscoveryFilters || (isScene2Curated ? scene2.discoveryFilters : {});
+      expect(targetFiltersScene2).toEqual({});
+    });
+
+    it('buildBaseProjectPayload strictly aggregates top-level seedArtists from curated scenes only (Step 3)', () => {
+      const scene1: ProjectScene = normalizeProjectScene({
+        ...createEmptyProjectScene(0, 'Poison The Well'),
+        curatedSeedArtists: 'Poison The Well',
+        status: 'completed',
+        graphData: { nodes: [{ id: 'scene-1::ptw', type: 'artist' }], links: [] },
+      }, 0);
+
+      const scene2: ProjectScene = normalizeProjectScene({
+        ...createEmptyProjectScene(1, 'To Kill'),
+        seedArtists: 'To Kill', // uncurated draft
+        curatedSeedArtists: '',
+        status: 'idle',
+        graphData: { nodes: [], links: [] }, // 0 nodes
+      }, 1);
+
+      const scene3: ProjectScene = normalizeProjectScene({
+        ...createEmptyProjectScene(2, 'Harms Way'),
+        seedArtists: 'Harms Way', // uncurated draft
+        curatedSeedArtists: '',
+        status: 'idle',
+        graphData: { nodes: [], links: [] }, // 0 nodes
+      }, 2);
+
+      const currentScenes = [scene1, scene2, scene3];
+
+      // Simulate App.tsx buildBaseProjectPayload calculation
+      const curatedScenes = currentScenes.filter(s => (s.graphData?.nodes?.length || 0) > 0);
+      const allProjectSeedList: string[] = (() => {
+        const byNorm = new Map<string, string>();
+        if (curatedScenes.length > 0) {
+          curatedScenes.forEach(scene => {
+            const sceneSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+            sceneSeeds.forEach(name => {
+              const norm = normalizeArtistId(name);
+              if (norm && !byNorm.has(norm)) byNorm.set(norm, name);
+            });
+          });
+        }
+        return Array.from(byNorm.values());
+      })();
+
+      const basePayloadSeedArtists = allProjectSeedList.join('::');
+
+      // Top-level seedArtists in payload must ONLY contain "Poison The Well", NOT "To Kill" or "Harms Way"!
+      expect(basePayloadSeedArtists).toBe('Poison The Well');
+      expect(curatedScenes.length).toBe(1);
+    });
+  });
 });

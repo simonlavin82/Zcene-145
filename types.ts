@@ -142,10 +142,12 @@ export interface ProjectScene {
   title: string;                      // Default: seed names joined by ' + '
   name?: string;                      // Alias of title for UI/legacy compatibility
   seedArtists: string;                // '::'-delimited seeds for this Scene
+  curatedSeedArtists?: string;        // Frozen baseline seeds used to curate this scene's graphData
   seedIds: string[];                  // Canonical geographically-suffixed IDs
   seedArtistIds?: string[];           // Alias of seedIds
   activeNodes?: string[];             // Optional per-scene active canonical entity IDs
   discoveryFilters: DiscoveryFilters; // Per-scene 3-Tier Anchors (Era, Origin, Genre, Label)
+  curatedDiscoveryFilters?: DiscoveryFilters; // Frozen baseline filters used to curate this scene
   graphData: GraphData;               // Un-namespaced canonical scene topology
   synthesisRationale: string;         // Scene-specific Zine editorial markdown
   artistSnippets?: Record<string, string>; // Scene-specific 1-sentence epicenter hooks keyed by canonical ID

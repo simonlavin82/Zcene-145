@@ -5,7 +5,7 @@ import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName } from '../services/artistCacheService';
 import { hasActiveDiscoveryFilters, sanitizeAnchorLabelInput } from '../services/cacheQualification';
-import { toSeedArtistsArray, MAX_SCENES_PER_PROJECT } from '../shared/multiSceneUtils';
+import { toSeedArtistsArray, stripSceneNamespace, MAX_SCENES_PER_PROJECT } from '../shared/multiSceneUtils';
 import HelpPage from './HelpPage';
 import Header from './Header';
 import MusicGraph from './MusicGraph';
@@ -1703,12 +1703,61 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const isOverLimit = selectedSeedArtists.length > MAX_SEED_ARTISTS;
   
+  const activeScene = useMemo(
+    () => scenes.find(s => (s.sceneId || s.id) === activeSceneId) || scenes[0] || null,
+    [scenes, activeSceneId]
+  );
+
+  const isSceneCurated = useMemo(() => {
+    return (activeScene?.graphData?.nodes?.length ?? 0) > 0;
+  }, [activeScene?.graphData?.nodes?.length]);
+
+  const baselineSeedArtists = useMemo(() => {
+    if (!isSceneCurated) return '';
+    if (activeScene?.curatedSeedArtists !== undefined) return activeScene.curatedSeedArtists;
+
+    // Guardrail 1 fallback: derive from root/seed artist nodes in activeScene.graphData.nodes
+    const rootArtistNodes = (activeScene?.graphData?.nodes || []).filter(
+      (n: any) => n && n.type === 'artist' && Boolean(n.isSceneSeed || n.isSeed)
+    );
+    if (rootArtistNodes.length > 0) {
+      const seenRoots = new Set<string>();
+      const rootNames: string[] = [];
+      for (const n of rootArtistNodes) {
+        const name = String(n.label || stripSceneNamespace(n.canonicalId || n.id) || '').trim();
+        const norm = normalizeArtistId(name);
+        if (norm && !seenRoots.has(norm)) {
+          seenRoots.add(norm);
+          rootNames.push(name);
+        }
+      }
+      return rootNames.join('::');
+    }
+    return activeScene?.seedArtists || seedArtists || '';
+  }, [isSceneCurated, activeScene?.curatedSeedArtists, activeScene?.graphData?.nodes, activeScene?.seedArtists, seedArtists]);
+
   const isArtistPending = useMemo(() => {
-    const currentEnabled = selectedSeedArtists.filter(a => a.enabled).map(a => normalizeArtistId(a.name)).sort().join('::');
-    const lastGenerated = seedArtists.split('::').map(s => normalizeArtistId(s)).filter(Boolean).sort().join('::');
+    const currentEnabled = selectedSeedArtists
+      .filter(a => a.enabled)
+      .map(a => normalizeArtistId(a.name))
+      .sort()
+      .join('::');
+    const baseline = baselineSeedArtists
+      .split('::')
+      .map(s => normalizeArtistId(s))
+      .filter(Boolean)
+      .sort()
+      .join('::');
     const hasSearchTerm = searchTerm.trim().length > 0;
-    return (currentEnabled !== lastGenerated && currentEnabled.length > 0) || hasSearchTerm || areFiltersChanged;
-  }, [selectedSeedArtists, seedArtists, searchTerm, areFiltersChanged]);
+
+    if (!isSceneCurated) {
+      // Uncurated scene (Scene 2..5 with 0 nodes): any enabled seed or search term enables curation
+      return currentEnabled.length > 0 || hasSearchTerm;
+    }
+
+    // Curated scene: dirty if enabled seeds differ from baseline, search term exists, or filters changed
+    return (currentEnabled !== baseline && currentEnabled.length > 0) || hasSearchTerm || areFiltersChanged;
+  }, [selectedSeedArtists, baselineSeedArtists, isSceneCurated, searchTerm, areFiltersChanged]);
 
   const memoizedLibraryArtists = useMemo(() => libraryArtists.map(a => a.name), [libraryArtists]);
   const memoizedSeedArtists = useMemo(() => selectedSeedArtists.filter(a => a.enabled).map(a => a.name), [selectedSeedArtists]);
@@ -1719,17 +1768,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const unreadDetailsCount = useMemo(() => activeNodes.filter(n => !readNodeIds.has(n.id.trim().toLowerCase())).length, [activeNodes, readNodeIds]);
   const artistIndicatorStyles = useMemo(() => isArtistPending ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700', [isArtistPending]);
   
-  const activeScene = useMemo(
-    () => scenes.find(s => (s.sceneId || s.id) === activeSceneId) || scenes[0] || null,
-    [scenes, activeSceneId]
-  );
   const isFirstGeneration = useMemo(() => data.nodes.length === 0 && !seedArtists, [data.nodes.length, seedArtists]);
-  // V43.1: The Update gate is project-scoped. Once ANY scene is mapped, every subsequent
-  // generation (modifying a scene OR curating a newly added scene) routes through
-  // UpdateInterceptModal (Save as New Zcene [default] vs. Overwrite Existing).
+  // Guardrail 2: The overwrite intercept gate applies ONLY when the active scene itself
+  // is already curated (overwriting existing connections). Uncurated scenes (Scene 2..5)
+  // curate directly via onRegenerate / preflight without popping up the overwrite intercept modal.
   const hasExistingProjectGraph = useMemo(
-    () => data.nodes.length > 0 || scenes.some(s => (s.graphData?.nodes?.length || 0) > 0),
-    [data.nodes.length, scenes]
+    () => isSceneCurated,
+    [isSceneCurated]
   );
 
   const handleApplyChanges = () => {
@@ -2683,7 +2728,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 <aside style={{ width: `${leftPanelWidth}px` }} className={`relative h-full z-50 flex flex-col flex-shrink-0 bg-zinc-900 border border-zinc-600/50 transition-all duration-300 ease-in-out overflow-hidden min-h-0 rounded-2xl ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     {!isLeftPanelCollapsed && (<div onMouseDown={handleMouseDown('left')} className="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none touch-none z-[100] group" aria-label="Resize left panel" role="separator"><div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div></div>)}
                     <div className={`${LayoutSizes.headerBar} flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] ${isLeftPanelCollapsed ? 'justify-center px-1' : 'justify-between px-4'}`}>{!isLeftPanelCollapsed && (<div className="flex items-center gap-2 overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Roots</h2><span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm ${artistIndicatorStyles}`}>{enabledArtistsCount}</span></div>)}<button onClick={handleToggleLeftPanel} className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none pointer-events-auto" title={isLeftPanelCollapsed ? "Expand Panel" : "Collapse Panel"}><span className="material-symbols-outlined !text-[18px]">{isLeftPanelCollapsed ? 'left_panel_open' : 'left_panel_close'}</span></button></div>
-                    {isLeftPanelCollapsed ? (<div className="flex-grow flex-col items-center justify-between py-6 text-zinc-400"><div className="flex flex-col items-center gap-y-6">{ libraryArtists.length > 0 ? (<button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Select from Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">queue_music</span></button>) : (<button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Import Music Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">upload</span></button>)}</div><div className="absolute bottom-6 left-1/2 -translate-x-1/2"><button onClick={handleApplyChanges} disabled={!isArtistPending || isLoading || isOverLimit || isPreFlightChecking} className="group" title="Update Zcene"><span className={`h-8 w-8 rounded-md flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${artistIndicatorStyles} ${enabledArtistsCount === 0 ? 'opacity-100' : 'group-active:scale-95'}`}>{enabledArtistsCount}</span></button></div></div>) : ( <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">{ArtistsPanelContent}</div> )}
+                    {isLeftPanelCollapsed ? (<div className="flex-grow flex-col items-center justify-between py-6 text-zinc-400"><div className="flex flex-col items-center gap-y-6">{ libraryArtists.length > 0 ? (<button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Select from Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">queue_music</span></button>) : (<button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Import Music Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">upload</span></button>)}</div><div className="absolute bottom-6 left-1/2 -translate-x-1/2"><button onClick={handleApplyChanges} disabled={!isArtistPending || isLoading || isOverLimit || isPreFlightChecking} className="group" title={createButtonLabel}><span className={`h-8 w-8 rounded-md flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${artistIndicatorStyles} ${enabledArtistsCount === 0 ? 'opacity-100' : 'group-active:scale-95'}`}>{enabledArtistsCount}</span></button></div></div>) : ( <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">{ArtistsPanelContent}</div> )}
                 </aside>
 
                 <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>

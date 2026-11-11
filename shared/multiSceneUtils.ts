@@ -334,6 +334,48 @@ export function normalizeProjectScene(
       ? rawSeedIds.map((id: any) => String(id).trim()).filter(Boolean)
       : seedsArray.map((seed) => normalizeCanonicalEntityId(seed)).filter(Boolean);
 
+  const isCurated = Boolean(graphData.nodes && graphData.nodes.length > 0);
+
+  let curatedSeedArtists: string;
+  if (typeof s.curatedSeedArtists === 'string') {
+    curatedSeedArtists = s.curatedSeedArtists;
+  } else if (isCurated) {
+    // Guardrail 1: derive curatedSeedArtists from the scene's actual root/seed artist node labels in graphData.nodes first (if present) before falling back to raw.seedArtists.
+    const rootArtistNodes = graphData.nodes.filter(
+      (n: any) => n && n.type === 'artist' && Boolean(n.isSceneSeed || n.isSeed)
+    );
+    if (rootArtistNodes.length > 0) {
+      const seenRoots = new Set<string>();
+      const rootNames: string[] = [];
+      for (const n of rootArtistNodes) {
+        const name = String(n.label || stripSceneNamespace(n.canonicalId || n.id) || '').trim();
+        const norm = normalizeCanonicalEntityId(name);
+        if (norm && !seenRoots.has(norm)) {
+          seenRoots.add(norm);
+          rootNames.push(name);
+        }
+      }
+      curatedSeedArtists = rootNames.length > 0 ? rootNames.join('::') : seedArtists;
+    } else {
+      curatedSeedArtists = seedArtists;
+    }
+  } else {
+    curatedSeedArtists = '';
+  }
+
+  let curatedDiscoveryFilters: DiscoveryFilters;
+  if (s.curatedDiscoveryFilters && typeof s.curatedDiscoveryFilters === 'object') {
+    try {
+      curatedDiscoveryFilters = typeof s.curatedDiscoveryFilters === 'string'
+        ? JSON.parse(s.curatedDiscoveryFilters)
+        : s.curatedDiscoveryFilters;
+    } catch {
+      curatedDiscoveryFilters = isCurated ? discoveryFilters : {};
+    }
+  } else {
+    curatedDiscoveryFilters = isCurated ? discoveryFilters : {};
+  }
+
   const rawTitle = String(s.title || s.name || '').trim();
   const isGenericDefaultTitle = /^Scene\s+\d+$/i.test(rawTitle);
   const title =
@@ -370,10 +412,12 @@ export function normalizeProjectScene(
     title,
     name: title,
     seedArtists,
+    curatedSeedArtists,
     seedIds,
     seedArtistIds: seedIds,
     ...(Array.isArray(s.activeNodes) ? { activeNodes: s.activeNodes } : {}),
     discoveryFilters,
+    curatedDiscoveryFilters,
     graphData,
     synthesisRationale: s.synthesisRationale || graphData.synthesisRationale || '',
     artistSnippets: s.artistSnippets && typeof s.artistSnippets === 'object' ? s.artistSnippets : {},
