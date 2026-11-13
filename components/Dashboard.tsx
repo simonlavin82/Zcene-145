@@ -575,7 +575,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   >
                     {/* Unified Folder Index Tab */}
                     <div 
-                      className={`group w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] pl-3 pr-1.5 py-1 flex items-center justify-between h-[22.5px] select-none ${openColorPopover === bucketKey ? 'z-[60]' : 'z-10'} ${!isUnassigned && isSmallScreen ? 'cursor-pointer' : ''}`}
+                      className={`group w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[24.5px] left-[-1px] pl-3 pr-1.5 py-1 flex items-center justify-between h-[25px] select-none ${openColorPopover === bucketKey ? 'z-[70]' : 'z-10'} ${!isUnassigned && isSmallScreen ? 'cursor-pointer active:brightness-95 before:absolute before:inset-[-6px] before:content-[\'\']' : ''}`}
                       style={{
                         backgroundColor: crateColor
                       }}
@@ -596,26 +596,50 @@ const Dashboard: React.FC<DashboardProps> = ({
                       {/* Trigger Icon */}
                       {!isUnassigned && (
                         <div className="hidden md:group-hover:flex items-center">
-                          <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center opacity-70 hover:opacity-100 transition-opacity" style={{ color: crateTextColor }}>
-                            <span className="material-symbols-outlined !text-[15px]">more_horiz</span>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} 
+                            className="w-6 h-6 rounded flex items-center justify-center opacity-75 hover:opacity-100 hover:bg-black/20 transition-all cursor-pointer" 
+                            style={{ color: crateTextColor }}
+                            aria-label="Change crate color"
+                          >
+                            <span className="material-symbols-outlined !text-[16px]">more_horiz</span>
                           </button>
                         </div>
                       )}
 
                       {/* Popover UI */}
                       {openColorPopover === bucketKey && (
-                        <div className="absolute top-full right-0 mt-1 p-2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50 flex gap-2" onClick={(e) => e.stopPropagation()}>
-                          {PROFILE_COLORS.map(color => (
-                            <button
-                              key={color.name}
-                              onClick={() => {
-                                 onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
-                                 setOpenColorPopover(null);
-                              }}
-                              className={`w-4 h-4 rounded-full transition-transform ${color.class} hover:scale-110`}
-                            />
-                          ))}
-                        </div>
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setOpenColorPopover(null)} />
+                          <div 
+                            className="absolute top-full left-0 mt-1.5 p-2.5 bg-brand-black border border-white/10 rounded-xl shadow-2xl shadow-black z-[70] flex items-center gap-2.5 max-w-[calc(100vw-2rem)] animate-fade-in-down antialiased pointer-events-auto" 
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {PROFILE_COLORS.map(color => {
+                              const isSelected = crateColor.toLowerCase() === colorHexMap[color.name]?.toLowerCase();
+                              const contrastColor = getContrastTextColor(colorHexMap[color.name]);
+                              return (
+                                <button
+                                  key={color.name}
+                                  aria-label={`Set crate color to ${color.name}`}
+                                  onClick={() => {
+                                     onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
+                                     setOpenColorPopover(null);
+                                  }}
+                                  className={`w-6 h-6 rounded-full transition-all shrink-0 flex items-center justify-center relative cursor-pointer ${color.class} hover:scale-110 active:scale-95 before:absolute before:inset-[-4px] before:content-[''] ${
+                                    isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-950 scale-105' : 'opacity-85 hover:opacity-100'
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <span className="material-symbols-outlined !text-[13px] font-bold" style={{ color: contrastColor }}>
+                                      check
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
                       )}
                     </div>
 
@@ -675,7 +699,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           <td colSpan={8} className="pt-6 pb-0 px-6 align-bottom bg-zinc-900 border-none">
                             {/* The Folder Tab */}
                             <div 
-                              className={`group w-[140px] sm:w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg pl-3 pr-1.5 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] flex items-center justify-between pointer-events-auto ${openColorPopover === bucketKey ? 'z-[60]' : 'z-0'} ${!isUnassigned && isSmallScreen ? 'cursor-pointer' : ''}`}
+                              className={`group w-[140px] sm:w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg pl-3 pr-1.5 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] flex items-center justify-between pointer-events-auto ${openColorPopover === bucketKey ? 'z-[70]' : 'z-0'} ${!isUnassigned && isSmallScreen ? 'cursor-pointer active:brightness-95 before:absolute before:inset-[-6px] before:content-[\'\']' : ''}`}
                               style={{
                                 backgroundColor: crateColor
                               }}
@@ -696,26 +720,50 @@ const Dashboard: React.FC<DashboardProps> = ({
                               {/* Trigger Icon */}
                               {!isUnassigned && (
                                 <div className="hidden md:group-hover:flex items-center pointer-events-auto">
-                                  <button onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} className="flex items-center opacity-70 hover:opacity-100 transition-opacity -my-1" style={{ color: crateTextColor }}>
-                                    <span className="material-symbols-outlined !text-[15px]">more_horiz</span>
+                                  <button 
+                                    onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} 
+                                    className="w-6 h-6 rounded flex items-center justify-center opacity-75 hover:opacity-100 hover:bg-black/20 transition-all cursor-pointer -my-1" 
+                                    style={{ color: crateTextColor }}
+                                    aria-label="Change crate color"
+                                  >
+                                    <span className="material-symbols-outlined !text-[16px]">more_horiz</span>
                                   </button>
                                 </div>
                               )}
 
                               {/* Popover UI */}
                               {openColorPopover === bucketKey && (
-                                <div className="absolute top-full left-0 sm:left-auto sm:right-0 mt-1 p-2 bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl z-50 flex gap-2 pointer-events-auto" onClick={(e) => e.stopPropagation()}>
-                                  {PROFILE_COLORS.map(color => (
-                                    <button
-                                      key={color.name}
-                                      onClick={() => {
-                                         onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
-                                         setOpenColorPopover(null);
-                                      }}
-                                      className={`w-4 h-4 rounded-full transition-transform ${color.class} hover:scale-110`}
-                                    />
-                                  ))}
-                                </div>
+                                <>
+                                  <div className="fixed inset-0 z-10" onClick={() => setOpenColorPopover(null)} />
+                                  <div 
+                                    className="absolute top-full left-0 mt-1.5 p-2.5 bg-brand-black border border-white/10 rounded-xl shadow-2xl shadow-black z-[70] flex items-center gap-2.5 max-w-[calc(100vw-2rem)] animate-fade-in-down antialiased pointer-events-auto" 
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {PROFILE_COLORS.map(color => {
+                                      const isSelected = crateColor.toLowerCase() === colorHexMap[color.name]?.toLowerCase();
+                                      const contrastColor = getContrastTextColor(colorHexMap[color.name]);
+                                      return (
+                                        <button
+                                          key={color.name}
+                                          aria-label={`Set crate color to ${color.name}`}
+                                          onClick={() => {
+                                             onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
+                                             setOpenColorPopover(null);
+                                          }}
+                                          className={`w-6 h-6 rounded-full transition-all shrink-0 flex items-center justify-center relative cursor-pointer ${color.class} hover:scale-110 active:scale-95 before:absolute before:inset-[-4px] before:content-[''] ${
+                                            isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-950 scale-105' : 'opacity-85 hover:opacity-100'
+                                          }`}
+                                        >
+                                          {isSelected && (
+                                            <span className="material-symbols-outlined !text-[13px] font-bold" style={{ color: contrastColor }}>
+                                              check
+                                            </span>
+                                          )}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </>
                               )}
                             </div>
                           </td>

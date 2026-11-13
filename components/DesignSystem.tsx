@@ -3135,7 +3135,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div>
                                             <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Index Tab Classes</p>
                                             <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
-                                                w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 h-[22.5px]
+                                                w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[24.5px] left-[-1px] pl-3 pr-1.5 py-1 h-[25px]
                                             </code>
                                         </div>
                                     </div>
@@ -3149,10 +3149,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             className="w-full md:w-fit max-w-full bg-zinc-950 rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative mt-6"
                                         >
                                             {/* Index Tab */}
-                                            <div className="w-[140px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[22px] left-[-1px] px-3 py-1 flex items-center h-[22.5px] z-10 select-none">
-                                                <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-medium">
+                                            <div className="w-[160px] bg-zinc-950 border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[24.5px] left-[-1px] pl-3 pr-1.5 py-1 flex items-center justify-between h-[25px] z-10 select-none">
+                                                <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest text-zinc-400 font-bold">
                                                     POP PUNK
-                                                 </div>
+                                                </div>
+                                                <div className="flex items-center">
+                                                    <span className="material-symbols-outlined !text-[16px] text-zinc-500">more_horiz</span>
+                                                </div>
                                             </div>
 
                                             {/* Cards inside this parent record crate compartment */}
@@ -3175,6 +3178,86 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         <span className="text-[8px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">DEEP CUTS: 5</span>
                                                     </div>
                                                 </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* ── Crate Color Picker Popover & Swatch System ── */}
+                        <div className="mt-16 space-y-8">
+                            <div className="border-b border-zinc-800 pb-4">
+                                <h3 className="text-xl font-medium text-zinc-200">Crate Color Picker Popover &amp; Swatch System</h3>
+                                <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-3xl">
+                                    Triggered by clicking or tapping a genre crate tab. Uses 24px (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">w-6 h-6</code>) color swatches with active ring indicators and checkmarks. To prevent horizontal viewport clipping on mobile screens (&lt; 400px), crate color picker popovers MUST be anchored at <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">left-0</code> relative to the index tab (rather than <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">right-0</code>), ensuring the popover expands inward across the crate folder container.
+                                </p>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                                {/* Color Swatch Configuration */}
+                                <div className="space-y-4">
+                                    <h4 className="text-base font-medium text-white flex items-center gap-2">
+                                        <span className="material-symbols-outlined text-primary">palette</span>
+                                        Swatch &amp; Popover Configuration
+                                    </h4>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        Swatches use 24×24px visual bounds with invisible <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">before:inset-[-4px]</code> touch expansion buffers. With <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">gap-2.5</code> (10px) spacing, this leaves a clean 2px non-overlapping hit buffer between adjacent swatches. Active swatches display a high-contrast white focus ring and contrast-checked micro icon.
+                                    </p>
+                                    <div className="space-y-4 pt-2">
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Popover Container Classes</p>
+                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
+                                                absolute top-full left-0 mt-1.5 p-2.5 bg-brand-black border border-white/10 rounded-xl shadow-2xl z-[70] flex items-center gap-2.5 max-w-[calc(100vw-2rem)]
+                                            </code>
+                                        </div>
+                                        <div>
+                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Swatch Button Classes</p>
+                                            <code className="text-xs font-mono text-primary bg-zinc-950 border border-zinc-800 rounded-lg px-3 py-2 block overflow-x-auto whitespace-nowrap">
+                                                w-6 h-6 rounded-full shrink-0 relative cursor-pointer before:absolute before:inset-[-4px] ring-2 ring-white
+                                            </code>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Live Popover Specimen */}
+                                <div className="space-y-3">
+                                    <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Live Popover Specimen</p>
+                                    <div className="p-8 bg-zinc-900/30 rounded-xl border border-zinc-800 flex justify-center">
+                                        <div className="relative pt-6">
+                                            {/* Specimen Index Tab */}
+                                            <div className="w-[160px] bg-[#ec4899] text-white border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute top-0 left-0 pl-3 pr-1.5 py-1 flex items-center justify-between h-[25px] select-none">
+                                                <div className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest font-bold">
+                                                    POST HARDCORE
+                                                </div>
+                                                <div className="flex items-center">
+                                                    <span className="material-symbols-outlined !text-[16px]">more_horiz</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Specimen Open Popover */}
+                                            <div className="p-2.5 bg-brand-black border border-white/10 rounded-xl shadow-2xl shadow-black flex items-center gap-2.5 mt-2">
+                                                {[
+                                                    { name: 'purple', class: 'bg-[#a855f7]' },
+                                                    { name: 'teal', class: 'bg-[#2dd4bf]' },
+                                                    { name: 'sky', class: 'bg-[#38bdf8]' },
+                                                    { name: 'indigo', class: 'bg-[#6366f1]' },
+                                                    { name: 'pink', class: 'bg-[#ec4899]', active: true },
+                                                    { name: 'orange', class: 'bg-[#f97316]' },
+                                                    { name: 'black', class: 'bg-[#18181b] border border-zinc-700' },
+                                                    { name: 'white', class: 'bg-[#f4f4f5]' }
+                                                ].map(s => (
+                                                    <div 
+                                                        key={s.name} 
+                                                        className={`w-6 h-6 rounded-full shrink-0 flex items-center justify-center relative cursor-pointer ${s.class} ${s.active ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-950 scale-105' : 'opacity-85'}`}
+                                                    >
+                                                        {s.active && (
+                                                            <span className="material-symbols-outlined !text-[13px] font-bold text-white">
+                                                                check
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                ))}
                                             </div>
                                         </div>
                                     </div>
