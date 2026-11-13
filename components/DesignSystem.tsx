@@ -533,6 +533,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     const [demoMobileBannerExpanded, setDemoMobileBannerExpanded] = useState(false);
     const [demoMobileNavTab, setDemoMobileNavTab] = useState<'artists' | 'spiderweb' | 'details'>('spiderweb');
     const [selectedOnboardingStep, setSelectedOnboardingStep] = useState<string>('step1');
+    const [demoGraphLinkActive, setDemoGraphLinkActive] = useState(false);
+    const [demoBridgeLineActive, setDemoBridgeLineActive] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -552,6 +554,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
         { id: 'layout-spacing', title: 'Layout & Spacing' },
         { id: 'iconography', title: 'Iconography' },
         { id: 'spiderweb-legends', title: 'Connections Legends' },
+        { id: 'graph-links-bridge-lines', title: 'Graph Links & Bridge Lines' },
         { id: 'spiderweb-controls', title: 'Connections Controls' },
         { id: 'mobile-navigation', title: 'Mobile Navigation Bar' },
         { id: 'buttons', title: 'Buttons' },
@@ -1541,6 +1544,312 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    {/* 6B. GRAPH LINKS & BRIDGE LINES */}
+                    <section id="graph-links-bridge-lines">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Graph Links &amp; Bridge Lines</h2>
+                        
+                        <p className="text-base text-zinc-300 leading-relaxed max-w-3xl mb-12">
+                            Connections on the D3 canvas are bifurcated into two distinct visual and structural primitives: 
+                            <strong> Intra-Scene Links</strong> (straight dashed SVG lines representing dense semantic and musical lineage within a single scene cluster) and 
+                            <strong> Cross-Scene Bridge Lines</strong> (quadratic Bézier SVG arcs representing shared canonical entities and AI-synthesized sonic lineage spanning across multi-scene coordinates).
+                        </p>
+
+                        <div className="space-y-16">
+                            {/* 1. Intra-Scene Links */}
+                            <div className="space-y-8">
+                                <div className="border-b border-zinc-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div>
+                                        <h3 className="text-xl font-medium text-zinc-200">1. Intra-Scene Links</h3>
+                                        <p className="text-xs text-zinc-400 mt-1 font-mono">Primitive: &lt;line className="link" /&gt; + &lt;line className="interactive-link" /&gt;</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-1 rounded-xl w-fit">
+                                        <button
+                                            onClick={() => setDemoGraphLinkActive(false)}
+                                            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${!demoGraphLinkActive ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                        >
+                                            Resting State
+                                        </button>
+                                        <button
+                                            onClick={() => setDemoGraphLinkActive(true)}
+                                            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${demoGraphLinkActive ? 'bg-primary text-black font-semibold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                        >
+                                            Active / Hover Focus
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                                    {/* Visual Specimen Preview */}
+                                    <div className="space-y-3">
+                                        <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Live Specimen Preview</p>
+                                        <div 
+                                            className="p-8 bg-zinc-950 border border-zinc-800 rounded-2xl flex flex-col items-center justify-center min-h-[220px] relative overflow-hidden cursor-pointer select-none group"
+                                            onClick={() => setDemoGraphLinkActive(prev => !prev)}
+                                            title="Click to toggle between Resting and Active states"
+                                        >
+                                            <div className="absolute top-3 right-3 text-[10px] font-mono text-zinc-500 bg-zinc-900/80 px-2 py-0.5 rounded border border-zinc-800">
+                                                {demoGraphLinkActive ? 'State: ACTIVE / ILLUMINATED' : 'State: RESTING (isPassiveSelection)'}
+                                            </div>
+                                            <svg className="w-full h-36 max-w-md" viewBox="0 0 360 120">
+                                                {/* Wide invisible hitbox */}
+                                                <line 
+                                                    x1="60" y1="60" x2="300" y2="60" 
+                                                    stroke="transparent" 
+                                                    strokeWidth="16" 
+                                                    className="cursor-pointer"
+                                                />
+                                                {/* Visual dashed link line */}
+                                                <line 
+                                                    x1="60" y1="60" x2="300" y2="60" 
+                                                    stroke={demoGraphLinkActive ? "#F6E468" : "#e4e4e7"} 
+                                                    strokeOpacity={demoGraphLinkActive ? 0.9 : 0.35} 
+                                                    strokeWidth={1} 
+                                                    strokeDasharray="3,3" 
+                                                    style={{ transition: 'stroke 300ms ease, stroke-opacity 300ms ease' }}
+                                                />
+                                                
+                                                {/* Node A: Root Artist */}
+                                                <g transform="translate(60, 60)">
+                                                    <circle 
+                                                        r={demoGraphLinkActive ? 18 : 16} 
+                                                        fill="#18181b" 
+                                                        stroke="#F6E468" 
+                                                        strokeWidth={demoGraphLinkActive ? 2.5 : 2} 
+                                                        className="transition-all duration-300"
+                                                    />
+                                                    <circle r="4" fill="#F6E468" />
+                                                    <text y="28" textAnchor="middle" fill="#f4f4f5" fontSize="10" fontFamily="sans-serif" fontWeight="600">Poison The Well</text>
+                                                    <text y="39" textAnchor="middle" fill="#71717a" fontSize="8" fontFamily="monospace">ROOT SEED</text>
+                                                </g>
+
+                                                {/* Node B: Label */}
+                                                <g transform="translate(300, 60)">
+                                                    <polygon 
+                                                        points="-10,-8 10,-8 10,8 -10,8" 
+                                                        fill="#18181b" 
+                                                        stroke="#2dd4bf" 
+                                                        strokeWidth={demoGraphLinkActive ? 2 : 1.5} 
+                                                        className="transition-all duration-300"
+                                                    />
+                                                    <text y="28" textAnchor="middle" fill="#f4f4f5" fontSize="10" fontFamily="sans-serif" fontWeight="600">Trustkill Records</text>
+                                                    <text y="39" textAnchor="middle" fill="#71717a" fontSize="8" fontFamily="monospace">LABEL</text>
+                                                </g>
+                                            </svg>
+                                            <p className="text-[11px] text-zinc-500 mt-2">Click canvas to toggle resting vs. active focus</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Token Specification Table */}
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Token Specification</p>
+                                        <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl overflow-hidden">
+                                            <table className="w-full text-left text-xs font-mono">
+                                                <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+                                                    <tr>
+                                                        <th className="p-3">Attribute</th>
+                                                        <th className="p-3">Resting State</th>
+                                                        <th className="p-3">Active / Hover Focus</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">stroke</td>
+                                                        <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">#e4e4e7</code> <span className="text-zinc-500">(zinc-200)</span></td>
+                                                        <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">#F6E468</code> <span className="text-zinc-500">(gold)</span></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">stroke-opacity</td>
+                                                        <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">0.30 – 0.40</code></td>
+                                                        <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">0.90</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">stroke-width</td>
+                                                        <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">1.0px</code></td>
+                                                        <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">1.0px</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">stroke-dasharray</td>
+                                                        <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">3,3</code></td>
+                                                        <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">3,3</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">hitbox layer</td>
+                                                        <td className="p-3 text-zinc-400" colSpan={2}>
+                                                            <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">line.interactive-link</code> (16px transparent, pointer-events: stroke)
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">transition</td>
+                                                        <td className="p-3 text-zinc-400" colSpan={2}>
+                                                            <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">d3.transition().duration(300)</code>
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 2. Cross-Scene Bridge Lines */}
+                            <div className="space-y-8">
+                                <div className="border-b border-zinc-800 pb-3 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div>
+                                        <h3 className="text-xl font-medium text-zinc-200">2. Cross-Scene Bridge Lines</h3>
+                                        <p className="text-xs text-zinc-400 mt-1 font-mono">Primitive: &lt;path className="bridge-visual-line" /&gt; + &lt;path className="bridge-hit-line" /&gt;</p>
+                                    </div>
+                                    <div className="flex items-center gap-2 bg-zinc-900 border border-zinc-800 p-1 rounded-xl w-fit">
+                                        <button
+                                            onClick={() => setDemoBridgeLineActive(false)}
+                                            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${!demoBridgeLineActive ? 'bg-zinc-800 text-white shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                        >
+                                            Resting State
+                                        </button>
+                                        <button
+                                            onClick={() => setDemoBridgeLineActive(true)}
+                                            className={`px-3 py-1 text-xs rounded-lg font-medium transition-colors ${demoBridgeLineActive ? 'bg-primary text-black font-semibold shadow-sm' : 'text-zinc-400 hover:text-zinc-200'}`}
+                                        >
+                                            Active / Hover Focus
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                                    {/* Visual Specimen Preview */}
+                                    <div className="space-y-3">
+                                        <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Live Specimen Preview</p>
+                                        <div 
+                                            className="p-8 bg-zinc-950 border border-zinc-800 rounded-2xl flex flex-col items-center justify-center min-h-[220px] relative overflow-hidden cursor-pointer select-none group"
+                                            onClick={() => setDemoBridgeLineActive(prev => !prev)}
+                                            title="Click to toggle between Resting and Active states"
+                                        >
+                                            <div className="absolute top-3 right-3 text-[10px] font-mono text-zinc-500 bg-zinc-900/80 px-2 py-0.5 rounded border border-zinc-800">
+                                                {demoBridgeLineActive ? 'State: ACTIVE / ILLUMINATED' : 'State: RESTING (isPassiveSelection)'}
+                                            </div>
+                                            <svg className="w-full h-36 max-w-md" viewBox="0 0 360 120">
+                                                {/* Wide invisible hitbox */}
+                                                <path 
+                                                    d="M 60,95 Q 180,25 300,95" 
+                                                    fill="none" 
+                                                    stroke="transparent" 
+                                                    strokeWidth="14" 
+                                                    className="cursor-pointer"
+                                                />
+                                                {/* Visual curved bridge path */}
+                                                <path 
+                                                    d="M 60,95 Q 180,25 300,95" 
+                                                    fill="none" 
+                                                    stroke={demoBridgeLineActive ? "#F6E468" : "#e4e4e7"} 
+                                                    strokeOpacity={demoBridgeLineActive ? 0.95 : 0.40} 
+                                                    strokeWidth={demoBridgeLineActive ? 2.0 : 1.2} 
+                                                    strokeDasharray="6,4" 
+                                                    style={{ transition: 'stroke 300ms ease, stroke-opacity 300ms ease, stroke-width 300ms ease' }}
+                                                />
+                                                
+                                                {/* Scene 1 Node */}
+                                                <g transform="translate(60, 95)">
+                                                    <circle 
+                                                        r={demoBridgeLineActive ? 16 : 14} 
+                                                        fill="#18181b" 
+                                                        stroke={demoBridgeLineActive ? "#F6E468" : "#a1a1aa"} 
+                                                        strokeWidth={demoBridgeLineActive ? 2.5 : 1.5} 
+                                                        className="transition-all duration-300"
+                                                    />
+                                                    <text y="24" textAnchor="middle" fill="#f4f4f5" fontSize="10" fontFamily="sans-serif" fontWeight="600">Harm's Way</text>
+                                                    <text y="35" textAnchor="middle" fill="#71717a" fontSize="8" fontFamily="monospace">SCENE 1 (PTW)</text>
+                                                </g>
+
+                                                {/* Scene 2 Node */}
+                                                <g transform="translate(300, 95)">
+                                                    <circle 
+                                                        r={demoBridgeLineActive ? 16 : 14} 
+                                                        fill="#18181b" 
+                                                        stroke={demoBridgeLineActive ? "#F6E468" : "#F6E468"} 
+                                                        strokeWidth={demoBridgeLineActive ? 2.5 : 2} 
+                                                        className="transition-all duration-300"
+                                                    />
+                                                    <text y="24" textAnchor="middle" fill="#f4f4f5" fontSize="10" fontFamily="sans-serif" fontWeight="600">Harm's Way</text>
+                                                    <text y="35" textAnchor="middle" fill="#71717a" fontSize="8" fontFamily="monospace">SCENE 2 (ROOT)</text>
+                                                </g>
+                                            </svg>
+                                            <p className="text-[11px] text-zinc-500 mt-2">Click canvas to toggle resting vs. active focus</p>
+                                        </div>
+                                    </div>
+
+                                    {/* Token Specification Table */}
+                                    <div className="space-y-4">
+                                        <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Token Specification</p>
+                                        <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl overflow-hidden">
+                                            <table className="w-full text-left text-xs font-mono">
+                                                <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
+                                                    <tr>
+                                                        <th className="p-3">Attribute</th>
+                                                        <th className="p-3">Resting State</th>
+                                                        <th className="p-3">Active / Hover Focus</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">stroke</td>
+                                                        <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">#e4e4e7</code> <span className="text-zinc-500">(zinc-200)</span></td>
+                                                        <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">#F6E468</code> <span className="text-zinc-500">(gold)</span></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">stroke-opacity</td>
+                                                        <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">0.35 – 0.40</code></td>
+                                                        <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">0.95</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">stroke-width</td>
+                                                        <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">1.2px</code></td>
+                                                        <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">2.0px</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">stroke-dasharray</td>
+                                                        <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">6,4</code> <span className="text-zinc-500">(elongated)</span></td>
+                                                        <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">6,4</code></td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">geometry</td>
+                                                        <td className="p-3 text-zinc-400" colSpan={2}>
+                                                            Non-physics quadratic Bézier: <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">d="M x1 y1 Q cx cy x2 y2"</code>
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">arc lift math</td>
+                                                        <td className="p-3 text-zinc-400" colSpan={2}>
+                                                            <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">midY - arcLift</code> (70px – 200px upward curve; guarded by <code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">hypot &ge; 12px</code>)
+                                                        </td>
+                                                    </tr>
+                                                    <tr>
+                                                        <td className="p-3 text-zinc-400">hitbox &amp; tooltips</td>
+                                                        <td className="p-3 text-zinc-400" colSpan={2}>
+                                                            Transparent <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">path.bridge-hit-line</code> (14px). Tooltip hoists <code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">[Rule 26]</code> narrative bridge snippets to top of node hover card.
+                                                        </td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 3. Interaction Architecture Contract */}
+                            <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4">
+                                <div className="flex items-center gap-3">
+                                    <span className="material-symbols-outlined text-primary">rule</span>
+                                    <h4 className="text-base font-medium text-white">Interaction Architecture Contract</h4>
+                                </div>
+                                <ul className="space-y-2 text-sm text-zinc-400 list-disc pl-5 leading-relaxed">
+                                    <li><strong>Neutral Rest State (<code className="text-xs text-primary font-mono">isPassiveSelection = true</code>):</strong> On initial project mount or empty canvas background click, intra-scene links rest at <code>0.30–0.40</code> opacity and cross-scene bridge lines rest at <code>0.35–0.40</code> opacity in neutral grey (<code>#e4e4e7</code>). Programmatic hover and tooltips remain suppressed until explicit node selection or cursor movement.</li>
+                                    <li><strong>Active Hover Illumination:</strong> Hovering or selecting any endpoint node triggers a 300ms D3 transition, illuminating directly connected intra-scene links to <code>#F6E468</code> (0.90 opacity) and cross-scene bridge lines to <code>#F6E468</code> (0.95 opacity, 2.0px width) while gently knocking back non-incident links.</li>
+                                    <li><strong>Hitbox Decoupling:</strong> Visual SVG paths use <code>pointer-events: none</code> to eliminate cursor flicker over dashed segments. Pointer capture is handled by transparent companion elements (<code className="text-xs font-mono">line.interactive-link</code> at 16px; <code className="text-xs font-mono">path.bridge-hit-line</code> at 14px).</li>
+                                    <li><strong>Degenerate Path Protection:</strong> Bridge arc math checks Euclidean distance <code>Math.hypot(dx, dy) &gt;= 12</code>. Sub-pixel or stacked cross-scene node pairs return empty path strings, preventing degenerate D3 arc artifacts.</li>
+                                </ul>
                             </div>
                         </div>
                     </section>
