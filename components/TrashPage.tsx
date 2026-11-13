@@ -347,7 +347,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                     const tdClass = `transition-colors ${rowBg} group-hover:bg-white/5`;
 
                     return (
-                      <tr key={project.id} className="group border-b border-zinc-800/30">
+                      <tr key={project.id} className={`group border-b border-zinc-800/30 ${activeMenuId === project.id ? 'relative z-40' : ''}`}>
                         <td className={`py-4 px-6 font-medium text-white ${tdClass}`}>
                           <div className="flex items-center gap-3">
                             <span className="material-symbols-outlined !text-lg text-amber-400">
@@ -390,7 +390,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                             {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
                           </span>
                         </td>
-                        <td className={`py-4 px-6 text-right ${tdClass}`} onClick={(e) => e.stopPropagation()}>
+                        <td className={`py-4 px-6 text-right ${tdClass} ${activeMenuId === project.id ? 'relative z-50' : ''}`} onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end relative">
                             <button
                               onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
@@ -401,7 +401,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                             {activeMenuId === project.id && (
                               <>
                                 <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                <div className="absolute right-0 top-10 w-56 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left antialiased space-y-0.5">
+                                <div className="absolute right-0 top-10 w-56 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left antialiased space-y-0.5">
                                   {onRestoreProject && (
                                     <button
                                       onClick={() => {

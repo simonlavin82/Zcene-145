@@ -563,11 +563,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                 const defaultColor = zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
                 const crateColor = isUnassigned ? zceneFallbackColor : (crateColors?.[bucketKey] || defaultColor);
                 const crateTextColor = getContrastTextColor(crateColor);
+                const isBucketActive = openColorPopover === bucketKey || projectsInBucket.some(p => p.id === activeMenuId);
 
                 return (
                   <div 
                     key={bucketKey} 
-                    className={`w-full md:w-fit max-w-full rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0 min-w-0 ${openColorPopover === bucketKey ? 'z-50' : 'z-0'}`}
+                    className={`w-full md:w-fit max-w-full rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-4 relative flex-shrink-0 min-w-0 ${isBucketActive ? 'z-50' : 'z-0'}`}
                     style={{
                       backgroundColor: crateColor.toLowerCase() === '#18181b' ? `${crateColor}26` : `${crateColor}33`
                     }}
@@ -741,7 +742,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           <tr 
                             key={project.id}
                             onClick={() => onSelectProject(project.id)}
-                            className="group border-b border-zinc-800/30 cursor-pointer"
+                            className={`group border-b border-zinc-800/30 cursor-pointer ${activeMenuId === project.id ? 'relative z-40' : ''}`}
                           >
                             <td className={`py-4 px-6 font-medium text-white group-hover:text-primary transition-colors ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
@@ -809,7 +810,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 </span>
                               )}
                             </td>
-                            <td className={`py-4 px-6 text-right ${tdClass}`} onClick={(e) => e.stopPropagation()}>
+                            <td className={`py-4 px-6 text-right ${tdClass} ${activeMenuId === project.id ? 'relative z-50' : ''}`} onClick={(e) => e.stopPropagation()}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               <div className="flex items-center justify-end relative">
                                 <button
@@ -822,7 +823,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {activeMenuId === project.id && (
                                   <>
                                     <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                    <div className="absolute right-0 top-10 w-56 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased space-y-0.5">
+                                    <div className="absolute right-0 top-10 w-56 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased space-y-0.5">
                                       <button
                                         onClick={() => {
                                           setActiveMenuId(null);

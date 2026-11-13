@@ -187,7 +187,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
               {activeMenuId === project.id && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                  <div className="absolute right-0 mt-2 w-56 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
+                  <div className="absolute right-0 mt-2 w-56 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
                     {isTrashed ? (
                       <div className="space-y-0.5">
                         {onRestoreProject && (
