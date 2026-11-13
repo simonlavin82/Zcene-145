@@ -712,7 +712,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                 <div className="relative flex-1 min-w-0">
                     <select
                         id="engine-nav"
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2 pl-4 pr-8 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-10 text-sm font-medium focus:ring-1 focus:ring-primary focus:outline-none"
                         onChange={handleSelectChange}
                         defaultValue=""
                     >
@@ -721,7 +721,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                             <option key={s.id} value={s.id}>{s.title}</option>
                         ))}
                     </select>
-                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">arrow_drop_down</span>
+                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 !text-[18px]">arrow_drop_down</span>
                 </div>
             </div>
 

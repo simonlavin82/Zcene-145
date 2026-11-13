@@ -445,7 +445,7 @@ export const MyTasteDialog: React.FC<{
                     if (filteredLabels.length === 0 && !canCreateCustom) return null;
 
                     return (
-                      <div className="absolute z-30 mt-1 w-full max-h-48 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                      <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
                         {canCreateCustom && (
                           <button
                             type="button"
@@ -453,10 +453,10 @@ export const MyTasteDialog: React.FC<{
                               updateProfile('favoriteLabel', cleanedTyped);
                               setIsLabelOpen(false);
                             }}
-                            className="w-full text-left px-3 py-1.5 text-xs text-primary hover:bg-zinc-800 transition-colors flex items-center justify-between border-b border-zinc-800/80"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-primary hover:bg-zinc-800 transition-colors flex items-center justify-between border-b border-zinc-800/80"
                           >
                             <span>Use custom label &ldquo;{cleanedTyped}&rdquo;</span>
-                            <span className="text-[9px] font-mono uppercase">Enter</span>
+                            <span className="text-[10px] font-mono uppercase">Enter</span>
                           </button>
                         )}
                         {filteredLabels.map(label => (
@@ -467,7 +467,7 @@ export const MyTasteDialog: React.FC<{
                               updateProfile('favoriteLabel', label);
                               setIsLabelOpen(false);
                             }}
-                            className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
                           >
                             {label}
                           </button>
@@ -493,7 +493,7 @@ export const MyTasteDialog: React.FC<{
                     className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
                   />
                   {isGenreOpen && (
-                    <div className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                    <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
                       {Object.entries(CANONICAL_GENRE_TAXONOMY).map(([category, genres]) => {
                         const q = (activeProfile.favoriteGenre || '').trim().toLowerCase();
                         const matches = genres.filter(g =>
@@ -503,7 +503,7 @@ export const MyTasteDialog: React.FC<{
                         if (matches.length === 0) return null;
                         return (
                           <div key={category} className="py-1">
-                            <div className="px-3 py-0.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+                            <div className="px-3.5 py-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
                               {category}
                             </div>
                             {matches.map(genre => (
@@ -514,7 +514,7 @@ export const MyTasteDialog: React.FC<{
                                   updateProfile('favoriteGenre', genre);
                                   setIsGenreOpen(false);
                                 }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                                className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
                               >
                                 {genre}
                               </button>
@@ -525,7 +525,7 @@ export const MyTasteDialog: React.FC<{
                       {CANONICAL_GENRES_FLAT.filter(g =>
                         g.toLowerCase().includes((activeProfile.favoriteGenre || '').trim().toLowerCase())
                       ).length === 0 && (
-                        <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical genres</div>
+                        <div className="px-3.5 py-2.5 text-xs text-zinc-500">No matching canonical genres</div>
                       )}
                     </div>
                   )}
@@ -547,7 +547,7 @@ export const MyTasteDialog: React.FC<{
                     className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
                   />
                   {isStyleOpen && (
-                    <div className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                    <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
                       {Object.entries(CANONICAL_STYLE_TAXONOMY).map(([category, styles]) => {
                         const q = (activeProfile.style || '').trim().toLowerCase();
                         const matches = styles.filter(s =>
@@ -557,7 +557,7 @@ export const MyTasteDialog: React.FC<{
                         if (matches.length === 0) return null;
                         return (
                           <div key={category} className="py-1">
-                            <div className="px-3 py-0.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+                            <div className="px-3.5 py-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
                               {category}
                             </div>
                             {matches.map(style => (
@@ -568,7 +568,7 @@ export const MyTasteDialog: React.FC<{
                                   updateProfile('style', style);
                                   setIsStyleOpen(false);
                                 }}
-                                className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                                className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
                               >
                                 {style}
                               </button>
@@ -579,7 +579,7 @@ export const MyTasteDialog: React.FC<{
                       {CANONICAL_STYLES_FLAT.filter(s =>
                         s.toLowerCase().includes((activeProfile.style || '').trim().toLowerCase())
                       ).length === 0 && (
-                        <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical styles</div>
+                        <div className="px-3.5 py-2.5 text-xs text-zinc-500">No matching canonical styles</div>
                       )}
                     </div>
                   )}
@@ -606,7 +606,7 @@ export const MyTasteDialog: React.FC<{
                       c.toLowerCase().includes(q)
                     );
                     return (
-                      <div className="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                      <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
                         {filtered.length > 0 ? (
                           filtered.map(country => (
                             <button
@@ -616,13 +616,13 @@ export const MyTasteDialog: React.FC<{
                                 updateProfile('favoriteOrigin', country);
                                 setIsOriginOpen(false);
                               }}
-                              className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center justify-between"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center justify-between"
                             >
                               <span>{country}</span>
                             </button>
                           ))
                         ) : (
-                          <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical countries (custom origin will be used)</div>
+                          <div className="px-3.5 py-2.5 text-xs text-zinc-500">No matching canonical countries (custom origin will be used)</div>
                         )}
                       </div>
                     );
@@ -1495,7 +1495,7 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
         <button
           type="button"
           onClick={() => setIsOpen(!isOpen)}
-          className="absolute right-2.5 text-zinc-400 hover:text-white p-1 rounded-lg transition-colors flex items-center justify-center cursor-pointer"
+          className="absolute right-1.5 w-8 h-8 rounded-lg text-zinc-400 hover:text-white transition-colors flex items-center justify-center cursor-pointer relative before:absolute before:inset-[-4px] before:content-['']"
         >
           <span className="material-symbols-outlined !text-[18px]">
             {isOpen ? 'arrow_drop_up' : 'arrow_drop_down'}
@@ -1506,14 +1506,14 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
       {isOpen && (
         <>
           <div className="fixed inset-0 z-[1190]" onClick={() => setIsOpen(false)} />
-          <div className="absolute left-0 right-0 top-full mt-1.5 bg-zinc-900 border border-zinc-700 rounded-xl max-h-48 overflow-y-auto z-[1200] scrollbar-thin py-1">
+          <div className="absolute left-0 right-0 top-full mt-1.5 bg-zinc-900 border border-zinc-700 rounded-xl max-h-56 overflow-y-auto z-[1200] scrollbar-thin p-1 space-y-0.5">
             <button
               type="button"
               onClick={() => {
                 onChange("None of these");
                 setIsOpen(false);
               }}
-              className={`w-full px-4 py-2 text-left text-xs font-medium transition-colors flex items-center justify-between cursor-pointer ${
+              className={`w-full px-4 py-2.5 text-left text-sm font-medium transition-colors rounded-lg flex items-center justify-between cursor-pointer ${
                 value === "None of these" 
                   ? 'bg-primary/10 text-primary font-semibold' 
                   : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
@@ -1521,7 +1521,7 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
             >
               <span>None of these</span>
               {value === "None of these" && (
-                <span className="material-symbols-outlined text-primary !text-[14px]">check</span>
+                <span className="material-symbols-outlined text-primary !text-[16px]">check</span>
               )}
             </button>
             {filtered.length > 0 ? (
@@ -1535,7 +1535,7 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
                       onChange(country);
                       setIsOpen(false);
                     }}
-                    className={`w-full px-4 py-2 text-left text-xs font-medium transition-colors flex items-center justify-between cursor-pointer ${
+                    className={`w-full px-4 py-2.5 text-left text-sm font-medium transition-colors rounded-lg flex items-center justify-between cursor-pointer ${
                       isSelected 
                         ? 'bg-primary/10 text-primary font-semibold' 
                         : 'text-zinc-300 hover:text-white hover:bg-zinc-800'
@@ -1543,7 +1543,7 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
                   >
                     <span>{country}</span>
                     {isSelected && (
-                      <span className="material-symbols-outlined text-primary !text-[14px]">check</span>
+                      <span className="material-symbols-outlined text-primary !text-[16px]">check</span>
                     )}
                   </button>
                 );

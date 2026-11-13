@@ -634,23 +634,23 @@ const DiscoveryFiltersPanel: React.FC<{
                   className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
                 {isOriginDropdownOpen && (
-                  <div className="absolute z-30 mt-1 w-full max-h-44 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                  <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
                     {filteredCountries.length > 0 ? (
                       filteredCountries.map(country => (
                         <button
                           key={country}
                           type="button"
                           onClick={() => handleAddOrigin(country)}
-                          className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center justify-between"
+                          className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors flex items-center justify-between"
                         >
                           <span>{country}</span>
-                          <span className="text-[9px] font-mono text-zinc-500">
+                          <span className="text-[10px] font-mono text-zinc-500">
                             {originMode === 'include' ? '+ Include' : '− Exclude'}
                           </span>
                         </button>
                       ))
                     ) : (
-                      <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical countries</div>
+                      <div className="px-3.5 py-2.5 text-xs text-zinc-500">No matching canonical countries</div>
                     )}
                   </div>
                 )}
@@ -709,7 +709,7 @@ const DiscoveryFiltersPanel: React.FC<{
                   className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
                 {isGenreDropdownOpen && (
-                  <div className="absolute z-30 mt-1 w-full max-h-52 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                  <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
                     {Object.entries(CANONICAL_GENRE_TAXONOMY).map(([category, genres]) => {
                       const matches = genres.filter(g =>
                         !selectedGenres.includes(g) &&
@@ -719,7 +719,7 @@ const DiscoveryFiltersPanel: React.FC<{
                       if (matches.length === 0) return null;
                       return (
                         <div key={category} className="py-1">
-                          <div className="px-3 py-0.5 text-[9px] font-mono uppercase tracking-wider text-zinc-500">
+                          <div className="px-3.5 py-1 text-[10px] font-mono uppercase tracking-wider text-zinc-500">
                             {category}
                           </div>
                           {matches.map(genre => (
@@ -727,7 +727,7 @@ const DiscoveryFiltersPanel: React.FC<{
                               key={genre}
                               type="button"
                               onClick={() => handleAddGenre(genre)}
-                              className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
                             >
                               {genre}
                             </button>
@@ -739,7 +739,7 @@ const DiscoveryFiltersPanel: React.FC<{
                       !selectedGenres.includes(g) &&
                       g.toLowerCase().includes(genreQuery.trim().toLowerCase())
                     ).length === 0 && (
-                      <div className="px-3 py-2 text-[11px] text-zinc-500">No matching canonical genres</div>
+                      <div className="px-3.5 py-2.5 text-xs text-zinc-500">No matching canonical genres</div>
                     )}
                   </div>
                 )}
@@ -795,15 +795,15 @@ const DiscoveryFiltersPanel: React.FC<{
                   className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
                 {isLabelDropdownOpen && (filteredLabelSuggestions.length > 0 || canCreateCustomLabel) && (
-                  <div className="absolute z-30 mt-1 w-full max-h-48 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1">
+                  <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
                     {canCreateCustomLabel && (
                       <button
                         type="button"
                         onClick={() => handleAddLabel(cleanedTypedLabel)}
-                        className="w-full text-left px-3 py-1.5 text-xs text-primary hover:bg-zinc-800 transition-colors flex items-center justify-between border-b border-zinc-800/80"
+                        className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-primary hover:bg-zinc-800 transition-colors flex items-center justify-between border-b border-zinc-800/80"
                       >
                         <span>Use custom label &ldquo;{cleanedTypedLabel}&rdquo;</span>
-                        <span className="text-[9px] font-mono uppercase">Enter</span>
+                        <span className="text-[10px] font-mono uppercase">Enter</span>
                       </button>
                     )}
                     {filteredLabelSuggestions.map(label => (
@@ -811,7 +811,7 @@ const DiscoveryFiltersPanel: React.FC<{
                         key={label}
                         type="button"
                         onClick={() => handleAddLabel(label)}
-                        className="w-full text-left px-3 py-1.5 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
+                        className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-300 hover:bg-zinc-800 hover:text-white transition-colors"
                       >
                         {label}
                       </button>
@@ -1085,8 +1085,8 @@ const LibraryDialog: React.FC<{
                             <span className="material-symbols-outlined !text-[14px] transition-transform duration-200" style={{ transform: isGenreOpen ? 'rotate(180deg)' : '' }}>expand_more</span>
                         </button>
                         {isGenreOpen && uniqueGenres.length > 0 && (
-                            <div className="absolute top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-1.5 w-auto sm:w-56 max-w-none rounded-xl border border-zinc-700 bg-zinc-950 z-20 flex flex-col">
-                                <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 rounded-t-xl">
+                            <div className="absolute top-full left-4 right-4 sm:left-auto sm:right-0 mt-2 sm:mt-1.5 w-auto sm:w-60 max-w-none rounded-xl border border-zinc-700 bg-zinc-950 z-20 flex flex-col p-1.5">
+                                <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-zinc-800 rounded-t-xl">
                                     <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Filter by Genre</span>
                                     {selectedGenres.length > 0 && (
                                         <button onClick={() => setSelectedGenres([])} className="text-[10px] font-semibold text-zinc-400 hover:text-primary transition-colors uppercase tracking-widest">
@@ -1094,16 +1094,16 @@ const LibraryDialog: React.FC<{
                                         </button>
                                     )}
                                 </div>
-                                <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5 rounded-b-xl">
+                                <div className="max-h-56 overflow-y-auto p-1 space-y-0.5 rounded-b-xl">
                                     {[...uniqueGenres].sort().map(genre => {
                                         const isChecked = selectedGenres.includes(genre);
                                         return (
-                                            <label key={genre} className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors ${ isChecked ? 'bg-primary/10' : 'hover:bg-zinc-800/80' }`}>
-                                                <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors ${ isChecked ? 'text-primary' : 'text-zinc-600' }`}>
+                                            <label key={genre} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${ isChecked ? 'bg-primary/10' : 'hover:bg-zinc-800/80' }`}>
+                                                <span className={`material-symbols-outlined !text-[18px] flex-shrink-0 transition-colors ${ isChecked ? 'text-primary' : 'text-zinc-600' }`}>
                                                     {isChecked ? 'check_box' : 'check_box_outline_blank'}
                                                 </span>
                                                 <input type="checkbox" checked={isChecked} onChange={() => handleGenreToggle(genre)} className="sr-only" />
-                                                <span className={`text-xs select-none truncate ${ isChecked ? 'text-white font-medium' : 'text-zinc-300' }`}>{genre}</span>
+                                                <span className={`text-sm select-none truncate ${ isChecked ? 'text-white font-medium' : 'text-zinc-300' }`}>{genre}</span>
                                             </label>
                                         );
                                     })}
@@ -2342,7 +2342,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               onMouseDown={(e) => e.preventDefault()}
                               onClick={() => handleSelectLibraryArtist(artist.name)}
                               onMouseEnter={() => setHighlightedSeedIndex(idx)}
-                              className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${
+                              className={`w-full text-left px-3.5 py-2.5 text-sm flex items-center justify-between gap-2.5 transition-colors ${
                                 isHighlighted
                                   ? 'bg-zinc-800 text-white'
                                   : 'text-zinc-300 hover:bg-zinc-800/70 hover:text-white'

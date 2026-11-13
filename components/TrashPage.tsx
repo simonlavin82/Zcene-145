@@ -394,35 +394,35 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                           <div className="flex items-center justify-end relative">
                             <button
                               onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
-                              className="w-7 h-7 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center"
+                              className="w-9 h-9 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center shrink-0 relative before:absolute before:inset-[-4px] before:content-['']"
                             >
                               <span className="material-symbols-outlined !text-xl">more_vert</span>
                             </button>
                             {activeMenuId === project.id && (
                               <>
                                 <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                <div className="absolute right-0 mt-8 w-44 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left antialiased">
+                                <div className="absolute right-0 top-10 w-56 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left antialiased space-y-0.5">
                                   {onRestoreProject && (
                                     <button
                                       onClick={() => {
                                         setActiveMenuId(null);
                                         onRestoreProject(project.id);
                                       }}
-                                      className="w-full text-left px-3 py-2 text-xs font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                                      className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
                                     >
-                                      <span className="material-symbols-outlined !text-[16px] text-emerald-400">restore</span>
+                                      <span className="material-symbols-outlined !text-[18px] text-emerald-400">restore</span>
                                       Restore (0T)
                                     </button>
                                   )}
-                                  <div className="border-t border-zinc-800/80 my-1" />
+                                  <div className="border-t border-zinc-800/80 my-2" />
                                   <button
                                     onClick={() => {
                                       setActiveMenuId(null);
                                       setProjectToPurge(project.id);
                                     }}
-                                    className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                                    className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
                                   >
-                                    <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete_forever</span>
+                                    <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete_forever</span>
                                     Delete Forever
                                   </button>
                                 </div>

@@ -291,7 +291,7 @@ const Header: React.FC<HeaderProps> = ({
                 <div className="relative">
                     <button 
                         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-                        className="h-8 w-8 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50"
+                        className="h-9 w-9 flex flex-shrink-0 items-center justify-center rounded-xl bg-zinc-900 text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 transition-colors leading-none shadow-lg border border-zinc-700/50 relative before:absolute before:inset-[-4px] before:content-['']"
                         title="Menu"
                     >
                         <MoreVertical size={18} />
@@ -305,7 +305,7 @@ const Header: React.FC<HeaderProps> = ({
                             initial={{ opacity: 0, y: 10, scale: 0.95 }}
                             animate={{ opacity: 1, y: 0, scale: 1 }}
                             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                            className="absolute right-0 top-full mt-2 w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased flex flex-col py-1"
+                            className="absolute right-0 top-full mt-2 w-56 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased flex flex-col p-1.5"
                           >
                             {onShare && (
                               <>
@@ -315,12 +315,12 @@ const Header: React.FC<HeaderProps> = ({
                                     onShare();
                                   }}
                                   disabled={isSharing}
-                                  className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all flex items-center gap-3 disabled:opacity-50"
+                                  className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-3 disabled:opacity-50"
                                 >
-                                  <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
+                                  <span className="material-symbols-outlined !text-[18px] text-zinc-500">share</span>
                                   Share
                                 </button>
-                                <div className="border-t border-zinc-800 w-full" />
+                                <div className="border-t border-zinc-800/80 my-1.5 w-full" />
                               </>
                             )}
                             <button
@@ -328,9 +328,9 @@ const Header: React.FC<HeaderProps> = ({
                                 setIsMobileMenuOpen(false);
                                 if (!user) onLogin?.(); else setIsTasteDialogOpen(true);
                               }}
-                              className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all flex items-center gap-3"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-3"
                             >
-                              <Flame size={16} className="text-zinc-500" />
+                              <Flame size={18} className="text-zinc-500" />
                               Style
                             </button>
                             <button
@@ -338,10 +338,10 @@ const Header: React.FC<HeaderProps> = ({
                                 setIsMobileMenuOpen(false);
                                 if (!user) onLogin?.(); else onOpenStack();
                               }}
-                              className="w-full text-left px-4 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all flex items-center justify-between"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center justify-between"
                             >
                               <div className="flex items-center gap-3">
-                                <StackIcon className="!text-[16px] text-zinc-500" />
+                                <StackIcon className="!text-[18px] text-zinc-500" />
                                 My Stack
                               </div>
                               {stackCount > 0 && (
@@ -361,7 +361,7 @@ const Header: React.FC<HeaderProps> = ({
             <div className="flex items-center gap-3 ml-1 relative">
                 <button 
                     onClick={() => setIsProfileOpen(!isProfileOpen)}
-                    className="group relative flex items-center justify-center pointer-events-auto"
+                    className="group relative flex items-center justify-center pointer-events-auto p-1 rounded-full before:absolute before:inset-[-4px] before:content-['']"
                     aria-label="Open profile menu"
                 >
                     {user ? (
@@ -391,17 +391,17 @@ const Header: React.FC<HeaderProps> = ({
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 top-full mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left antialiased"
+                        className="absolute right-0 top-full mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left antialiased"
                       >
                         {user ? (
-                          <div className="px-3 py-2.5 border-b border-white/5">
+                          <div className="px-3.5 py-2.5 border-b border-white/5">
                             <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Authenticated Account</p>
-                            <p className="text-xs font-medium text-zinc-200 truncate">{user.email}</p>
+                            <p className="text-sm font-medium text-zinc-200 truncate">{user.email}</p>
                           </div>
                         ) : (
-                          <div className="px-3 py-2.5 border-b border-white/5">
+                          <div className="px-3.5 py-2.5 border-b border-white/5">
                             <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Guest Account</p>
-                            <p className="text-xs font-medium text-zinc-400 truncate">Not Signed In</p>
+                            <p className="text-sm font-medium text-zinc-400 truncate">Not Signed In</p>
                           </div>
                         )}
 
@@ -409,22 +409,22 @@ const Header: React.FC<HeaderProps> = ({
                           <div className="p-1 border-b border-white/5">
                             <button
                               onClick={() => { setIsProfileOpen(false); onLogin(); }}
-                              className="w-full bg-white text-brand-black rounded-xl px-4 py-2 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-xs font-semibold cursor-pointer"
+                              className="w-full bg-white text-brand-black rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-sm font-semibold cursor-pointer"
                             >
-                              <span className="material-symbols-outlined !text-[14px] text-black font-bold">login</span>
+                              <span className="material-symbols-outlined !text-[16px] text-black font-bold">login</span>
                               Sign In with Google
                             </button>
                           </div>
                         )}
-                        <div className="p-1">
+                        <div className="p-0.5 space-y-0.5">
                           {/* 1. Top Up Tokens */}
                           {user && !isGuest && !isAdmin && (
                             <button
                               onClick={() => { setIsProfileOpen(false); triggerTopUpModal(); }}
-                              className="w-full text-left px-3 py-2 text-xs font-medium text-primary hover:bg-zinc-800 transition-all rounded-lg flex items-center justify-between gap-2 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-primary hover:bg-zinc-800 transition-all rounded-lg flex items-center justify-between gap-2.5 group"
                             >
-                              <span className="flex items-center gap-2">
-                                <span className="material-symbols-outlined !text-[16px] text-primary">bolt</span>
+                              <span className="flex items-center gap-2.5">
+                                <span className="material-symbols-outlined !text-[18px] text-primary">bolt</span>
                                 Top Up Tokens
                               </span>
                               <span className="font-mono text-[10px] bg-primary/15 border border-primary/30 px-1.5 py-0.5 rounded text-primary">
@@ -437,9 +437,9 @@ const Header: React.FC<HeaderProps> = ({
                           {!isGuest && (
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate('analytics'); }}
-                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                             >
-                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">monitoring</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">monitoring</span>
                               Discovery Ledger
                             </button>
                           )}
@@ -448,9 +448,9 @@ const Header: React.FC<HeaderProps> = ({
                           {user && !isGuest && (
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate('trash'); }}
-                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                             >
-                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">delete</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">delete</span>
                               Trash
                             </button>
                           )}
@@ -458,9 +458,9 @@ const Header: React.FC<HeaderProps> = ({
                           {/* 4. Help */}
                           <button
                             onClick={() => { setIsProfileOpen(false); onNavigate('help'); }}
-                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">help</span>
+                            <span className="material-symbols-outlined !text-[18px] text-zinc-500">help</span>
                             Help
                           </button>
 
@@ -468,9 +468,9 @@ const Header: React.FC<HeaderProps> = ({
                           {isAdmin && (
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate('engine'); }}
-                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                             >
-                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">settings_input_component</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">settings_input_component</span>
                               Engine
                             </button>
                           )}
@@ -479,9 +479,9 @@ const Header: React.FC<HeaderProps> = ({
                           {isAdmin && (
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate('design'); }}
-                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                             >
-                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">grid_view</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">grid_view</span>
                               Design System
                             </button>
                           )}
@@ -500,9 +500,9 @@ const Header: React.FC<HeaderProps> = ({
                                 }
                               }
                             }}
-                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">restart_alt</span>
+                            <span className="material-symbols-outlined !text-[18px] text-zinc-500">restart_alt</span>
                             Restart Walkthrough
                           </button>
 
@@ -512,31 +512,31 @@ const Header: React.FC<HeaderProps> = ({
                               setIsProfileOpen(false);
                               window.open(ZCENE_INSTAGRAM_URL, '_blank');
                             }}
-                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">camera_alt</span>
+                            <span className="material-symbols-outlined !text-[18px] text-zinc-500">camera_alt</span>
                             Instagram
-                            <span className="material-symbols-outlined !text-[10px] ml-auto opacity-40">open_in_new</span>
+                            <span className="material-symbols-outlined !text-[12px] ml-auto opacity-40">open_in_new</span>
                           </button>
                         </div>
 
                         {user && (
                           <>
-                            <div className="border-t border-zinc-800/80 my-1.5" />
-                            <div className="p-1">
+                            <div className="border-t border-zinc-800/80 my-2" />
+                            <div className="p-0.5 space-y-0.5">
                               <button
                                 onClick={() => { setIsProfileOpen(false); onLogout(); }}
-                                className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                                className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                               >
-                                <span className="material-symbols-outlined !text-[16px] text-zinc-500">logout</span>
+                                <span className="material-symbols-outlined !text-[18px] text-zinc-500">logout</span>
                                 Sign Out
                               </button>
-                              <div className="border-t border-zinc-800/80 my-1.5" />
+                              <div className="border-t border-zinc-800/80 my-2" />
                               <button
                                 onClick={() => { setIsProfileOpen(false); setIsDeleteAccountModalOpen(true); }}
-                                className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group"
+                                className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group"
                               >
-                                <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete_forever</span>
+                                <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete_forever</span>
                                 Delete Account
                               </button>
                             </div>

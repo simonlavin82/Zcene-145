@@ -179,7 +179,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
             >
               <button
                 onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
-                className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-all cursor-pointer flex items-center justify-center drop-shadow-md"
+                className="w-9 h-9 -mr-2 -mt-1 shrink-0 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition-all cursor-pointer flex items-center justify-center drop-shadow-md relative before:absolute before:inset-[-4px] before:content-['']"
               >
                 <span className="material-symbols-outlined !text-xl">more_vert</span>
               </button>
@@ -187,22 +187,22 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
               {activeMenuId === project.id && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                  <div className="absolute right-0 mt-2 w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
+                  <div className="absolute right-0 mt-2 w-56 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
                     {isTrashed ? (
-                      <>
+                      <div className="space-y-0.5">
                         {onRestoreProject && (
                           <button
                             onClick={() => {
                               setActiveMenuId(null);
                               onRestoreProject(project.id);
                             }}
-                            className="w-full text-left px-3 py-2 text-xs font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-emerald-400">restore</span>
+                            <span className="material-symbols-outlined !text-[18px] text-emerald-400">restore</span>
                             Restore (0T)
                           </button>
                         )}
-                        <div className="border-t border-zinc-800/80 my-1" />
+                        <div className="border-t border-zinc-800/80 my-2" />
                         <button
                           onClick={() => {
                             setActiveMenuId(null);
@@ -212,22 +212,22 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                               setProjectToDelete(project.id);
                             }
                           }}
-                          className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                          className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
                         >
-                          <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete_forever</span>
+                          <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete_forever</span>
                           Delete Forever
                         </button>
-                      </>
+                      </div>
                     ) : (
-                      <>
+                      <div className="space-y-0.5">
                         <button
                           onClick={() => {
                             setActiveMenuId(null);
                             handleRenameClick(project);
                           }}
-                          className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                          className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                         >
-                          <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
+                          <span className="material-symbols-outlined !text-[18px] text-zinc-500">edit</span>
                           Rename
                         </button>
                         {onShareProject && (
@@ -236,9 +236,9 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                               setActiveMenuId(null);
                               onShareProject(project);
                             }}
-                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
+                            <span className="material-symbols-outlined !text-[18px] text-zinc-500">share</span>
                             Share
                           </button>
                         )}
@@ -248,24 +248,24 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                               setActiveMenuId(null);
                               onDuplicateProject(project);
                             }}
-                            className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-zinc-500">content_copy</span>
+                            <span className="material-symbols-outlined !text-[18px] text-zinc-500">content_copy</span>
                             Duplicate
                           </button>
                         )}
-                        <div className="border-t border-zinc-800/80 my-1" />
+                        <div className="border-t border-zinc-800/80 my-2" />
                         <button
                           onClick={() => {
                             setActiveMenuId(null);
                             setProjectToDelete(project.id);
                           }}
-                          className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group cursor-pointer"
+                          className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
                         >
-                          <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete</span>
+                          <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete</span>
                           Move to Trash
                         </button>
-                      </>
+                      </div>
                     )}
                   </div>
                 </>

@@ -814,7 +814,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                               <div className="flex items-center justify-end relative">
                                 <button
                                   onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
-                                  className="w-7 h-7 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center"
+                                  className="w-9 h-9 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center shrink-0 relative before:absolute before:inset-[-4px] before:content-['']"
                                 >
                                   <span className="material-symbols-outlined !text-xl">more_vert</span>
                                 </button>
@@ -822,15 +822,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 {activeMenuId === project.id && (
                                   <>
                                     <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                    <div className="absolute right-0 top-8 w-48 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased">
+                                    <div className="absolute right-0 top-10 w-56 z-50 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased space-y-0.5">
                                       <button
                                         onClick={() => {
                                           setActiveMenuId(null);
                                           handleRenameClick(project);
                                         }}
-                                        className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                                        className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                                       >
-                                        <span className="material-symbols-outlined !text-[16px] text-zinc-500">edit</span>
+                                        <span className="material-symbols-outlined !text-[18px] text-zinc-500">edit</span>
                                         Rename
                                       </button>
                                           {onShareProject && (
@@ -839,9 +839,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                 setActiveMenuId(null);
                                                 onShareProject(project);
                                               }}
-                                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                                             >
-                                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">share</span>
+                                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">share</span>
                                               Share
                                             </button>
                                           )}
@@ -851,21 +851,21 @@ const Dashboard: React.FC<DashboardProps> = ({
                                                 setActiveMenuId(null);
                                                 onDuplicateProject(project);
                                               }}
-                                              className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2 group"
+                                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
                                             >
-                                              <span className="material-symbols-outlined !text-[16px] text-zinc-500">content_copy</span>
+                                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">content_copy</span>
                                               Duplicate
                                             </button>
                                           )}
-                                          <div className="border-t border-zinc-800/80 my-1" />
+                                          <div className="border-t border-zinc-800/80 my-2" />
                                           <button
                                             onClick={() => {
                                               setActiveMenuId(null);
                                               setProjectToDelete(project.id);
                                             }}
-                                            className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2 group"
+                                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
                                           >
-                                            <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete</span>
+                                            <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete</span>
                                             Move to Trash
                                           </button>
                                     </div>

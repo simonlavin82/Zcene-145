@@ -640,14 +640,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                 <div className="relative flex-1 min-w-0">
                     <select
                         id="styleguide-nav"
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2 pl-4 pr-8 text-xs font-medium focus:ring-1 focus:ring-primary focus:outline-none"
+                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-10 text-sm font-medium focus:ring-1 focus:ring-primary focus:outline-none"
                         onChange={handleSelectChange}
                         defaultValue=""
                     >
                         <option value="" disabled>Jump to section...</option>
                         {sections.map(section => (<option key={section.id} value={section.id}>{section.title}</option>))}
                     </select>
-                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 text-sm">arrow_drop_down</span>
+                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 !text-[18px]">arrow_drop_down</span>
                 </div>
             </div>
 
@@ -3266,7 +3266,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <div className="flex flex-col gap-1.5 min-w-0 flex-1">
                                                     <div className="flex items-center justify-between gap-3">
                                                         <h3 className="text-base font-medium text-white truncate">Midwest Emo Roots</h3>
-                                                        <div className="w-7 h-7 -mr-1.5 rounded-lg text-zinc-600 flex items-center justify-center">
+                                                        <div className="w-9 h-9 -mr-2 -mt-1 shrink-0 rounded-lg text-zinc-600 flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
                                                             <span className="material-symbols-outlined !text-xl">more_vert</span>
                                                         </div>
                                                     </div>
@@ -3363,7 +3363,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         </span>
                                                     </td>
                                                     <td className="py-4 px-6 text-right bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
-                                                        <span className="material-symbols-outlined text-zinc-600 !text-xl">more_vert</span>
+                                                        <div className="w-9 h-9 rounded-lg text-zinc-600 inline-flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
+                                                            <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                                 {/* Unmapped row (odd row style: bg-zinc-950/40) */}
@@ -3395,7 +3397,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                         </span>
                                                     </td>
                                                     <td className="py-4 px-6 text-right bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
-                                                        <span className="material-symbols-outlined text-zinc-600 !text-xl">more_vert</span>
+                                                        <div className="w-9 h-9 rounded-lg text-zinc-600 inline-flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
+                                                            <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             </tbody>
@@ -4087,38 +4091,38 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Unified Dropdown Anatomy</h3>
                                     <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex justify-center">
-                                        <div className="w-56 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1">
-                                            <div className="px-3 py-2.5 border-b border-white/5">
+                                        <div className="w-56 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5">
+                                            <div className="px-3.5 py-2.5 border-b border-white/5">
                                                 <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Authenticated Account</p>
-                                                <p className="text-xs font-medium text-zinc-200 truncate">user@example.com</p>
+                                                <p className="text-sm font-medium text-zinc-200 truncate">user@example.com</p>
                                             </div>
                                             
-                                            <div className="p-1">
-                                                <div className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 rounded-lg flex items-center gap-2">
-                                                    <span className="material-symbols-outlined !text-[16px] text-zinc-500">help</span>
+                                            <div className="p-0.5 space-y-0.5">
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5">
+                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500">help</span>
                                                     Help
                                                 </div>
-                                                <div className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 rounded-lg flex items-center gap-2">
-                                                    <span className="material-symbols-outlined !text-[16px] text-zinc-500">monitoring</span>
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5">
+                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500">monitoring</span>
                                                     Discovery Ledger
                                                 </div>
-                                                <div className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 rounded-lg flex items-center gap-2">
-                                                    <span className="material-symbols-outlined !text-[16px] text-zinc-500">camera_alt</span>
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5">
+                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500">camera_alt</span>
                                                     Instagram
-                                                    <span className="material-symbols-outlined !text-[10px] ml-auto opacity-40">open_in_new</span>
+                                                    <span className="material-symbols-outlined !text-[12px] ml-auto opacity-40">open_in_new</span>
                                                 </div>
                                             </div>
 
-                                            <div className="border-t border-zinc-800/80 my-1.5" />
+                                            <div className="border-t border-zinc-800/80 my-2" />
                                             
-                                            <div className="p-1">
-                                                <div className="w-full text-left px-3 py-2 text-xs font-medium text-zinc-400 rounded-lg flex items-center gap-2">
-                                                    <span className="material-symbols-outlined !text-[16px] text-zinc-500">logout</span>
+                                            <div className="p-0.5 space-y-0.5">
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5">
+                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500">logout</span>
                                                     Sign Out
                                                 </div>
-                                                <div className="border-t border-zinc-800/80 my-1.5" />
-                                                <div className="w-full text-left px-3 py-2 text-xs font-medium text-[#ef4444] rounded-lg flex items-center gap-2">
-                                                    <span className="material-symbols-outlined !text-[16px] text-[#ef4444]">delete_forever</span>
+                                                <div className="border-t border-zinc-800/80 my-2" />
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] rounded-lg flex items-center gap-2.5">
+                                                    <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete_forever</span>
                                                     Delete Account
                                                 </div>
                                             </div>
@@ -4128,22 +4132,22 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200 mt-12 mb-6">Multi-Select Filter Dropdown</h3>
                                     <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex justify-center">
                                         <div className="w-56 rounded-xl border border-zinc-700 bg-zinc-950 flex flex-col relative z-20">
-                                            <div className="flex items-center justify-between px-3 py-2 border-b border-zinc-800 rounded-t-xl">
+                                            <div className="flex items-center justify-between px-3.5 py-2.5 border-b border-zinc-800 rounded-t-xl">
                                                 <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Filter by Genre</span>
                                                 <button className="text-[10px] font-semibold text-zinc-400 hover:text-primary transition-colors uppercase tracking-widest">Clear</button>
                                             </div>
-                                            <div className="max-h-52 overflow-y-auto p-1.5 space-y-0.5 rounded-b-xl bg-zinc-950">
-                                                <label className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors hover:bg-zinc-800/80">
-                                                    <span className="material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors text-zinc-600">check_box_outline_blank</span>
-                                                    <span className="text-xs select-none truncate text-zinc-300">acoustic</span>
+                                            <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5 rounded-b-xl bg-zinc-950">
+                                                <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-colors hover:bg-zinc-800/80">
+                                                    <span className="material-symbols-outlined !text-[18px] flex-shrink-0 transition-colors text-zinc-600">check_box_outline_blank</span>
+                                                    <span className="text-sm select-none truncate text-zinc-300">acoustic</span>
                                                 </label>
-                                                <label className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors bg-primary/10">
-                                                    <span className="material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors text-primary">check_box</span>
-                                                    <span className="text-xs select-none truncate text-white font-medium">emo</span>
+                                                <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-colors bg-primary/10">
+                                                    <span className="material-symbols-outlined !text-[18px] flex-shrink-0 transition-colors text-primary">check_box</span>
+                                                    <span className="text-sm select-none truncate text-white font-medium">emo</span>
                                                 </label>
-                                                <label className="flex items-center gap-2.5 px-2.5 py-1.5 rounded-lg cursor-pointer transition-colors hover:bg-zinc-800/80">
-                                                    <span className="material-symbols-outlined !text-[16px] flex-shrink-0 transition-colors text-zinc-600">check_box_outline_blank</span>
-                                                    <span className="text-xs select-none truncate text-zinc-300">punk</span>
+                                                <label className="flex items-center gap-2.5 px-3 py-2.5 rounded-lg cursor-pointer transition-colors hover:bg-zinc-800/80">
+                                                    <span className="material-symbols-outlined !text-[18px] flex-shrink-0 transition-colors text-zinc-600">check_box_outline_blank</span>
+                                                    <span className="text-sm select-none truncate text-zinc-300">punk</span>
                                                 </label>
                                             </div>
                                         </div>
@@ -4157,12 +4161,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <p className="text-sm text-zinc-400">Separate distinct item groups (account info/guest sign-in, utilities, and session/destructive actions) using thin borders (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">border-zinc-800/80</code>) to maximize reading scannability.</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Border Radius</h4>
-                                            <p className="text-sm text-zinc-400">Dropdown containers use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl</code> (12px) as functional interactive signifiers, harmonizing with the surrounding softened structural panels.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Border Radius & Dimensions</h4>
+                                            <p className="text-sm text-zinc-400">Dropdown containers use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl</code> (12px) with universal <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">w-56</code> (224px) width and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">p-1.5</code> inner padding, pairing with <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">w-9 h-9</code> (44px touch target) triggers.</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Typography & Smoothing</h4>
-                                            <p className="text-sm text-zinc-400">Labels use compact <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-xs font-medium</code> styling to match high-density UI constraints, with metadata labels in tiny caps (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-[9px] font-bold uppercase</code>) like GUEST ACCOUNT. The container uses <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">antialiased</code> font smoothing to keep small sizes thin and readable.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Typography & Sizing</h4>
+                                            <p className="text-sm text-zinc-400">Labels use comfortable <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-sm font-medium</code> (14px) styling with 18px icons and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">px-3.5 py-2.5</code> (40px–42px row height) to ensure universal accessibility across both desktop and mobile viewports, with metadata labels in tiny caps (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-[9px] font-bold uppercase</code>) like GUEST ACCOUNT. The container uses <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">antialiased</code> font smoothing.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Icon Hover States</h4>
@@ -4174,7 +4178,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Sign-In Action CTA</h4>
-                                            <p className="text-sm text-zinc-400">Unauthenticated dropdowns feature a prominent primary CTA button (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-primary text-black rounded-xl px-4 py-2 text-xs font-semibold</code>) to bridge guest journeys immediately.</p>
+                                            <p className="text-sm text-zinc-400">Unauthenticated dropdowns feature a prominent primary CTA button (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-primary text-black rounded-xl px-4 py-2.5 text-sm font-semibold</code>) to bridge guest journeys immediately.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Multi-Select Filtering</h4>
