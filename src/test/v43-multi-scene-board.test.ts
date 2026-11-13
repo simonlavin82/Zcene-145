@@ -892,27 +892,27 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(scene2Seeds.length).toBe(1); // Badge displays '1'
     });
 
-    it('preserves mobile ROOTS tab on scene-pill change and restricts spatial camera zoom to desktop screens', () => {
+    it('preserves mobile ROOTS tab on scene-pill change while syncing CONNECTIONS camera across both mobile and desktop screens', () => {
       let activeMobileTab: 'artists' | 'spiderweb' | 'details' = 'artists';
       let focusedSceneClusterTriggered = false;
 
-      // Simulation of Scene pill click on mobile:
-      const onSelectSceneMobile = (sceneId: string, isSmallScreen: boolean) => {
-        // In V44, seedArtists effect that flipped to 'spiderweb' is removed.
-        // Active tab stays as whatever the user was on ('artists')
-        if (!isSmallScreen) {
+      // Simulation of Scene pill click across viewports:
+      const onSelectSceneSim = (sceneId: string, isMapped: boolean = true) => {
+        // Active tab stays as whatever the user was on ('artists') on mobile
+        if (isMapped) {
           focusedSceneClusterTriggered = true;
         }
       };
 
-      // Test mobile: isSmallScreen = true
-      onSelectSceneMobile('scene-2', true);
+      // Test mobile: retains ROOTS tab while triggering camera sync in the background
+      onSelectSceneSim('scene-2', true);
       expect(activeMobileTab).toBe('artists'); // Retained ROOTS tab!
-      expect(focusedSceneClusterTriggered).toBe(false); // No camera zoom on mobile!
+      expect(focusedSceneClusterTriggered).toBe(true); // Camera synchronized on mobile!
 
-      // Test desktop: isSmallScreen = false
-      onSelectSceneMobile('scene-2', false);
-      expect(focusedSceneClusterTriggered).toBe(true); // Camera zooms on desktop!
+      // Test desktop: camera synchronized on desktop
+      focusedSceneClusterTriggered = false;
+      onSelectSceneSim('scene-2', true);
+      expect(focusedSceneClusterTriggered).toBe(true); // Camera synchronized on desktop!
     });
 
     it('suppresses programmatic node hover in triggerNodeHover and clearNodeHover when isPassiveSelection is true', () => {

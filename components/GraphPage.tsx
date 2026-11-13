@@ -2207,7 +2207,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                           onClick={() => {
                             onSelectScene?.(sceneKey);
                             const isMapped = (scene.graphData?.nodes?.length ?? 0) > 0;
-                            if (!isSmallScreen && isMapped) {
+                            if (isMapped) {
                               setFocusedSceneCluster({ sceneId: sceneKey, timestamp: Date.now() });
                             }
                           }}
