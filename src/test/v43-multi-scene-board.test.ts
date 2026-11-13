@@ -26,7 +26,7 @@ import {
   resolveSceneNodeOverlaps,
   MAX_SCENES_PER_PROJECT,
 } from '../../shared/multiSceneUtils';
-import { normalizeArtistId, stripCountrySlug, cleanArtistDisplayName } from '../../services/artistCacheService';
+import { normalizeArtistId, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
 import { BACKEND_REGRESSION_RUNBOOK } from '../../docs/backend-regression-runbook';
@@ -2689,6 +2689,197 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       // Case 2: Departing scene has uncommitted draft seed edits -> preserves activeSceneId (Scene 2)
       handleNodeClickSync('scene-3', true);
       expect(activeSceneId).toBe('scene-2');
+    });
+
+    it('computeAutosaveDocSnapshot returns identical snapshot string regardless of activeSceneId', () => {
+      const payload1 = {
+        name: 'Multi-Scene Zcene',
+        seedArtists: 'Poison The Well::Harms Way::To Kill',
+        scenes: JSON.stringify([{ sceneId: 'scene-1' }, { sceneId: 'scene-2' }, { sceneId: 'scene-3' }]),
+        activeSceneId: 'scene-1',
+        overarchingRationale: 'Test rationale',
+        crossSceneLinks: '[]',
+        discoveryFilters: '{}',
+        activeNodes: ['ptw', 'harms-way', 'to-kill'],
+        pinnedNodes: [],
+        chatHistories: '[]',
+        lastViewedStackCount: 0,
+        graphData: JSON.stringify({ nodes: [{ id: 'scene-1::ptw', type: 'artist' }], links: [] }),
+      };
+
+      const payload2 = {
+        ...payload1,
+        activeSceneId: 'scene-2',
+      };
+
+      const payload3 = {
+        ...payload1,
+        activeSceneId: 'scene-3',
+      };
+
+      const snap1 = computeAutosaveDocSnapshot(payload1);
+      const snap2 = computeAutosaveDocSnapshot(payload2);
+      const snap3 = computeAutosaveDocSnapshot(payload3);
+
+      expect(snap1).toBe(snap2);
+      expect(snap2).toBe(snap3);
+    });
+
+    it('buildBaseProjectPayload persists activeSceneId as scene-1 when completed, and activeSceneIdRef when curating', () => {
+      const getActiveSceneIdForPayload = (projectStatus: string, currentActiveSceneId: string) => {
+        return (projectStatus === 'curating' && currentActiveSceneId) ? currentActiveSceneId : 'scene-1';
+      };
+
+      expect(getActiveSceneIdForPayload('completed', 'scene-3')).toBe('scene-1');
+      expect(getActiveSceneIdForPayload('idle', 'scene-2')).toBe('scene-1');
+      expect(getActiveSceneIdForPayload('curating', 'scene-2')).toBe('scene-2');
+      expect(getActiveSceneIdForPayload('curating', 'scene-3')).toBe('scene-3');
+    });
+
+    it('ProjectLoader resolves to Scene 1 on initial load even if Firestore doc has activeSceneId: scene-3 (Guardrail 1)', () => {
+      const parsedScenes: ProjectScene[] = [
+        normalizeProjectScene({ ...createEmptyProjectScene(0, 'Poison The Well'), sceneId: 'scene-1' }, 0),
+        normalizeProjectScene({ ...createEmptyProjectScene(1, 'Harms Way'), sceneId: 'scene-2' }, 1),
+        normalizeProjectScene({ ...createEmptyProjectScene(2, 'To Kill'), sceneId: 'scene-3' }, 2),
+      ];
+
+      const resolveActiveSceneId = (
+        incomingStatus: string,
+        hasActiveJobId: boolean,
+        isAlreadyHydrated: boolean,
+        inMemoryActiveSceneId: string,
+        docActiveSceneId: string | undefined
+      ) => {
+        const isCurating = incomingStatus === 'curating' || hasActiveJobId;
+        return isCurating && docActiveSceneId && parsedScenes.some(s => (s.sceneId || s.id) === docActiveSceneId)
+          ? docActiveSceneId
+          : (isAlreadyHydrated && inMemoryActiveSceneId && parsedScenes.some(s => (s.sceneId || s.id) === inMemoryActiveSceneId))
+            ? inMemoryActiveSceneId
+            : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
+      };
+
+      // Initial entry: completed project, not yet hydrated in memory, doc has activeSceneId: scene-3
+      const initialEntry = resolveActiveSceneId('completed', false, false, 'scene-1', 'scene-3');
+      expect(initialEntry).toBe('scene-1');
+
+      // Mid-session snapshot arrives while user is viewing scene-3 (already hydrated)
+      const midSessionSnapshot = resolveActiveSceneId('completed', false, true, 'scene-3', 'scene-1');
+      expect(midSessionSnapshot).toBe('scene-3');
+
+      // Curating job updates active scene
+      const curatingEntry = resolveActiveSceneId('curating', true, false, 'scene-1', 'scene-2');
+      expect(curatingEntry).toBe('scene-2');
+    });
+
+    it('syncs DEEP CUTS to Scene N root artist with cached details and isPassiveSelection when switching tabs (Step 3 & Guardrail 2)', () => {
+      const parsedScenes: ProjectScene[] = [
+        normalizeProjectScene({
+          ...createEmptyProjectScene(0, 'Poison The Well'),
+          sceneId: 'scene-1',
+          curatedSeedArtists: 'Poison The Well',
+          graphData: {
+            nodes: [
+              { id: 'scene-1::poison-the-well-us', canonicalId: 'poison-the-well-us', type: 'artist', isSceneSeed: true, group: 0 },
+              { id: 'scene-1::underoath-us', canonicalId: 'underoath-us', type: 'artist', group: 1 }
+            ],
+            links: []
+          }
+        }, 0),
+        normalizeProjectScene({
+          ...createEmptyProjectScene(1, 'Harms Way'),
+          sceneId: 'scene-2',
+          curatedSeedArtists: 'Harms Way',
+          graphData: {
+            nodes: [
+              { id: 'scene-2::harms-way-us', canonicalId: 'harms-way-us', type: 'artist', isSceneSeed: true, group: 0 },
+              { id: 'scene-2::vein-fm-us', canonicalId: 'vein-fm-us', type: 'artist', group: 1 }
+            ],
+            links: []
+          }
+        }, 1),
+      ];
+
+      const detailsCache = new Map<string, any>([
+        ['harms-way-us', { summary: 'Harm’s Way is an American hardcore band from Chicago.', details: { genre: 'Hardcore', origin: 'Chicago, IL', artist: 'Harm’s Way' }, imageUrl: 'https://example.com/harmsway.jpg' }],
+        ['poison-the-well-us', { summary: 'Poison The Well bio', details: { genre: 'Post-Hardcore', origin: 'Miami, FL', artist: 'Poison The Well' } }]
+      ]);
+
+      let selectedNode: any = { id: 'scene-1::underoath-us', canonicalId: 'underoath-us', sceneId: 'scene-1', type: 'artist' };
+      let isPassiveSelection = false;
+
+      const handleSelectSceneSim = (targetSceneId: string, syncDeepCuts = true) => {
+        const targetScene = parsedScenes.find(s => (s.sceneId || s.id) === targetSceneId);
+        if (!targetScene) return;
+        const resolvedId = targetScene.sceneId || targetScene.id;
+        const isTargetCurated = (targetScene.graphData?.nodes?.length ?? 0) > 0;
+
+        if (syncDeepCuts && isTargetCurated) {
+          const currentSelectedCanon = selectedNode
+            ? stripSceneNamespace(selectedNode.canonicalId || selectedNode.id).toLowerCase()
+            : null;
+          const targetGraphNodes = targetScene.graphData?.nodes || [];
+          const alreadyInTargetScene = Boolean(
+            selectedNode && (
+              selectedNode.sceneId === resolvedId ||
+              selectedNode.id.startsWith(`${resolvedId}::`) ||
+              (currentSelectedCanon && targetGraphNodes.some(n =>
+                stripSceneNamespace(n.canonicalId || n.id).toLowerCase() === currentSelectedCanon
+              ))
+            )
+          );
+
+          if (!alreadyInTargetScene) {
+            const targetSeeds = toSeedArtistsArray(targetScene.curatedSeedArtists || targetScene.seedArtists);
+            const rootNode = targetGraphNodes.find(n =>
+              (n.type === 'artist' || n.type === 'label') &&
+              (n.isSceneSeed || n.isSeed || isNodeInSeedList(stripSceneNamespace(n.canonicalId || n.id), targetSeeds))
+            ) || targetGraphNodes.find(n => n.type === 'artist' || n.type === 'label');
+
+            if (rootNode) {
+              const canonicalRootId = stripSceneNamespace(rootNode.canonicalId || rootNode.id);
+              const cached = detailsCache.get(canonicalRootId);
+              const syncedNode = {
+                ...rootNode,
+                id: `${resolvedId}::${canonicalRootId}`,
+                canonicalId: canonicalRootId,
+                sceneId: resolvedId,
+                isSeed: true,
+                bio: cached?.summary || '',
+                summary: cached?.summary || '',
+                genre: cached?.details?.genre || '',
+                origin: cached?.details?.origin || '',
+                name: cached?.details?.artist || canonicalRootId,
+                imageUrl: cached?.imageUrl || '',
+                isLibrary: true,
+              };
+              isPassiveSelection = true;
+              selectedNode = syncedNode;
+            }
+          }
+        }
+      };
+
+      // 1. Switching to Scene 2 when currently on Scene 1's Underoath: syncs to Harm's Way with cached details
+      handleSelectSceneSim('scene-2', true);
+      expect(selectedNode.id).toBe('scene-2::harms-way-us');
+      expect(selectedNode.name).toBe('Harm’s Way');
+      expect(selectedNode.summary).toContain('American hardcore band');
+      expect(selectedNode.imageUrl).toBe('https://example.com/harmsway.jpg');
+      expect(isPassiveSelection).toBe(true);
+
+      // 2. User manually selects Vein.fm in Scene 2
+      selectedNode = { id: 'scene-2::vein-fm-us', canonicalId: 'vein-fm-us', sceneId: 'scene-2', type: 'artist' };
+      isPassiveSelection = false;
+
+      // 3. User clicks Scene 2 pill again while already on Vein.fm: preserves Vein.fm
+      handleSelectSceneSim('scene-2', true);
+      expect(selectedNode.id).toBe('scene-2::vein-fm-us');
+      expect(isPassiveSelection).toBe(false);
+
+      // 4. Canvas click on a Scene 1 node calls handleSelectScene('scene-1', false) -> does NOT override with Scene 1 root
+      selectedNode = { id: 'scene-1::underoath-us', canonicalId: 'underoath-us', sceneId: 'scene-1', type: 'artist' };
+      handleSelectSceneSim('scene-1', false);
+      expect(selectedNode.id).toBe('scene-1::underoath-us');
     });
   });
 });

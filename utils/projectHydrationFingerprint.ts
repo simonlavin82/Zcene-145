@@ -102,7 +102,6 @@ export const computeAutosaveDocSnapshot = (data: any): string => {
     name: data.name || '',
     seedArtists: data.seedArtists || '',
     scenes: normalizeJson(data.scenes, '[]'),
-    activeSceneId: data.activeSceneId || 'scene-1',
     overarchingRationale: data.overarchingRationale || '',
     crossSceneLinks: normalizeJson(data.crossSceneLinks, '[]'),
     discoveryFilters: normalizeJson(data.discoveryFilters, '{}'),

@@ -1686,6 +1686,7 @@ const App: React.FC = () => {
   const overarchingRationaleRef = useRef<string>('');
   const crossSceneLinksRef = useRef<CrossSceneLink[]>([]);
   const lastAppliedFiltersRef = useRef<DiscoveryFilters>({});
+  const selectedNodeRef = useRef<Node | null>(null);
 
   useEffect(() => { currentProjectOwnerIdRef.current = currentProjectOwnerId; }, [currentProjectOwnerId]);
   useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
@@ -1702,6 +1703,7 @@ const App: React.FC = () => {
   useEffect(() => { overarchingRationaleRef.current = overarchingRationale; }, [overarchingRationale]);
   useEffect(() => { crossSceneLinksRef.current = crossSceneLinks; }, [crossSceneLinks]);
   useEffect(() => { lastAppliedFiltersRef.current = lastAppliedFilters; }, [lastAppliedFilters]);
+  useEffect(() => { selectedNodeRef.current = selectedNode; }, [selectedNode]);
 
   const syncGraphDataState = useCallback((g: any) => {
     graphDataRef.current = mergeGraphDataWithRationale(graphDataRef.current, g);
@@ -1758,7 +1760,7 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleSelectScene = useCallback((targetSceneId: string) => {
+  const handleSelectScene = useCallback((targetSceneId: string, syncDeepCuts: boolean = true) => {
     if (targetSceneId === activeSceneIdRef.current) return;
     curationSessionIdRef.current = null;
     sessionTokenApprovedRef.current = false;
@@ -1800,6 +1802,67 @@ const App: React.FC = () => {
     discoveryFiltersRef.current = nextFilters;
     lastAppliedFiltersRef.current = targetCuratedFilters || {};
     setLastAppliedFilters(targetCuratedFilters || {});
+
+    // Step 3 & Guardrail 2: Sync DEEP CUTS if switching curated scene tabs and current node is not in target scene
+    if (syncDeepCuts && isTargetCurated) {
+      const currentSelected = selectedNodeRef.current;
+      const targetGraphNodes = targetScene.graphData?.nodes || [];
+      const currentSelectedCanon = currentSelected
+        ? stripSceneNamespace(currentSelected.canonicalId || currentSelected.id).toLowerCase()
+        : null;
+
+      // Check if currentSelected already belongs to target scene
+      const alreadyInTargetScene = Boolean(
+        currentSelected && (
+          currentSelected.sceneId === resolvedId ||
+          currentSelected.id.startsWith(`${resolvedId}::`) ||
+          (currentSelectedCanon && targetGraphNodes.some(n => 
+            stripSceneNamespace(n.canonicalId || n.id).toLowerCase() === currentSelectedCanon
+          ))
+        )
+      );
+
+      if (!alreadyInTargetScene) {
+        const targetSeeds = toSeedArtistsArray(targetScene.curatedSeedArtists || targetScene.seedArtists);
+        const rootNode = targetGraphNodes.find(n =>
+          (n.type === 'artist' || n.type === 'label') &&
+          (n.isSceneSeed || n.isSeed || isNodeInSeedList(stripSceneNamespace(n.canonicalId || n.id), targetSeeds))
+        ) || targetGraphNodes.find(n => n.type === 'artist' || n.type === 'label');
+
+        if (rootNode) {
+          const canonicalRootId = stripSceneNamespace(rootNode.canonicalId || rootNode.id);
+          const disambiguatedCacheId = (rootNode as any).origin
+            ? `${canonicalRootId}-${normalizeArtistId((rootNode as any).origin)}`
+            : canonicalRootId;
+          const cachedDetails = detailsCacheRef.current.get(disambiguatedCacheId) ||
+            detailsCacheRef.current.get(canonicalRootId) ||
+            detailsCacheRef.current.get(canonicalRootId.toLowerCase()) ||
+            detailsCacheRef.current.get(rootNode.id) ||
+            detailsCacheRef.current.get(rootNode.id.toLowerCase());
+
+          const isLabelNode = rootNode.type === 'label';
+          const fallbackSummary = cachedDetails?.summary || (rootNode as any).summary || (rootNode as any).bio || "";
+          const syncedNode: Node = {
+            ...rootNode,
+            id: `${resolvedId}::${canonicalRootId}`,
+            canonicalId: canonicalRootId,
+            sceneId: resolvedId,
+            isSeed: true,
+            bio: fallbackSummary,
+            summary: fallbackSummary,
+            genre: cachedDetails?.details?.genre || (rootNode as any).genre || "",
+            origin: cachedDetails?.details?.origin || (rootNode as any).origin || "",
+            founded: cachedDetails?.details?.founded || (rootNode as any).founded || "",
+            name: cachedDetails?.details?.artist || rootNode.label || canonicalRootId,
+            imageUrl: isLabelNode ? null : (cachedDetails?.imageUrl || (cachedDetails as any)?.image || (rootNode as any).imageUrl || ""),
+            isLibrary: true,
+          };
+
+          setIsPassiveSelection(true);
+          setSelectedNode(syncedNode);
+        }
+      }
+    }
   }, []);
 
   const handleAddScene = useCallback(() => {
@@ -2768,7 +2831,7 @@ const App: React.FC = () => {
       const hasUncommittedEdits = areFiltersDirty || areSeedsDirty;
 
       if (!hasUncommittedEdits) {
-        handleSelectScene(nodeSceneId);
+        handleSelectScene(nodeSceneId, false);
       }
     }
 
@@ -3337,7 +3400,7 @@ const App: React.FC = () => {
       schemaVersion: 43,
       supportsLabelDeepCuts: true,
       scenes: JSON.stringify(scenesRef.current),
-      activeSceneId: activeSceneIdRef.current || 'scene-1',
+      activeSceneId: (projectStatus === 'curating' && activeSceneIdRef.current) ? activeSceneIdRef.current : 'scene-1',
       overarchingRationale: overarchingRationaleRef.current || '',
       crossSceneLinks: JSON.stringify(crossSceneLinksRef.current || []),
       sceneCount: Math.max(1, scenesRef.current.length),
@@ -6842,9 +6905,13 @@ const App: React.FC = () => {
         try {
           const parsedScenes: ProjectScene[] = parseProjectScenes(data.scenes);
           if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
-            const resolvedActiveSceneId = data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId)
+            const isCurating = incomingStatus === 'curating' || !!data.activeJobId;
+            const isAlreadyHydrated = Boolean(graphDataRef.current?.nodes && graphDataRef.current.nodes.length > 0);
+            const resolvedActiveSceneId = isCurating && data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId)
               ? data.activeSceneId
-              : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
+              : (isAlreadyHydrated && activeSceneIdRef.current && parsedScenes.some(s => (s.sceneId || s.id) === activeSceneIdRef.current))
+                ? activeSceneIdRef.current
+                : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
             activeSceneIdRef.current = resolvedActiveSceneId;
             setActiveSceneId(resolvedActiveSceneId);
             const activeIdxInParsed = parsedScenes.findIndex(s => (s.sceneId || s.id) === resolvedActiveSceneId);
@@ -7621,14 +7688,33 @@ const App: React.FC = () => {
         const urlSelected = searchParams.get('selected');
         if (!urlSelected && hasAutoSelectedRef.current !== currentProjectId) {
           hasAutoSelectedRef.current = currentProjectId;
-          const seedList = (seedArtists || '').split('::').map(s => s.trim()).filter(Boolean);
+          const currentScenes = scenesRef.current || [];
+          const scene1 = currentScenes[0];
+          const scene1Seeds = scene1 ? toSeedArtistsArray(scene1.seedArtists) : [];
+          const seedList = scene1Seeds.length > 0
+            ? scene1Seeds
+            : (seedArtists || '').split('::').map(s => s.trim()).filter(Boolean);
           const firstSeedNode = graphData.nodes.find(n => 
             (n.type === 'artist' || n.type === 'label') && isNodeInSeedList(stripSceneNamespace(n.canonicalId || n.id), seedList)
           );
           const defaultNode = firstSeedNode || graphData.nodes.find(n => n.type === 'artist' || n.type === 'label');
           if (defaultNode) {
-            console.log(`[Re-hydration Hook] Auto-selecting seed node for hydration:`, defaultNode.id);
-            setSelectedNode(defaultNode);
+            const canonicalId = stripSceneNamespace(defaultNode.canonicalId || defaultNode.id);
+            const cached = detailsCacheRef.current.get(canonicalId) ||
+              detailsCacheRef.current.get(canonicalId.toLowerCase()) ||
+              detailsCacheRef.current.get(defaultNode.id);
+            const hydratedDefaultNode = cached ? {
+              ...defaultNode,
+              bio: cached.summary || (defaultNode as any).bio || '',
+              summary: cached.summary || (defaultNode as any).summary || '',
+              genre: cached.details?.genre || (defaultNode as any).genre || '',
+              origin: cached.details?.origin || (defaultNode as any).origin || '',
+              founded: cached.details?.founded || (defaultNode as any).founded || '',
+              imageUrl: defaultNode.type === 'label' ? null : (cached.imageUrl || (defaultNode as any).imageUrl || ''),
+            } : defaultNode;
+            console.log(`[Re-hydration Hook] Auto-selecting seed node for hydration:`, hydratedDefaultNode.id);
+            setIsPassiveSelection(true);
+            setSelectedNode(hydratedDefaultNode);
           }
         }
       } else {
@@ -7934,11 +8020,11 @@ const App: React.FC = () => {
                     if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
                       scenesRef.current = parsedScenes;
                       setScenes(parsedScenes);
-                      const resolvedActiveId = data.activeSceneId || parsedScenes[0].sceneId || parsedScenes[0].id;
+                      const resolvedActiveId = parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1';
                       activeSceneIdRef.current = resolvedActiveId;
                       setActiveSceneId(resolvedActiveId);
                       // Top-level seedArtists is project-scoped (all scenes); ROOTS input is scene-scoped.
-                      const sharedActiveScene = parsedScenes.find(s => (s.sceneId || s.id) === resolvedActiveId) || parsedScenes[0];
+                      const sharedActiveScene = parsedScenes[0];
                       const sharedActiveSeeds = toSeedArtistsString(sharedActiveScene?.seedArtists);
                       if (sharedActiveSeeds) setSeedArtists(sharedActiveSeeds);
                     }
