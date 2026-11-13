@@ -1685,6 +1685,7 @@ const App: React.FC = () => {
   const activeSceneIdRef = useRef<string>('scene-1');
   const overarchingRationaleRef = useRef<string>('');
   const crossSceneLinksRef = useRef<CrossSceneLink[]>([]);
+  const lastAppliedFiltersRef = useRef<DiscoveryFilters>({});
 
   useEffect(() => { currentProjectOwnerIdRef.current = currentProjectOwnerId; }, [currentProjectOwnerId]);
   useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
@@ -1700,6 +1701,7 @@ const App: React.FC = () => {
   useEffect(() => { activeSceneIdRef.current = activeSceneId; }, [activeSceneId]);
   useEffect(() => { overarchingRationaleRef.current = overarchingRationale; }, [overarchingRationale]);
   useEffect(() => { crossSceneLinksRef.current = crossSceneLinks; }, [crossSceneLinks]);
+  useEffect(() => { lastAppliedFiltersRef.current = lastAppliedFilters; }, [lastAppliedFilters]);
 
   const syncGraphDataState = useCallback((g: any) => {
     graphDataRef.current = mergeGraphDataWithRationale(graphDataRef.current, g);
@@ -1796,6 +1798,7 @@ const App: React.FC = () => {
     const nextFilters = targetScene.discoveryFilters || {};
     setDiscoveryFilters(nextFilters);
     discoveryFiltersRef.current = nextFilters;
+    lastAppliedFiltersRef.current = targetCuratedFilters || {};
     setLastAppliedFilters(targetCuratedFilters || {});
   }, []);
 
@@ -2722,14 +2725,52 @@ const App: React.FC = () => {
       if (sceneMatch) {
         resolvedRawNode = sceneMatch;
       } else {
-        const anyMatch = graphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === canonicalNodeId);
-        if (anyMatch) resolvedRawNode = anyMatch;
+        // Guardrail 1: If node appears in multiple scenes, prefer instance in activeSceneId if present;
+        // otherwise pick earliest scene arrival (sceneIndex ascending)
+        const allMatches = graphData.nodes.filter(n => stripSceneNamespace(n.canonicalId || n.id) === canonicalNodeId);
+        if (allMatches.length > 0) {
+          const sorted = [...allMatches].sort((a, b) => (a.sceneIndex ?? 999) - (b.sceneIndex ?? 999));
+          resolvedRawNode = sorted[0];
+        }
       }
     }
     const node: Node = {
       ...resolvedRawNode,
       canonicalId: canonicalNodeId,
     };
+
+    // Step 3 & Guardrail 1: Sync activeSceneId in ROOTS when selecting a node in another scene without uncommitted draft edits
+    let nodeSceneId = resolvedRawNode.sceneId;
+    if (!nodeSceneId) {
+      const match = (resolvedRawNode.id || '').match(/^(scene-\d+)::/i);
+      if (match) nodeSceneId = match[1];
+    }
+    if (!nodeSceneId && scenesRef.current.length > 0) {
+      const activeScene = scenesRef.current.find(s => (s.sceneId || s.id) === activeSceneIdRef.current);
+      const inActive = activeScene?.graphData?.nodes?.some(n => stripSceneNamespace(n.canonicalId || n.id).toLowerCase() === canonicalNodeId.toLowerCase());
+      if (inActive) {
+        nodeSceneId = activeSceneIdRef.current;
+      } else {
+        const matchingScenes = scenesRef.current.filter(s =>
+          s.graphData?.nodes?.some(n => stripSceneNamespace(n.canonicalId || n.id).toLowerCase() === canonicalNodeId.toLowerCase())
+        );
+        if (matchingScenes.length > 0) {
+          nodeSceneId = matchingScenes[0].sceneId || matchingScenes[0].id;
+        }
+      }
+    }
+
+    if (nodeSceneId && nodeSceneId !== activeSceneIdRef.current) {
+      const departingScene = scenesRef.current.find(s => (s.sceneId || s.id) === activeSceneIdRef.current);
+      const areFiltersDirty = !areFiltersEqual(discoveryFiltersRef.current || {}, lastAppliedFiltersRef.current || {});
+      const curatedSeeds = toSeedArtistsString(departingScene?.curatedSeedArtists || departingScene?.seedArtists || '');
+      const areSeedsDirty = (seedArtistsRef.current || '').trim() !== curatedSeeds.trim();
+      const hasUncommittedEdits = areFiltersDirty || areSeedsDirty;
+
+      if (!hasUncommittedEdits) {
+        handleSelectScene(nodeSceneId);
+      }
+    }
 
     const isTouchInteraction = isSmallScreen || (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
     const isAlreadySelected = selectedNode && (
@@ -3120,7 +3161,7 @@ const App: React.FC = () => {
       setActiveNodeIds(prev => prev.some(id => id.toLowerCase() === node.id.toLowerCase()) ? prev : [...prev, node.id]);
     }
 
-  }, [selectedNode, peekedNode, isSmallScreen, supportsLabelDeepCuts, showToast, isGuest]);
+  }, [selectedNode, peekedNode, isSmallScreen, supportsLabelDeepCuts, showToast, isGuest, handleSelectScene]);
 
   const handleAddToStack = useCallback(async (node: Node, link?: string) => {
     if (!user) {

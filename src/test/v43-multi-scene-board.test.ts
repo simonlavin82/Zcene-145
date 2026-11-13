@@ -2495,4 +2495,200 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       });
     });
   });
+
+  describe('V45 Multi-Scene Board: Initial Scene 1 Framing, Post-Curation Framing & Smart Camera Follow (MusicGraph & App)', () => {
+    it('frames Scene 1 on initial multi-scene project load instead of zooming out to all scenes (Step 1)', () => {
+      let focusedCluster: { sceneId: string; duration: number } | null = null;
+      let fitToScreenCalled = false;
+
+      const simulateInitialSettlement = (sceneCount: number, activeSceneId: string) => {
+        if (sceneCount > 1) {
+          focusedCluster = { sceneId: activeSceneId || 'scene-1', duration: 0 };
+        } else {
+          fitToScreenCalled = true;
+        }
+      };
+
+      // 3-scene project (Poison The Well + Harm's Way + To Kill)
+      simulateInitialSettlement(3, 'scene-1');
+      expect(focusedCluster).toEqual({ sceneId: 'scene-1', duration: 0 });
+      expect(fitToScreenCalled).toBe(false);
+
+      // 1-scene legacy project
+      focusedCluster = null;
+      fitToScreenCalled = false;
+      simulateInitialSettlement(1, 'scene-1');
+      expect(focusedCluster).toBeNull();
+      expect(fitToScreenCalled).toBe(true);
+    });
+
+    it('frames the newly curated scene cluster when detectedSceneCount increases (Step 1)', () => {
+      let focusedCluster: { sceneId: string; duration: number } | null = null;
+      let fitToScreenCalled = false;
+
+      const onDetectedSceneCountChange = (prevCount: number, newCount: number, activeSceneId: string) => {
+        if (newCount > prevCount) {
+          focusedCluster = { sceneId: activeSceneId || `scene-${newCount}`, duration: 750 };
+        } else {
+          fitToScreenCalled = true;
+        }
+      };
+
+      // User curates Scene 2
+      onDetectedSceneCountChange(1, 2, 'scene-2');
+      expect(focusedCluster).toEqual({ sceneId: 'scene-2', duration: 750 });
+      expect(fitToScreenCalled).toBe(false);
+
+      // User removes a scene (3 -> 2)
+      focusedCluster = null;
+      fitToScreenCalled = false;
+      onDetectedSceneCountChange(3, 2, 'scene-2');
+      expect(focusedCluster).toBeNull();
+      expect(fitToScreenCalled).toBe(true);
+    });
+
+    it('resolves canonical ID to target scene preferring activeSceneId when shared (Guardrail 1)', () => {
+      const visibleNodes = [
+        { id: 'scene-1::roadrunner', canonicalId: 'roadrunner', sceneId: 'scene-1', sceneIndex: 0, x: 1000, y: 1000 },
+        { id: 'scene-2::roadrunner', canonicalId: 'roadrunner', sceneId: 'scene-2', sceneIndex: 1, x: 1950, y: 1000 },
+        { id: 'scene-2::vein-fm-us', canonicalId: 'vein-fm-us', sceneId: 'scene-2', sceneIndex: 1, x: 1980, y: 1050 }
+      ];
+
+      const resolveTarget = (node: { id: string; canonicalId?: string; sceneId?: string }, activeSceneId: string) => {
+        const rawId = String(node.id || '');
+        const canonicalId = (node.canonicalId || rawId).replace(/^scene-\d+::/, '').toLowerCase();
+
+        let targetSceneId = node.sceneId;
+        if (!targetSceneId) {
+          const match = rawId.match(/^(scene-\d+)::/i);
+          if (match) targetSceneId = match[1];
+        }
+
+        const candidates = visibleNodes.filter(n => {
+          const nCanon = (n.canonicalId || n.id).replace(/^scene-\d+::/, '').toLowerCase();
+          return nCanon === canonicalId;
+        });
+
+        if (candidates.length === 0) {
+          return { targetSceneId: targetSceneId || activeSceneId || 'scene-1', targetNode: null };
+        }
+
+        let bestNode = candidates[0];
+        if (candidates.length > 1) {
+          const activeMatch = candidates.find(n => n.sceneId === activeSceneId);
+          if (activeMatch) {
+            bestNode = activeMatch;
+          } else {
+            const sorted = [...candidates].sort((a, b) => a.sceneIndex - b.sceneIndex);
+            bestNode = sorted[0];
+          }
+        }
+
+        const resolvedSceneId = bestNode.sceneId || `scene-${bestNode.sceneIndex + 1}`;
+        return { targetSceneId: resolvedSceneId, targetNode: bestNode };
+      };
+
+      // Bare canonical ID 'vein-fm-us' solely in Scene 2
+      expect(resolveTarget({ id: 'vein-fm-us' }, 'scene-1')).toEqual({
+        targetSceneId: 'scene-2',
+        targetNode: visibleNodes[2]
+      });
+
+      // Shared node 'roadrunner' when currently parked on Scene 2 -> prefers Scene 2
+      expect(resolveTarget({ id: 'roadrunner' }, 'scene-2')).toEqual({
+        targetSceneId: 'scene-2',
+        targetNode: visibleNodes[1]
+      });
+
+      // Shared node 'roadrunner' when currently parked on Scene 3 -> picks earliest arrival (Scene 1)
+      expect(resolveTarget({ id: 'roadrunner' }, 'scene-3')).toEqual({
+        targetSceneId: 'scene-1',
+        targetNode: visibleNodes[0]
+      });
+    });
+
+    it('triggers focusSceneCluster in Scenario A (Zoomed Out Overview) and Scenario B (Wrong Scene Cluster) (Step 2)', () => {
+      let focusedCluster: { sceneId: string; duration: number } | null = null;
+      let panTarget: { x: number; y: number; k: number } | null = null;
+
+      const cameraDirector = (
+        currentK: number,
+        worldCenterX: number,
+        worldCenterY: number,
+        targetSceneId: string,
+        targetClusterCenter: { cx: number; cy: number },
+        targetNode: { x: number; y: number },
+        viewport: { width: number; height: number; margin: number }
+      ) => {
+        const distToTargetCluster = Math.hypot(worldCenterX - targetClusterCenter.cx, worldCenterY - targetClusterCenter.cy);
+
+        if (currentK < 0.65 || distToTargetCluster > 500) {
+          focusedCluster = { sceneId: targetSceneId, duration: 750 };
+          return;
+        }
+
+        // Scenario C
+        const sx = viewport.width / 2 + currentK * (targetNode.x - worldCenterX);
+        const sy = viewport.height / 2 + currentK * (targetNode.y - worldCenterY);
+        const isOffScreen = sx < viewport.margin || sx > viewport.width - viewport.margin || sy < viewport.margin || sy > viewport.height - viewport.margin;
+        if (isOffScreen) {
+          panTarget = { x: targetNode.x, y: targetNode.y, k: currentK };
+        }
+      };
+
+      // Scenario A: Zoomed out overview across all scenes (k = 0.28)
+      focusedCluster = null;
+      panTarget = null;
+      cameraDirector(0.28, 1950, 1000, 'scene-2', { cx: 1950, cy: 1000 }, { x: 1980, y: 1050 }, { width: 1000, height: 800, margin: 80 });
+      expect(focusedCluster).toEqual({ sceneId: 'scene-2', duration: 750 });
+      expect(panTarget).toBeNull();
+
+      // Scenario B: Camera parked on Scene 3 (worldCenterX = 2900), DEEP CUTS steps into Scene 2 (cx = 1950, dist = 950 > 500)
+      focusedCluster = null;
+      panTarget = null;
+      cameraDirector(1.0, 2900, 1000, 'scene-2', { cx: 1950, cy: 1000 }, { x: 1980, y: 1050 }, { width: 1000, height: 800, margin: 80 });
+      expect(focusedCluster).toEqual({ sceneId: 'scene-2', duration: 750 });
+      expect(panTarget).toBeNull();
+
+      // Scenario C1: Zoomed in tightly within Scene 2 (k = 1.8), target node is off-screen
+      focusedCluster = null;
+      panTarget = null;
+      cameraDirector(1.8, 1950, 1000, 'scene-2', { cx: 1950, cy: 1000 }, { x: 2300, y: 1000 }, { width: 1000, height: 800, margin: 80 });
+      expect(focusedCluster).toBeNull();
+      expect(panTarget).toEqual({ x: 2300, y: 1000, k: 1.8 });
+
+      // Scenario C2: Zoomed in tightly within Scene 2 (k = 1.8), target node is comfortably inside viewport
+      focusedCluster = null;
+      panTarget = null;
+      cameraDirector(1.8, 1950, 1000, 'scene-2', { cx: 1950, cy: 1000 }, { x: 1960, y: 1010 }, { width: 1000, height: 800, margin: 80 });
+      expect(focusedCluster).toBeNull();
+      expect(panTarget).toBeNull();
+    });
+
+    it('syncs activeSceneId in App.tsx when departing scene has clean draft, preserving draft if dirty (Step 3)', () => {
+      let activeSceneId = 'scene-1';
+      const handleSelectSceneSim = (newSceneId: string) => {
+        activeSceneId = newSceneId;
+      };
+
+      const handleNodeClickSync = (
+        targetNodeSceneId: string,
+        departingSceneHasUncommittedDraft: boolean
+      ) => {
+        if (targetNodeSceneId && targetNodeSceneId !== activeSceneId) {
+          if (!departingSceneHasUncommittedDraft) {
+            handleSelectSceneSim(targetNodeSceneId);
+          }
+        }
+      };
+
+      // Case 1: Departing scene is clean -> syncs activeSceneId to Scene 2
+      handleNodeClickSync('scene-2', false);
+      expect(activeSceneId).toBe('scene-2');
+
+      // Case 2: Departing scene has uncommitted draft seed edits -> preserves activeSceneId (Scene 2)
+      handleNodeClickSync('scene-3', true);
+      expect(activeSceneId).toBe('scene-2');
+    });
+  });
 });

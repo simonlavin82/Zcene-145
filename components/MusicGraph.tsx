@@ -674,8 +674,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const tx = width / 2 - cx * k;
     const ty = height / 2 - cy * k;
 
-    d3.select(svgRef.current).transition().duration(duration).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
+    if (duration === 0) {
+      zoomRef.current.transform(d3.select(svgRef.current), d3.zoomIdentity.translate(tx, ty).scale(k));
+    } else {
+      d3.select(svgRef.current).transition().duration(duration).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
+    }
   }, [scenes, fitGraphToScreen]);
+
+  const focusSceneClusterRef = useRef(focusSceneCluster);
+  useEffect(() => {
+    focusSceneClusterRef.current = focusSceneCluster;
+  }, [focusSceneCluster]);
 
   const lastFocusedClusterTimestampRef = useRef<number>(0);
   useEffect(() => {
@@ -701,12 +710,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
   useEffect(() => {
     if (lastSceneCountRef.current !== detectedSceneCount) {
+      const prevCount = lastSceneCountRef.current;
       lastSceneCountRef.current = detectedSceneCount;
-      if (fitGraphToScreenRef.current) {
+      if (detectedSceneCount > prevCount) {
+        const targetScene = activeSceneId || `scene-${detectedSceneCount}`;
+        focusSceneCluster(targetScene, 750);
+      } else if (fitGraphToScreenRef.current) {
         fitGraphToScreenRef.current(750);
       }
     }
-  }, [detectedSceneCount]);
+  }, [detectedSceneCount, activeSceneId, focusSceneCluster]);
 
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
@@ -1282,13 +1295,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     onSimulationCompleteRef.current();
                 }
 
-                if (!hasInitialCentered.current && fitGraphToScreenRef.current) {
+                if (!hasInitialCentered.current) {
                     hasInitialCentered.current = true;
                     
                     setTimeout(() => {
-                        if (fitGraphToScreenRef.current) {
+                        const sceneCount = detectedSceneCount;
+                        if (sceneCount > 1 && focusSceneClusterRef.current) {
+                            focusSceneClusterRef.current(activeSceneId || 'scene-1', 0);
+                        } else if (fitGraphToScreenRef.current) {
                             fitGraphToScreenRef.current(0);
-                            const sceneCount = detectedSceneCount;
                             if (sceneCount <= 1) {
                                 setTimeout(() => {
                                     if (svgRef.current && zoomRef.current) {
@@ -1833,23 +1848,153 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   // Used dimensions.width > 0 to trigger initial mount safely while preserving physics isolation during resizes
   }, [visibleNodes, visibleLinks, seedArtists, activeFilters, dimensions.width > 0]);
 
-  // Set tracking target when selectedNode or peekedNode changes
-  useEffect(() => {
-      const isSearchActive = searchQuery.trim().length > 0;
-      if (isSearchActive) return;
-      const activeNode = selectedNode || peekedNode;
-      const isMultiScene = detectedSceneCount > 1;
-      if (activeNode) {
-          // In multi-scene mode, do not auto-force camera tracking to Scene 1 on initial load/re-hydration
-          if (!isMultiScene) {
-              isTrackingRef.current = true;
-              targetNodeIdRef.current = activeNode.id;
-          }
-      } else {
-          isTrackingRef.current = false;
-          targetNodeIdRef.current = null;
+  const getSceneClusterCenter = useCallback((targetSceneId: string) => {
+    let targetIndex = -1;
+    if (scenes && scenes.length > 0) {
+      targetIndex = scenes.findIndex((s, idx) => (s.sceneId || s.id || `scene-${idx + 1}`) === targetSceneId);
+    }
+    if (targetIndex === -1) {
+      const match = targetSceneId.match(/^scene-(\d+)$/i);
+      if (match) targetIndex = parseInt(match[1], 10) - 1;
+    }
+
+    const clusterNodes = visibleNodesRef.current.filter(n => {
+      if (n.sceneId && n.sceneId === targetSceneId) return true;
+      if (n.id && n.id.startsWith(targetSceneId + '::')) return true;
+      if (targetIndex >= 0 && n.sceneIndex === targetIndex) return true;
+      return false;
+    });
+
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    let validCount = 0;
+    clusterNodes.forEach(n => {
+      if (n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y)) {
+        if (n.x < minX) minX = n.x;
+        if (n.x > maxX) maxX = n.x;
+        if (n.y < minY) minY = n.y;
+        if (n.y > maxY) maxY = n.y;
+        validCount++;
       }
-  }, [selectedNode, peekedNode, searchQuery]);
+    });
+
+    if (validCount > 0) {
+      return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, validCount };
+    }
+    const fallbackIdx = targetIndex >= 0 ? targetIndex : 0;
+    const center = getSceneCenterOffset(fallbackIdx);
+    return { cx: center.x, cy: center.y, validCount: 0 };
+  }, [scenes]);
+
+  const resolveTargetNodeAndScene = useCallback((node: Node | null) => {
+    if (!node) return null;
+    const rawId = String(node.id || '');
+    const canonicalId = stripSceneNamespace(node.canonicalId || rawId).toLowerCase();
+
+    // Check if node already has explicit sceneId or scene-k:: prefix
+    let targetSceneId = node.sceneId;
+    if (!targetSceneId) {
+      const match = rawId.match(/^(scene-\d+)::/i);
+      if (match) targetSceneId = match[1];
+    }
+
+    // Look up candidate matching nodes in visibleNodesRef.current
+    const candidates = visibleNodesRef.current.filter(n => {
+      const nCanon = stripSceneNamespace(n.canonicalId || n.id).toLowerCase();
+      return nCanon === canonicalId || isSameNodeId(n.id, node.id);
+    });
+
+    if (candidates.length === 0) {
+      return { targetSceneId: targetSceneId || activeSceneId || 'scene-1', targetNode: null };
+    }
+
+    // If node appears in multiple scenes, prefer instance in activeSceneId if present;
+    // otherwise pick earliest scene arrival (sceneIndex ascending)
+    let bestNode = candidates[0];
+    if (candidates.length > 1) {
+      const activeMatch = candidates.find(n => (n.sceneId === activeSceneId) || (n.id && n.id.startsWith((activeSceneId || '') + '::')));
+      if (activeMatch) {
+        bestNode = activeMatch;
+      } else {
+        const sorted = [...candidates].sort((a, b) => (a.sceneIndex ?? 999) - (b.sceneIndex ?? 999));
+        bestNode = sorted[0];
+      }
+    }
+
+    const resolvedSceneId = bestNode.sceneId || 
+      bestNode.id.match(/^(scene-\d+)::/i)?.[1] ||
+      (bestNode.sceneIndex !== undefined ? `scene-${bestNode.sceneIndex + 1}` : (targetSceneId || activeSceneId || 'scene-1'));
+
+    return { targetSceneId: resolvedSceneId, targetNode: bestNode };
+  }, [activeSceneId]);
+
+  const lastCameraFollowedNodeIdRef = useRef<string | null>(null);
+
+  // Smart Camera Follow: direct camera across Scenarios A, B, and C when navigating DEEP CUTS or selecting nodes
+  useEffect(() => {
+    const isSearchActive = searchQuery.trim().length > 0;
+    if (isSearchActive) return;
+
+    const activeNode = selectedNode || peekedNode;
+    if (!activeNode) {
+      isTrackingRef.current = false;
+      targetNodeIdRef.current = null;
+      lastCameraFollowedNodeIdRef.current = null;
+      return;
+    }
+
+    // Guardrail 2: On initial load / passive selection, Scene 1 framing is handled by focusSceneCluster on mount
+    if (isPassiveSelection) {
+      return;
+    }
+
+    const activeIdStr = String(activeNode.id || '');
+    if (lastCameraFollowedNodeIdRef.current === activeIdStr) {
+      return;
+    }
+    lastCameraFollowedNodeIdRef.current = activeIdStr;
+
+    if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0) return;
+
+    const resolution = resolveTargetNodeAndScene(activeNode);
+    if (!resolution) return;
+    const { targetSceneId, targetNode } = resolution;
+
+    const transform = d3.zoomTransform(svgRef.current);
+    const currentK = transform.k;
+    const { width, height } = dimensionsRef.current;
+    const worldCenterX = (width / 2 - transform.x) / currentK;
+    const worldCenterY = (height / 2 - transform.y) / currentK;
+
+    const targetClusterCenter = getSceneClusterCenter(targetSceneId);
+    const distToTargetCluster = Math.hypot(worldCenterX - targetClusterCenter.cx, worldCenterY - targetClusterCenter.cy);
+
+    // Scenario A (Zoomed Out Overview) or Scenario B (Camera Centered on Another Scene)
+    if (currentK < 0.65 || distToTargetCluster > 500) {
+      isTrackingRef.current = false;
+      targetNodeIdRef.current = null;
+      focusSceneCluster(targetSceneId, 750);
+      return;
+    }
+
+    // Scenario C (Zoomed In Within the Same Scene)
+    if (targetNode && typeof targetNode.x === 'number' && typeof targetNode.y === 'number' && !isNaN(targetNode.x) && !isNaN(targetNode.y)) {
+      const sx = transform.x + currentK * targetNode.x;
+      const sy = transform.y + currentK * targetNode.y;
+      const margin = 80;
+      const isOffScreen = sx < margin || sx > width - margin || sy < margin || sy > height - margin;
+
+      if (isOffScreen) {
+        isTrackingRef.current = false;
+        targetNodeIdRef.current = null;
+        const targetTx = width / 2 - currentK * targetNode.x;
+        const targetTy = height / 2 - currentK * targetNode.y;
+        d3.select(svgRef.current)
+          .transition()
+          .duration(600)
+          .call(zoomRef.current.transform as any, d3.zoomIdentity.translate(targetTx, targetTy).scale(currentK));
+      }
+    }
+  }, [selectedNode, peekedNode, searchQuery, isPassiveSelection, resolveTargetNodeAndScene, getSceneClusterCenter, focusSceneCluster]);
 
   // Pin Hover Box and highlight connections when selectedNode or peekedNode changes
   useEffect(() => {
