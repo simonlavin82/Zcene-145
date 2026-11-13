@@ -517,6 +517,26 @@ export function getSceneDisplayName(
 }
 
 /**
+ * Computes container-clamped horizontal positioning for dropdown menus
+ * anchored to flex-wrapping pills (e.g. Scene pills in the ROOTS drawer).
+ *
+ * Ensures 0px left cropping (left >= 0 in container) and 0px right cropping
+ * (left + menuWidth <= containerWidth) regardless of which row a pill wraps onto.
+ */
+export function computeClampedDropdownLeft(
+  pillOffsetLeft: number,
+  containerClientWidth: number,
+  menuWidth = 192
+): { idealLeftInContainer: number; offsetLeftRelativeToPill: number } {
+  const idealLeftInContainer = Math.max(
+    0,
+    Math.min(pillOffsetLeft, containerClientWidth - menuWidth)
+  );
+  const offsetLeftRelativeToPill = idealLeftInContainer - pillOffsetLeft;
+  return { idealLeftInContainer, offsetLeftRelativeToPill };
+}
+
+/**
  * Normalizes a `CrossSceneLink` so both `sourceSceneId`/`targetSceneId` and
  * `fromSceneId`/`toSceneId` (plus `sourceCanonicalId`/`targetCanonicalId` and
  * `fromNodeId`/`toNodeId`) are always populated and consistent.

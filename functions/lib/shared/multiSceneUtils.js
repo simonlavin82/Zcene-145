@@ -17,6 +17,7 @@ exports.isCanonicalSeedMatch = isCanonicalSeedMatch;
 exports.normalizeProjectScene = normalizeProjectScene;
 exports.createEmptyProjectScene = createEmptyProjectScene;
 exports.getSceneDisplayName = getSceneDisplayName;
+exports.computeClampedDropdownLeft = computeClampedDropdownLeft;
 exports.normalizeCrossSceneLink = normalizeCrossSceneLink;
 exports.computeDeterministicIdentityBridges = computeDeterministicIdentityBridges;
 exports.mergeCrossSceneLinks = mergeCrossSceneLinks;
@@ -501,6 +502,18 @@ function getSceneDisplayName(scene, fallbackIndex) {
             ? fallbackIndex
             : 0;
     return `Scene ${idx + 1}`;
+}
+/**
+ * Computes container-clamped horizontal positioning for dropdown menus
+ * anchored to flex-wrapping pills (e.g. Scene pills in the ROOTS drawer).
+ *
+ * Ensures 0px left cropping (left >= 0 in container) and 0px right cropping
+ * (left + menuWidth <= containerWidth) regardless of which row a pill wraps onto.
+ */
+function computeClampedDropdownLeft(pillOffsetLeft, containerClientWidth, menuWidth = 192) {
+    const idealLeftInContainer = Math.max(0, Math.min(pillOffsetLeft, containerClientWidth - menuWidth));
+    const offsetLeftRelativeToPill = idealLeftInContainer - pillOffsetLeft;
+    return { idealLeftInContainer, offsetLeftRelativeToPill };
 }
 /**
  * Normalizes a `CrossSceneLink` so both `sourceSceneId`/`targetSceneId` and

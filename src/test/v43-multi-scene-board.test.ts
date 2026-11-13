@@ -26,6 +26,7 @@ import {
   resolveSceneNodeOverlaps,
   MAX_SCENES_PER_PROJECT,
   getSceneDisplayName,
+  computeClampedDropdownLeft,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
@@ -2940,6 +2941,79 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(resolveCustomNameInput('SCENE 3')).toBeUndefined();
       expect(resolveCustomNameInput('PTW')).toBe('PTW');
       expect(resolveCustomNameInput('Melodic Hardcore')).toBe('Melodic Hardcore');
+    });
+  });
+
+  describe('Scene Pill more_vert Dynamic Container-Clamped Horizontal Positioning ([Rule 44])', () => {
+    const MENU_WIDTH = 192; // w-48 (12rem)
+
+    it('guarantees 0px left cropping when Scene 3 wraps to Row 2 at offsetLeft = 0 on mobile', () => {
+      // iPhone SE: containerEl.clientWidth = 343, Scene 3 wrapped to row 2 at offsetLeft = 0
+      const containerWidth = 343;
+      const scene3OffsetLeft = 0;
+
+      const { idealLeftInContainer, offsetLeftRelativeToPill } = computeClampedDropdownLeft(
+        scene3OffsetLeft,
+        containerWidth,
+        MENU_WIDTH
+      );
+
+      // Must start at left = 0 in container (0px left cropping)
+      expect(idealLeftInContainer).toBe(0);
+      expect(offsetLeftRelativeToPill).toBe(0);
+      // Right edge must not exceed container boundary
+      expect(idealLeftInContainer + MENU_WIDTH).toBeLessThanOrEqual(containerWidth);
+    });
+
+    it('shifts dropdown left to prevent right-edge clipping when pill is near the right edge of ROOTS drawer', () => {
+      // Narrow desktop ROOTS drawer: containerWidth = 280, pill at offsetLeft = 140
+      const containerWidth = 280;
+      const pillOffsetLeft = 140;
+
+      const { idealLeftInContainer, offsetLeftRelativeToPill } = computeClampedDropdownLeft(
+        pillOffsetLeft,
+        containerWidth,
+        MENU_WIDTH
+      );
+
+      // idealLeftInContainer = Math.max(0, Math.min(140, 280 - 192)) = 88
+      expect(idealLeftInContainer).toBe(88);
+      // Relative to pill: 88 - 140 = -52px (shifted 52px left)
+      expect(offsetLeftRelativeToPill).toBe(-52);
+      // Right edge exactly aligns with container edge (88 + 192 = 280)
+      expect(idealLeftInContainer + MENU_WIDTH).toBe(containerWidth);
+      // Left edge remains >= 0
+      expect(idealLeftInContainer).toBeGreaterThanOrEqual(0);
+    });
+
+    it('clamps to left = 0 without negative overflow even in ultra-narrow containers', () => {
+      const containerWidth = 160; // narrower than 192px menu
+      const pillOffsetLeft = 30;
+
+      const { idealLeftInContainer, offsetLeftRelativeToPill } = computeClampedDropdownLeft(
+        pillOffsetLeft,
+        containerWidth,
+        MENU_WIDTH
+      );
+
+      expect(idealLeftInContainer).toBe(0);
+      expect(offsetLeftRelativeToPill).toBe(-30);
+    });
+
+    it('preserves left = 0 relative to pill when pill and dropdown fit comfortably', () => {
+      const containerWidth = 500;
+      const pillOffsetLeft = 100;
+
+      const { idealLeftInContainer, offsetLeftRelativeToPill } = computeClampedDropdownLeft(
+        pillOffsetLeft,
+        containerWidth,
+        MENU_WIDTH
+      );
+
+      // Fits without shifting: 100 + 192 = 292 <= 500
+      expect(idealLeftInContainer).toBe(100);
+      expect(offsetLeftRelativeToPill).toBe(0);
+      expect(idealLeftInContainer + MENU_WIDTH).toBeLessThanOrEqual(containerWidth);
     });
   });
 });

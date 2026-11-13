@@ -5,7 +5,7 @@ import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
 import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, stripCountrySlug } from '../services/artistCacheService';
 import { hasActiveDiscoveryFilters, sanitizeAnchorLabelInput } from '../services/cacheQualification';
-import { toSeedArtistsArray, stripSceneNamespace, MAX_SCENES_PER_PROJECT } from '../shared/multiSceneUtils';
+import { toSeedArtistsArray, stripSceneNamespace, MAX_SCENES_PER_PROJECT, computeClampedDropdownLeft } from '../shared/multiSceneUtils';
 import HelpPage from './HelpPage';
 import Header from './Header';
 import MusicGraph from './MusicGraph';
@@ -1323,6 +1323,14 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const [sceneToRename, setSceneToRename] = useState<{ sceneId: string; currentName: string; index: number } | null>(null);
   const [sceneRenameInput, setSceneRenameInput] = useState('');
   const [activeSceneMenuId, setActiveSceneMenuId] = useState<string | null>(null);
+  const [sceneMenuOffsetLeft, setSceneMenuOffsetLeft] = useState<number>(0);
+
+  useEffect(() => {
+    if (!activeSceneMenuId) return;
+    const handleResize = () => setActiveSceneMenuId(null);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [activeSceneMenuId]);
   const [pendingUpdateSeed, setPendingUpdateSeed] = useState('');
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [isExpectingUpload, setIsExpectingUpload] = useState(false);
@@ -2188,7 +2196,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                       const isCurrent = sceneKey === activeSceneKey;
                       const seedCount = toSeedArtistsArray(scene.seedArtists).length;
                       const isMenuOpen = activeSceneMenuId === sceneKey;
-                      const menuAlignClass = idx === 0 ? 'left-0' : 'right-0';
                       const displayName = scene.customName || `Scene ${idx + 1}`;
 
                       return (
@@ -2224,67 +2231,87 @@ const GraphPage: React.FC<GraphPageProps> = ({
                             <button
                               type="button"
                               data-testid={`scene-menu-trigger-${sceneKey}`}
-                              onClick={() => setActiveSceneMenuId(isMenuOpen ? null : sceneKey)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isMenuOpen) {
+                                  setActiveSceneMenuId(null);
+                                } else {
+                                  const pillEl = e.currentTarget.closest('[data-testid^="scene-pill-"]') as HTMLElement | null;
+                                  const containerEl = pillEl?.parentElement as HTMLElement | null;
+                                  if (pillEl && containerEl) {
+                                    const { offsetLeftRelativeToPill } = computeClampedDropdownLeft(
+                                      pillEl.offsetLeft,
+                                      containerEl.clientWidth,
+                                      192
+                                    );
+                                    setSceneMenuOffsetLeft(offsetLeftRelativeToPill);
+                                  } else {
+                                    setSceneMenuOffsetLeft(0);
+                                  }
+                                  setActiveSceneMenuId(sceneKey);
+                                }
+                              }}
                               className="w-5 h-5 -mr-1 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
                               title={`Options for ${displayName}`}
                               aria-label={`Options for ${displayName}`}
                             >
                               <span className="material-symbols-outlined !text-[15px]">more_vert</span>
                             </button>
-
-                            {isMenuOpen && (
-                              <>
-                                <div className="fixed inset-0 z-10" onClick={() => setActiveSceneMenuId(null)} />
-                                <div 
-                                  className={`absolute top-full mt-1.5 ${menuAlignClass} w-48 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased space-y-0.5`}
-                                  onClick={(e) => e.stopPropagation()}
-                                >
-                                  {/* Rename Action */}
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setActiveSceneMenuId(null);
-                                      setSceneRenameInput(scene.customName || '');
-                                      setSceneToRename({ sceneId: sceneKey, currentName: displayName, index: idx + 1 });
-                                    }}
-                                    className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
-                                  >
-                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500">edit</span>
-                                    Rename
-                                  </button>
-
-                                  {/* Remove Action (shown when scenes.length > 1 and not guest) */}
-                                  {!isGuest && scenes.length > 1 && onRemoveScene && (
-                                    <>
-                                      <div className="my-2 border-t border-zinc-800/80" />
-                                      <button
-                                        type="button"
-                                        data-testid={`remove-scene-${sceneKey}`}
-                                        onClick={() => {
-                                          setActiveSceneMenuId(null);
-                                          const targetScene = scenes.find(s => (s.sceneId || s.id) === sceneKey);
-                                          const isMapped = (targetScene?.graphData?.nodes?.length || 0) > 0;
-                                          if (isMapped) {
-                                            setScenePendingRemoval({
-                                              sceneId: sceneKey,
-                                              title: targetScene?.customName || targetScene?.title || targetScene?.name || `Scene ${idx + 1}`,
-                                              index: idx + 1
-                                            });
-                                          } else {
-                                            onRemoveScene(sceneKey);
-                                          }
-                                        }}
-                                        className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
-                                      >
-                                        <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete</span>
-                                        Remove
-                                      </button>
-                                    </>
-                                  )}
-                                </div>
-                              </>
-                            )}
                           </div>
+
+                          {isMenuOpen && (
+                            <>
+                              <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); setActiveSceneMenuId(null); }} />
+                              <div 
+                                style={{ left: `${sceneMenuOffsetLeft}px` }}
+                                className="absolute top-full mt-1.5 w-48 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased space-y-0.5"
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                {/* Rename Action */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setActiveSceneMenuId(null);
+                                    setSceneRenameInput(scene.customName || '');
+                                    setSceneToRename({ sceneId: sceneKey, currentName: displayName, index: idx + 1 });
+                                  }}
+                                  className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
+                                >
+                                  <span className="material-symbols-outlined !text-[18px] text-zinc-500">edit</span>
+                                  Rename
+                                </button>
+
+                                {/* Remove Action (shown when scenes.length > 1 and not guest) */}
+                                {!isGuest && scenes.length > 1 && onRemoveScene && (
+                                  <>
+                                    <div className="my-2 border-t border-zinc-800/80" />
+                                    <button
+                                      type="button"
+                                      data-testid={`remove-scene-${sceneKey}`}
+                                      onClick={() => {
+                                        setActiveSceneMenuId(null);
+                                        const targetScene = scenes.find(s => (s.sceneId || s.id) === sceneKey);
+                                        const isMapped = (targetScene?.graphData?.nodes?.length || 0) > 0;
+                                        if (isMapped) {
+                                          setScenePendingRemoval({
+                                            sceneId: sceneKey,
+                                            title: targetScene?.customName || targetScene?.title || targetScene?.name || `Scene ${idx + 1}`,
+                                            index: idx + 1
+                                          });
+                                        } else {
+                                          onRemoveScene(sceneKey);
+                                        }
+                                      }}
+                                      className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
+                                    >
+                                      <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete</span>
+                                      Remove
+                                    </button>
+                                  </>
+                                )}
+                              </div>
+                            </>
+                          )}
                         </div>
                       );
                     })}
