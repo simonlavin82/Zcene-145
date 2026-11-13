@@ -1014,6 +1014,55 @@ describe('DetailsPanel', () => {
                 expect(cardPills[0].parentElement?.children[0]).toBe(cardPills[0]);
             });
 
+            it('resolves custom scene names for sceneMembershipLabel and Zine section badges', () => {
+                const customNamedScenes = [
+                    { ...multiScenes[0], customName: 'PTW' },
+                    { ...multiScenes[1], customName: "Harm's Way" },
+                    multiScenes[2],
+                ];
+
+                render(
+                    <DetailsPanel
+                        {...defaultProps}
+                        selectedNode={ptw}
+                        activeNodes={[ptw, shai, harms, toKill, bridgeLabel]}
+                        detailsCache={detailsCache}
+                        seedArtists={['Poison The Well']}
+                        scenes={customNamedScenes}
+                        isMagazineViewOpen={true}
+                    />
+                );
+
+                // Section header badges in Zine view use customName
+                expect(screen.getAllByText('PTW').length).toBeGreaterThan(0);
+                expect(screen.getAllByText("HARM'S WAY").length).toBeGreaterThan(0);
+                expect(screen.getAllByText('SCENE 3').length).toBeGreaterThan(0);
+
+                // Multi-scene bridge label resolves to custom names
+                expect(screen.getByText("PTW & HARM'S WAY")).toBeInTheDocument();
+            });
+
+            it('resolves mixed custom and default names as e.g. PTW & SCENE 2', () => {
+                const mixedScenes = [
+                    { ...multiScenes[0], customName: 'PTW' },
+                    multiScenes[1], // default Scene 2
+                ];
+
+                render(
+                    <DetailsPanel
+                        {...defaultProps}
+                        selectedNode={ptw}
+                        activeNodes={[ptw, shai, harms, bridgeLabel]}
+                        detailsCache={detailsCache}
+                        seedArtists={['Poison The Well']}
+                        scenes={mixedScenes}
+                        isMagazineViewOpen={true}
+                    />
+                );
+
+                expect(screen.getByText('PTW & SCENE 2')).toBeInTheDocument();
+            });
+
             it('renders ROOT badge for seed artists across all scenes (multi-scene ROOT badge parity)', () => {
                 render(
                     <DetailsPanel

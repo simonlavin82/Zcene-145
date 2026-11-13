@@ -130,6 +130,7 @@ interface GraphPageProps {
   onSelectScene?: (sceneId: string) => void;
   onAddScene?: () => void;
   onRemoveScene?: (sceneId: string) => void;
+  onRenameScene?: (sceneId: string, customName: string) => void;
   overarchingRationale?: string;
   crossSceneLinks?: CrossSceneLink[];
   isPassiveSelection?: boolean;
@@ -1186,6 +1187,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onSelectScene,
   onAddScene,
   onRemoveScene,
+  onRenameScene,
   overarchingRationale,
   crossSceneLinks,
   isPassiveSelection = false,
@@ -1318,6 +1320,9 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
   const [scenePendingRemoval, setScenePendingRemoval] = useState<{ sceneId: string; title: string; index: number } | null>(null);
+  const [sceneToRename, setSceneToRename] = useState<{ sceneId: string; currentName: string; index: number } | null>(null);
+  const [sceneRenameInput, setSceneRenameInput] = useState('');
+  const [activeSceneMenuId, setActiveSceneMenuId] = useState<string | null>(null);
   const [pendingUpdateSeed, setPendingUpdateSeed] = useState('');
   const [confirmOverwrite, setConfirmOverwrite] = useState(false);
   const [isExpectingUpload, setIsExpectingUpload] = useState(false);
@@ -2150,7 +2155,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
         <div className="flex-grow overflow-y-auto" style={{ overscrollBehaviorY: 'contain', flexBasis: 0 }}>
             {/* V43 Multi-Scene Switcher Strip */}
             {(scenes.length > 0 || (!isGuest && onAddScene)) && (
-              <div className="px-4 pt-4 pb-2 border-b border-zinc-800/80">
+              <div className={`px-4 pt-4 pb-2 border-b border-zinc-800/80 relative ${activeSceneMenuId ? 'z-[70]' : 'z-20'}`}>
                 <div className="flex items-center justify-between mb-2">
                   <h3 className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">
                     Scenes
@@ -2176,12 +2181,16 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   )}
                 </div>
                 {scenes.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5" role="tablist" aria-label="Project Scenes">
+                  <div className={`flex flex-wrap gap-1.5 relative ${activeSceneMenuId ? 'z-[70]' : ''}`} role="tablist" aria-label="Project Scenes">
                     {scenes.map((scene, idx) => {
                       const sceneKey = scene.sceneId || scene.id || `scene-${idx + 1}`;
                       const activeSceneKey = activeScene?.sceneId || activeScene?.id || activeSceneId;
                       const isCurrent = sceneKey === activeSceneKey;
                       const seedCount = toSeedArtistsArray(scene.seedArtists).length;
+                      const isMenuOpen = activeSceneMenuId === sceneKey;
+                      const menuAlignClass = idx === 0 ? 'left-0' : 'right-0';
+                      const displayName = scene.customName || `Scene ${idx + 1}`;
+
                       return (
                         <div
                           key={sceneKey}
@@ -2195,43 +2204,87 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               setFocusedSceneCluster({ sceneId: sceneKey, timestamp: Date.now() });
                             }
                           }}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none ${
+                          className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none ${
+                            isMenuOpen ? 'z-[70]' : ''
+                          } ${
                             isCurrent
                               ? 'bg-zinc-800 text-primary border border-zinc-700 ring-1 ring-primary/30 shadow-sm'
                               : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:border-zinc-700'
                           }`}
                         >
-                          <span>Scene {idx + 1}</span>
+                          <span>{displayName}</span>
                           {seedCount > 0 && (
                             <span className={`text-[10px] font-mono px-1 rounded ${isCurrent ? 'bg-primary/15 text-primary' : 'bg-zinc-900 text-zinc-500'}`}>
                               {seedCount}
                             </span>
                           )}
-                          {!isGuest && scenes.length > 1 && onRemoveScene && (
+
+                          {/* more_vert trigger button */}
+                          <div className="relative inline-flex items-center" onClick={(e) => e.stopPropagation()}>
                             <button
                               type="button"
-                              data-testid={`remove-scene-${sceneKey}`}
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                const targetScene = scenes.find(s => (s.sceneId || s.id) === sceneKey);
-                                const isMapped = (targetScene?.graphData?.nodes?.length || 0) > 0;
-                                if (isMapped) {
-                                  setScenePendingRemoval({
-                                    sceneId: sceneKey,
-                                    title: targetScene?.title || targetScene?.name || `Scene ${idx + 1}`,
-                                    index: idx + 1
-                                  });
-                                } else {
-                                  onRemoveScene(sceneKey);
-                                }
-                              }}
-                              className="ml-0.5 text-zinc-500 hover:text-red-400 transition-colors leading-none"
-                              title={`Remove Scene ${idx + 1}`}
-                              aria-label={`Remove Scene ${idx + 1}`}
+                              data-testid={`scene-menu-trigger-${sceneKey}`}
+                              onClick={() => setActiveSceneMenuId(isMenuOpen ? null : sceneKey)}
+                              className="w-5 h-5 -mr-1 rounded flex items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+                              title={`Options for ${displayName}`}
+                              aria-label={`Options for ${displayName}`}
                             >
-                              ×
+                              <span className="material-symbols-outlined !text-[15px]">more_vert</span>
                             </button>
-                          )}
+
+                            {isMenuOpen && (
+                              <>
+                                <div className="fixed inset-0 z-10" onClick={() => setActiveSceneMenuId(null)} />
+                                <div 
+                                  className={`absolute top-full mt-1.5 ${menuAlignClass} w-48 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased space-y-0.5`}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  {/* Rename Action */}
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setActiveSceneMenuId(null);
+                                      setSceneRenameInput(scene.customName || '');
+                                      setSceneToRename({ sceneId: sceneKey, currentName: displayName, index: idx + 1 });
+                                    }}
+                                    className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
+                                  >
+                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500">edit</span>
+                                    Rename
+                                  </button>
+
+                                  {/* Remove Action (shown when scenes.length > 1 and not guest) */}
+                                  {!isGuest && scenes.length > 1 && onRemoveScene && (
+                                    <>
+                                      <div className="my-2 border-t border-zinc-800/80" />
+                                      <button
+                                        type="button"
+                                        data-testid={`remove-scene-${sceneKey}`}
+                                        onClick={() => {
+                                          setActiveSceneMenuId(null);
+                                          const targetScene = scenes.find(s => (s.sceneId || s.id) === sceneKey);
+                                          const isMapped = (targetScene?.graphData?.nodes?.length || 0) > 0;
+                                          if (isMapped) {
+                                            setScenePendingRemoval({
+                                              sceneId: sceneKey,
+                                              title: targetScene?.customName || targetScene?.title || targetScene?.name || `Scene ${idx + 1}`,
+                                              index: idx + 1
+                                            });
+                                          } else {
+                                            onRemoveScene(sceneKey);
+                                          }
+                                        }}
+                                        className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
+                                      >
+                                        <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete</span>
+                                        Remove
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
+                              </>
+                            )}
+                          </div>
                         </div>
                       );
                     })}
@@ -2243,12 +2296,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
             {!isGuest && (
               <div className="mb-3">
                 {libraryArtists.length > 0 ? (
-                    <button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none">
+                    <button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white active:scale-95 transition-all text-xs font-medium leading-none cursor-pointer">
                       <span className="material-symbols-outlined !text-[16px]">queue_music</span>
                       Select from Library ({libraryArtists.length})
                     </button>
                 ) : (
-                    <button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none">
+                    <button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white active:scale-95 transition-all text-xs font-medium leading-none cursor-pointer">
                       <span className="material-symbols-outlined !text-[16px]">upload</span>
                       Import Music Library
                     </button>
@@ -2648,6 +2701,64 @@ const GraphPage: React.FC<GraphPageProps> = ({
                   className="px-4 py-1.5 bg-red-500 text-white rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
                 >
                   Remove Scene
+                </button>
+              </ModalFooter>
+            </ModalContainer>
+          </ModalBackdrop>
+        )}
+
+        {sceneToRename && (
+          <ModalBackdrop className="z-[110]" onClick={() => setSceneToRename(null)}>
+            <ModalContainer className="text-left sm:max-w-md">
+              <ModalHeader>
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-primary !text-[18px]">edit</span>
+                  <h3 className="text-base font-medium text-white">Rename Scene</h3>
+                </div>
+                <button 
+                  onClick={() => setSceneToRename(null)} 
+                  className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none cursor-pointer"
+                  aria-label="Close"
+                >
+                  <span className="material-symbols-outlined !text-[18px]">close</span>
+                </button>
+              </ModalHeader>
+
+              <ModalBody>
+                <input 
+                  type="text" 
+                  value={sceneRenameInput}
+                  onChange={(e) => setSceneRenameInput(e.target.value)}
+                  autoFocus
+                  autoComplete="off"
+                  data-1p-ignore="true"
+                  data-lpignore="true"
+                  placeholder={`Scene ${sceneToRename.index}`}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      onRenameScene?.(sceneToRename.sceneId, sceneRenameInput);
+                      setSceneToRename(null);
+                    }
+                  }}
+                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                />
+              </ModalBody>
+
+              <ModalFooter>
+                <button 
+                  onClick={() => setSceneToRename(null)} 
+                  className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    onRenameScene?.(sceneToRename.sceneId, sceneRenameInput);
+                    setSceneToRename(null);
+                  }} 
+                  className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 cursor-pointer"
+                >
+                  Save
                 </button>
               </ModalFooter>
             </ModalContainer>

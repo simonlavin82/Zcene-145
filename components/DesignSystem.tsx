@@ -4235,6 +4235,37 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                         </div>
                                     </div>
+
+                                    <h3 className="text-xl font-medium text-zinc-200 mt-12 mb-6">Scene Switcher Pill Menu</h3>
+                                    <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex flex-col items-center gap-6">
+                                        <div className="flex items-center gap-3">
+                                            <div className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-zinc-800 text-primary border border-zinc-700 ring-1 ring-primary/30 shadow-sm z-[70]">
+                                                <span>Scene 1</span>
+                                                <span className="text-[10px] font-mono px-1 rounded bg-primary/15 text-primary">1</span>
+                                                <div className="relative inline-flex items-center">
+                                                    <div className="w-5 h-5 -mr-1 rounded flex items-center justify-center text-white bg-zinc-800">
+                                                        <span className="material-symbols-outlined !text-[15px]">more_vert</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 text-xs font-medium leading-none">
+                                                <span className="material-symbols-outlined !text-[16px]">queue_music</span>
+                                                Select from Library (1084)
+                                            </button>
+                                        </div>
+
+                                        <div className="w-48 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black text-left">
+                                            <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5">
+                                                <span className="material-symbols-outlined !text-[18px] text-zinc-500">edit</span>
+                                                Rename
+                                            </div>
+                                            <div className="my-2 border-t border-zinc-800/80" />
+                                            <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] rounded-lg flex items-center gap-2.5">
+                                                <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete</span>
+                                                Remove
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Design Guidelines</h3>
@@ -4270,6 +4301,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Stacking Context & Rendering</h4>
                                             <p className="text-sm text-zinc-400">To prevent WebKit GPU clipping bugs, <strong>never use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">overflow-hidden</code> on an absolute container</strong> that holds a nested scrollable element. Instead, apply <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-t-xl</code> and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-b-xl</code> explicitly to the top and bottom inner children. Always wrap the trigger in <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">relative z-10</code> to elevate the stacking context safely above adjacent flex/scroll layers. <strong>Parent Container Elevation:</strong> When an absolute dropdown menu overflows its parent card, folder container, or table row, the parent wrapper must dynamically elevate its stacking context (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">z-50</code> when <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">activeMenuId</code> is active within it, pairing with <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">z-[70]</code> on the open menu container) to prevent later DOM siblings (such as subsequent folder tabs or table rows) from painting over the open menu.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Scene Switcher Pill Menu &amp; Drawer Alignment</h4>
+                                            <p className="text-sm text-zinc-400">Scene switcher pills feature a compact 3-dot <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">more_vert</code> trigger (!text-[15px]) opening a standardized Option 2 dropdown (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">w-48 p-1.5</code>, <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">px-3.5 py-2.5 text-sm</code>, and 18px icons). Within narrow drawer sidebars (e.g. ROOTS), pills dynamically align the menu (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">left-0</code> on initial pill, <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">right-0</code> on trailing pills) and elevate to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">z-[70]</code> to prevent horizontal clipping by drawer scroll containers.</p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Toolbar Button Parity</h4>
+                                            <p className="text-sm text-zinc-400">Toolbar action buttons (such as <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">+ Add Scene</code>, <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Select from Library</code>, and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Import Music Library</code>) share identical button architecture (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white text-xs font-medium</code>) for consistent visual weight across panels.</p>
                                         </div>
                                     </div>
                                 </div>

@@ -25,6 +25,7 @@ import {
   compactDetailsCacheToCanonical,
   resolveSceneNodeOverlaps,
   MAX_SCENES_PER_PROJECT,
+  getSceneDisplayName,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
@@ -2880,6 +2881,65 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       selectedNode = { id: 'scene-1::underoath-us', canonicalId: 'underoath-us', sceneId: 'scene-1', type: 'artist' };
       handleSelectSceneSim('scene-1', false);
       expect(selectedNode.id).toBe('scene-1::underoath-us');
+    });
+  });
+
+  describe('Custom Scene Names & Global Reversion Contract ([Rule 44])', () => {
+    it('preserves and trims customName in normalizeProjectScene', () => {
+      const rawScene = {
+        ...createEmptyProjectScene(0, 'Poison The Well'),
+        customName: '  PTW Roots  ',
+      };
+      const normalized = normalizeProjectScene(rawScene, 0);
+      expect(normalized.customName).toBe('PTW Roots');
+    });
+
+    it('omits customName if empty, whitespace-only, or missing', () => {
+      const rawScene1 = {
+        ...createEmptyProjectScene(0, 'Poison The Well'),
+        customName: '   ',
+      };
+      const normalized1 = normalizeProjectScene(rawScene1, 0);
+      expect(normalized1.customName).toBeUndefined();
+
+      const rawScene2 = {
+        ...createEmptyProjectScene(1, 'Harm\'s Way'),
+      };
+      const normalized2 = normalizeProjectScene(rawScene2, 1);
+      expect(normalized2.customName).toBeUndefined();
+    });
+
+    it('resolves display name via getSceneDisplayName with customName and fallbacks', () => {
+      const sceneWithCustom: Partial<ProjectScene> = {
+        sceneIndex: 0,
+        customName: 'Florida Hardcore',
+      };
+      expect(getSceneDisplayName(sceneWithCustom)).toBe('Florida Hardcore');
+
+      const sceneWithoutCustom: Partial<ProjectScene> = {
+        sceneIndex: 1,
+      };
+      expect(getSceneDisplayName(sceneWithoutCustom)).toBe('Scene 2');
+
+      const emptyScene: Partial<ProjectScene> = {};
+      expect(getSceneDisplayName(emptyScene, 2)).toBe('Scene 3');
+      expect(getSceneDisplayName(null, 0)).toBe('Scene 1');
+    });
+
+    it('implements global reversion contract: clearing or default "Scene N" sets customName to undefined', () => {
+      const resolveCustomNameInput = (input: string) => {
+        const trimmed = input.trim();
+        const isDefaultLabel = /^scene\s+\d+$/i.test(trimmed);
+        return (!trimmed || isDefaultLabel) ? undefined : trimmed;
+      };
+
+      expect(resolveCustomNameInput('')).toBeUndefined();
+      expect(resolveCustomNameInput('   ')).toBeUndefined();
+      expect(resolveCustomNameInput('Scene 1')).toBeUndefined();
+      expect(resolveCustomNameInput('scene 2')).toBeUndefined();
+      expect(resolveCustomNameInput('SCENE 3')).toBeUndefined();
+      expect(resolveCustomNameInput('PTW')).toBe('PTW');
+      expect(resolveCustomNameInput('Melodic Hardcore')).toBe('Melodic Hardcore');
     });
   });
 });

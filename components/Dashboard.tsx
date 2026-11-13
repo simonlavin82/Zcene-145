@@ -598,7 +598,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <div className="hidden md:group-hover:flex items-center">
                           <button 
                             onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} 
-                            className="w-6 h-6 rounded flex items-center justify-center opacity-75 hover:opacity-100 hover:bg-black/20 transition-all cursor-pointer" 
+                            className="flex items-center justify-center opacity-75 hover:opacity-100 transition-opacity cursor-pointer" 
                             style={{ color: crateTextColor }}
                             aria-label="Change crate color"
                           >
@@ -722,7 +722,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <div className="hidden md:group-hover:flex items-center pointer-events-auto">
                                   <button 
                                     onClick={(e) => { e.stopPropagation(); setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey); }} 
-                                    className="w-6 h-6 rounded flex items-center justify-center opacity-75 hover:opacity-100 hover:bg-black/20 transition-all cursor-pointer -my-1" 
+                                    className="flex items-center justify-center opacity-75 hover:opacity-100 transition-opacity cursor-pointer -my-1" 
                                     style={{ color: crateTextColor }}
                                     aria-label="Change crate color"
                                   >

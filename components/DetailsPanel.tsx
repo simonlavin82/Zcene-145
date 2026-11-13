@@ -821,6 +821,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     // Ordering A / Multi-Scene Membership Indicator ([Rule 29], [Rule 44])
     // Emits SCENE 1, SCENE 2, SCENE 1 & 2, SCENE 1, 2 & 3 based on presence in scenes[i].graphData.nodes.
+    // When custom scene names exist, resolves to e.g. PTW & HARM'S WAY, PTW & SCENE 2, or PTW.
     // Suppressed on single-scene projects (populatedScenes.length < 2) to eliminate visual noise.
     const sceneMembershipLabel = useMemo(() => {
         if (!scenes || !Array.isArray(scenes)) return null;
@@ -832,7 +833,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const targetLabel = (node.label || '').toLowerCase().trim();
         const isLabel = node.type === 'label';
 
-        const memberIndices: number[] = [];
+        const matchingScenes: { displayNum: number; customName?: string }[] = [];
 
         populatedScenes.forEach((scene, idx) => {
             const sceneNodes = scene?.graphData?.nodes || [];
@@ -851,16 +852,31 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
             if (isPresent) {
                 const displayNum = typeof scene.sceneIndex === 'number' ? scene.sceneIndex + 1 : idx + 1;
-                if (!memberIndices.includes(displayNum)) memberIndices.push(displayNum);
+                if (!matchingScenes.some(m => m.displayNum === displayNum)) {
+                    matchingScenes.push({
+                        displayNum,
+                        customName: scene.customName?.trim() || undefined,
+                    });
+                }
             }
         });
 
-        if (memberIndices.length === 0) return null;
-        memberIndices.sort((a, b) => a - b);
+        if (matchingScenes.length === 0) return null;
+        matchingScenes.sort((a, b) => a.displayNum - b.displayNum);
 
-        if (memberIndices.length === 1) return `SCENE ${memberIndices[0]}`;
-        if (memberIndices.length === 2) return `SCENE ${memberIndices[0]} & ${memberIndices[1]}`;
-        return `SCENE ${memberIndices.slice(0, -1).join(', ')} & ${memberIndices[memberIndices.length - 1]}`;
+        const hasAnyCustomName = matchingScenes.some(m => !!m.customName);
+
+        if (!hasAnyCustomName) {
+            const memberIndices = matchingScenes.map(m => m.displayNum);
+            if (memberIndices.length === 1) return `SCENE ${memberIndices[0]}`;
+            if (memberIndices.length === 2) return `SCENE ${memberIndices[0]} & ${memberIndices[1]}`;
+            return `SCENE ${memberIndices.slice(0, -1).join(', ')} & ${memberIndices[memberIndices.length - 1]}`;
+        }
+
+        const labels = matchingScenes.map(m => (m.customName || `Scene ${m.displayNum}`).toUpperCase());
+        if (labels.length === 1) return labels[0];
+        if (labels.length === 2) return `${labels[0]} & ${labels[1]}`;
+        return `${labels.slice(0, -1).join(', ')} & ${labels[labels.length - 1]}`;
     }, [node, scenes]);
 
     const activeTasteProfilesData = useMemo(() => {
@@ -2894,7 +2910,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             >
                                                 <div className="flex items-center flex-wrap gap-2 mb-4">
                                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
-                                                        SCENE {idx + 1}
+                                                        {(scene.customName && scene.customName.trim()) ? scene.customName.trim().toUpperCase() : `SCENE ${idx + 1}`}
                                                     </span>
                                                     {sceneSeeds.length > 0 && (
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">

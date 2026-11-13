@@ -1955,6 +1955,26 @@ const App: React.FC = () => {
     setLastAppliedFilters({});
   }, [activeNodeIds]);
 
+  const handleRenameScene = useCallback((sceneIdToRename: string, newCustomName: string) => {
+    const trimmed = newCustomName.trim();
+    // Guardrail 3: If user clears the input or enters default "Scene N", clear customName so it reverts to Scene N
+    const isDefaultLabel = /^scene\s+\d+$/i.test(trimmed);
+    const resolvedCustomName = (!trimmed || isDefaultLabel) ? undefined : trimmed;
+
+    const nextScenes = scenesRef.current.map((s, idx) => {
+      const match = (s.sceneId || s.id) === sceneIdToRename;
+      if (match) {
+        return normalizeProjectScene({
+          ...s,
+          customName: resolvedCustomName,
+        }, s.sceneIndex ?? idx);
+      }
+      return s;
+    });
+    scenesRef.current = nextScenes;
+    setScenes(nextScenes);
+  }, []);
+
   const handleRemoveScene = useCallback((sceneIdToRemove: string) => {
     const currentScenes = scenesRef.current;
     if (currentScenes.length <= 1) return;
@@ -9316,6 +9336,7 @@ const App: React.FC = () => {
               onSelectScene={handleSelectScene}
               onAddScene={handleAddScene}
               onRemoveScene={handleRemoveScene}
+              onRenameScene={handleRenameScene}
               overarchingRationale={overarchingRationale}
               crossSceneLinks={crossSceneLinks}
               isPassiveSelection={isPassiveSelection}

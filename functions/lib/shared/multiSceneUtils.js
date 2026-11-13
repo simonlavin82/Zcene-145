@@ -16,6 +16,7 @@ exports.toSeedArtistsString = toSeedArtistsString;
 exports.isCanonicalSeedMatch = isCanonicalSeedMatch;
 exports.normalizeProjectScene = normalizeProjectScene;
 exports.createEmptyProjectScene = createEmptyProjectScene;
+exports.getSceneDisplayName = getSceneDisplayName;
 exports.normalizeCrossSceneLink = normalizeCrossSceneLink;
 exports.computeDeterministicIdentityBridges = computeDeterministicIdentityBridges;
 exports.mergeCrossSceneLinks = mergeCrossSceneLinks;
@@ -449,6 +450,9 @@ function normalizeProjectScene(raw, fallbackIndex = 0) {
         sceneIndex,
         title,
         name: title,
+        ...(s.customName && typeof s.customName === 'string' && s.customName.trim()
+            ? { customName: s.customName.trim() }
+            : {}),
         seedArtists: resolvedSeedArtists,
         curatedSeedArtists,
         seedIds,
@@ -480,6 +484,24 @@ function createEmptyProjectScene(sceneIndex, seedArtists = '', discoveryFilters 
     }, sceneIndex);
 }
 exports.createEmptyScene = createEmptyProjectScene;
+/**
+ * Returns the resolved display name for a Scene.
+ * Uses `scene.customName` if set, otherwise falls back to `Scene ${index + 1}`.
+ */
+function getSceneDisplayName(scene, fallbackIndex) {
+    if (!scene) {
+        return typeof fallbackIndex === 'number' ? `Scene ${fallbackIndex + 1}` : 'Scene';
+    }
+    if (scene.customName && typeof scene.customName === 'string' && scene.customName.trim()) {
+        return scene.customName.trim();
+    }
+    const idx = typeof scene.sceneIndex === 'number'
+        ? scene.sceneIndex
+        : typeof fallbackIndex === 'number'
+            ? fallbackIndex
+            : 0;
+    return `Scene ${idx + 1}`;
+}
 /**
  * Normalizes a `CrossSceneLink` so both `sourceSceneId`/`targetSceneId` and
  * `fromSceneId`/`toSceneId` (plus `sourceCanonicalId`/`targetCanonicalId` and

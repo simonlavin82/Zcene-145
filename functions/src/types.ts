@@ -141,6 +141,7 @@ export interface ProjectScene {
   sceneIndex: number;                 // 0-based ordinal index (0, 1, 2, ...)
   title: string;                      // Default: seed names joined by ' + '
   name?: string;                      // Alias of title for UI/legacy compatibility
+  customName?: string;                // Optional user-defined display name (overrides 'Scene N' in UI)
   seedArtists: string;                // '::'-delimited seeds for this Scene
   curatedSeedArtists?: string;        // Frozen baseline seeds used to curate this scene's graphData
   seedIds: string[];                  // Canonical geographically-suffixed IDs
