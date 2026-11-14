@@ -1060,6 +1060,31 @@ const isGraphDataPresent = (data: any): boolean => {
   } catch { return false; }
 };
 
+export const BRAND_DOCUMENT_TITLE = 'Zcene - Own Music Discovery';
+
+/**
+ * Deterministically resolves the browser tab title based on the active view,
+ * project routing status, and current project display name.
+ * 
+ * Rules:
+ * - Active project routes (/p/:id, /z/:id in View.Graph) display `<Project Title> - Zcene`.
+ * - If displayProjectName is empty or 'Untitled Zcene', fallback to BRAND_DOCUMENT_TITLE (avoids "Untitled Zcene - Zcene").
+ * - All non-project routes (/dashboard, /analytics, /engine, /design, /trash, /help, /) reset to BRAND_DOCUMENT_TITLE.
+ */
+export function resolveDocumentTitle(
+  view: View,
+  isProjectActive: boolean,
+  displayProjectName?: string | null
+): string {
+  if (view === View.Graph && isProjectActive) {
+    const cleanTitle = displayProjectName?.trim();
+    if (cleanTitle && cleanTitle !== 'Untitled Zcene') {
+      return `${cleanTitle} - Zcene`;
+    }
+  }
+  return BRAND_DOCUMENT_TITLE;
+}
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Home);
   const currentViewRef = useRef<View>(View.Home);
@@ -2785,12 +2810,9 @@ const App: React.FC = () => {
   }, [projectName, seedArtists, scenes, graphData]);
 
   useEffect(() => {
-    if (displayProjectName && displayProjectName !== 'Untitled Zcene') {
-      document.title = `${displayProjectName} - Zcene`;
-    } else {
-      document.title = 'Zcene - Own Music Discovery';
-    }
-  }, [displayProjectName]);
+    const isProjectActive = Boolean(currentProjectId) || isViewingShare;
+    document.title = resolveDocumentTitle(currentView, isProjectActive, displayProjectName);
+  }, [currentView, currentProjectId, isViewingShare, displayProjectName]);
 
   useEffect(() => {
     const hasCuratedGraph = Boolean(graphData && graphData.nodes && graphData.nodes.length > 0);
@@ -7071,14 +7093,30 @@ const App: React.FC = () => {
   // Re-hydrate and Sync current project from Firestore (Real-Time)
   useEffect(() => {
     if (!isAuthInitialized || !isFirebaseReady || !currentProjectId) {
-      if (!currentProjectId) {
-        // Clear ephemeral state if no project selected
+      if (!currentProjectId && !isViewingShare) {
+        // Clear ephemeral & project-scoped state if no project selected and not viewing a share
         lastHydratedProjectFingerprintRef.current = '';
         setGraphData(null);
+        graphDataRef.current = null;
         setSeedArtists('');
+        seedArtistsRef.current = '';
+        setProjectName('');
+        projectNameRef.current = '';
+        setScenes([]);
+        scenesRef.current = [];
+        setCrossSceneLinks([]);
+        crossSceneLinksRef.current = [];
+        setOverarchingRationale('');
+        overarchingRationaleRef.current = '';
+        setProjectStatus(null);
+        projectStatusRef.current = null;
+        setActiveJobId(null);
+        activeJobIdRef.current = null;
         setActiveNodeIds([]);
         setDetailsCache(new Map());
+        detailsCacheRef.current = new Map();
         setChatHistories(new Map());
+        chatHistoriesRef.current = new Map();
         setCurrentCacheKey(null);
         setCurrentProjectOwnerId(null);
         overarchingZineImagesRef.current = [];
@@ -7086,6 +7124,7 @@ const App: React.FC = () => {
         overarchingZineIntroRef.current = '';
         setOverarchingZineIntro('');
         setSelectedNode(null);
+        selectedNodeRef.current = null;
         hasAutoSelectedRef.current = null;
         lastLocalChatUpdateAtRef.current = 0;
       }
@@ -7895,7 +7934,7 @@ const App: React.FC = () => {
       isMounted = false;
       unsubscribeList.forEach(u => u());
     };
-  }, [user, isAuthInitialized, isFirebaseReady, currentProjectId, navigate]);
+  }, [user, isAuthInitialized, isFirebaseReady, currentProjectId, isViewingShare, navigate]);
 
   // Reconnect to active background curation job if page refreshed during curation
   useEffect(() => {
