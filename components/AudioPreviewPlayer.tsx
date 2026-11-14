@@ -12,6 +12,7 @@ class GlobalAudioController {
   private static instance: GlobalAudioController;
   private audio: HTMLAudioElement | null = null;
   private currentTrackId: string | null = null;
+  private listenerAbortController: AbortController | null = null;
   private listeners = new Set<(trackId: string | null, isPlaying: boolean, currentTime: number, duration: number) => void>();
 
   private constructor() {
@@ -50,7 +51,7 @@ class GlobalAudioController {
     return this.currentTrackId === trackId && !!this.audio && !this.audio.paused && !this.audio.ended;
   }
 
-  public play(trackId: string, previewUrl: string) {
+  public play(trackId: string, previewUrl: string, onError?: (err: any) => void) {
     if (this.currentTrackId === trackId && this.audio) {
       // If audio reached the end, restart from beginning; otherwise resume from paused timestamp
       if (this.audio.ended || (this.audio.duration > 0 && this.audio.currentTime >= this.audio.duration - 0.2)) {
@@ -71,26 +72,54 @@ class GlobalAudioController {
 
     try {
       this.currentTrackId = trackId;
-      this.audio = new Audio(previewUrl);
-      this.audio.volume = 0.85;
+      const audio = new Audio(previewUrl);
+      this.audio = audio;
+      audio.volume = 0.85;
 
-      this.audio.addEventListener('play', () => this.notify());
-      this.audio.addEventListener('pause', () => this.notify());
-      this.audio.addEventListener('timeupdate', () => this.notify());
-      this.audio.addEventListener('ended', () => {
+      const ac = new AbortController();
+      this.listenerAbortController = ac;
+      const signal = ac.signal;
+
+      audio.addEventListener('play', () => {
+        if (this.audio !== audio) return;
+        this.notify();
+      }, { signal });
+
+      audio.addEventListener('pause', () => {
+        if (this.audio !== audio) return;
+        this.notify();
+      }, { signal });
+
+      audio.addEventListener('timeupdate', () => {
+        if (this.audio !== audio) return;
+        this.notify();
+      }, { signal });
+
+      audio.addEventListener('ended', () => {
+        if (this.audio !== audio) return;
         this.stop();
-      });
+      }, { signal });
 
-      this.audio.addEventListener('error', (e) => {
+      audio.addEventListener('error', (e) => {
+        if (this.audio !== audio) return;
         // Architecture V40: Ignore harmless teardown events triggered when audio.src is cleared on stop/unmount
-        if (!this.audio?.src || this.audio.src === '' || this.audio.src === window.location.href || !this.currentTrackId) return;
-        console.warn('[GlobalAudioController] Audio playback error:', e);
+        if (!audio.src || audio.src === '' || audio.src === window.location.href || !this.currentTrackId) return;
+        if (onError) {
+          onError(e);
+        } else {
+          console.warn('[GlobalAudioController] Audio playback error:', e);
+        }
         this.stop();
-      });
+      }, { signal });
 
-      this.audio.play().catch(err => {
+      audio.play().catch(err => {
+        if (this.audio !== audio) return;
         if (err.name === 'AbortError') return; // Silence rapid tap interruption
-        console.warn('[GlobalAudioController] Play stream error:', err);
+        if (onError) {
+          onError(err);
+        } else {
+          console.warn('[GlobalAudioController] Play stream error:', err);
+        }
         this.stop();
       });
     } catch (e) {
@@ -106,14 +135,27 @@ class GlobalAudioController {
   }
 
   public stop() {
-    if (this.audio) {
+    if (this.listenerAbortController) {
       try {
-        this.audio.pause();
-        this.audio.currentTime = 0;
-        this.audio.src = '';
+        this.listenerAbortController.abort();
       } catch (e) {}
-      this.audio = null;
+      this.listenerAbortController = null;
     }
+
+    const prevAudio = this.audio;
+    this.audio = null;
+
+    if (prevAudio) {
+      try {
+        prevAudio.pause();
+        prevAudio.currentTime = 0;
+        prevAudio.removeAttribute('src');
+        if (typeof prevAudio.load === 'function' && typeof navigator !== 'undefined' && !navigator.userAgent?.includes('jsdom')) {
+          prevAudio.load();
+        }
+      } catch (e) {}
+    }
+
     const prevId = this.currentTrackId;
     this.currentTrackId = null;
     if (prevId) {
@@ -166,6 +208,8 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
 
   const abortControllerRef = useRef<AbortController | null>(null);
   const onPreviewResolvedRef = useRef(onPreviewResolved);
+  const hasForceRefreshedRef = useRef(false);
+  const pendingPlayRef = useRef(false);
 
   useEffect(() => {
     onPreviewResolvedRef.current = onPreviewResolved;
@@ -185,7 +229,42 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
       setHasResolved(false);
     }
     setIsLoading(false);
+    hasForceRefreshedRef.current = false;
+    pendingPlayRef.current = false;
   }, [nodeId, initialPreviewUrl, initialTrackName, itunesArtistId]);
+
+  const playTrack = useCallback((trackPreviewUrl: string) => {
+    audioController.play(nodeId, trackPreviewUrl, (mediaErr) => {
+      const numericId = Number(itunesArtistId);
+      if (numericId > 0 && !hasForceRefreshedRef.current) {
+        hasForceRefreshedRef.current = true;
+        console.log(`[AudioPreviewPlayer] Playback error for ${nodeId} (iTunes ID: ${numericId}). Auto self-healing with fresh iTunes preview...`);
+        setIsLoading(true);
+        resolveArtistAudioPreview(numericId, undefined, extractTrailingCountryIso(nodeId), true)
+          .then(freshRes => {
+            setIsLoading(false);
+            if (freshRes?.previewUrl) {
+              setPreview(freshRes);
+              setHasResolved(true);
+              onPreviewResolvedRef.current?.({
+                previewUrl: freshRes.previewUrl,
+                previewTrackName: freshRes.previewTrackName,
+                itunesArtistId: freshRes.itunesArtistId,
+              });
+              audioController.play(nodeId, freshRes.previewUrl);
+            } else {
+              console.warn(`[AudioPreviewPlayer] Self-healing failed for ${nodeId}: No preview found.`);
+            }
+          })
+          .catch(err => {
+            setIsLoading(false);
+            console.warn(`[AudioPreviewPlayer] Self-healing lookup failed for ${nodeId}:`, err);
+          });
+      } else {
+        console.warn('[GlobalAudioController] Audio playback error:', mediaErr);
+      }
+    });
+  }, [nodeId, itunesArtistId]);
 
   // On-demand fetch if previewUrl is missing but verified itunesArtistId exists
   useEffect(() => {
@@ -215,6 +294,10 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
               previewTrackName: res.previewTrackName,
               itunesArtistId: res.itunesArtistId,
             });
+            if (pendingPlayRef.current) {
+              pendingPlayRef.current = false;
+              playTrack(res.previewUrl);
+            }
           }
         }
       })
@@ -228,7 +311,7 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
     return () => {
       ac.abort();
     };
-  }, [nodeId, itunesArtistId, hasResolved, preview?.previewUrl]);
+  }, [nodeId, itunesArtistId, hasResolved, preview?.previewUrl, playTrack]);
 
   // Stop playback on node switch or unmount
   useEffect(() => {
@@ -255,22 +338,39 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
     return unsubscribe;
   }, [nodeId]);
 
-  const handleTogglePlay = useCallback((e: React.MouseEvent) => {
-    e.stopPropagation();
+  const handleTogglePlay = useCallback((e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
     if (!preview?.previewUrl) return;
 
     if (isPlaying) {
       audioController.pause();
     } else {
-      audioController.play(nodeId, preview.previewUrl);
+      playTrack(preview.previewUrl);
     }
-  }, [nodeId, isPlaying, preview?.previewUrl]);
+  }, [isPlaying, preview?.previewUrl, playTrack]);
 
-  // If loading preview for a verified itunesArtistId, display centered glassmorphic pulse
+  // If loading preview for a verified itunesArtistId, display centered glassmorphic pulse (clickable to auto-play when resolved)
   if (isLoading && !preview?.previewUrl) {
     return (
-      <div className={`absolute inset-0 flex items-center justify-center pointer-events-none z-30 ${className}`}>
-        <div className="w-12 h-12 rounded-full bg-black/45 border border-white/20 flex items-center justify-center animate-pulse backdrop-blur-sm shadow-md">
+      <div 
+        className={`absolute inset-0 flex items-center justify-center cursor-pointer select-none z-30 ${className}`}
+        onClick={(e) => {
+          e.stopPropagation();
+          pendingPlayRef.current = true;
+        }}
+        tabIndex={0}
+        role="button"
+        aria-label="Loading audio preview... Click to auto-play when ready"
+        title="Loading audio preview... Click to auto-play when ready"
+        onKeyDown={(e) => {
+          if (e.key === ' ' || e.key === 'Enter') {
+            e.preventDefault();
+            e.stopPropagation();
+            pendingPlayRef.current = true;
+          }
+        }}
+      >
+        <div className="w-12 h-12 rounded-full bg-black/45 border border-white/20 flex items-center justify-center animate-pulse backdrop-blur-sm shadow-md transition-transform duration-200 hover:scale-105 active:scale-95">
           <div className="w-4 h-4 rounded-full bg-white/30" />
         </div>
       </div>

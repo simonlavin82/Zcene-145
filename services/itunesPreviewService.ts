@@ -27,14 +27,18 @@ const inFlightRequests = new Map<number, Promise<AudioPreviewResult | null>>();
 export async function resolveArtistAudioPreview(
   itunesArtistId?: number | null,
   signal?: AbortSignal,
-  countryIso?: string | null
+  countryIso?: string | null,
+  forceRefresh: boolean = false
 ): Promise<AudioPreviewResult | null> {
   const numericId = Number(itunesArtistId);
   if (!numericId || isNaN(numericId) || numericId <= 0) {
     return null;
   }
 
-  if (previewMemoryCache.has(numericId)) {
+  if (forceRefresh) {
+    previewMemoryCache.delete(numericId);
+    inFlightRequests.delete(numericId);
+  } else if (previewMemoryCache.has(numericId)) {
     return previewMemoryCache.get(numericId) ?? null;
   }
 

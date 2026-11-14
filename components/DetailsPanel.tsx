@@ -17,7 +17,7 @@ import { formatSystemTimestamp, extractInitials } from '../utils/formatters';
 import { Select, InputSizes, LayoutSizes, Button } from './DesignSystem';
 import { Flame, Pin } from 'lucide-react';
 import { useDominantColor } from '../hooks/useDominantColor';
-import { AudioPreviewPlayer, stopGlobalAudio } from './AudioPreviewPlayer';
+import { AudioPreviewPlayer, stopGlobalAudio, audioController } from './AudioPreviewPlayer';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
 export const getArtistDisplayName = (details: any, node: any): string => {
@@ -2542,6 +2542,16 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             }
         }
     }, [selectedNode, filteredAndSortedNodes]);
+
+    // Stop active audio preview when switching viewed node in panel mode
+    useEffect(() => {
+        if (!isMagazineViewOpen && viewedNode?.id) {
+            const currentAudioTrack = audioController.getCurrentTrackId();
+            if (currentAudioTrack && currentAudioTrack !== viewedNode.id) {
+                stopGlobalAudio();
+            }
+        }
+    }, [viewedNode?.id, isMagazineViewOpen]);
 
     const viewedNodeDetails = viewedNode 
         ? (detailsCache.get(viewedNode.id) || detailsCache.get(viewedNode.id.toLowerCase()) || detailsCache.get(normalizeArtistId(viewedNode.id)) || null)

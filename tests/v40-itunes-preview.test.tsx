@@ -208,6 +208,187 @@ describe('Architecture V40: Instant 30-Second iTunes Audio Previews', () => {
 
       expect(stopSpy).toHaveBeenCalled();
     });
+
+    it('switches from Track A to Track B without teardown race when previous audio emits async error event', async () => {
+      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      let trackAAudioInstance: any = null;
+      const originalAudio = window.Audio;
+
+      // Intercept Audio construction to capture Track A's element
+      window.Audio = vi.fn().mockImplementation(function(src: string) {
+        const el = document.createElement('audio');
+        el.src = src;
+        vi.spyOn(el, 'play').mockImplementation(async function() {
+          Object.defineProperty(el, 'paused', { value: false, configurable: true });
+        });
+        vi.spyOn(el, 'pause').mockImplementation(function() {
+          Object.defineProperty(el, 'paused', { value: true, configurable: true });
+        });
+        if (src && src.includes('track-a')) {
+          trackAAudioInstance = el;
+        }
+        return el;
+      }) as any;
+
+      // 1. Play Track A
+      audioController.play('track-a', 'https://test.com/track-a.m4a');
+      expect(audioController.getCurrentTrackId()).toBe('track-a');
+
+      // 2. Play Track B on the first click
+      audioController.play('track-b', 'https://test.com/track-b.m4a');
+      expect(audioController.getCurrentTrackId()).toBe('track-b');
+
+      // 3. Simulate browser asynchronously firing error event on Track A after teardown
+      if (trackAAudioInstance) {
+        trackAAudioInstance.dispatchEvent(new Event('error'));
+      }
+
+      // Assert Track B remains active and zero audio playback warning logs occurred
+      expect(audioController.getCurrentTrackId()).toBe('track-b');
+      expect(audioController.isTrackPlaying('track-b')).toBe(true);
+
+      const audioPlaybackWarnings = consoleWarnSpy.mock.calls.filter(call =>
+        typeof call[0] === 'string' && call[0].includes('[GlobalAudioController] Audio playback error')
+      );
+      expect(audioPlaybackWarnings.length).toBe(0);
+
+      audioController.stop();
+      window.Audio = originalAudio;
+      consoleWarnSpy.mockRestore();
+    });
+
+    it('automatically self-heals and starts playback on first click when initial previewUrl fails with a media error', async () => {
+      const onPreviewResolvedMock = vi.fn();
+      const createdAudios: HTMLAudioElement[] = [];
+
+      const originalAudio = window.Audio;
+      window.Audio = vi.fn().mockImplementation(function(src: string) {
+        const el = document.createElement('audio');
+        el.src = src;
+        vi.spyOn(el, 'play').mockImplementation(async function() {
+          Object.defineProperty(el, 'paused', { value: false, configurable: true });
+        });
+        vi.spyOn(el, 'pause').mockImplementation(function() {
+          Object.defineProperty(el, 'paused', { value: true, configurable: true });
+        });
+        createdAudios.push(el);
+        return el;
+      }) as any;
+
+      // Mock fresh iTunes API response for self-heal
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        json: async () => ({
+          results: [
+            {
+              wrapperType: 'track',
+              kind: 'song',
+              artistId: 1798548,
+              trackName: 'The Middle',
+              previewUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/fresh-the-middle.m4a'
+            }
+          ]
+        })
+      });
+      global.fetch = fetchMock;
+
+      const { container } = render(
+        <AudioPreviewPlayer
+          nodeId="jimmy-eat-world-us"
+          artistName="Jimmy Eat World"
+          previewUrl="https://expired.mzstatic.com/expired-preview.m4a"
+          previewTrackName="The Middle (Expired)"
+          itunesArtistId={1798548}
+          onPreviewResolved={onPreviewResolvedMock}
+        />
+      );
+
+      const playButton = container.querySelector('[role="button"]') as HTMLElement;
+      expect(playButton).not.toBeNull();
+
+      // Click Play on the expired track
+      await act(async () => {
+        playButton.click();
+      });
+
+      expect(createdAudios.length).toBe(1);
+      expect(createdAudios[0].src).toBe('https://expired.mzstatic.com/expired-preview.m4a');
+
+      // Dispatch error event on the expired audio element to simulate media error
+      await act(async () => {
+        createdAudios[0].dispatchEvent(new Event('error'));
+        // Allow the async resolveArtistAudioPreview promise to settle
+        await new Promise(r => setTimeout(r, 20));
+      });
+
+      // Verify self-healing re-queried iTunes with forceRefresh = true
+      expect(fetchMock).toHaveBeenCalled();
+      expect(onPreviewResolvedMock).toHaveBeenCalledWith(expect.objectContaining({
+        previewUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/fresh-the-middle.m4a',
+        itunesArtistId: 1798548,
+      }));
+
+      // Verify fresh audio instance was created and started playing
+      expect(createdAudios.length).toBe(2);
+      expect(createdAudios[1].src).toBe('https://audio-ssl.itunes.apple.com/itunes-assets/fresh-the-middle.m4a');
+      expect(audioController.getCurrentTrackId()).toBe('jimmy-eat-world-us');
+      expect(audioController.isTrackPlaying('jimmy-eat-world-us')).toBe(true);
+
+      audioController.stop();
+      window.Audio = originalAudio;
+    });
+
+    it('auto-plays resolved preview when user clicks during in-flight preview lookup', async () => {
+      let resolveFetch: any;
+      const fetchPromise = new Promise((resolve) => {
+        resolveFetch = resolve;
+      });
+      global.fetch = vi.fn().mockImplementation(() => fetchPromise);
+
+      const playSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(async function(this: any) {
+        Object.defineProperty(this, 'paused', { value: false, configurable: true });
+      });
+
+      const { container } = render(
+        <AudioPreviewPlayer
+          nodeId="say-anything-us"
+          artistName="Say Anything"
+          itunesArtistId={2818055}
+        />
+      );
+
+      const loadingPulse = container.querySelector('[role="button"]') as HTMLElement;
+      expect(loadingPulse).not.toBeNull();
+
+      // Click while loading
+      await act(async () => {
+        loadingPulse.click();
+      });
+
+      // Now resolve the fetch
+      await act(async () => {
+        resolveFetch({
+          ok: true,
+          json: async () => ({
+            results: [{
+              wrapperType: 'track',
+              kind: 'song',
+              artistId: 2818055,
+              trackName: 'Alive with the Glory of Love',
+              previewUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/alive.m4a'
+            }]
+          })
+        });
+        await new Promise(r => setTimeout(r, 20));
+      });
+
+      expect(audioController.getCurrentTrackId()).toBe('say-anything-us');
+      expect(audioController.isTrackPlaying('say-anything-us')).toBe(true);
+
+      audioController.stop();
+      playSpy.mockRestore();
+    });
   });
 
   describe('Part 3: V40 Architectural Safety Guard (Rule 37 & Rule 40 Agnosticism)', () => {
