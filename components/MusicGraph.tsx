@@ -1,5 +1,6 @@
 
 import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import * as d3 from 'd3';
 import { Loader2 } from 'lucide-react';
 import { GraphData, Node, Link, GraphSettings, NodeDetails, CanvasNodeRef, ProjectScene } from '../types';
@@ -11,6 +12,44 @@ import { sanitizeDirectionalLinkContext, resolveFallbackRelationContext } from '
 import { getSceneCenterOffset, stripSceneNamespace, resolveSceneNodeOverlaps } from '../shared/multiSceneUtils';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
+
+export interface DesktopTooltipPositionParams {
+  nodeScreenX: number;
+  nodeScreenY: number;
+  tooltipHeight?: number;
+  tooltipWidth?: number;
+  nodeRadius?: number;
+  margin?: number;
+  viewportWidth?: number;
+  viewportHeight?: number;
+  minTop?: number;
+}
+
+export function computeDesktopTooltipPosition({
+  nodeScreenX,
+  nodeScreenY,
+  tooltipHeight = 380,
+  tooltipWidth = 320,
+  nodeRadius = 35,
+  margin = 16,
+  viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200,
+  viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800,
+  minTop = 72,
+}: DesktopTooltipPositionParams): { left: number; top: number; isFlipped: boolean } {
+  // Default: anchor +16px to right of node circle hit radius (nodeScreenX + 35 + 16)
+  const defaultLeft = nodeScreenX + nodeRadius + margin;
+  const isFlipped = defaultLeft + tooltipWidth > viewportWidth - margin;
+  const left = isFlipped
+    ? Math.max(margin, nodeScreenX - nodeRadius - margin - tooltipWidth)
+    : defaultLeft;
+
+  // Vertically center relative to nodeScreenY, clamped between minTop (72px) and viewport bottom
+  const targetTop = nodeScreenY - tooltipHeight / 2;
+  const maxTop = Math.max(minTop, viewportHeight - tooltipHeight - margin);
+  const top = Math.max(minTop, Math.min(targetTop, maxTop));
+
+  return { left, top, isFlipped };
+}
 
 // Define static virtual space to isolate physics from container resizes
 const VIRTUAL_WIDTH = 2000;
@@ -204,11 +243,24 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     dna?: string;
     x: number;
     y: number;
+    screenX?: number;
+    screenY?: number;
   } | null>(null);
   const [hoverQuadrant, setHoverQuadrant] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('top-right');
   const activeHoveredLinkRef = useRef<{ link: Link } | null>(null);
   const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
   const [isCardExpanded, setIsCardExpanded] = useState(false);
+  const desktopTooltipRef = useRef<HTMLDivElement>(null);
+  const [measuredTooltipHeight, setMeasuredTooltipHeight] = useState<number>(380);
+
+  useEffect(() => {
+    if (desktopTooltipRef.current) {
+      const h = desktopTooltipRef.current.offsetHeight;
+      if (h && Math.abs(h - measuredTooltipHeight) > 4) {
+        setMeasuredTooltipHeight(h);
+      }
+    }
+  }, [hoveredLink, measuredTooltipHeight]);
 
   useEffect(() => {
     setIsCardExpanded(false);
@@ -988,13 +1040,21 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
                 if ((connections.length > 0 || nodeDna || fallbackMessage) && !isProgrammatic) {
                     const transform = d3.zoomTransform(svgRef.current);
+                    const canvasX = transform.applyX(d.x ?? 0);
+                    const canvasY = transform.applyY(d.y ?? 0);
+                    const containerRect = containerRef.current?.getBoundingClientRect();
+                    const screenX = containerRect ? containerRect.left + canvasX : canvasX;
+                    const screenY = containerRect ? containerRect.top + canvasY : canvasY;
+
                     setHoveredLink({
                         sourceId: toDisplayLabel(d),
                         connections: connections.length > 0 ? connections : undefined,
                         fallbackMessage: fallbackMessage || undefined,
                         dna: nodeDna || undefined,
-                        x: transform.applyX(d.x ?? 0),
-                        y: transform.applyY(d.y ?? 0)
+                        x: canvasX,
+                        y: canvasY,
+                        screenX,
+                        screenY
                     });
                 } else {
                     setHoveredLink(null);
@@ -1126,10 +1186,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 } else if (activeHoveredNodeRef.current && svgRef.current) {
                     const n = activeHoveredNodeRef.current;
                     if (!isNaN(n.x!) && !isNaN(n.y!)) {
+                        const canvasX = event.transform.applyX(n.x!);
+                        const canvasY = event.transform.applyY(n.y!);
+                        const containerRect = containerRef.current?.getBoundingClientRect();
+                        const screenX = containerRect ? containerRect.left + canvasX : canvasX;
+                        const screenY = containerRect ? containerRect.top + canvasY : canvasY;
                         setHoveredLink(prev => prev ? {
                             ...prev,
-                            x: event.transform.applyX(n.x!),
-                            y: event.transform.applyY(n.y!)
+                            x: canvasX,
+                            y: canvasY,
+                            screenX,
+                            screenY
                         } : null);
                     }
                 }
@@ -1161,6 +1228,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             if (activeHoveredNodeRef.current || activeHoveredLinkRef.current) {
                 setHoveredLink(null);
             }
+        }
+    });
+
+    svg.on("mouseleave", () => {
+        if (!isSmallScreen) {
+            clearNodeHover();
         }
     });
 
@@ -1240,10 +1313,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                       const n = activeHoveredNodeRef.current;
                       if (!isNaN(n.x!) && !isNaN(n.y!)) {
                           const transform = d3.zoomTransform(svgRef.current);
+                          const canvasX = transform.applyX(n.x!);
+                          const canvasY = transform.applyY(n.y!);
+                          const containerRect = containerRef.current?.getBoundingClientRect();
+                          const screenX = containerRect ? containerRect.left + canvasX : canvasX;
+                          const screenY = containerRect ? containerRect.top + canvasY : canvasY;
                           setHoveredLink(prev => prev ? {
                               ...prev,
-                              x: transform.applyX(n.x!),
-                              y: transform.applyY(n.y!)
+                              x: canvasX,
+                              y: canvasY,
+                              screenX,
+                              screenY
                           } : null);
                       }
                   }
@@ -1626,13 +1706,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
         .on("mouseleave", (event, d) => {
             if (!isSmallScreen) {
-                const isPinned = !isPassiveSelectionRef.current && (
-                                 (selectedNodeRef.current && isSameNodeId(selectedNodeRef.current.id, d.id)) ||
-                                 (peekedNodeRef.current && isSameNodeId(peekedNodeRef.current.id, d.id))
-                                );
-                if (!isPinned) {
-                    clearNodeHoverRef.current();
-                }
+                clearNodeHoverRef.current();
             }
         });
 
@@ -2203,44 +2277,114 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         ref={containerRef}
         className="w-full h-full relative overflow-hidden bg-transparent touch-none" 
         style={{ cursor: 'grab', touchAction: 'none' }}
+        onMouseLeave={() => {
+            if (!isSmallScreen) {
+                clearNodeHoverRef.current();
+            }
+        }}
     >
         <svg ref={svgRef} className="w-full h-full touch-none" />
         
-        {hoveredLink && (
+        {hoveredLink && !isSmallScreen && typeof document !== 'undefined' && (() => {
+            const tooltipHeight = desktopTooltipRef.current?.offsetHeight || measuredTooltipHeight || 380;
+            const containerRect = containerRef.current?.getBoundingClientRect();
+            const nodeScreenX = hoveredLink.screenX ?? (containerRect ? containerRect.left + hoveredLink.x : hoveredLink.x);
+            const nodeScreenY = hoveredLink.screenY ?? (containerRect ? containerRect.top + hoveredLink.y : hoveredLink.y);
+
+            const { left: portalLeft, top: portalTop } = computeDesktopTooltipPosition({
+                nodeScreenX,
+                nodeScreenY,
+                tooltipHeight,
+                tooltipWidth: 320,
+                nodeRadius: 35,
+                margin: 16,
+                minTop: 72,
+            });
+
+            return createPortal(
+                <div
+                    ref={desktopTooltipRef}
+                    style={{
+                        position: 'fixed',
+                        left: `${portalLeft}px`,
+                        top: `${portalTop}px`,
+                        width: '320px',
+                        maxWidth: '320px',
+                        pointerEvents: 'none',
+                        zIndex: 60,
+                    }}
+                    className="bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left max-h-[520px] overflow-hidden"
+                    data-testid="musicgraph-desktop-hover-tooltip"
+                >
+                    <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                        {/* Zone 1: Spiderweb DNA (Narrative First) */}
+                        {hoveredLink.dna && (
+                            <div className="shrink-0">
+                                <p className="text-sm leading-relaxed font-normal text-zinc-400 m-0">
+                                    {(() => {
+                                        const cleanedDna = hoveredLink.dna || '';
+                                        const target = hoveredLink.sourceId || '';
+                                        if (!cleanedDna || !target) return cleanedDna;
+
+                                        const regex = new RegExp(`(${escapeRegExp(target)})`, 'gi');
+                                        const parts = cleanedDna.split(regex);
+
+                                        return (
+                                            <>
+                                                {parts.map((part, i) =>
+                                                    part.toLowerCase() === target.toLowerCase() ? (
+                                                        <span key={i} className="text-primary font-normal">{part}</span>
+                                                    ) : (
+                                                        <React.Fragment key={i}>{part}</React.Fragment>
+                                                    )
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </p>
+                            </div>
+                        )}
+
+                        {/* Zone 2: Direct Connections / Fallback */}
+                        {((hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage) && (
+                            <div className={`flex flex-col gap-1 ${hoveredLink.dna ? "mt-1 pt-1.5" : ""}`}>
+                                {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
+                                    hoveredLink.connections.map((c, i) => (
+                                        <div key={i} className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                            <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                            <span>
+                                                <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
+                                                <span className="text-primary font-normal">{c.targetName}</span>
+                                            </span>
+                                        </div>
+                                    ))
+                                ) : hoveredLink.fallbackMessage ? (
+                                    <div className="text-sm italic text-zinc-500 font-normal leading-normal shrink-0">
+                                        {hoveredLink.fallbackMessage}
+                                    </div>
+                                ) : null}
+                            </div>
+                        )}
+                    </div>
+                </div>,
+                document.body
+            );
+        })()}
+
+        {hoveredLink && isSmallScreen && (
             <div
-                style={
-                    typeof window !== 'undefined' && window.innerWidth >= 1024
-                        /* Desktop: absolute positioning without mouse-following coordinates */
-                        ? {
-                            position: 'absolute' as const,
-                            pointerEvents: isCardExpanded || (hoveredLink.connections && hoveredLink.connections.length > 3) ? 'auto' : 'none',
-                            zIndex: 50
-                          }
-                        /* Mobile: absolute top-drop banner within the canvas container */
-                        : {
-                            position: 'absolute',
-                            top: 0,
-                            left: 0,
-                            right: 0,
-                            pointerEvents: isCardExpanded || (hoveredLink.connections && hoveredLink.connections.length > 3) ? 'auto' : 'none',
-                            zIndex: 50
-                        }
-                }
-                className={
-                    typeof window !== 'undefined' && window.innerWidth >= 1024
-                        /* Desktop visual tokens + quadrant class positioning */
-                        ? `bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left min-w-[200px] max-w-[320px] max-h-[520px] overflow-hidden absolute ${
-                            hoverQuadrant === 'top-left' ? 'top-6 left-6' :
-                            hoverQuadrant === 'top-right' ? 'top-6 right-6' :
-                            hoverQuadrant === 'bottom-left' ? 'bottom-6 left-24' :
-                            'bottom-6 right-24'
-                          }`
-                        /* Mobile visual tokens — full-width top-drop banner */
-                        : 'bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left max-h-[55vh] overflow-hidden'
-                }
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 0,
+                    right: 0,
+                    pointerEvents: isCardExpanded || (hoveredLink.connections && hoveredLink.connections.length > 3) ? 'auto' : 'none',
+                    zIndex: 50
+                }}
+                className="bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left max-h-[55vh] overflow-hidden"
+                data-testid="musicgraph-mobile-banner"
             >
-                
-                <div className={`overflow-y-auto shrink min-h-0 flex flex-col gap-2 ${isSmallScreen ? 'scrollbar-hide' : 'scrollbar-thin scrollbar-thumb-zinc-800'}`}>
+                <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-hide">
                     {/* Zone 1: Spiderweb DNA (Narrative First) */}
                     {hoveredLink.dna && (
                         <div className="shrink-0">
@@ -2273,7 +2417,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     {((hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage) && (
                         <div className={`flex flex-col gap-1 ${hoveredLink.dna ? "mt-1 pt-1.5" : ""}`}>
                             {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
-                                (!isSmallScreen || isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
+                                (isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
                                     <div key={i} className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
                                         <span className="text-zinc-500 font-normal shrink-0">•</span>
                                         <span>
@@ -2292,7 +2436,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 </div>
                 
                 {/* Dynamic CTA / Close Button */}
-                {isSmallScreen && hoveredLink.connections && hoveredLink.connections.length > 3 && !isCardExpanded && (
+                {hoveredLink.connections && hoveredLink.connections.length > 3 && !isCardExpanded && (
                     <div className="pt-2 shrink-0 flex justify-center pointer-events-auto">
                         <Button variant="secondary" size="sm" onClick={() => setIsCardExpanded(true)}>
                             View {hoveredLink.connections.length - 3} more connections
@@ -2300,7 +2444,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     </div>
                 )}
                 
-                {isSmallScreen && isCardExpanded && (
+                {isCardExpanded && (
                     <div className="pt-2 shrink-0 flex justify-center pointer-events-auto">
                         <Button variant="secondary" size="sm" onClick={() => setHoveredLink(null)}>
                             Close

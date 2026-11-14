@@ -16,6 +16,7 @@ vi.mock('../services/firebaseConfig', () => ({
 
 import { httpsCallable } from 'firebase/functions';
 import { ConsolidatedValidationModal } from '../components/SharedModals';
+import MusicGraph, { computeDesktopTooltipPosition } from '../components/MusicGraph';
 import {
   sanitizeDirectionalLinkContext,
   extractNarrativeCoMentionContext,
@@ -304,6 +305,166 @@ describe('Architecture V42.1: Blank-Input Escape Hatch UX, Warm Ambiguous 3rd-Ho
       });
       expect(ultimate).toBe('shares scene lineage with');
       expect(ultimate.toLowerCase()).not.toContain('connected to');
+    });
+  });
+
+  describe('3. Desktop Hover Tooltip Viewport Portal & Strict pointer-events: none ([Option A])', () => {
+    it('always applies pointer-events: none to desktop hover tooltips even when connections.length > 3', async () => {
+      global.ResizeObserver = class {
+        cb: any;
+        constructor(cb: any) {
+          this.cb = cb;
+        }
+        observe(target: any) {
+          if (this.cb) {
+            this.cb([{ contentRect: { width: 800, height: 600 }, target }]);
+          }
+        }
+        unobserve() {}
+        disconnect() {}
+      } as any;
+
+      const mockNode = {
+        id: 'rocking-horse-winner',
+        type: 'artist',
+        label: 'Rocking Horse Winner',
+        x: 235,
+        y: 300,
+      };
+      const mockConnectedArtists = Array.from({ length: 10 }, (_, i) => ({
+        id: `connected-artist-${i}`,
+        type: 'artist',
+        label: `Peer Artist ${i + 1}`,
+        x: 100 + i * 20,
+        y: 100 + i * 20,
+      }));
+      const mockLinks = mockConnectedArtists.map(target => ({
+        source: 'rocking-horse-winner',
+        target: target.id,
+        context: 'shared scene lineage with',
+      }));
+
+      const mockData = {
+        nodes: [mockNode, ...mockConnectedArtists],
+        links: mockLinks,
+      };
+
+      const defaultFilters = {
+        seed: true,
+        recommended: true,
+        artist: true,
+        label: true,
+        genre: true,
+        country: true,
+        founded: true,
+      };
+
+      const { container } = render(
+        <MusicGraph
+          data={mockData as any}
+          libraryArtists={[]}
+          seedArtists={['Rocking Horse Winner']}
+          onNodeClick={vi.fn()}
+          selectedNode={null}
+          isSmallScreen={false}
+          activeFilters={defaultFilters as any}
+          searchQuery=""
+          setSearchQuery={vi.fn()}
+          toggleFilter={vi.fn()}
+          legendConfig={{}}
+          legendOrder={[]}
+          detailsCache={new Map()}
+        />
+      );
+
+      await waitFor(() => {
+        const nodeElements = container.querySelectorAll('g.node-element');
+        expect(nodeElements.length).toBeGreaterThan(0);
+      });
+
+      const nodeElements = container.querySelectorAll('g.node-element');
+      const targetG = Array.from(nodeElements).find(el => el.textContent?.includes('Rocking Horse Winner')) || nodeElements[0];
+
+      fireEvent.mouseEnter(targetG);
+
+      await waitFor(() => {
+        const tooltip = document.querySelector('[data-testid="musicgraph-desktop-hover-tooltip"]');
+        expect(tooltip).toBeInTheDocument();
+        // Assert unconditional pointer-events: none and zIndex: 60 on desktop
+        expect(tooltip).toHaveStyle({ pointerEvents: 'none', zIndex: '60', position: 'fixed' });
+      });
+    });
+
+    it('anchors desktop tooltip outside the node radius without overlapping nodeScreenX in narrow 3-column mode', () => {
+      // In narrow 3-column mode, center CONNECTIONS canvas is ~470px wide (e.g. left: 400, right: 870 in a 1440px viewport)
+      // Centered node at nodeScreenX = 635, nodeScreenY = 400. Hit-box radius = 35px. Tooltip width = 320px.
+      const pos = computeDesktopTooltipPosition({
+        nodeScreenX: 635,
+        nodeScreenY: 400,
+        tooltipHeight: 440,
+        tooltipWidth: 320,
+        nodeRadius: 35,
+        margin: 16,
+        viewportWidth: 1440,
+        viewportHeight: 900,
+        minTop: 72,
+      });
+
+      expect(pos.isFlipped).toBe(false);
+      // Default anchors to the right: nodeScreenX (635) + 35 + 16 = 686
+      expect(pos.left).toBe(686);
+      // Crucial: left edge must be strictly greater than nodeScreenX + nodeRadius (670) to prevent any node overlap
+      expect(pos.left).toBeGreaterThan(635 + 35);
+      // Vertically centered at 400 - 440/2 = 180, within [72, 900 - 440 - 16 = 444]
+      expect(pos.top).toBe(180);
+    });
+
+    it('flips desktop tooltip cleanly to the left of the node when near the right viewport edge', () => {
+      // Node positioned near the right edge (nodeScreenX = 1300 in a 1400px viewport)
+      const pos = computeDesktopTooltipPosition({
+        nodeScreenX: 1300,
+        nodeScreenY: 350,
+        tooltipHeight: 400,
+        tooltipWidth: 320,
+        nodeRadius: 35,
+        margin: 16,
+        viewportWidth: 1400,
+        viewportHeight: 900,
+        minTop: 72,
+      });
+
+      expect(pos.isFlipped).toBe(true);
+      // Flipped to left: nodeScreenX (1300) - 35 - 16 - 320 = 929
+      expect(pos.left).toBe(929);
+      // Crucial: right edge of tooltip (929 + 320 = 1249) must be strictly less than nodeScreenX - nodeRadius (1265)
+      expect(pos.left + 320).toBeLessThan(1300 - 35);
+    });
+
+    it('accurately clamps vertical positioning between 72px and viewport bottom for tall tooltips', () => {
+      // 1. Tooltip near top header (nodeScreenY = 100, targetTop = 100 - 220 = -120)
+      const topClamped = computeDesktopTooltipPosition({
+        nodeScreenX: 500,
+        nodeScreenY: 100,
+        tooltipHeight: 440,
+        tooltipWidth: 320,
+        viewportWidth: 1400,
+        viewportHeight: 900,
+        minTop: 72,
+      });
+      expect(topClamped.top).toBe(72);
+
+      // 2. Tooltip near viewport bottom (nodeScreenY = 850, targetTop = 850 - 220 = 630)
+      const bottomClamped = computeDesktopTooltipPosition({
+        nodeScreenX: 500,
+        nodeScreenY: 850,
+        tooltipHeight: 440,
+        tooltipWidth: 320,
+        viewportWidth: 1400,
+        viewportHeight: 900,
+        minTop: 72,
+      });
+      // maxTop = 900 - 440 - 16 = 444
+      expect(bottomClamped.top).toBe(444);
     });
   });
 });
