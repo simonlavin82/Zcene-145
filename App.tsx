@@ -6742,6 +6742,7 @@ const App: React.FC = () => {
           createdAt: data.createdAt,
           updatedAt: data.updatedAt,
           artistIds: data.artistIds,
+          labelIds: data.labelIds,
           graphData: data.graphData,
           detailsCache: data.detailsCache,
           canvasLayout: data.canvasLayout,

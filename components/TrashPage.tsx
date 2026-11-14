@@ -5,6 +5,7 @@ import { DashboardProjectCard } from './DashboardProjectCard';
 import { Project, View } from '../types';
 import { User } from 'firebase/auth';
 import { getProjectDisplayTitle, isNodeInSeedList } from '../services/artistCacheService';
+import { parseProjectScenes, stripSceneNamespace } from '../shared/multiSceneUtils';
 import { formatSystemTimestamp } from '../utils/formatters';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 import { BackButton } from './DesignSystem';
@@ -82,11 +83,79 @@ export const TrashPage: React.FC<TrashPageProps> = ({
     const query = searchQuery.trim().toLowerCase();
     if (query) {
       result = result.filter((p) => {
+        // 1. Check Project Name and Clean Display Title
         const rawName = (p.name || '').toLowerCase();
         if (rawName.includes(query)) return true;
+
         const displayTitle = getProjectDisplayTitle(p).toLowerCase();
         if (displayTitle.includes(query)) return true;
+
+        // 2. Check Seed Artists string and seedArtistIds
         if (p.seedArtists && p.seedArtists.toLowerCase().includes(query)) return true;
+        if (Array.isArray(p.seedArtistIds) && p.seedArtistIds.some(id => typeof id === 'string' && id.toLowerCase().includes(query))) {
+          return true;
+        }
+
+        // 3. Check Phase 1+ artistIds and labelIds arrays if populated
+        if (Array.isArray(p.artistIds) && p.artistIds.some(id => typeof id === 'string' && id.toLowerCase().includes(query))) {
+          return true;
+        }
+        if (Array.isArray(p.labelIds) && p.labelIds.some(id => typeof id === 'string' && id.toLowerCase().includes(query))) {
+          return true;
+        }
+
+        // 4. Check multi-scene descriptors & collect candidate nodes
+        let candidateNodes: any[] = [];
+        if (p.scenes) {
+          try {
+            const parsedScenes = parseProjectScenes(p.scenes);
+            for (const s of parsedScenes) {
+              if (s.customName && s.customName.toLowerCase().includes(query)) return true;
+              if (s.title && s.title.toLowerCase().includes(query)) return true;
+              if (s.name && s.name.toLowerCase().includes(query)) return true;
+              if (s.seedArtists && s.seedArtists.toLowerCase().includes(query)) return true;
+              if (s.curatedSeedArtists && s.curatedSeedArtists.toLowerCase().includes(query)) return true;
+              if (Array.isArray(s.seedIds) && s.seedIds.some((id: string) => typeof id === 'string' && id.toLowerCase().includes(query))) return true;
+              if (Array.isArray(s.seedArtistIds) && s.seedArtistIds.some((id: string) => typeof id === 'string' && id.toLowerCase().includes(query))) return true;
+
+              if (s.graphData && Array.isArray(s.graphData.nodes)) {
+                candidateNodes.push(...s.graphData.nodes);
+              }
+            }
+          } catch (e) {}
+        }
+
+        // Fallback to legacy single-scene graphData
+        if (candidateNodes.length === 0 && p.graphData) {
+          try {
+            const parsed = typeof p.graphData === 'string' ? JSON.parse(p.graphData) : p.graphData;
+            if (parsed && Array.isArray(parsed.nodes)) {
+              candidateNodes = parsed.nodes;
+            }
+          } catch (e) {}
+        }
+
+        // 5. Check candidate nodes (Artist AND Record Label nodes)
+        if (candidateNodes.length > 0) {
+          const hasEntityMatch = candidateNodes.some((node: any) => {
+            const nodeType = node.type || 'artist';
+            if (nodeType !== 'artist' && nodeType !== 'label') return false;
+
+            const label = (node.label || node.name || '').toLowerCase();
+            const id = (node.id || '').toLowerCase();
+            const canonicalId = (node.canonicalId || '').toLowerCase();
+            const unnamespacedId = stripSceneNamespace(node.id || '').toLowerCase();
+
+            return (
+              label.includes(query) ||
+              id.includes(query) ||
+              canonicalId.includes(query) ||
+              unnamespacedId.includes(query)
+            );
+          });
+          if (hasEntityMatch) return true;
+        }
+
         return false;
       });
     }

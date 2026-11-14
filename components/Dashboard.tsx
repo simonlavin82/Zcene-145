@@ -13,7 +13,7 @@ import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } fr
 import { DashboardProjectCard } from './DashboardProjectCard';
 import { CreateProjectCard } from './CreateProjectCard';
 import { PROFILE_COLORS } from './SharedModals';
-import { computeProjectCardMetrics, parseProjectScenes } from '../shared/multiSceneUtils';
+import { computeProjectCardMetrics, parseProjectScenes, stripSceneNamespace } from '../shared/multiSceneUtils';
 
 
 interface DashboardProps {
@@ -147,44 +147,75 @@ const Dashboard: React.FC<DashboardProps> = ({
       const displayTitle = getProjectDisplayTitle(project).toLowerCase();
       if (displayTitle.includes(query)) return true;
 
-      // 2. Check Seed Artists string
+      // 2. Check Seed Artists string and seedArtistIds
       if (project.seedArtists && project.seedArtists.toLowerCase().includes(query)) return true;
-
-      // 3. Check Phase 1+ artistIds array if populated
-      if (Array.isArray(project.artistIds) && project.artistIds.some(id => id.toLowerCase().includes(query))) {
+      if (Array.isArray(project.seedArtistIds) && project.seedArtistIds.some(id => typeof id === 'string' && id.toLowerCase().includes(query))) {
         return true;
       }
 
-      // 4. Check scenes or graphData.nodes for any artist node (node.label or node.id)
-      let artistNodes: any[] = [];
+      // 3. Check Phase 1+ artistIds and labelIds arrays if populated
+      if (Array.isArray(project.artistIds) && project.artistIds.some(id => typeof id === 'string' && id.toLowerCase().includes(query))) {
+        return true;
+      }
+      if (Array.isArray(project.labelIds) && project.labelIds.some(id => typeof id === 'string' && id.toLowerCase().includes(query))) {
+        return true;
+      }
+
+      // 4. Check multi-scene descriptors (customName, title, name, scene seeds) & collect candidate nodes
+      let candidateNodes: any[] = [];
       if (project.scenes) {
         try {
           const parsedScenes = parseProjectScenes(project.scenes);
           for (const s of parsedScenes) {
+            // Check custom scene name
+            if (s.customName && s.customName.toLowerCase().includes(query)) return true;
+            // Check scene title / name
+            if (s.title && s.title.toLowerCase().includes(query)) return true;
+            if (s.name && s.name.toLowerCase().includes(query)) return true;
+            // Check scene seeds
+            if (s.seedArtists && s.seedArtists.toLowerCase().includes(query)) return true;
+            if (s.curatedSeedArtists && s.curatedSeedArtists.toLowerCase().includes(query)) return true;
+            if (Array.isArray(s.seedIds) && s.seedIds.some((id: string) => typeof id === 'string' && id.toLowerCase().includes(query))) return true;
+            if (Array.isArray(s.seedArtistIds) && s.seedArtistIds.some((id: string) => typeof id === 'string' && id.toLowerCase().includes(query))) return true;
+
             if (s.graphData && Array.isArray(s.graphData.nodes)) {
-              artistNodes.push(...s.graphData.nodes);
+              candidateNodes.push(...s.graphData.nodes);
             }
           }
         } catch (e) {}
       }
-      if (artistNodes.length === 0 && project.graphData) {
+
+      // Fallback to legacy single-scene graphData
+      if (candidateNodes.length === 0 && project.graphData) {
         try {
           const parsed = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
           if (parsed && Array.isArray(parsed.nodes)) {
-            artistNodes = parsed.nodes;
+            candidateNodes = parsed.nodes;
           }
         } catch (e) {
           // Ignore parsing error
         }
       }
-      if (artistNodes.length > 0) {
-        const hasArtistMatch = artistNodes.some((node: any) => {
-          if (node.type && node.type !== 'artist') return false;
-          const label = (node.label || '').toLowerCase();
+
+      // 5. Check candidate nodes (matching Artist AND Record Label nodes)
+      if (candidateNodes.length > 0) {
+        const hasEntityMatch = candidateNodes.some((node: any) => {
+          const nodeType = node.type || 'artist';
+          if (nodeType !== 'artist' && nodeType !== 'label') return false;
+
+          const label = (node.label || node.name || '').toLowerCase();
           const id = (node.id || '').toLowerCase();
-          return label.includes(query) || id.includes(query);
+          const canonicalId = (node.canonicalId || '').toLowerCase();
+          const unnamespacedId = stripSceneNamespace(node.id || '').toLowerCase();
+
+          return (
+            label.includes(query) ||
+            id.includes(query) ||
+            canonicalId.includes(query) ||
+            unnamespacedId.includes(query)
+          );
         });
-        if (hasArtistMatch) return true;
+        if (hasEntityMatch) return true;
       }
 
       return false;
