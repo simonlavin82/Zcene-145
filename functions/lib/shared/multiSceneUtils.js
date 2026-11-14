@@ -17,6 +17,7 @@ exports.isCanonicalSeedMatch = isCanonicalSeedMatch;
 exports.normalizeProjectScene = normalizeProjectScene;
 exports.createEmptyProjectScene = createEmptyProjectScene;
 exports.getSceneDisplayName = getSceneDisplayName;
+exports.resolveCrossSceneTargetName = resolveCrossSceneTargetName;
 exports.computeClampedDropdownLeft = computeClampedDropdownLeft;
 exports.normalizeCrossSceneLink = normalizeCrossSceneLink;
 exports.computeDeterministicIdentityBridges = computeDeterministicIdentityBridges;
@@ -502,6 +503,28 @@ function getSceneDisplayName(scene, fallbackIndex) {
             ? fallbackIndex
             : 0;
     return `Scene ${idx + 1}`;
+}
+/**
+ * Resolves the display name for a cross-scene target node with its scene label suffix.
+ * Uses `customName` if set (e.g. "Rainer Maria (American Football)"),
+ * falling back to `Scene N` (e.g. "Rainer Maria (Scene 3)") if no custom title is defined.
+ */
+function resolveCrossSceneTargetName(node, scenes = [], baseDisplayLabel) {
+    const baseLabel = (baseDisplayLabel && baseDisplayLabel.trim()) ||
+        (node.label && node.label.trim()) ||
+        stripSceneNamespace(node.canonicalId || node.id);
+    const targetSceneId = node.sceneId ||
+        extractSceneIdFromNodeId(node.id) ||
+        (typeof node.sceneIndex === 'number' ? `scene-${node.sceneIndex + 1}` : undefined);
+    const targetScene = (scenes || []).find(s => (s.sceneId || s.id) === targetSceneId) ||
+        (typeof node.sceneIndex === 'number' ? (scenes || [])[node.sceneIndex] : undefined);
+    const fallbackIdx = typeof node.sceneIndex === 'number'
+        ? node.sceneIndex
+        : targetSceneId
+            ? parseInt(targetSceneId.replace(/^scene-/i, ''), 10) - 1
+            : 0;
+    const sceneName = getSceneDisplayName(targetScene, fallbackIdx);
+    return `${baseLabel} (${sceneName})`;
 }
 /**
  * Computes container-clamped horizontal positioning for dropdown menus

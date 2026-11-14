@@ -9,7 +9,7 @@ import { CanvasControlStyles, InputSizes, Button } from './DesignSystem';
 import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
 import { normalizeArtistId, isNodeInSeedList, cleanLabelDisplayName } from '../services/artistCacheService';
 import { sanitizeDirectionalLinkContext, resolveFallbackRelationContext } from '../shared/linkContext';
-import { getSceneCenterOffset, stripSceneNamespace, resolveSceneNodeOverlaps } from '../shared/multiSceneUtils';
+import { getSceneCenterOffset, stripSceneNamespace, resolveSceneNodeOverlaps, resolveCrossSceneTargetName } from '../shared/multiSceneUtils';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 
@@ -267,9 +267,19 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   }, [hoveredLink?.sourceId]);
   const hoveredNodeIdRef = useRef<string | null>(null);
   const activeHoveredNodeRef = useRef<Node | null>(null);
+  const scenesRef = useRef<ProjectScene[]>(scenes || []);
+  scenesRef.current = scenes || [];
 
   const triggerNodeHoverRef = useRef<(d: Node, isProgrammatic?: boolean) => void>(() => {});
   const clearNodeHoverRef = useRef<() => void>(() => {});
+
+  useEffect(() => {
+    scenesRef.current = scenes || [];
+    const activeNode = activeHoveredNodeRef.current || selectedNode || peekedNode;
+    if (hoveredLink && activeNode && triggerNodeHoverRef.current) {
+      triggerNodeHoverRef.current(activeNode, false);
+    }
+  }, [scenes]);
 
   useEffect(() => {
     hoveredNodeIdRef.current = hoveredNodeId;
@@ -1001,7 +1011,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
                     const isCrossScenePeer = isBridge || Boolean(d.sceneId && node.sceneId && d.sceneId !== node.sceneId);
                     const targetName = isCrossScenePeer
-                        ? `${toDisplayLabel(node)} (Scene ${(node.sceneIndex ?? 0) + 1})`
+                        ? resolveCrossSceneTargetName(node, scenesRef.current, toDisplayLabel(node))
                         : toDisplayLabel(node);
                     return {
                         context: capitalizedContext,

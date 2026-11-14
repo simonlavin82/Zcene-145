@@ -26,6 +26,7 @@ import {
   resolveSceneNodeOverlaps,
   MAX_SCENES_PER_PROJECT,
   getSceneDisplayName,
+  resolveCrossSceneTargetName,
   computeClampedDropdownLeft,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
@@ -2947,6 +2948,98 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(resolveCustomNameInput('SCENE 3')).toBeUndefined();
       expect(resolveCustomNameInput('PTW')).toBe('PTW');
       expect(resolveCustomNameInput('Melodic Hardcore')).toBe('Melodic Hardcore');
+    });
+
+    it('resolves cross-scene target name via resolveCrossSceneTargetName with custom scene name, default fallback, and namespaced IDs', () => {
+      const scenes: ProjectScene[] = [
+        {
+          sceneId: 'scene-1',
+          sceneIndex: 0,
+          title: 'Dashboard Confessional',
+          customName: 'Dashboard',
+          seedArtists: 'Dashboard Confessional',
+          seedIds: ['dashboard-confessional-us'],
+          discoveryFilters: {},
+          graphData: { nodes: [], links: [] },
+          synthesisRationale: '',
+          centerOffset: { x: 1000, y: 1000 },
+          status: 'ready',
+          updatedAt: Date.now(),
+        },
+        {
+          sceneId: 'scene-2',
+          sceneIndex: 1,
+          title: 'Rocking Horse Winner',
+          customName: 'Rocking Horse',
+          seedArtists: 'Rocking Horse Winner',
+          seedIds: ['rocking-horse-winner-us'],
+          discoveryFilters: {},
+          graphData: { nodes: [], links: [] },
+          synthesisRationale: '',
+          centerOffset: { x: 2050, y: 1000 },
+          status: 'ready',
+          updatedAt: Date.now(),
+        },
+        {
+          sceneId: 'scene-3',
+          sceneIndex: 2,
+          title: 'American Football',
+          customName: 'American Football',
+          seedArtists: 'American Football',
+          seedIds: ['american-football-us'],
+          discoveryFilters: {},
+          graphData: { nodes: [], links: [] },
+          synthesisRationale: '',
+          centerOffset: { x: 3100, y: 1000 },
+          status: 'ready',
+          updatedAt: Date.now(),
+        },
+      ];
+
+      // 1. Custom scene name with explicit sceneId
+      const nodeWithCustom = {
+        id: 'scene-3::rainer-maria-us',
+        canonicalId: 'rainer-maria-us',
+        label: 'Rainer Maria',
+        sceneId: 'scene-3',
+        sceneIndex: 2,
+      };
+      expect(resolveCrossSceneTargetName(nodeWithCustom, scenes)).toBe('Rainer Maria (American Football)');
+
+      // 2. Custom scene name derived solely from namespaced ID (sceneId/sceneIndex missing)
+      const nodeWithNamespacedIdOnly = {
+        id: 'scene-3::rainer-maria-us',
+        label: 'Rainer Maria',
+      };
+      expect(resolveCrossSceneTargetName(nodeWithNamespacedIdOnly, scenes)).toBe('Rainer Maria (American Football)');
+
+      // 3. Custom scene name with baseDisplayLabel override
+      expect(resolveCrossSceneTargetName(nodeWithCustom, scenes, 'Rainer Maria')).toBe('Rainer Maria (American Football)');
+
+      // 4. Default fallback when customName is undefined/not set
+      const scenesWithoutCustom: ProjectScene[] = [
+        ...scenes.slice(0, 2),
+        { ...scenes[2], customName: undefined },
+      ];
+      expect(resolveCrossSceneTargetName(nodeWithCustom, scenesWithoutCustom)).toBe('Rainer Maria (Scene 3)');
+
+      // 5. Default fallback when scenes array is empty or undefined
+      expect(resolveCrossSceneTargetName(nodeWithCustom, [])).toBe('Rainer Maria (Scene 3)');
+      expect(resolveCrossSceneTargetName(nodeWithCustom)).toBe('Rainer Maria (Scene 3)');
+
+      // 6. Cross-scene bridge connection ordering / prioritization in hover tooltips
+      const tooltipConnections = [
+        { context: 'Was a primary musical precursor to', targetName: 'Rocking Horse Winner', isBridge: false },
+        { context: 'Bridges both constellations as a shared anchor with', targetName: resolveCrossSceneTargetName(nodeWithCustom, scenes), isBridge: true },
+      ];
+      tooltipConnections.sort((a, b) => {
+        if (a.isBridge && !b.isBridge) return -1;
+        if (!a.isBridge && b.isBridge) return 1;
+        return 0;
+      });
+      expect(tooltipConnections[0].isBridge).toBe(true);
+      expect(tooltipConnections[0].targetName).toBe('Rainer Maria (American Football)');
+      expect(tooltipConnections[1].targetName).toBe('Rocking Horse Winner');
     });
   });
 
