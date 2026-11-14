@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, ProjectScene, ZineEditorialImageEntry, ZineImageSlot, COST_PER_AI_CALL } from '../types';
-import { stripSceneNamespace, toSeedArtistsArray, normalizeCanonicalEntityId, resolveZineImageSlot, serializeZineImageEntry, validateZineImageUrl, normalizeZineImages, normalizeZineIntro, MAX_ZINE_IMAGE_SLOTS } from '../shared/multiSceneUtils';
+import { stripSceneNamespace, toSeedArtistsArray, normalizeCanonicalEntityId, resolveZineImageSlot, serializeZineImageEntry, validateZineImageUrl, normalizeZineImages, normalizeZineIntro, formatZineSceneBadgeLabel, MAX_ZINE_IMAGE_SLOTS } from '../shared/multiSceneUtils';
 import { streamNodeChat, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
 import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch, stripCountrySlug } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
@@ -3764,7 +3764,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             >
                                                 <div className="flex items-center flex-wrap gap-2 mb-4">
                                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
-                                                        {(scene.customName && scene.customName.trim()) ? scene.customName.trim().toUpperCase() : `SCENE ${idx + 1}`}
+                                                        {formatZineSceneBadgeLabel(scene, idx)}
                                                     </span>
                                                     {sceneSeeds.length > 0 && (
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">

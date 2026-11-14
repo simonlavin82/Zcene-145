@@ -22,6 +22,7 @@ exports.normalizeZineIntro = normalizeZineIntro;
 exports.normalizeProjectScene = normalizeProjectScene;
 exports.createEmptyProjectScene = createEmptyProjectScene;
 exports.getSceneDisplayName = getSceneDisplayName;
+exports.formatZineSceneBadgeLabel = formatZineSceneBadgeLabel;
 exports.resolveCrossSceneTargetName = resolveCrossSceneTargetName;
 exports.computeClampedDropdownLeft = computeClampedDropdownLeft;
 exports.normalizeCrossSceneLink = normalizeCrossSceneLink;
@@ -630,6 +631,23 @@ function getSceneDisplayName(scene, fallbackIndex) {
             ? fallbackIndex
             : 0;
     return `Scene ${idx + 1}`;
+}
+/**
+ * Formats the uppercase Scene badge pill for per-scene Zine editorial headers:
+ * - Default / un-renamed (`!customName` or matches `Scene N`): `"SCENE 1"`, `"SCENE 2"`, etc. (no colon)
+ * - Renamed (`scene.customName` is set): `"SCENE: DASHBOARD"`, `"SCENE: AMERICAN FOOTBALL"`, etc.
+ *   (strips any user-typed leading `"Scene:"` prefix to prevent `"SCENE: SCENE: ..."`).
+ */
+function formatZineSceneBadgeLabel(scene, fallbackIndex = 0) {
+    const idx = typeof scene?.sceneIndex === 'number' && Number.isFinite(scene.sceneIndex) && scene.sceneIndex >= 0
+        ? Math.floor(scene.sceneIndex)
+        : Math.max(0, Math.floor(fallbackIndex));
+    const rawCustom = typeof scene?.customName === 'string' ? scene.customName.trim() : '';
+    const strippedCustom = rawCustom.replace(/^scene\s*:\s*/i, '').trim();
+    if (!strippedCustom || /^scene\s+\d+$/i.test(strippedCustom)) {
+        return `SCENE ${idx + 1}`;
+    }
+    return `SCENE: ${strippedCustom.toUpperCase()}`;
 }
 /**
  * Resolves the display name for a cross-scene target node with its scene label suffix.

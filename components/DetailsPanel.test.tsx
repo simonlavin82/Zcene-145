@@ -1033,12 +1033,12 @@ describe('DetailsPanel', () => {
                     />
                 );
 
-                // Section header badges in Zine view use customName
-                expect(screen.getAllByText('PTW').length).toBeGreaterThan(0);
-                expect(screen.getAllByText("HARM'S WAY").length).toBeGreaterThan(0);
+                // Section header badges in Zine view prefix renamed scenes with SCENE: while un-renamed stay SCENE N
+                expect(screen.getByText('SCENE: PTW')).toBeInTheDocument();
+                expect(screen.getByText("SCENE: HARM'S WAY")).toBeInTheDocument();
                 expect(screen.getAllByText('SCENE 3').length).toBeGreaterThan(0);
 
-                // Multi-scene bridge label resolves to custom names
+                // Multi-scene bridge label on Deep Cut cards stays compact without prefix
                 expect(screen.getByText("PTW & HARM'S WAY")).toBeInTheDocument();
             });
 

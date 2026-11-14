@@ -649,6 +649,28 @@ export function getSceneDisplayName(
 }
 
 /**
+ * Formats the uppercase Scene badge pill for per-scene Zine editorial headers:
+ * - Default / un-renamed (`!customName` or matches `Scene N`): `"SCENE 1"`, `"SCENE 2"`, etc. (no colon)
+ * - Renamed (`scene.customName` is set): `"SCENE: DASHBOARD"`, `"SCENE: AMERICAN FOOTBALL"`, etc.
+ *   (strips any user-typed leading `"Scene:"` prefix to prevent `"SCENE: SCENE: ..."`).
+ */
+export function formatZineSceneBadgeLabel(
+  scene: Partial<ProjectScene> | null | undefined,
+  fallbackIndex: number = 0
+): string {
+  const idx =
+    typeof scene?.sceneIndex === 'number' && Number.isFinite(scene.sceneIndex) && scene.sceneIndex >= 0
+      ? Math.floor(scene.sceneIndex)
+      : Math.max(0, Math.floor(fallbackIndex));
+  const rawCustom = typeof scene?.customName === 'string' ? scene.customName.trim() : '';
+  const strippedCustom = rawCustom.replace(/^scene\s*:\s*/i, '').trim();
+  if (!strippedCustom || /^scene\s+\d+$/i.test(strippedCustom)) {
+    return `SCENE ${idx + 1}`;
+  }
+  return `SCENE: ${strippedCustom.toUpperCase()}`;
+}
+
+/**
  * Resolves the display name for a cross-scene target node with its scene label suffix.
  * Uses `customName` if set (e.g. "Rainer Maria (American Football)"),
  * falling back to `Scene N` (e.g. "Rainer Maria (Scene 3)") if no custom title is defined.

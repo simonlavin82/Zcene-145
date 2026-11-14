@@ -26,6 +26,7 @@ import {
   resolveSceneNodeOverlaps,
   MAX_SCENES_PER_PROJECT,
   getSceneDisplayName,
+  formatZineSceneBadgeLabel,
   resolveCrossSceneTargetName,
   computeClampedDropdownLeft,
   MAX_ZINE_IMAGE_SLOTS,
@@ -3648,6 +3649,29 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(dcRawHealed?.y).toBe(1000);
       expect(dcRawHealed?.fx).toBe(1000);
       expect(dcRawHealed?.fy).toBe(1000);
+    });
+  });
+
+  describe('Zine Editorial Per-Scene Header Badge Formatting (formatZineSceneBadgeLabel)', () => {
+    it('renders SCENE N with no colon for un-renamed scenes or default Scene N names', () => {
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 0 })).toBe('SCENE 1');
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 1, customName: '' })).toBe('SCENE 2');
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 2, customName: '   ' })).toBe('SCENE 3');
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 0, customName: 'Scene 1' })).toBe('SCENE 1');
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 1, customName: 'scene   2' })).toBe('SCENE 2');
+      expect(formatZineSceneBadgeLabel(null, 2)).toBe('SCENE 3');
+    });
+
+    it('prefixes renamed custom scene names with SCENE: in uppercase', () => {
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 0, customName: 'Dashboard' })).toBe('SCENE: DASHBOARD');
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 1, customName: '  Rocking Horse  ' })).toBe('SCENE: ROCKING HORSE');
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 2, customName: 'American Football' })).toBe('SCENE: AMERICAN FOOTBALL');
+    });
+
+    it('strips any user-typed leading Scene: prefix to prevent double-prefixing', () => {
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 0, customName: 'Scene: Dashboard' })).toBe('SCENE: DASHBOARD');
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 1, customName: 'SCENE:Rocking Horse' })).toBe('SCENE: ROCKING HORSE');
+      expect(formatZineSceneBadgeLabel({ sceneIndex: 0, customName: 'Scene:' })).toBe('SCENE 1');
     });
   });
 });
