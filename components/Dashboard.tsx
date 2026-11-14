@@ -412,7 +412,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
       
       <div className="flex-grow w-full overflow-y-auto relative">
-        <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-24 sm:pb-32">
           <div className="w-full space-y-8">
           <div className="flex flex-col gap-6 w-full">
             <div className="flex flex-row items-start sm:items-center justify-between w-full gap-4">
@@ -548,7 +548,7 @@ const Dashboard: React.FC<DashboardProps> = ({
               </button>
             </div>
           ) : view === 'grid' ? (
-            <div className="w-full flex flex-wrap gap-x-8 gap-y-10 items-start">
+            <div className="w-full flex flex-wrap gap-x-8 gap-y-12 items-start pt-6">
               {sortedBucketKeys.map((bucketKey, bucketIndex) => {
                 const projectsInBucket = groupedProjects[bucketKey] || [];
                 const count = projectsInBucket.length;
