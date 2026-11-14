@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink } from './types';
-import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeduplicatedActiveNodes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT } from './shared/multiSceneUtils';
+import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeduplicatedActiveNodes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, normalizeZineImages, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing, stripCountrySlug, canonicalizeEntitySlugWithCountry } from './services/artistCacheService';
 export { canonicalizeEntitySlugWithCountry };
@@ -1225,6 +1225,7 @@ const App: React.FC = () => {
   const [scenes, setScenes] = useState<ProjectScene[]>([]);
   const [activeSceneId, setActiveSceneId] = useState<string>('scene-1');
   const [overarchingRationale, setOverarchingRationale] = useState<string>('');
+  const [overarchingZineImages, setOverarchingZineImages] = useState<(string | null)[]>([]);
   const [crossSceneLinks, setCrossSceneLinks] = useState<CrossSceneLink[]>([]);
   const healedNodeIdsRef = useRef<Set<string>>(new Set());
 
@@ -1704,6 +1705,7 @@ const App: React.FC = () => {
   const projectSeedImageSnapshotRef = useRef<{ names: string[]; urls: (string | null)[] }>({ names: [], urls: [] });
   const activeSceneIdRef = useRef<string>('scene-1');
   const overarchingRationaleRef = useRef<string>('');
+  const overarchingZineImagesRef = useRef<(string | null)[]>([]);
   const crossSceneLinksRef = useRef<CrossSceneLink[]>([]);
   const lastAppliedFiltersRef = useRef<DiscoveryFilters>({});
   const selectedNodeRef = useRef<Node | null>(null);
@@ -1721,6 +1723,7 @@ const App: React.FC = () => {
   useEffect(() => { scenesRef.current = scenes; }, [scenes]);
   useEffect(() => { activeSceneIdRef.current = activeSceneId; }, [activeSceneId]);
   useEffect(() => { overarchingRationaleRef.current = overarchingRationale; }, [overarchingRationale]);
+  useEffect(() => { overarchingZineImagesRef.current = overarchingZineImages; }, [overarchingZineImages]);
   useEffect(() => { crossSceneLinksRef.current = crossSceneLinks; }, [crossSceneLinks]);
   useEffect(() => { lastAppliedFiltersRef.current = lastAppliedFilters; }, [lastAppliedFilters]);
   useEffect(() => { selectedNodeRef.current = selectedNode; }, [selectedNode]);
@@ -2027,6 +2030,8 @@ const App: React.FC = () => {
     if (remaining.length < 2) {
       overarchingRationaleRef.current = '';
       setOverarchingRationale('');
+      overarchingZineImagesRef.current = [];
+      setOverarchingZineImages([]);
     }
 
     scenesRef.current = remaining;
@@ -2058,6 +2063,65 @@ const App: React.FC = () => {
       const dedupedNodes = buildCanonicalDeduplicatedNodesFromScenes(populatedScenes);
       setActiveNodeIds(dedupedNodes.map(n => n.id));
     }
+  }, []);
+
+  const handleUpdateZineImages = useCallback((
+    target: 'overarching' | string,
+    slotIndex: 0 | 1 | 2,
+    url: string | null
+  ) => {
+    const applySlotUpdate = (current?: (string | null)[]): (string | null)[] => {
+      const normalized = normalizeZineImages(current) || [null, null, null];
+      const nextSlots: [string | null, string | null, string | null] = [
+        normalized[0] ?? null,
+        normalized[1] ?? null,
+        normalized[2] ?? null
+      ];
+      nextSlots[slotIndex] = url;
+      return normalizeZineImages(nextSlots) || [];
+    };
+
+    if (target === 'overarching') {
+      const nextImages = applySlotUpdate(overarchingZineImagesRef.current);
+      overarchingZineImagesRef.current = nextImages;
+      setOverarchingZineImages(nextImages);
+      return;
+    }
+
+    const currentScenes = scenesRef.current;
+    let nextScenes: ProjectScene[];
+    if (currentScenes.length === 0) {
+      const nextImages = applySlotUpdate(undefined);
+      const existingNodes = graphDataRef.current?.nodes || [];
+      nextScenes = [
+        normalizeProjectScene({
+          ...createEmptyScene(0),
+          seedArtists: seedArtistsRef.current || '',
+          ...(existingNodes.length > 0 ? {
+            graphData: sanitizeGraphDataForTransport(graphDataRef.current!),
+            status: 'completed'
+          } : {}),
+          ...(nextImages.length > 0 ? { zineImages: nextImages } : {})
+        }, 0)
+      ];
+    } else {
+      let matched = false;
+      nextScenes = currentScenes.map((scene, idx) => {
+        const sid = scene.sceneId || scene.id;
+        if (sid !== target) return scene;
+        matched = true;
+        const nextImages = applySlotUpdate(scene.zineImages);
+        if (nextImages.length === 0) {
+          const { zineImages: _removed, ...rest } = scene;
+          return normalizeProjectScene(rest, idx);
+        }
+        return normalizeProjectScene({ ...scene, zineImages: nextImages }, idx);
+      });
+      if (!matched) return;
+    }
+
+    scenesRef.current = nextScenes;
+    setScenes(nextScenes);
   }, []);
 
   const handleUpdateChatHistories = useCallback((
@@ -2261,6 +2325,8 @@ const App: React.FC = () => {
     setActiveSceneId(initialScene.id);
     overarchingRationaleRef.current = '';
     setOverarchingRationale('');
+    overarchingZineImagesRef.current = [];
+    setOverarchingZineImages([]);
     crossSceneLinksRef.current = [];
     setCrossSceneLinks([]);
 
@@ -2287,6 +2353,7 @@ const App: React.FC = () => {
         scenes: JSON.stringify([initialScene]),
         activeSceneId: initialScene.id,
         overarchingRationale: '',
+        overarchingZineImages: [],
         crossSceneLinks: '[]',
         sceneCount: 1,
         createdAt: serverTimestamp(),
@@ -2758,6 +2825,8 @@ const App: React.FC = () => {
     setActiveSceneId(freshScene.id);
     overarchingRationaleRef.current = '';
     setOverarchingRationale('');
+    overarchingZineImagesRef.current = [];
+    setOverarchingZineImages([]);
     crossSceneLinksRef.current = [];
     setCrossSceneLinks([]);
     curationSessionIdRef.current = null;
@@ -3449,6 +3518,7 @@ const App: React.FC = () => {
       scenes: JSON.stringify(scenesRef.current),
       activeSceneId: (projectStatus === 'curating' && activeSceneIdRef.current) ? activeSceneIdRef.current : 'scene-1',
       overarchingRationale: overarchingRationaleRef.current || '',
+      overarchingZineImages: normalizeZineImages(overarchingZineImagesRef.current) || [],
       crossSceneLinks: JSON.stringify(crossSceneLinksRef.current || []),
       sceneCount: Math.max(1, scenesRef.current.length),
       createdAt: serverTimestamp(),
@@ -3469,7 +3539,7 @@ const App: React.FC = () => {
     }
 
     return basePayload;
-  }, [graphData, activeNodeIds, pinnedNodes, chatHistories, lastViewedStackCount, projectName, detailsCache, user, currentCacheKey]);
+  }, [graphData, activeNodeIds, pinnedNodes, chatHistories, lastViewedStackCount, projectName, detailsCache, user, currentCacheKey, scenes, overarchingZineImages, overarchingRationale]);
 
   const handleSaveToDashboard = useCallback(async () => {
     if (!user) {
@@ -3845,6 +3915,7 @@ const App: React.FC = () => {
           scenes: JSON.stringify(currentScenesList),
           activeSceneId: targetSceneId,
           overarchingRationale: overarchingRationaleRef.current || '',
+          overarchingZineImages: normalizeZineImages(overarchingZineImagesRef.current) || [],
           crossSceneLinks: JSON.stringify(nextBridges),
           sceneCount: currentScenesList.length,
           seedArtistIds: allSeedIds,
@@ -3949,6 +4020,7 @@ const App: React.FC = () => {
         scenes: JSON.stringify([initialScene]),
         activeSceneId: initialScene.sceneId,
         overarchingRationale: '',
+        overarchingZineImages: [],
         crossSceneLinks: '[]',
         sceneCount: 1,
         createdAt: serverTimestamp(),
@@ -4692,6 +4764,7 @@ const App: React.FC = () => {
           scenes: JSON.stringify([stepZeroScene]),
           activeSceneId: stepZeroScene.id,
           overarchingRationale: '',
+          overarchingZineImages: [],
           crossSceneLinks: '[]',
           sceneCount: 1,
           createdAt: serverTimestamp(),
@@ -6583,6 +6656,7 @@ const App: React.FC = () => {
           scenes: typeof data.scenes === 'string' ? (() => { try { return JSON.parse(data.scenes); } catch { return undefined; } })() : data.scenes,
           activeSceneId: data.activeSceneId,
           overarchingRationale: data.overarchingRationale,
+          overarchingZineImages: normalizeZineImages(data.overarchingZineImages),
           crossSceneLinks: typeof data.crossSceneLinks === 'string' ? (() => { try { return JSON.parse(data.crossSceneLinks); } catch { return undefined; } })() : data.crossSceneLinks,
           activeJobId: data.activeJobId,
           authorId: data.authorId,
@@ -6927,6 +7001,8 @@ const App: React.FC = () => {
         setChatHistories(new Map());
         setCurrentCacheKey(null);
         setCurrentProjectOwnerId(null);
+        overarchingZineImagesRef.current = [];
+        setOverarchingZineImages([]);
         setSelectedNode(null);
         hasAutoSelectedRef.current = null;
         lastLocalChatUpdateAtRef.current = 0;
@@ -7059,6 +7135,16 @@ const App: React.FC = () => {
       if (data.overarchingRationale !== undefined) {
         overarchingRationaleRef.current = data.overarchingRationale || '';
         setOverarchingRationale(data.overarchingRationale || '');
+      }
+      if (data.overarchingZineImages !== undefined) {
+        const nextOverarchingImages = normalizeZineImages(data.overarchingZineImages) || [];
+        overarchingZineImagesRef.current = nextOverarchingImages;
+        setOverarchingZineImages((prev) =>
+          JSON.stringify(prev) === JSON.stringify(nextOverarchingImages) ? prev : nextOverarchingImages
+        );
+      } else if (!(graphDataRef.current?.nodes && graphDataRef.current.nodes.length > 0)) {
+        overarchingZineImagesRef.current = [];
+        setOverarchingZineImages((prev) => (prev.length === 0 ? prev : []));
       }
       if (data.crossSceneLinks !== undefined) {
         try {
@@ -8077,6 +8163,8 @@ const App: React.FC = () => {
                 } else {
                   seedArtistsRef.current = '';
                   scenesRef.current = [];
+                  overarchingZineImagesRef.current = [];
+                  setOverarchingZineImages([]);
                   setSeedArtists('');
                   setProjectName('');
                   setProjectStatus(null);
@@ -8111,6 +8199,8 @@ const App: React.FC = () => {
             setChatHistories(new Map());
             setCurrentCacheKey(null);
             setSeedArtists('');
+            overarchingZineImagesRef.current = [];
+            setOverarchingZineImages([]);
             setProjectName('');
             setProjectStatus(null);
             setActiveJobId(null);
@@ -8143,6 +8233,12 @@ const App: React.FC = () => {
                 if (data.overarchingRationale !== undefined) {
                   overarchingRationaleRef.current = data.overarchingRationale || '';
                   setOverarchingRationale(data.overarchingRationale || '');
+                }
+
+                if (data.overarchingZineImages !== undefined) {
+                  const nextSharedOverarchingImages = normalizeZineImages(data.overarchingZineImages) || [];
+                  overarchingZineImagesRef.current = nextSharedOverarchingImages;
+                  setOverarchingZineImages(nextSharedOverarchingImages);
                 }
 
                 let parsedCross: CrossSceneLink[] = [];
@@ -9427,6 +9523,8 @@ const App: React.FC = () => {
               onRemoveScene={handleRemoveScene}
               onRenameScene={handleRenameScene}
               overarchingRationale={overarchingRationale}
+              overarchingZineImages={overarchingZineImages}
+              onUpdateZineImages={handleUpdateZineImages}
               crossSceneLinks={crossSceneLinks}
               isPassiveSelection={isPassiveSelection}
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} 
@@ -9467,6 +9565,7 @@ const App: React.FC = () => {
                             discoveryFilters: forkFilters,
                             graphData: { nodes: [], links: [] },
                             synthesisRationale: '',
+                            zineImages: undefined,
                             artistSnippets: {},
                             activeNodes: [],
                             status: 'curating'
@@ -9497,6 +9596,7 @@ const App: React.FC = () => {
                       .filter((nd: any) => (nd.type === 'artist' || nd.type === 'label') && typeof nd.x === 'number')
                       .map((nd: any) => ({ nodeId: nd.id, x: nd.x, y: nd.y, fx: nd.fx ?? null, fy: nd.fy ?? null }));
                     const forkOverarching = settledForkScenes.length >= 2 ? (overarchingRationaleRef.current || '') : '';
+                    const forkOverarchingImages = settledForkScenes.length >= 2 ? (normalizeZineImages(overarchingZineImagesRef.current) || []) : [];
 
                     await setDoc(newDocRef, {
                       name: forkName,
@@ -9518,6 +9618,7 @@ const App: React.FC = () => {
                       scenes: JSON.stringify(sanitizeScenesForTransport(forkedScenes)),
                       activeSceneId: forkTargetSceneId,
                       overarchingRationale: forkOverarching,
+                      overarchingZineImages: forkOverarchingImages,
                       crossSceneLinks: JSON.stringify(forkBridges),
                       sceneCount: forkedScenes.length,
                       createdAt: serverTimestamp(),
@@ -9538,6 +9639,8 @@ const App: React.FC = () => {
                     setActiveSceneId(forkTargetSceneId);
                     overarchingRationaleRef.current = forkOverarching;
                     setOverarchingRationale(forkOverarching);
+                    overarchingZineImagesRef.current = forkOverarchingImages;
+                    setOverarchingZineImages(forkOverarchingImages);
                     crossSceneLinksRef.current = forkBridges;
                     setCrossSceneLinks(forkBridges);
                     projectSeedImageSnapshotRef.current = { names: forkAllSeeds, urls: forkSeedImageUrls };
@@ -9571,6 +9674,7 @@ const App: React.FC = () => {
                     scenes: [forkedScene],
                     activeSceneId: forkedScene.id,
                     overarchingRationale: '',
+                    overarchingZineImages: [],
                     crossSceneLinks: [],
                     sceneCount: 1,
                     createdAt: serverTimestamp(),
@@ -9590,6 +9694,8 @@ const App: React.FC = () => {
                   setActiveSceneId(forkedScene.id);
                   overarchingRationaleRef.current = '';
                   setOverarchingRationale('');
+                  overarchingZineImagesRef.current = [];
+                  setOverarchingZineImages([]);
                   crossSceneLinksRef.current = [];
                   setCrossSceneLinks([]);
                   setProjectName(defaultName);
@@ -9618,6 +9724,8 @@ const App: React.FC = () => {
                   setActiveSceneId(forkedScene.id);
                   overarchingRationaleRef.current = '';
                   setOverarchingRationale('');
+                  overarchingZineImagesRef.current = [];
+                  setOverarchingZineImages([]);
                   crossSceneLinksRef.current = [];
                   setCrossSceneLinks([]);
                   setProjectName("Untitled Zcene");

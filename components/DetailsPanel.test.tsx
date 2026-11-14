@@ -1214,6 +1214,225 @@ describe('DetailsPanel', () => {
             });
         });
     });
+
+    describe('Power-User Edit Zine Mode (Editorial Column Images)', () => {
+        const threeParagraphMarkdown = [
+            'Paragraph one explores the raw DIY basement roots of the late nineties scene.',
+            'Paragraph two traces the label partnerships that carried these bands nationwide.',
+            'Paragraph three synthesizes the enduring sonic legacy across later generations.'
+        ].join('\n\n');
+
+        const baseZineScenes: any[] = [
+            {
+                id: 'scene-1',
+                sceneId: 'scene-1',
+                seedArtists: 'Dashboard Confessional',
+                synthesisRationale: threeParagraphMarkdown,
+                graphData: {
+                    nodes: [{ id: 'scene-1::dc', label: 'Dashboard Confessional', type: 'artist' }],
+                    links: [],
+                },
+                status: 'completed',
+            },
+            {
+                id: 'scene-2',
+                sceneId: 'scene-2',
+                seedArtists: 'American Football',
+                synthesisRationale: 'Scene two col 1 copy.\n\nScene two col 2 copy.\n\nScene two col 3 copy.',
+                graphData: {
+                    nodes: [{ id: 'scene-2::af', label: 'American Football', type: 'artist' }],
+                    links: [],
+                },
+                status: 'completed',
+            },
+        ];
+
+        const baseZineGraph = {
+            nodes: [
+                { id: 'scene-1::dc', label: 'Dashboard Confessional', type: 'artist' },
+                { id: 'scene-2::af', label: 'American Football', type: 'artist' },
+            ],
+            links: [],
+            synthesisRationale: threeParagraphMarkdown,
+        } as any;
+
+        const baseProps = (overrides: Record<string, any> = {}) => ({
+            selectedNode: baseZineGraph.nodes[0],
+            activeNodes: baseZineGraph.nodes,
+            detailsCache: new Map(),
+            loadingNodeIds: new Set<string>(),
+            onTogglePinNode: () => {},
+            pinnedNodes: new Set<string>(),
+            onRefreshNode: () => {},
+            error: null,
+            systemError: null,
+            graphData: baseZineGraph,
+            libraryArtists: [],
+            seedArtists: ['Dashboard Confessional', 'American Football'],
+            onAddArtist: () => {},
+            isCollapsed: false,
+            onToggleCollapse: () => {},
+            isSmallScreen: false,
+            onNodeClick: () => {},
+            onNavigate: () => {},
+            isGlobalLoading: false,
+            onCancelGlobalLoading: () => {},
+            unreadCount: 0,
+            isActive: true,
+            isMagazineViewOpen: true,
+            onMagazineViewToggle: () => {},
+            chatHistories: new Map(),
+            onUpdateChatHistories: () => {},
+            onAddToStack: () => {},
+            scenes: baseZineScenes,
+            overarchingRationale: threeParagraphMarkdown,
+            user: { uid: 'owner-1' },
+            isGuest: false,
+            onUpdateZineImages: vi.fn(),
+            ...overrides,
+        });
+
+        it('keeps unedited Zine rendering 100% clean (columns-3 container, zero edit chrome) in default reading mode', () => {
+            const { container } = render(<DetailsPanel {...baseProps()} />);
+
+            expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveTextContent('Edit');
+            expect(screen.queryByTestId('zine-editorial-grid-overarching')).not.toBeInTheDocument();
+            expect(screen.queryByText('+ Add Image URL')).not.toBeInTheDocument();
+            expect(container.querySelector('.columns-1.md\\:columns-2.lg\\:columns-3')).toBeInTheDocument();
+        });
+
+        it('strictly hides Edit Zine controls when viewing as guest or logged-out user', () => {
+            const { rerender } = render(<DetailsPanel {...baseProps({ isGuest: true })} />);
+            expect(screen.queryByTestId('zine-edit-toggle-btn')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('zine-edit-toggle-btn-mobile')).not.toBeInTheDocument();
+
+            rerender(<DetailsPanel {...baseProps({ isGuest: false, user: null })} />);
+            expect(screen.queryByTestId('zine-edit-toggle-btn')).not.toBeInTheDocument();
+
+            rerender(<DetailsPanel {...baseProps({ isGuest: false, user: { uid: 'owner-1' }, onUpdateZineImages: undefined })} />);
+            expect(screen.queryByTestId('zine-edit-toggle-btn')).not.toBeInTheDocument();
+        });
+
+        it('reveals 3 column-width slots in Edit Mode, validates https:// URLs, and commits valid saves to onUpdateZineImages', () => {
+            const onUpdateZineImages = vi.fn();
+            render(<DetailsPanel {...baseProps({ onUpdateZineImages })} />);
+
+            fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+            expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveTextContent('Done');
+            expect(screen.getByTestId('zine-editorial-grid-overarching')).toBeInTheDocument();
+            expect(screen.getByTestId('zine-slot-add-overarching-0')).toHaveClass('aspect-[16/10]');
+            expect(screen.getByTestId('zine-slot-add-overarching-1')).toHaveClass('aspect-[16/10]');
+            expect(screen.getByTestId('zine-slot-add-overarching-2')).toHaveClass('aspect-[16/10]');
+
+            // Open Column 2 slot editor
+            fireEvent.click(screen.getByTestId('zine-slot-add-overarching-1'));
+            const urlInput = screen.getByTestId('zine-slot-input-overarching-1');
+            expect(urlInput).toHaveClass('h-10');
+
+            // Reject insecure http:// URL
+            fireEvent.change(urlInput, { target: { value: 'http://example.com/photo.jpg' } });
+            fireEvent.click(screen.getByTestId('zine-slot-save-overarching-1'));
+            expect(screen.getByTestId('zine-slot-error-overarching-1')).toHaveTextContent('https://');
+            expect(onUpdateZineImages).not.toHaveBeenCalled();
+
+            // Accept valid https:// URL
+            fireEvent.change(urlInput, { target: { value: '  https://i.scdn.co/image/cb812efb7d836138  ' } });
+            fireEvent.click(screen.getByTestId('zine-slot-save-overarching-1'));
+            expect(onUpdateZineImages).toHaveBeenCalledTimes(1);
+            expect(onUpdateZineImages).toHaveBeenCalledWith(
+                'overarching',
+                1,
+                'https://i.scdn.co/image/cb812efb7d836138'
+            );
+        });
+
+        it('renders editorial photos with referrerPolicy="no-referrer", loading="lazy", and interleaves images between paragraph buckets in DOM order', () => {
+            render(
+                <DetailsPanel
+                    {...baseProps({
+                        overarchingZineImages: [null, 'https://i.guim.co.uk/band.jpg', null],
+                    })}
+                />
+            );
+
+            const grid = screen.getByTestId('zine-editorial-grid-overarching');
+            const fig = screen.getByTestId('zine-image-figure-overarching-1');
+            expect(fig).toHaveClass('rounded-xl');
+            expect(fig).toHaveClass('border-zinc-800/80');
+            expect(fig).toHaveClass('bg-zinc-900/50');
+
+            const img = fig.querySelector('img') as HTMLImageElement;
+            expect(img).not.toBeNull();
+            expect(img.getAttribute('src')).toBe('https://i.guim.co.uk/band.jpg');
+            expect(img.getAttribute('referrerpolicy')).toBe('no-referrer');
+            expect(img.getAttribute('loading')).toBe('lazy');
+
+            // Verify interleaved reading order for mobile single-column stacking:
+            // Col 1 paragraph comes BEFORE Col 2 image, which comes BEFORE Col 2 paragraph.
+            const htmlOrder = grid.innerHTML;
+            const col1Idx = htmlOrder.indexOf('Paragraph one explores');
+            const col2ImgIdx = htmlOrder.indexOf('https://i.guim.co.uk/band.jpg');
+            const col2TextIdx = htmlOrder.indexOf('Paragraph two traces');
+            expect(col1Idx).toBeGreaterThan(-1);
+            expect(col2ImgIdx).toBeGreaterThan(col1Idx);
+            expect(col2TextIdx).toBeGreaterThan(col2ImgIdx);
+        });
+
+        it('collapses broken images cleanly in Reading Mode and offers Change URL + Remove recovery in Edit Mode', () => {
+            const onUpdateZineImages = vi.fn();
+            const singleSceneOnly = [baseZineScenes[0]];
+            render(
+                <DetailsPanel
+                    {...baseProps({
+                        scenes: [
+                            {
+                                ...singleSceneOnly[0],
+                                zineImages: ['https://broken.example.com/missing.jpg', null, null],
+                            },
+                        ],
+                        overarchingRationale: undefined,
+                        onUpdateZineImages,
+                    })}
+                />
+            );
+
+            // In Reading Mode, figure initially renders, then collapses to null when onError fires
+            const img = screen.getByTestId('zine-image-figure-scene-1-0').querySelector('img') as HTMLImageElement;
+            fireEvent.error(img);
+            expect(screen.queryByTestId('zine-image-figure-scene-1-0')).not.toBeInTheDocument();
+
+            // Switching to Edit Mode reveals diagnostic box with Change URL and Remove actions
+            fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+            expect(screen.getByTestId('zine-slot-broken-scene-1-0')).toHaveTextContent('Image failed to load');
+
+            fireEvent.click(screen.getByTestId('zine-slot-remove-scene-1-0'));
+            expect(onUpdateZineImages).toHaveBeenCalledWith('scene-1', 0, null);
+        });
+
+        it('renders mobile Edit Zine button on small screens and allows editing a specific scene slot', () => {
+            const onUpdateZineImages = vi.fn();
+            render(
+                <DetailsPanel
+                    {...baseProps({
+                        isSmallScreen: true,
+                        scenes: [
+                            baseZineScenes[0],
+                            {
+                                ...baseZineScenes[1],
+                                zineImages: [null, null, 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcTest'],
+                            },
+                        ],
+                        onUpdateZineImages,
+                    })}
+                />
+            );
+
+            fireEvent.click(screen.getByTestId('zine-edit-toggle-btn-mobile'));
+            expect(screen.getByTestId('zine-edit-toggle-btn-mobile')).toHaveTextContent('Done');
+            fireEvent.click(screen.getByTestId('zine-slot-remove-scene-2-2'));
+            expect(onUpdateZineImages).toHaveBeenCalledWith('scene-2', 2, null);
+        });
+    });
 });
 
 

@@ -2072,12 +2072,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 });
                 const cleanHumanSeedString = humanSeedList.join('::');
                 const completedSceneTitle = humanSeedList.join(" + ");
+                const prevTargetScene = existingProjectScenes.find((s) => (s.sceneId || s.id) === targetSceneId);
                 const completedScene = (0, multiSceneUtils_1.normalizeProjectScene)({
                     id: targetSceneId,
                     sceneId: targetSceneId,
                     sceneIndex: targetSceneIndex,
                     title: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
                     name: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
+                    ...(prevTargetScene?.customName ? { customName: prevTargetScene.customName } : {}),
                     seedArtists: cleanHumanSeedString || cleanSeedArtistsContext,
                     curatedSeedArtists: cleanHumanSeedString || cleanSeedArtistsContext,
                     seedIds: resolvedSeedArray.map((s) => s.id),
@@ -2086,6 +2088,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     curatedDiscoveryFilters: inputPayload.filters || {},
                     graphData: finalGraph,
                     synthesisRationale: finalGraph.synthesisRationale || rootBreakdownStr || "",
+                    ...(prevTargetScene?.zineImages ? { zineImages: prevTargetScene.zineImages } : {}),
                     artistSnippets: sceneArtistSnippetsMap,
                     centerOffset: (0, multiSceneUtils_1.getSceneCenterOffset)(targetSceneIndex),
                     status: "ready",

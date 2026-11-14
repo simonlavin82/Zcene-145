@@ -55,14 +55,18 @@ export const computeProjectHydrationFingerprint = (
         Array.isArray(data.artistIds) ? [...data.artistIds].map(String).sort().join(',') : '',
         Array.isArray(data.labelIds) ? [...data.labelIds].map(String).sort().join(',') : '',
       ].join(';');
+  const rawOverarchingImages = Array.isArray(data.overarchingZineImages)
+    ? data.overarchingZineImages.slice(0, 3).map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
+    : [];
+  const hasOverarchingImages = rawOverarchingImages.some(Boolean);
   const multiSceneSig =
-    data.overarchingRationale || data.scenes || data.crossSceneLinks
+    data.overarchingRationale || data.scenes || data.crossSceneLinks || hasOverarchingImages
       ? fnv1aHash(
           `${String(data.overarchingRationale ?? '')}|${
             typeof data.scenes === 'string' ? data.scenes : JSON.stringify(data.scenes ?? '')
           }|${
             typeof data.crossSceneLinks === 'string' ? data.crossSceneLinks : JSON.stringify(data.crossSceneLinks ?? '')
-          }`
+          }${hasOverarchingImages ? `|${JSON.stringify(rawOverarchingImages)}` : ''}`
         )
       : '';
   const canonicalPayload = [
@@ -101,6 +105,12 @@ export const computeAutosaveDocSnapshot = (data: any): string => {
     ? data.seedImageUrls.map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
     : [];
   const seedImageUrls = rawSeedImageUrls.some(Boolean) ? rawSeedImageUrls : [];
+  const rawOverarchingZineImages = Array.isArray(data.overarchingZineImages)
+    ? data.overarchingZineImages.slice(0, 3).map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
+    : [];
+  const overarchingZineImages = rawOverarchingZineImages.some(Boolean)
+    ? [rawOverarchingZineImages[0] ?? null, rawOverarchingZineImages[1] ?? null, rawOverarchingZineImages[2] ?? null]
+    : [];
 
   return JSON.stringify({
     name: data.name || '',
@@ -109,6 +119,7 @@ export const computeAutosaveDocSnapshot = (data: any): string => {
     seedImageUrls,
     scenes: normalizeJson(data.scenes, '[]'),
     overarchingRationale: data.overarchingRationale || '',
+    overarchingZineImages,
     crossSceneLinks: normalizeJson(data.crossSceneLinks, '[]'),
     discoveryFilters: normalizeJson(data.discoveryFilters, '{}'),
     activeNodes,

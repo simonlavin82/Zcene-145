@@ -28,6 +28,8 @@ import {
   getSceneDisplayName,
   resolveCrossSceneTargetName,
   computeClampedDropdownLeft,
+  validateZineImageUrl,
+  normalizeZineImages,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
@@ -3170,6 +3172,134 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         seedImageUrls: ['https://is1-ssl.mzstatic.com/image/thumb/dc.jpg'],
       });
       expect(snapHydrated).not.toBe(snapEmpty);
+    });
+  });
+
+  describe('Power-User Edit Zine Mode (Schema, Normalizers & Autosave Snapshot)', () => {
+    it('validateZineImageUrl enforces https://-only URLs and rejects http://, data:, and malformed inputs', () => {
+      expect(validateZineImageUrl('  https://i.scdn.co/image/cb812efb7d836138  ')).toBe(
+        'https://i.scdn.co/image/cb812efb7d836138'
+      );
+      expect(validateZineImageUrl('https://i.guim.co.uk/img/media/band.jpg?width=1200')).toBe(
+        'https://i.guim.co.uk/img/media/band.jpg?width=1200'
+      );
+      expect(validateZineImageUrl('http://insecure.example.com/photo.jpg')).toBeNull();
+      expect(validateZineImageUrl('data:image/png;base64,iVBORw0KGgo=')).toBeNull();
+      expect(validateZineImageUrl('javascript:alert(1)')).toBeNull();
+      expect(validateZineImageUrl('')).toBeNull();
+      expect(validateZineImageUrl(null)).toBeNull();
+      expect(validateZineImageUrl(undefined)).toBeNull();
+      expect(validateZineImageUrl('not a url')).toBeNull();
+    });
+
+    it('normalizeZineImages preserves up to 3 sparse column slots and returns undefined when all slots are empty/invalid', () => {
+      expect(normalizeZineImages(undefined)).toBeUndefined();
+      expect(normalizeZineImages([])).toBeUndefined();
+      expect(normalizeZineImages([null, null, null])).toBeUndefined();
+      expect(normalizeZineImages(['http://insecure.example.com/a.jpg', ''])).toBeUndefined();
+
+      expect(
+        normalizeZineImages([null, 'https://i.scdn.co/image/col2.jpg', 'http://bad.example.com/x.jpg'])
+      ).toEqual([null, 'https://i.scdn.co/image/col2.jpg', null]);
+
+      expect(
+        normalizeZineImages([
+          'https://col1.example.com/1.jpg',
+          'https://col2.example.com/2.jpg',
+          'https://col3.example.com/3.jpg',
+          'https://col4-ignored.example.com/4.jpg',
+        ])
+      ).toEqual([
+        'https://col1.example.com/1.jpg',
+        'https://col2.example.com/2.jpg',
+        'https://col3.example.com/3.jpg',
+      ]);
+    });
+
+    it('normalizeProjectScene persists valid scene.zineImages across serialization and omits empty/all-null arrays', () => {
+      const withImages = normalizeProjectScene(
+        {
+          id: 'scene-1',
+          sceneId: 'scene-1',
+          seedArtists: 'American Football',
+          zineImages: [null, 'https://i.guim.co.uk/af.jpg', null],
+        },
+        0
+      );
+      expect(withImages.zineImages).toEqual([null, 'https://i.guim.co.uk/af.jpg', null]);
+
+      const withoutImages = normalizeProjectScene(
+        {
+          id: 'scene-2',
+          sceneId: 'scene-2',
+          seedArtists: 'Dashboard Confessional',
+          zineImages: [null, 'http://invalid.example.com/dc.jpg', null],
+        },
+        1
+      );
+      expect(withoutImages.zineImages).toBeUndefined();
+    });
+
+    it('computeAutosaveDocSnapshot and computeProjectHydrationFingerprint track overarchingZineImages and scene.zineImages without false-positive idle writes', () => {
+      const baseScene = normalizeProjectScene(
+        {
+          id: 'scene-1',
+          sceneId: 'scene-1',
+          seedArtists: 'Dashboard Confessional',
+          synthesisRationale: 'Paragraph one.\n\nParagraph two.\n\nParagraph three.',
+          graphData: {
+            nodes: [{ id: 'scene-1::dashboard-confessional', label: 'Dashboard Confessional', type: 'artist' }],
+            links: [],
+          },
+          status: 'completed',
+        },
+        0
+      );
+
+      const uneditedUndefined = computeAutosaveDocSnapshot({
+        name: 'Dashboard Confessional',
+        seedArtists: 'Dashboard Confessional',
+        scenes: [baseScene],
+      });
+      const uneditedAllNull = computeAutosaveDocSnapshot({
+        name: 'Dashboard Confessional',
+        seedArtists: 'Dashboard Confessional',
+        overarchingZineImages: [null, null, null],
+        scenes: [baseScene],
+      });
+      expect(uneditedAllNull).toBe(uneditedUndefined);
+
+      const withOverarchingImage = computeAutosaveDocSnapshot({
+        name: 'Dashboard Confessional',
+        seedArtists: 'Dashboard Confessional',
+        overarchingZineImages: ['https://i.scdn.co/image/cb812efb7d836138', null, null],
+        scenes: [baseScene],
+      });
+      expect(withOverarchingImage).not.toBe(uneditedUndefined);
+
+      const sceneWithImage = normalizeProjectScene(
+        {
+          ...baseScene,
+          zineImages: [null, null, 'https://i.guim.co.uk/band.jpg'],
+        },
+        0
+      );
+      const withSceneImage = computeAutosaveDocSnapshot({
+        name: 'Dashboard Confessional',
+        seedArtists: 'Dashboard Confessional',
+        scenes: [sceneWithImage],
+      });
+      expect(withSceneImage).not.toBe(uneditedUndefined);
+
+      const fpBefore = computeProjectHydrationFingerprint('proj-1', {
+        scenes: [baseScene],
+        overarchingZineImages: [],
+      });
+      const fpAfter = computeProjectHydrationFingerprint('proj-1', {
+        scenes: [baseScene],
+        overarchingZineImages: ['https://i.scdn.co/image/cb812efb7d836138', null, null],
+      });
+      expect(fpAfter).not.toBe(fpBefore);
     });
   });
 });

@@ -135,6 +135,8 @@ export interface SceneCenterOffset {
   y: number; // Deterministic cluster center Y: 1000
 }
 
+export type ZineEditorialImages = (string | null)[];
+
 export interface ProjectScene {
   id?: string;                        // Alias of sceneId ('scene-1', 'scene-2', ...)
   sceneId: string;                    // Deterministic slug: 'scene-1', 'scene-2', ...
@@ -151,6 +153,7 @@ export interface ProjectScene {
   curatedDiscoveryFilters?: DiscoveryFilters; // Frozen baseline filters used to curate this scene
   graphData: GraphData;               // Un-namespaced canonical scene topology
   synthesisRationale: string;         // Scene-specific Zine editorial markdown
+  zineImages?: (string | null)[];     // Optional [col1Url, col2Url, col3Url] for this Scene's Zine editorial
   artistSnippets?: Record<string, string>; // Scene-specific 1-sentence epicenter hooks keyed by canonical ID
   centerOffset: SceneCenterOffset;    // { x: 1000 + sceneIndex * 1050, y: 1000 }
   status: 'unmapped' | 'curating' | 'ready' | 'failed' | 'completed' | 'idle';
@@ -246,6 +249,7 @@ export interface Project {
   scenes?: string | ProjectScene[] | null;         // V43 Authoritative Multi-Scene array (JSON or parsed)
   activeSceneId?: string;                          // Currently focused Scene in ROOTS panel (e.g. 'scene-1')
   overarchingRationale?: string | null;            // Master Overarching Zine Editorial (when scenes.length >= 2)
+  overarchingZineImages?: (string | null)[];       // Optional [col1Url, col2Url, col3Url] for Overarching Zine editorial
   crossSceneLinks?: string | CrossSceneLink[] | null; // Deterministic identity + AI sonic_lineage cross-scene bridges
   seedArtistIds?: string[];                        // Union of all scene.seedIds across all scenes
   sceneCount?: number;

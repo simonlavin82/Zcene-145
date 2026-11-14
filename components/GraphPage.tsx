@@ -132,6 +132,8 @@ interface GraphPageProps {
   onRemoveScene?: (sceneId: string) => void;
   onRenameScene?: (sceneId: string, customName: string) => void;
   overarchingRationale?: string;
+  overarchingZineImages?: (string | null)[];
+  onUpdateZineImages?: (target: 'overarching' | string, slotIndex: 0 | 1 | 2, url: string | null) => void;
   crossSceneLinks?: CrossSceneLink[];
   isPassiveSelection?: boolean;
 }
@@ -1189,6 +1191,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onRemoveScene,
   onRenameScene,
   overarchingRationale,
+  overarchingZineImages,
+  onUpdateZineImages,
   crossSceneLinks,
   isPassiveSelection = false,
 }) => {
@@ -2604,6 +2608,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
           scenes={scenes}
           activeSceneId={activeSceneId}
           overarchingRationale={overarchingRationale}
+          overarchingZineImages={overarchingZineImages}
+          onUpdateZineImages={onUpdateZineImages}
           activeDeepWebSession={effectiveDeepWebSession}
           onUpdateDeepWebSession={setDeepWebSession}
           selectedNode={selectedNode} 

@@ -565,18 +565,21 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                         // Graceful fallback if project doc doesn't exist yet or in unit test mocks without .get()
                     }
                 }
+                const prevTargetScene = updatedScenes.find(s => (s.sceneId || s.id) === targetSceneId);
                 const activeScenePayload = (0, multiSceneUtils_1.normalizeProjectScene)({
                     id: targetSceneId,
                     sceneId: targetSceneId,
                     sceneIndex: targetSceneIndex,
                     title: displaySeeds || `Scene ${targetSceneIndex + 1}`,
                     name: displaySeeds || `Scene ${targetSceneIndex + 1}`,
+                    ...(prevTargetScene?.customName ? { customName: prevTargetScene.customName } : {}),
                     seedArtists: resolvedSeedArray.map(s => s.name || s.id).join('::'),
                     seedIds: resolvedSeedArray.map(s => s.id),
                     seedArtistIds: resolvedSeedArray.map(s => s.id),
                     discoveryFilters: payload.filters || {},
                     graphData: finalGraph,
                     synthesisRationale: finalGraph.synthesisRationale || "",
+                    ...(prevTargetScene?.zineImages ? { zineImages: prevTargetScene.zineImages } : {}),
                     artistSnippets: {},
                     centerOffset: (0, multiSceneUtils_1.getSceneCenterOffset)(targetSceneIndex),
                     status: determinedGenerationType === "Direct Hit" ? "ready" : "curating",

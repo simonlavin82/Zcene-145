@@ -2306,12 +2306,16 @@ export const processCurationJob = onDocumentCreated({
         const cleanHumanSeedString = humanSeedList.join('::');
         const completedSceneTitle = humanSeedList.join(" + ");
 
+        const prevTargetScene = existingProjectScenes.find(
+          (s) => (s.sceneId || s.id) === targetSceneId
+        );
         const completedScene: ProjectScene = normalizeProjectScene({
           id: targetSceneId,
           sceneId: targetSceneId,
           sceneIndex: targetSceneIndex,
           title: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
           name: completedSceneTitle || `Scene ${targetSceneIndex + 1}`,
+          ...(prevTargetScene?.customName ? { customName: prevTargetScene.customName } : {}),
           seedArtists: cleanHumanSeedString || cleanSeedArtistsContext,
           curatedSeedArtists: cleanHumanSeedString || cleanSeedArtistsContext,
           seedIds: resolvedSeedArray.map((s: any) => s.id),
@@ -2320,6 +2324,7 @@ export const processCurationJob = onDocumentCreated({
           curatedDiscoveryFilters: inputPayload.filters || {},
           graphData: finalGraph,
           synthesisRationale: finalGraph.synthesisRationale || rootBreakdownStr || "",
+          ...(prevTargetScene?.zineImages ? { zineImages: prevTargetScene.zineImages } : {}),
           artistSnippets: sceneArtistSnippetsMap,
           centerOffset: getSceneCenterOffset(targetSceneIndex),
           status: "ready",

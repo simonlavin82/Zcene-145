@@ -272,6 +272,48 @@ export function isCanonicalSeedMatch(nodeIdOrLabel: string, seedList: string[]):
 }
 
 /**
+ * Validates that a Zine editorial image URL is a valid, non-empty https:// URL.
+ */
+export function validateZineImageUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string') return null;
+  const trimmed = raw.trim();
+  if (!trimmed || trimmed.length > 2048) return null;
+  try {
+    const parsed = new URL(trimmed);
+    if (parsed.protocol !== 'https:' || !parsed.hostname) return null;
+    return trimmed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Normalizes up to 3 column-width Zine editorial image URLs into [col0, col1, col2].
+ * Returns undefined if all 3 slots are null so unedited scenes incur zero overhead.
+ */
+export function normalizeZineImages(
+  raw: unknown
+): [string | null, string | null, string | null] | undefined {
+  let arr: unknown = raw;
+  if (typeof raw === 'string') {
+    const trimmed = raw.trim();
+    if (!trimmed.startsWith('[')) return undefined;
+    try {
+      arr = JSON.parse(trimmed);
+    } catch {
+      return undefined;
+    }
+  }
+  if (!Array.isArray(arr)) return undefined;
+  const tuple: [string | null, string | null, string | null] = [
+    validateZineImageUrl(arr[0]),
+    validateZineImageUrl(arr[1]),
+    validateZineImageUrl(arr[2]),
+  ];
+  return tuple.some(Boolean) ? tuple : undefined;
+}
+
+/**
  * Canonicalizes a `ProjectScene` object so that `sceneId` & `id`, `title` & `name`,
  * `seedArtists` (string), and `seedIds` & `seedArtistIds` (string[]) are always
  * present and synchronized across frontend and backend boundaries.
@@ -444,6 +486,8 @@ export function normalizeProjectScene(
     }
   }
 
+  const normalizedZineImages = normalizeZineImages((s as any).zineImages);
+
   return {
     id: sceneId,
     sceneId,
@@ -462,6 +506,7 @@ export function normalizeProjectScene(
     curatedDiscoveryFilters,
     graphData,
     synthesisRationale: s.synthesisRationale || graphData.synthesisRationale || '',
+    ...(normalizedZineImages ? { zineImages: normalizedZineImages } : {}),
     artistSnippets: s.artistSnippets && typeof s.artistSnippets === 'object' ? s.artistSnippets : {},
     centerOffset,
     status,
