@@ -7320,6 +7320,7 @@ const App: React.FC = () => {
         return true;
       }
 
+      let wasLayoutHealed = false;
       try {
         let loadedFromGraphData = false;
         let hydratedNodes: Node[] = [];
@@ -7367,8 +7368,31 @@ const App: React.FC = () => {
             }
 
             let g: GraphData;
-            if (populatedScenesFromDoc.length >= 2) {
+            if (populatedScenesFromDoc.length >= 1) {
               g = buildCompositeCanvasGraph(populatedScenesFromDoc, crossSceneLinksRef.current || [], savedPositions);
+              const healedLayout: CanvasNodeRef[] = (g.nodes || [])
+                .filter((n: any) => typeof n?.id === 'string' && typeof n?.x === 'number' && Number.isFinite(n.x) && typeof n?.y === 'number' && Number.isFinite(n.y))
+                .map((n: any) => ({
+                  nodeId: n.id,
+                  x: Math.round(n.x * 100) / 100,
+                  y: Math.round(n.y * 100) / 100,
+                  fx: typeof n.fx === 'number' && Number.isFinite(n.fx) ? Math.round(n.fx * 100) / 100 : null,
+                  fy: typeof n.fy === 'number' && Number.isFinite(n.fy) ? Math.round(n.fy * 100) / 100 : null,
+                }));
+              const savedPosById = new Map<string, CanvasNodeRef>();
+              for (const r of savedPositions) {
+                const k = r?.id || r?.nodeId;
+                if (k) savedPosById.set(k.toLowerCase(), r);
+              }
+              wasLayoutHealed = healedLayout.some((h) => {
+                const k = (h.nodeId || '').toLowerCase();
+                const prev = savedPosById.get(k) || savedPosById.get(stripSceneNamespace(k));
+                if (!prev || typeof prev.x !== 'number' || typeof prev.y !== 'number') return false;
+                return Math.abs((h.x ?? 0) - prev.x) > 1 || Math.abs((h.y ?? 0) - prev.y) > 1;
+              });
+              if (healedLayout.length > 0 && (wasLayoutHealed || !lastSettledLayoutRef.current)) {
+                lastSettledLayoutRef.current = JSON.stringify(healedLayout);
+              }
             } else if (hasGraphDataNodes) {
               g = normalizeGraphData(parsedGraphData);
               g.links = g.links.map((l: any) => ({
@@ -7768,7 +7792,12 @@ const App: React.FC = () => {
       }
 
       // Update the last synced payload to prevent the autosave hook from running on load
-      updateLastSyncedSnapshot();
+      // unless the Territory & Seed Integrity Sanitizer healed a corrupted layout that should persist.
+      if (!wasLayoutHealed) {
+        updateLastSyncedSnapshot();
+      } else {
+        lastSyncedDocRef.current = '';
+      }
 
       isProjectLoadingRef.current = false;
       return true; // Found
@@ -7899,8 +7928,39 @@ const App: React.FC = () => {
             const parsedGraph = typeof job.result.graphData === 'string'
               ? JSON.parse(job.result.graphData)
               : job.result.graphData;
-            if (parsedGraph && Array.isArray(parsedGraph.nodes) && parsedGraph.nodes.length > 0) {
-              const normalized = normalizeGraphData(parsedGraph);
+            const parsedScenesFromJob: ProjectScene[] = job.result?.scenes
+              ? parseProjectScenes(job.result.scenes)
+              : scenesRef.current;
+            const populatedScenesFromJob = parsedScenesFromJob.filter(
+              (s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+            );
+            if ((parsedGraph && Array.isArray(parsedGraph.nodes) && parsedGraph.nodes.length > 0) || populatedScenesFromJob.length >= 1) {
+              let existingLayout: CanvasNodeRef[] = [];
+              if (lastSettledLayoutRef.current) {
+                try { existingLayout = JSON.parse(lastSettledLayoutRef.current); } catch {}
+              }
+              const parsedCrossLinksFromJob: CrossSceneLink[] = job.result?.crossSceneLinks
+                ? parseCrossSceneLinks(job.result.crossSceneLinks)
+                : (crossSceneLinksRef.current || []);
+
+              let normalized: GraphData;
+              if (populatedScenesFromJob.length >= 1) {
+                if (job.result?.scenes) {
+                  scenesRef.current = parsedScenesFromJob;
+                  setScenes(parsedScenesFromJob);
+                }
+                if (job.result?.crossSceneLinks) {
+                  crossSceneLinksRef.current = parsedCrossLinksFromJob;
+                  setCrossSceneLinks(parsedCrossLinksFromJob);
+                }
+                normalized = buildCompositeCanvasGraph(
+                  populatedScenesFromJob,
+                  parsedCrossLinksFromJob,
+                  existingLayout
+                );
+              } else {
+                normalized = normalizeGraphData(parsedGraph);
+              }
               normalized.links = normalized.links.map((l: any) => ({
                 ...l,
                 source: typeof l.source === 'object' ? l.source.id : l.source,

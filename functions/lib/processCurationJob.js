@@ -261,6 +261,20 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 ? parsedTargetIdx - 1
                 : 0;
         let existingProjectScenes = (0, multiSceneUtils_1.parseProjectScenes)(inputPayload?.scenes);
+        let existingProjectCanvasLayout;
+        if (inputPayload?.canvasLayout) {
+            try {
+                const parsedInputLayout = typeof inputPayload.canvasLayout === "string"
+                    ? JSON.parse(inputPayload.canvasLayout)
+                    : inputPayload.canvasLayout;
+                if (Array.isArray(parsedInputLayout)) {
+                    existingProjectCanvasLayout = parsedInputLayout;
+                }
+            }
+            catch {
+                // Ignore malformed layout
+            }
+        }
         const existingProjectDetailsMap = new Map();
         const ingestDetailsCacheIntoMap = (rawCache) => {
             if (!rawCache)
@@ -303,6 +317,19 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const projData = projSnap.data();
                     if (existingProjectScenes.length === 0 && projData?.scenes) {
                         existingProjectScenes = (0, multiSceneUtils_1.parseProjectScenes)(projData.scenes);
+                    }
+                    if (!existingProjectCanvasLayout && projData?.canvasLayout) {
+                        try {
+                            const parsedProjLayout = typeof projData.canvasLayout === "string"
+                                ? JSON.parse(projData.canvasLayout)
+                                : projData.canvasLayout;
+                            if (Array.isArray(parsedProjLayout)) {
+                                existingProjectCanvasLayout = parsedProjLayout;
+                            }
+                        }
+                        catch {
+                            // Ignore malformed canvasLayout
+                        }
                     }
                     if (projData?.detailsCache) {
                         ingestDetailsCacheIntoMap(projData.detailsCache);
@@ -353,8 +380,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 const activeScene = existingProjectScenes.find((s) => (s.sceneId || s.id) === targetSceneId) ||
                     existingProjectScenes[existingProjectScenes.length - 1];
                 const populatedExistingScenes = existingProjectScenes.filter((s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
-                const compositeOverarchingGraph = populatedExistingScenes.length >= 2
-                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedExistingScenes, overarchingResult.crossSceneLinks)
+                const compositeOverarchingGraph = populatedExistingScenes.length >= 1
+                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedExistingScenes, overarchingResult.crossSceneLinks, existingProjectCanvasLayout)
                     : (activeScene?.graphData || { nodes: [], links: [] });
                 const compactedCacheEntries = (0, multiSceneUtils_1.compactDetailsCacheToCanonical)(existingProjectDetailsMap, compositeOverarchingGraph.nodes);
                 result = {
@@ -2111,8 +2138,8 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     crossSceneLinks = overarchingPayload.crossSceneLinks;
                 }
                 const populatedCompletedScenes = updatedScenes.filter((s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
-                const projectGraphToPersist = populatedCompletedScenes.length >= 2
-                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedCompletedScenes, crossSceneLinks)
+                const projectGraphToPersist = populatedCompletedScenes.length >= 1
+                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedCompletedScenes, crossSceneLinks, existingProjectCanvasLayout)
                     : finalGraph;
                 result = {
                     graphData: projectGraphToPersist,

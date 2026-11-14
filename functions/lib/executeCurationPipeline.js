@@ -548,16 +548,38 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
             throw new https_1.HttpsError("invalid-argument", "Maximum of 5 scenes per project reached.");
         }
         let updatedScenes = (0, multiSceneUtils_1.parseProjectScenes)(payload.scenes);
+        let existingSavedLayout;
+        if (Array.isArray(payload.canvasLayout)) {
+            existingSavedLayout = payload.canvasLayout;
+        }
+        else if (typeof payload.canvasLayout === 'string') {
+            try {
+                const parsedLayout = JSON.parse(payload.canvasLayout);
+                if (Array.isArray(parsedLayout))
+                    existingSavedLayout = parsedLayout;
+            }
+            catch { }
+        }
         if (payload.userId && payload.projectId) {
             try {
                 const projectDocRef = db.collection('users').doc(payload.userId).collection('projects').doc(payload.projectId);
-                if (updatedScenes.length === 0) {
+                if (updatedScenes.length === 0 || !existingSavedLayout) {
                     try {
                         const existingProjSnap = await projectDocRef.get();
                         if (existingProjSnap.exists) {
                             const existingProjData = existingProjSnap.data();
-                            if (existingProjData?.scenes) {
+                            if (updatedScenes.length === 0 && existingProjData?.scenes) {
                                 updatedScenes = (0, multiSceneUtils_1.parseProjectScenes)(existingProjData.scenes);
+                            }
+                            if (!existingSavedLayout && existingProjData?.canvasLayout) {
+                                try {
+                                    const parsedLayout = typeof existingProjData.canvasLayout === 'string'
+                                        ? JSON.parse(existingProjData.canvasLayout)
+                                        : existingProjData.canvasLayout;
+                                    if (Array.isArray(parsedLayout))
+                                        existingSavedLayout = parsedLayout;
+                                }
+                                catch { }
                             }
                         }
                     }
@@ -600,8 +622,8 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 }
                 updatedScenes.sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
                 const populatedUpdatedScenes = updatedScenes.filter(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
-                const compositeProjectGraph = populatedUpdatedScenes.length >= 2
-                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedUpdatedScenes, [])
+                const compositeProjectGraph = populatedUpdatedScenes.length >= 1
+                    ? (0, multiSceneUtils_1.buildCompositeCanvasGraph)(populatedUpdatedScenes, [], existingSavedLayout)
                     : finalGraph;
                 console.log(`[Pipeline Diamond] -> Initiating Curation Pipeline for ${payload.projectId} (scene=${targetSceneId}) with type: ${determinedGenerationType}`);
                 const projectUpdate = {

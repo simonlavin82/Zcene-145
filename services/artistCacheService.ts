@@ -449,25 +449,43 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
 
   const normalizedNodes = graph.nodes.map(node => {
     const originalId = node.id;
-    let normalizedId = originalId.trim();
-    
+    const trimmedOriginal = originalId.trim();
+    const scenePrefixMatch = trimmedOriginal.match(/^(scene-\d+::)/i);
+    const scenePrefix = scenePrefixMatch ? scenePrefixMatch[1].toLowerCase() : '';
+    const unprefixedOriginalId = scenePrefix ? trimmedOriginal.slice(scenePrefix.length) : originalId;
+
+    let baseCleanId: string;
     if (node.type === 'label') {
-      normalizedId = normalizeLabelId(node.label || originalId);
+      baseCleanId = normalizeLabelId(node.label || unprefixedOriginalId);
     } else if (node.type === 'artist') {
-      normalizedId = normalizeArtistId(originalId);
+      baseCleanId = normalizeArtistId(unprefixedOriginalId);
     } else {
-      normalizedId = normalizedId.toLowerCase();
+      baseCleanId = unprefixedOriginalId.trim().toLowerCase();
     }
-    
+
+    const normalizedId = baseCleanId ? `${scenePrefix}${baseCleanId}` : trimmedOriginal;
+
     idMap.set(originalId, normalizedId);
     idMap.set(originalId.toLowerCase(), normalizedId); // fallback
-    idMap.set(normalizeArtistId(originalId), normalizedId); // accent-insensitive fallback
+    if (scenePrefix) {
+      idMap.set(`${scenePrefix}${normalizeArtistId(unprefixedOriginalId)}`, normalizedId);
+      if (baseCleanId) {
+        idMap.set(`${scenePrefix}${baseCleanId}`, normalizedId);
+      }
+    } else {
+      idMap.set(normalizeArtistId(originalId), normalizedId); // accent-insensitive fallback
+      if (baseCleanId) {
+        idMap.set(baseCleanId, normalizedId);
+      }
+    }
 
     let label: string;
     if (node.type === 'label') {
-      label = cleanLabelDisplayName(node.label || originalId, graph.nodes);
+      label = cleanLabelDisplayName(node.label || unprefixedOriginalId, graph.nodes);
     } else {
-      label = node.label ? cleanArtistDisplayName(node.label) : titleCaseArtistId(cleanArtistDisplayName(originalId.trim()));
+      label = node.label
+        ? cleanArtistDisplayName(node.label)
+        : titleCaseArtistId(cleanArtistDisplayName(unprefixedOriginalId.trim()));
     }
 
     return {
@@ -483,13 +501,25 @@ export const normalizeGraphData = (graph: GraphData): GraphData => {
     const sourceId = typeof link.source === 'string' ? link.source : (link.source as Node).id;
     const targetId = typeof link.target === 'string' ? link.target : (link.target as Node).id;
 
-    const sourceLower = sourceId.trim().toLowerCase();
-    const targetLower = targetId.trim().toLowerCase();
-    const sourceNorm = normalizeArtistId(sourceId);
-    const targetNorm = normalizeArtistId(targetId);
+    const sourceTrim = sourceId.trim();
+    const targetTrim = targetId.trim();
+    const sourceLower = sourceTrim.toLowerCase();
+    const targetLower = targetTrim.toLowerCase();
 
-    const newSource = idMap.get(sourceId) || idMap.get(sourceLower) || idMap.get(sourceNorm) || sourceLower;
-    const newTarget = idMap.get(targetId) || idMap.get(targetLower) || idMap.get(targetNorm) || targetLower;
+    const sPrefixMatch = sourceTrim.match(/^(scene-\d+::)/i);
+    const sPrefix = sPrefixMatch ? sPrefixMatch[1].toLowerCase() : '';
+    const sourceNorm = sPrefix
+      ? `${sPrefix}${normalizeArtistId(sourceTrim.slice(sPrefix.length))}`
+      : normalizeArtistId(sourceId);
+
+    const tPrefixMatch = targetTrim.match(/^(scene-\d+::)/i);
+    const tPrefix = tPrefixMatch ? tPrefixMatch[1].toLowerCase() : '';
+    const targetNorm = tPrefix
+      ? `${tPrefix}${normalizeArtistId(targetTrim.slice(tPrefix.length))}`
+      : normalizeArtistId(targetId);
+
+    const newSource = idMap.get(sourceId) || idMap.get(sourceTrim) || idMap.get(sourceLower) || idMap.get(sourceNorm) || sourceLower;
+    const newTarget = idMap.get(targetId) || idMap.get(targetTrim) || idMap.get(targetLower) || idMap.get(targetNorm) || targetLower;
 
     return {
       ...link,

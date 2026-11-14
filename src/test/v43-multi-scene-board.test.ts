@@ -35,7 +35,7 @@ import {
   normalizeZineImages,
   normalizeZineIntro,
 } from '../../shared/multiSceneUtils';
-import { normalizeArtistId, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
+import { normalizeArtistId, normalizeGraphData, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
 import { BACKEND_REGRESSION_RUNBOOK } from '../../docs/backend-regression-runbook';
@@ -3449,6 +3449,205 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         overarchingZineImages: [{ url: 'https://i.scdn.co/image/col1.jpg', blockOffset: 1 }, null, null],
       });
       expect(fpAfterIntroAndMigratedOffset).not.toBe(fpBefore);
+    });
+  });
+
+  describe('Multi-Scene Coordinate Integrity & Territory Self-Healing Sanitizer', () => {
+    it('normalizeGraphData preserves scene-1:: and scene-2:: prefixes on artist, label, and metadata nodes and links', () => {
+      const compositeInput = {
+        nodes: [
+          { id: 'scene-1::Dashboard Confessional', label: 'Dashboard Confessional', type: 'artist' as const, group: 1, isSeed: true },
+          { id: 'scene-1::Vagrant Records', label: 'Vagrant Records', type: 'label' as const, group: 3 },
+          { id: 'scene-1::Emo', label: 'Emo', type: 'genre' as const, group: 2 },
+          { id: 'scene-2::Dashboard Confessional', label: 'Dashboard Confessional', type: 'artist' as const, group: 1, isSeed: false },
+          { id: 'scene-2::The Rocking Horse Winner', label: 'The Rocking Horse Winner', type: 'artist' as const, group: 1, isSeed: true },
+        ],
+        links: [
+          { source: 'scene-1::Dashboard Confessional', target: 'scene-1::Vagrant Records', value: 1 },
+          { source: 'scene-1::Dashboard Confessional', target: 'scene-1::Emo', value: 1 },
+          { source: 'scene-2::The Rocking Horse Winner', target: 'scene-2::Dashboard Confessional', value: 1 },
+          { source: 'scene-1::Dashboard Confessional', target: 'scene-2::Dashboard Confessional', value: 2, isCrossSceneBridge: true },
+        ],
+      };
+
+      const normalized = normalizeGraphData(compositeInput);
+      expect(normalized.nodes.map((n) => n.id)).toEqual([
+        'scene-1::dashboard-confessional',
+        'scene-1::vagrant',
+        'scene-1::emo',
+        'scene-2::dashboard-confessional',
+        'scene-2::the-rocking-horse-winner',
+      ]);
+
+      expect(normalized.links[0]).toMatchObject({
+        source: 'scene-1::dashboard-confessional',
+        target: 'scene-1::vagrant',
+      });
+      expect(normalized.links[1]).toMatchObject({
+        source: 'scene-1::dashboard-confessional',
+        target: 'scene-1::emo',
+      });
+      expect(normalized.links[2]).toMatchObject({
+        source: 'scene-2::the-rocking-horse-winner',
+        target: 'scene-2::dashboard-confessional',
+      });
+      expect(normalized.links[3]).toMatchObject({
+        source: 'scene-1::dashboard-confessional',
+        target: 'scene-2::dashboard-confessional',
+      });
+    });
+
+    it('uses first-write-wins for duplicate bare keys in savedLayout so later scenes never overwrite Scene 1 coordinates', () => {
+      const scene1: ProjectScene = {
+        ...createEmptyProjectScene(0, 'Dashboard Confessional'),
+        seedIds: ['dashboard-confessional-us'],
+        status: 'ready',
+        graphData: {
+          nodes: [
+            { id: 'dashboard-confessional-us', label: 'Dashboard Confessional', type: 'artist', group: 1, isSeed: true },
+            { id: 'further-seems-forever-us', label: 'Further Seems Forever', type: 'artist', group: 1, isSeed: false },
+          ],
+          links: [{ source: 'dashboard-confessional-us', target: 'further-seems-forever-us', value: 1 }],
+        },
+      };
+      const scene2: ProjectScene = {
+        ...createEmptyProjectScene(1, 'The Rocking Horse Winner'),
+        seedIds: ['the-rocking-horse-winner-us'],
+        status: 'ready',
+        graphData: {
+          nodes: [
+            { id: 'the-rocking-horse-winner-us', label: 'The Rocking Horse Winner', type: 'artist', group: 1, isSeed: true },
+            { id: 'dashboard-confessional-us', label: 'Dashboard Confessional', type: 'artist', group: 1, isSeed: false },
+            { id: 'further-seems-forever-us', label: 'Further Seems Forever', type: 'artist', group: 1, isSeed: false },
+          ],
+          links: [{ source: 'the-rocking-horse-winner-us', target: 'dashboard-confessional-us', value: 1 }],
+        },
+      };
+
+      const bareDuplicateLayout: CanvasNodeRef[] = [
+        // Scene 1 bare entries first (x ≈ 1000)
+        { nodeId: 'dashboard-confessional-us', x: 1000, y: 1000, fx: 1000, fy: 1000 },
+        { nodeId: 'further-seems-forever-us', x: 1140, y: 940, fx: 1140, fy: 940 },
+        // Scene 2 bare entries second (x ≈ 2050) — must NOT overwrite Scene 1
+        { nodeId: 'the-rocking-horse-winner-us', x: 2050, y: 1000, fx: 2050, fy: 1000 },
+        { nodeId: 'dashboard-confessional-us', x: 2150, y: 980, fx: 2150, fy: 980 },
+        { nodeId: 'further-seems-forever-us', x: 1960, y: 1060, fx: 1960, fy: 1960 },
+      ];
+
+      const composite = buildCompositeCanvasGraph([scene1, scene2], [], bareDuplicateLayout);
+      const dcScene1 = composite.nodes.find((n) => n.id === 'scene-1::dashboard-confessional-us');
+      const fsfScene1 = composite.nodes.find((n) => n.id === 'scene-1::further-seems-forever-us');
+      expect(dcScene1?.x).toBe(1000);
+      expect(dcScene1?.fx).toBe(1000);
+      expect(fsfScene1?.x).toBe(1140);
+      expect(fsfScene1?.fx).toBe(1140);
+    });
+
+    it('Territory & Seed Integrity Sanitizer heals drifted Scene 1 coordinates back to (1000, 1000) while leaving healthy Scenes 2 & 3 untouched', () => {
+      const scene1: ProjectScene = {
+        ...createEmptyProjectScene(0, 'Dashboard Confessional'),
+        seedIds: ['dashboard-confessional-us'],
+        status: 'ready',
+        graphData: {
+          nodes: [
+            { id: 'dashboard-confessional-us', label: 'Dashboard Confessional', type: 'artist', group: 1, isSeed: true },
+            { id: 'taking-back-sunday-us', label: 'Taking Back Sunday', type: 'artist', group: 1, isSeed: false },
+            { id: 'further-seems-forever-us', label: 'Further Seems Forever', type: 'artist', group: 1, isSeed: false },
+            { id: 'vagrant', label: 'Vagrant', type: 'label', group: 3 },
+            { id: 'the-get-up-kids-us', label: 'The Get Up Kids', type: 'artist', group: 1, isSeed: false },
+          ],
+          links: [
+            { source: 'dashboard-confessional-us', target: 'taking-back-sunday-us', value: 1 },
+            { source: 'dashboard-confessional-us', target: 'further-seems-forever-us', value: 1 },
+            { source: 'dashboard-confessional-us', target: 'vagrant', value: 1 },
+            { source: 'dashboard-confessional-us', target: 'the-get-up-kids-us', value: 1 },
+          ],
+        },
+      };
+      const scene2: ProjectScene = {
+        ...createEmptyProjectScene(1, 'The Rocking Horse Winner'),
+        seedIds: ['the-rocking-horse-winner-us'],
+        status: 'ready',
+        graphData: {
+          nodes: [
+            { id: 'the-rocking-horse-winner-us', label: 'The Rocking Horse Winner', type: 'artist', group: 1, isSeed: true },
+            { id: 'dashboard-confessional-us', label: 'Dashboard Confessional', type: 'artist', group: 1, isSeed: false },
+            { id: 'further-seems-forever-us', label: 'Further Seems Forever', type: 'artist', group: 1, isSeed: false },
+            { id: 'vagrant', label: 'Vagrant', type: 'label', group: 3 },
+          ],
+          links: [{ source: 'the-rocking-horse-winner-us', target: 'dashboard-confessional-us', value: 1 }],
+        },
+      };
+      const scene3: ProjectScene = {
+        ...createEmptyProjectScene(2, 'American Football'),
+        seedIds: ['american-football-us'],
+        status: 'ready',
+        graphData: {
+          nodes: [
+            { id: 'american-football-us', label: 'American Football', type: 'artist', group: 1, isSeed: true },
+            { id: 'the-get-up-kids-us', label: 'The Get Up Kids', type: 'artist', group: 1, isSeed: false },
+          ],
+          links: [{ source: 'american-football-us', target: 'the-get-up-kids-us', value: 1 }],
+        },
+      };
+
+      const corruptedLayout: CanvasNodeRef[] = [
+        // Scene 1 root & shared nodes drifted into Scene 2 (x ≈ 2050) and Scene 3 (x ≈ 3100)
+        { nodeId: 'scene-1::dashboard-confessional-us', x: 2050, y: 1000, fx: 2050, fy: 1000 },
+        { nodeId: 'scene-1::taking-back-sunday-us', x: 960, y: 980, fx: 960, fy: 980 },
+        { nodeId: 'scene-1::further-seems-forever-us', x: 2120, y: 1080, fx: 2120, fy: 1080 },
+        { nodeId: 'scene-1::vagrant', x: 1990, y: 1120, fx: 1990, fy: 1120 },
+        { nodeId: 'scene-1::the-get-up-kids-us', x: 3080, y: 1050, fx: 3080, fy: 1050 },
+        // Healthy Scene 2 (around x = 2050)
+        { nodeId: 'scene-2::the-rocking-horse-winner-us', x: 2050, y: 1000, fx: 2050, fy: 1000 },
+        { nodeId: 'scene-2::dashboard-confessional-us', x: 2180, y: 920, fx: 2180, fy: 920 },
+        { nodeId: 'scene-2::further-seems-forever-us', x: 1950, y: 1140, fx: 1950, fy: 1140 },
+        { nodeId: 'scene-2::vagrant', x: 2110, y: 1150, fx: 2110, fy: 1150 },
+        // Healthy Scene 3 (around x = 3100)
+        { nodeId: 'scene-3::american-football-us', x: 3100, y: 1000, fx: 3100, fy: 1000 },
+        { nodeId: 'scene-3::the-get-up-kids-us', x: 3220, y: 1090, fx: 3220, fy: 1090 },
+      ];
+
+      const healed = buildCompositeCanvasGraph([scene1, scene2, scene3], [], corruptedLayout);
+
+      const dcScene1 = healed.nodes.find((n) => n.id === 'scene-1::dashboard-confessional-us');
+      expect(dcScene1?.x).toBe(1000);
+      expect(dcScene1?.y).toBe(1000);
+      expect(dcScene1?.fx).toBe(1000);
+      expect(dcScene1?.fy).toBe(1000);
+
+      // Every Scene 1 node must sit inside Scene 1 territory around x = 1000 (not pulled into 2050 or 3100)
+      const scene1Nodes = healed.nodes.filter((n) => n.sceneIndex === 0);
+      for (const n of scene1Nodes) {
+        expect(Math.abs((n.x ?? 0) - 1000)).toBeLessThanOrEqual(480);
+      }
+
+      // Healthy Scene 2 & Scene 3 coordinates remain intact
+      const rhwScene2 = healed.nodes.find((n) => n.id === 'scene-2::the-rocking-horse-winner-us');
+      const afScene3 = healed.nodes.find((n) => n.id === 'scene-3::american-football-us');
+      expect(rhwScene2?.x).toBe(2050);
+      expect(rhwScene2?.fx).toBe(2050);
+      expect(afScene3?.x).toBe(3100);
+      expect(afScene3?.fx).toBe(3100);
+
+      // Also verify rawNode coordinates inside scene.graphData.nodes trigger self-healing when no savedLayout is passed
+      const scene1WithRawDrift: ProjectScene = {
+        ...scene1,
+        graphData: {
+          ...scene1.graphData,
+          nodes: scene1.graphData.nodes.map((n) =>
+            n.id === 'dashboard-confessional-us'
+              ? { ...n, x: 2050, y: 1000, fx: 2050, fy: 1000 }
+              : { ...n, x: 960, y: 980 }
+          ),
+        },
+      };
+      const healedRaw = buildCompositeCanvasGraph([scene1WithRawDrift, scene2], [], null);
+      const dcRawHealed = healedRaw.nodes.find((n) => n.id === 'scene-1::dashboard-confessional-us');
+      expect(dcRawHealed?.x).toBe(1000);
+      expect(dcRawHealed?.y).toBe(1000);
+      expect(dcRawHealed?.fx).toBe(1000);
+      expect(dcRawHealed?.fy).toBe(1000);
     });
   });
 });

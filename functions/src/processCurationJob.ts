@@ -326,6 +326,19 @@ export const processCurationJob = onDocumentCreated({
           : 0;
 
     let existingProjectScenes: ProjectScene[] = parseProjectScenes(inputPayload?.scenes);
+    let existingProjectCanvasLayout: any[] | undefined;
+    if (inputPayload?.canvasLayout) {
+      try {
+        const parsedInputLayout = typeof inputPayload.canvasLayout === "string"
+          ? JSON.parse(inputPayload.canvasLayout)
+          : inputPayload.canvasLayout;
+        if (Array.isArray(parsedInputLayout)) {
+          existingProjectCanvasLayout = parsedInputLayout;
+        }
+      } catch {
+        // Ignore malformed layout
+      }
+    }
     const existingProjectDetailsMap = new Map<string, any>();
 
     const ingestDetailsCacheIntoMap = (rawCache: any) => {
@@ -368,6 +381,18 @@ export const processCurationJob = onDocumentCreated({
           const projData = projSnap.data();
           if (existingProjectScenes.length === 0 && projData?.scenes) {
             existingProjectScenes = parseProjectScenes(projData.scenes);
+          }
+          if (!existingProjectCanvasLayout && projData?.canvasLayout) {
+            try {
+              const parsedProjLayout = typeof projData.canvasLayout === "string"
+                ? JSON.parse(projData.canvasLayout)
+                : projData.canvasLayout;
+              if (Array.isArray(parsedProjLayout)) {
+                existingProjectCanvasLayout = parsedProjLayout;
+              }
+            } catch {
+              // Ignore malformed canvasLayout
+            }
           }
           if (projData?.detailsCache) {
             ingestDetailsCacheIntoMap(projData.detailsCache);
@@ -431,8 +456,8 @@ export const processCurationJob = onDocumentCreated({
         const populatedExistingScenes = existingProjectScenes.filter(
           (s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
         );
-        const compositeOverarchingGraph = populatedExistingScenes.length >= 2
-          ? buildCompositeCanvasGraph(populatedExistingScenes, overarchingResult.crossSceneLinks)
+        const compositeOverarchingGraph = populatedExistingScenes.length >= 1
+          ? buildCompositeCanvasGraph(populatedExistingScenes, overarchingResult.crossSceneLinks, existingProjectCanvasLayout)
           : (activeScene?.graphData || { nodes: [], links: [] });
 
         const compactedCacheEntries = compactDetailsCacheToCanonical(
@@ -2360,8 +2385,8 @@ export const processCurationJob = onDocumentCreated({
         const populatedCompletedScenes = updatedScenes.filter(
           (s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
         );
-        const projectGraphToPersist = populatedCompletedScenes.length >= 2
-          ? buildCompositeCanvasGraph(populatedCompletedScenes, crossSceneLinks)
+        const projectGraphToPersist = populatedCompletedScenes.length >= 1
+          ? buildCompositeCanvasGraph(populatedCompletedScenes, crossSceneLinks, existingProjectCanvasLayout)
           : finalGraph;
 
         result = {

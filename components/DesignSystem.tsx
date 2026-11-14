@@ -4719,7 +4719,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Trigger</p>
-                                        <p className="text-sm text-zinc-300">open_in_full icon in Deep Cut header; owner-only `[ Edit ]` / `[ Done ]` toggle beside Close.</p>
+                                        <p className="text-sm text-zinc-300">open_in_full icon in Deep Cut header; owner-only `[ Edit ]` / `[ Done ]` toggle paired with `[ Close ]` using matched `h-9 !px-5` (`rounded-xl`, `text-sm`, `!text-[18px]` icon) Zine header action geometry.</p>
                                     </div>
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">State & Layout</p>

@@ -20,6 +20,11 @@ export const SCENE_HORIZONTAL_STRIDE = 1050;
 export const PREV_SCENE_HORIZONTAL_STRIDE = 950;
 /** Pre-V43.1 stride. Retained only to detect and migrate legacy Coordinate Memory. */
 export const LEGACY_SCENE_HORIZONTAL_STRIDE = 1600;
+/** Territory & Seed Integrity bounds around each Scene's deterministic center. */
+export const SCENE_TERRITORY_MAX_DX = 480;
+export const SCENE_TERRITORY_MAX_DY = 750;
+export const SCENE_SEED_MAX_DX = 280;
+export const SCENE_SEED_MAX_DY = 280;
 
 export function getSceneCenterOffset(sceneIndex: number): SceneCenterOffset {
   const safeIndex = Number.isFinite(sceneIndex) && sceneIndex >= 0 ? Math.floor(sceneIndex) : 0;
@@ -1182,11 +1187,16 @@ export function buildCompositeCanvasGraph(
   const layoutMap = new Map<string, CanvasNodeRef>();
   if (Array.isArray(savedLayout)) {
     for (const ref of savedLayout) {
-      const refKey = ref?.id || ref?.nodeId;
-      if (refKey) {
-        layoutMap.set(refKey, ref);
-        layoutMap.set(refKey.toLowerCase(), ref);
+      const refKey = (ref?.id || ref?.nodeId || '').trim();
+      if (!refKey) continue;
+      const isNamespaced = /^scene-\d+::/i.test(refKey);
+      const lowerKey = refKey.toLowerCase();
+      // First-write-wins for un-namespaced bare keys so later scenes never overwrite Scene 1 coordinates
+      if (!isNamespaced && (layoutMap.has(refKey) || layoutMap.has(lowerKey))) {
+        continue;
       }
+      layoutMap.set(refKey, ref);
+      layoutMap.set(lowerKey, ref);
     }
   }
 
@@ -1227,6 +1237,61 @@ export function buildCompositeCanvasGraph(
     const savedShiftX = detectLegacyStrideShiftX(sceneIndex, sceneSavedXs);
     const rawShiftX = detectLegacyStrideShiftX(sceneIndex, sceneRawXs);
 
+    // Territory & Seed Integrity Sanitizer: verify both savedRef (canvasLayout) and rawNode
+    // coordinates stay within this scene's territory around `center`. If a scene's Root Seed or
+    // any node has drifted into another scene's territory, mark the scene corrupted and reset it
+    // cleanly around `center` without disturbing healthy scenes.
+    let isSceneLayoutCorrupted = false;
+    let sceneSeedCount = 0;
+    for (const rawNode of rawNodes) {
+      if (!rawNode || !rawNode.id) continue;
+      const canonicalId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
+      const isSeedNode =
+        rawNode.type === 'artist' &&
+        (Boolean(rawNode.isSceneSeed) ||
+          Boolean(rawNode.isSeed) ||
+          isCanonicalSeedMatch(canonicalId, seedList) ||
+          (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false));
+      if (isSeedNode) sceneSeedCount++;
+      if (isSceneLayoutCorrupted) continue;
+
+      const namespacedId = namespaceSceneNodeId(sceneId, canonicalId);
+      const savedRef = lookupSavedRef(canonicalId, namespacedId);
+      const hasSavedCoords =
+        savedRef &&
+        typeof savedRef.x === 'number' &&
+        Number.isFinite(savedRef.x) &&
+        typeof savedRef.y === 'number' &&
+        Number.isFinite(savedRef.y);
+      const hasRawCoords =
+        typeof rawNode.x === 'number' &&
+        Number.isFinite(rawNode.x) &&
+        typeof rawNode.y === 'number' &&
+        Number.isFinite(rawNode.y);
+      const candX = hasSavedCoords
+        ? (savedRef!.x as number) + savedShiftX
+        : hasRawCoords
+          ? (rawNode.x as number) + rawShiftX
+          : undefined;
+      const candY = hasSavedCoords
+        ? (savedRef!.y as number)
+        : hasRawCoords
+          ? (rawNode.y as number)
+          : undefined;
+      if (candX === undefined || candY === undefined) continue;
+
+      const dx = Math.abs(candX - center.x);
+      const dy = Math.abs(candY - center.y);
+      if (isSeedNode && (dx > SCENE_SEED_MAX_DX || dy > SCENE_SEED_MAX_DY)) {
+        isSceneLayoutCorrupted = true;
+      } else if (dx > SCENE_TERRITORY_MAX_DX || dy > SCENE_TERRITORY_MAX_DY) {
+        isSceneLayoutCorrupted = true;
+      }
+    }
+
+    let healedSeedIdx = 0;
+    let healedPeerIdx = 0;
+
     for (const rawNode of rawNodes) {
       if (!rawNode || !rawNode.id) continue;
       const canonicalId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
@@ -1244,7 +1309,18 @@ export function buildCompositeCanvasGraph(
       const savedRef = lookupSavedRef(canonicalId, namespacedId);
 
       const hasSavedCoords =
-        savedRef && typeof savedRef.x === 'number' && typeof savedRef.y === 'number';
+        !isSceneLayoutCorrupted &&
+        savedRef &&
+        typeof savedRef.x === 'number' &&
+        Number.isFinite(savedRef.x) &&
+        typeof savedRef.y === 'number' &&
+        Number.isFinite(savedRef.y);
+      const hasRawCoords =
+        !isSceneLayoutCorrupted &&
+        typeof rawNode.x === 'number' &&
+        Number.isFinite(rawNode.x) &&
+        typeof rawNode.y === 'number' &&
+        Number.isFinite(rawNode.y);
 
       const snippetFromScene =
         scene.artistSnippets?.[canonicalId] ||
@@ -1267,15 +1343,34 @@ export function buildCompositeCanvasGraph(
         nodeClone.y = savedRef!.y;
         nodeClone.fx = (savedRef!.x as number) + savedShiftX;
         nodeClone.fy = savedRef!.y;
-      } else if (typeof rawNode.x === 'number' && typeof rawNode.y === 'number') {
-        nodeClone.x = rawNode.x + rawShiftX;
+      } else if (hasRawCoords) {
+        nodeClone.x = (rawNode.x as number) + rawShiftX;
         nodeClone.y = rawNode.y;
         if (typeof rawNode.fx === 'number' && typeof rawNode.fy === 'number') {
           nodeClone.fx = rawNode.fx + rawShiftX;
           nodeClone.fy = rawNode.fy;
         }
+      } else if (isSceneLayoutCorrupted) {
+        // Self-healing reset: pin Root Artist seed(s) at scene center and place peers in deterministic polar rings
+        if (isSceneSeed) {
+          const seedSpreadOffset =
+            sceneSeedCount > 1 ? healedSeedIdx * 120 - ((sceneSeedCount - 1) * 60) : 0;
+          healedSeedIdx++;
+          nodeClone.x = center.x + seedSpreadOffset;
+          nodeClone.y = center.y;
+          nodeClone.fx = nodeClone.x;
+          nodeClone.fy = nodeClone.y;
+        } else {
+          const angle = (healedPeerIdx * 137.5 * Math.PI) / 180;
+          const radius = 180 + (healedPeerIdx % 3) * 90;
+          healedPeerIdx++;
+          nodeClone.x = center.x + Math.cos(angle) * radius;
+          nodeClone.y = center.y + Math.sin(angle) * radius;
+          delete nodeClone.fx;
+          delete nodeClone.fy;
+        }
       } else {
-        // Initialize near the deterministic Scene center so D3 blooms cleanly around (1000 + k*950, 1000)
+        // Initialize near the deterministic Scene center so D3 blooms cleanly around (1000 + k*1050, 1000)
         const angle = (compositeNodes.length * 137.5 * Math.PI) / 180;
         const radius = isSceneSeed ? 25 : 90 + (compositeNodes.length % 7) * 30;
         nodeClone.x = center.x + Math.cos(angle) * radius;

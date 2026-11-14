@@ -3552,7 +3552,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             type="button"
                                             data-testid="zine-edit-toggle-btn"
                                             onClick={() => setIsEditingZine((prev) => !prev)}
-                                            className={`h-10 px-4 ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
+                                            className={`h-9 !px-5 ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
                                             title={isEditingZine ? 'Done Editing Zine' : 'Edit Zine Images'}
                                         >
                                             <span className="material-symbols-outlined !text-[18px]">
@@ -3564,6 +3564,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     <Button 
                                         variant="primary"
                                         size="md"
+                                        className="h-9 !px-5"
                                         onClick={() => onMagazineViewToggle(false)}
                                         title="Close Zine View"
                                     >

@@ -1292,10 +1292,16 @@ describe('DetailsPanel', () => {
             ...overrides,
         });
 
-        it('keeps unedited Zine rendering 100% clean (columns-3 container, zero edit chrome) in default reading mode', () => {
+        it('keeps unedited Zine rendering 100% clean (columns-3 container, zero edit chrome) in default reading mode and enforces desktop header button geometry parity', () => {
             const { container } = render(<DetailsPanel {...baseProps()} />);
 
-            expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveTextContent('Edit');
+            const editToggleBtn = screen.getByTestId('zine-edit-toggle-btn');
+            const closeBtn = screen.getByTitle('Close Zine View');
+            expect(editToggleBtn).toHaveTextContent('Edit');
+            expect(editToggleBtn).toHaveClass('h-9');
+            expect(editToggleBtn).toHaveClass('!px-5');
+            expect(closeBtn).toHaveClass('h-9');
+            expect(closeBtn).toHaveClass('!px-5');
             expect(screen.queryByTestId('zine-editorial-grid-overarching')).not.toBeInTheDocument();
             expect(screen.queryByText('+ Add Image URL')).not.toBeInTheDocument();
             expect(container.querySelector('.columns-1.md\\:columns-2.lg\\:columns-3')).toBeInTheDocument();
