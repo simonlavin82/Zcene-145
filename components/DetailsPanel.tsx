@@ -21,202 +21,202 @@ import { AudioPreviewPlayer, stopGlobalAudio, audioController } from './AudioPre
 const SENTINEL_INSIGHT = 'No insight provided.';
 
 export const getArtistDisplayName = (details: any, node: any): string => {
-  if (node?.type === 'label') {
-    const raw = (node?.label && typeof node.label === 'string' && node.label.trim())
-      ? node.label.trim()
-      : (node?.id || '');
-    return cleanLabelDisplayName(raw);
-  }
-  if (details?.details?.artist && typeof details.details.artist === 'string' && details.details.artist.trim()) {
-    return cleanArtistDisplayName(details.details.artist.trim());
-  }
-  if (node?.label && typeof node.label === 'string' && node.label.trim()) {
-    return cleanArtistDisplayName(node.label.trim());
-  }
-  return cleanArtistDisplayName(node?.id || '');
+    if (node?.type === 'label') {
+        const raw = (node?.label && typeof node.label === 'string' && node.label.trim())
+            ? node.label.trim()
+            : (node?.id || '');
+        return cleanLabelDisplayName(raw);
+    }
+    if (details?.details?.artist && typeof details.details.artist === 'string' && details.details.artist.trim()) {
+        return cleanArtistDisplayName(details.details.artist.trim());
+    }
+    if (node?.label && typeof node.label === 'string' && node.label.trim()) {
+        return cleanArtistDisplayName(node.label.trim());
+    }
+    return cleanArtistDisplayName(node?.id || '');
 };
 
 
 declare global {
-  interface Window {
-    SpeechRecognition: any;
-    webkitSpeechRecognition: any;
-    YT: any;
-    onYouTubeIframeAPIReady: (() => void) | undefined;
-  }
+    interface Window {
+        SpeechRecognition: any;
+        webkitSpeechRecognition: any;
+        YT: any;
+        onYouTubeIframeAPIReady: (() => void) | undefined;
+    }
 }
 
 // --- Sub-component: Shared Empty State ---
 const ZceneEmptyState: React.FC<{ onNavigate: (view: View) => void }> = ({ onNavigate }) => (
-  <div className="max-w-md w-full pointer-events-auto">
-    <div className="flex items-center justify-center mb-2 gap-1">
-      <div className="w-10 shrink-0 invisible" aria-hidden="true" />
-      <h3 className="text-xs font-medium text-white text-center">Create Your Zcene</h3>
-      <button
-        onClick={() => onNavigate(View.Help)}
-        className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors pointer-events-auto shrink-0 leading-none"
-        title="View Zcene guide, keyboard shortcuts & rules"
-      >
-        <HelpIcon className="!text-[18px]" />
-      </button>
+    <div className="max-w-md w-full pointer-events-auto">
+        <div className="flex items-center justify-center mb-2 gap-1">
+            <div className="w-10 shrink-0 invisible" aria-hidden="true" />
+            <h3 className="text-xs font-medium text-white text-center">Create Your Zcene</h3>
+            <button
+                onClick={() => onNavigate(View.Help)}
+                className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors pointer-events-auto shrink-0 leading-none"
+                title="View Zcene guide, keyboard shortcuts & rules"
+            >
+                <HelpIcon className="!text-[18px]" />
+            </button>
+        </div>
+        <div className="mt-3 text-zinc-400 text-xs space-y-4">
+            <p className="text-center px-4 leading-relaxed">Start with 1–5 root artists, and Zcene will map how their scenes connect across genres, labels, origins, and eras.</p>
+            <div className="text-left bg-zinc-800/30 p-5 rounded-xl border border-zinc-700/50 mx-4 text-xs">
+                <p className="font-medium text-zinc-200 mb-2">How it works</p>
+                <ol className="list-decimal list-inside space-y-1.5 text-zinc-400 leading-normal">
+                    <li>Add 1–5 roots to build your first Scene (or import your library).</li>
+                    <li>Create your Zcene to map the musical constellation.</li>
+                    <li>Add up to 5 scenes to bridge connections and read the multi-scene Zine.</li>
+                </ol>
+            </div>
+        </div>
     </div>
-    <div className="mt-3 text-zinc-400 text-xs space-y-4">
-      <p className="text-center px-4 leading-relaxed">Start with 1–5 root artists, and Zcene will map how their scenes connect across genres, labels, origins, and eras.</p>
-      <div className="text-left bg-zinc-800/30 p-5 rounded-xl border border-zinc-700/50 mx-4 text-xs">
-        <p className="font-medium text-zinc-200 mb-2">How it works</p>
-        <ol className="list-decimal list-inside space-y-1.5 text-zinc-400 leading-normal">
-          <li>Add 1–5 roots to build your first Scene (or import your library).</li>
-          <li>Create your Zcene to map the musical constellation.</li>
-          <li>Add up to 5 scenes to bridge connections and read the multi-scene Zine.</li>
-        </ol>
-      </div>
-    </div>
-  </div>
 );
 
 // --- Sub-component: Safe YouTube Player with Error Detection ---
 interface SafeYoutubePlayerProps {
-  videoId?: string | null;
-  artistDisplay: string;
+    videoId?: string | null;
+    artistDisplay: string;
 }
 
 const SafeYoutubePlayer: React.FC<SafeYoutubePlayerProps> = ({ videoId, artistDisplay }) => {
-  const [hasError, setHasError] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<any>(null);
+    const [hasError, setHasError] = useState(false);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const playerRef = useRef<any>(null);
 
-  useEffect(() => {
-    if (!videoId) return;
+    useEffect(() => {
+        if (!videoId) return;
 
-    setHasError(false);
+        setHasError(false);
 
-    // Dynamic injection of the YouTube IFrame API script (only if not already injected)
-    if (!window.YT && !document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
-      const tag = document.createElement('script');
-      tag.src = 'https://www.youtube.com/iframe_api';
-      const firstScriptTag = document.getElementsByTagName('script')[0];
-      firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+        // Dynamic injection of the YouTube IFrame API script (only if not already injected)
+        if (!window.YT && !document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+            const tag = document.createElement('script');
+            tag.src = 'https://www.youtube.com/iframe_api';
+            const firstScriptTag = document.getElementsByTagName('script')[0];
+            firstScriptTag.parentNode?.insertBefore(tag, firstScriptTag);
+        }
+
+        let player: any = null;
+        let isDestroyed = false;
+
+        const initPlayer = () => {
+            if (!containerRef.current || isDestroyed) return;
+
+            const playerDivId = `yt-player-${videoId}`;
+            containerRef.current.innerHTML = `<div id="${playerDivId}" class="w-full h-full"></div>`;
+
+            try {
+                player = new window.YT.Player(playerDivId, {
+                    height: '100%',
+                    width: '100%',
+                    videoId: videoId,
+                    playerVars: {
+                        rel: 0,
+                        modestbranding: 1,
+                        color: 'white',
+                        origin: window.location.origin
+                    },
+                    events: {
+                        onError: (event: any) => {
+                            console.warn('SafeYoutubePlayer error detected:', event.data);
+                            // YT.Player error codes:
+                            // 2: Invalid parameter
+                            // 5: HTML5 player error
+                            // 100: Video not found (removed/private)
+                            // 101/150: Video embedding restricted by owner/label
+                            if ([2, 5, 100, 101, 150].includes(event.data)) {
+                                setHasError(true);
+                            }
+                        }
+                    }
+                });
+                playerRef.current = player;
+            } catch (err) {
+                console.error('Failed to initialize YT.Player:', err);
+                setHasError(true);
+            }
+        };
+
+        const checkAPIAndInit = () => {
+            if (isDestroyed) return;
+            if (window.YT && window.YT.Player) {
+                initPlayer();
+            } else {
+                setTimeout(checkAPIAndInit, 100);
+            }
+        };
+
+        checkAPIAndInit();
+
+        return () => {
+            isDestroyed = true;
+            if (player && typeof player.destroy === 'function') {
+                try {
+                    player.destroy();
+                } catch (e) {
+                    // ignore destroy errors
+                }
+            }
+        };
+    }, [videoId]);
+
+    if (!videoId) {
+        const src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(artistDisplay + ' official music video')}`;
+        return (
+            <iframe
+                src={src}
+                className="w-full h-full aspect-video border-0 bg-zinc-950"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+            />
+        );
     }
 
-    let player: any = null;
-    let isDestroyed = false;
+    if (hasError) {
+        return (
+            <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-zinc-950 border border-zinc-800 text-center gap-3 relative overflow-hidden">
+                {/* Subtle scanline texture */}
+                <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.5) 2px, rgba(255,255,255,0.5) 3px)' }} />
+                <span className="material-symbols-outlined text-zinc-600 !text-3xl">domain_disabled</span>
+                <div>
+                    <h5 className="text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-400">Embedding Blocked</h5>
+                    <p className="text-[10px] text-zinc-500 max-w-[240px] mt-1.5 leading-relaxed">
+                        The uploader or label has restricted this video from playing on external domains. You can watch it directly on YouTube:
+                    </p>
+                </div>
+                <div className="flex flex-col gap-2 w-full max-w-[200px] mt-1 z-10">
+                    <a
+                        href={`https://www.youtube.com/watch?v=${videoId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-bold uppercase tracking-wider text-brand-black bg-primary px-3 py-2 hover:bg-white transition-all text-center rounded-none"
+                    >
+                        Watch on YouTube ↗
+                    </a>
+                    <a
+                        href={`https://www.youtube.com/results?search_query=${encodeURIComponent(artistDisplay + ' live')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 border border-zinc-800 px-3 py-2 hover:bg-zinc-900 transition-all text-center"
+                    >
+                        Search Live Footage ↗
+                    </a>
+                </div>
+            </div>
+        );
+    }
 
-    const initPlayer = () => {
-      if (!containerRef.current || isDestroyed) return;
-      
-      const playerDivId = `yt-player-${videoId}`;
-      containerRef.current.innerHTML = `<div id="${playerDivId}" class="w-full h-full"></div>`;
-
-      try {
-        player = new window.YT.Player(playerDivId, {
-          height: '100%',
-          width: '100%',
-          videoId: videoId,
-          playerVars: {
-            rel: 0,
-            modestbranding: 1,
-            color: 'white',
-            origin: window.location.origin
-          },
-          events: {
-            onError: (event: any) => {
-              console.warn('SafeYoutubePlayer error detected:', event.data);
-              // YT.Player error codes:
-              // 2: Invalid parameter
-              // 5: HTML5 player error
-              // 100: Video not found (removed/private)
-              // 101/150: Video embedding restricted by owner/label
-              if ([2, 5, 100, 101, 150].includes(event.data)) {
-                setHasError(true);
-              }
-            }
-          }
-        });
-        playerRef.current = player;
-      } catch (err) {
-        console.error('Failed to initialize YT.Player:', err);
-        setHasError(true);
-      }
-    };
-
-    const checkAPIAndInit = () => {
-      if (isDestroyed) return;
-      if (window.YT && window.YT.Player) {
-        initPlayer();
-      } else {
-        setTimeout(checkAPIAndInit, 100);
-      }
-    };
-
-    checkAPIAndInit();
-
-    return () => {
-      isDestroyed = true;
-      if (player && typeof player.destroy === 'function') {
-        try {
-          player.destroy();
-        } catch (e) {
-          // ignore destroy errors
-        }
-      }
-    };
-  }, [videoId]);
-
-  if (!videoId) {
-    const src = `https://www.youtube.com/embed?listType=search&list=${encodeURIComponent(artistDisplay + ' official music video')}`;
     return (
-      <iframe
-        src={src}
-        className="w-full h-full aspect-video border-0 bg-zinc-950"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowFullScreen
-      />
+        <div ref={containerRef} className="w-full h-full aspect-video border-0 bg-zinc-950" />
     );
-  }
-
-  if (hasError) {
-    return (
-      <div className="w-full h-full flex flex-col items-center justify-center p-4 bg-zinc-950 border border-zinc-800 text-center gap-3 relative overflow-hidden">
-        {/* Subtle scanline texture */}
-        <div className="absolute inset-0 opacity-[0.03] pointer-events-none" style={{ backgroundImage: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(255,255,255,0.5) 2px, rgba(255,255,255,0.5) 3px)' }} />
-        <span className="material-symbols-outlined text-zinc-600 !text-3xl">domain_disabled</span>
-        <div>
-          <h5 className="text-[10px] font-bold uppercase tracking-[0.15em] text-zinc-400">Embedding Blocked</h5>
-          <p className="text-[10px] text-zinc-500 max-w-[240px] mt-1.5 leading-relaxed">
-            The uploader or label has restricted this video from playing on external domains. You can watch it directly on YouTube:
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 w-full max-w-[200px] mt-1 z-10">
-          <a
-            href={`https://www.youtube.com/watch?v=${videoId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] font-bold uppercase tracking-wider text-brand-black bg-primary px-3 py-2 hover:bg-white transition-all text-center rounded-none"
-          >
-            Watch on YouTube ↗
-          </a>
-          <a
-            href={`https://www.youtube.com/results?search_query=${encodeURIComponent(artistDisplay + ' live')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 border border-zinc-800 px-3 py-2 hover:bg-zinc-900 transition-all text-center"
-          >
-            Search Live Footage ↗
-          </a>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div ref={containerRef} className="w-full h-full aspect-video border-0 bg-zinc-950" />
-  );
 };
 
 // --- Helper: Highlighted Text ---
 export const HighlightedText: React.FC<{ text: string; query?: string }> = ({ text, query }) => {
     if (!query || !query.trim()) return <>{text}</>;
-    
+
     const parts = text.split(new RegExp(`(${query})`, 'gi'));
     return (
         <>
@@ -235,7 +235,7 @@ export const HighlightedText: React.FC<{ text: string; query?: string }> = ({ te
 
 export const renderWithHighlights = (children: React.ReactNode, query?: string): React.ReactNode => {
     if (!query || !query.trim()) return children;
-    
+
     return React.Children.map(children, child => {
         if (typeof child === 'string') {
             return <HighlightedText text={child} query={query} />;
@@ -246,48 +246,48 @@ export const renderWithHighlights = (children: React.ReactNode, query?: string):
 
 // --- Sub-component: Single Detail Card ---
 interface NodeDetailsCardProps {
-  node: Node;
-  details: NodeDetails | null;
-  isLoading: boolean;
-  isGlobalLoading: boolean;
-  graphData: GraphData;
-  libraryArtists: string[];
-  seedArtists: string[];
-  onAddArtist: (artistName: string) => void;
-  isSmallScreen: boolean;
-  onTogglePin: () => void;
-  isPinned: boolean;
-  pinSequence?: number;
-  onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
+    node: Node;
+    details: NodeDetails | null;
+    isLoading: boolean;
+    isGlobalLoading: boolean;
+    graphData: GraphData;
+    libraryArtists: string[];
+    seedArtists: string[];
+    onAddArtist: (artistName: string) => void;
+    isSmallScreen: boolean;
+    onTogglePin: () => void;
+    isPinned: boolean;
+    pinSequence?: number;
+    onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
 
-  onNavigate: (view: View) => void;
-  chatHistory: ChatMessage[];
-  onSendMessage: (message: string) => void;
-  isChatLoading: boolean;
-  chatMode: 'instant' | 'live';
-  onChatModeChange: (mode: 'instant' | 'live') => void;
-  liveMessageCount: number;
-  hasActiveDeepWebSession?: boolean;
-  onDeleteMessage?: (index: number) => void;
-  onClearChat?: () => void;
-  isFullScreenMode?: boolean;
-  isHero?: boolean;
-  onAddToStack: (node: Node, link?: string) => void;
-  onToggleMagazineView?: () => void;
-  searchQuery?: string;
-  isGuest?: boolean;
-  user?: any;
-  onAuthRequest?: () => void;
-  userTaste?: UserTaste;
-  isAdmin?: boolean;
-  onUpdateTasteProfile?: (taste: UserTaste) => Promise<void>;
-  onShowToast?: (message: string) => void;
-  onOpenTasteModal?: () => void;
-  isActive?: boolean;
-  onStashArtist?: (artistName: string) => void;
-  onOpenStackDrawer?: () => void;
-  isStaticMockup?: boolean;
-  scenes?: ProjectScene[];
+    onNavigate: (view: View) => void;
+    chatHistory: ChatMessage[];
+    onSendMessage: (message: string) => void;
+    isChatLoading: boolean;
+    chatMode: 'instant' | 'live';
+    onChatModeChange: (mode: 'instant' | 'live') => void;
+    liveMessageCount: number;
+    hasActiveDeepWebSession?: boolean;
+    onDeleteMessage?: (index: number) => void;
+    onClearChat?: () => void;
+    isFullScreenMode?: boolean;
+    isHero?: boolean;
+    onAddToStack: (node: Node, link?: string) => void;
+    onToggleMagazineView?: () => void;
+    searchQuery?: string;
+    isGuest?: boolean;
+    user?: any;
+    onAuthRequest?: () => void;
+    userTaste?: UserTaste;
+    isAdmin?: boolean;
+    onUpdateTasteProfile?: (taste: UserTaste) => Promise<void>;
+    onShowToast?: (message: string) => void;
+    onOpenTasteModal?: () => void;
+    isActive?: boolean;
+    onStashArtist?: (artistName: string) => void;
+    onOpenStackDrawer?: () => void;
+    isStaticMockup?: boolean;
+    scenes?: ProjectScene[];
 }
 
 const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } => {
@@ -297,9 +297,9 @@ const parseTourDates = (text: string): { isTouring: boolean; dates: string[] } =
     }
     const lower = cleaned.toLowerCase();
     if (
-        lower.includes("no active tour dates found") || 
-        lower.includes("not touring") || 
-        lower.includes("no upcoming events") || 
+        lower.includes("no active tour dates found") ||
+        lower.includes("not touring") ||
+        lower.includes("no upcoming events") ||
         lower.includes("no tour dates")
     ) {
         return { isTouring: false, dates: [] };
@@ -326,7 +326,7 @@ const isTourCacheStale = (tourCachedAtString: string | undefined): boolean => {
     if (!tourCachedAtString) return true;
     const cachedDate = new Date(tourCachedAtString);
     if (isNaN(cachedDate.getTime())) return true;
-    
+
     const sevenDaysMs = 7 * 24 * 60 * 60 * 1000;
     return (Date.now() - cachedDate.getTime()) >= sevenDaysMs;
 };
@@ -370,11 +370,10 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                             const newTaste = userTaste.filter(p => p.id !== data.profile.id);
                             onUpdateTasteProfile?.(newTaste);
                         }}
-                        className={`flex flex-shrink-0 items-center justify-center transition-all text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800 relative z-[60] ${
-                            isSmallScreen
-                                ? (isExpanded ? 'w-4 h-4 ml-1.5 opacity-100' : 'w-0 h-4 ml-0 opacity-0 pointer-events-none overflow-hidden')
-                                : 'w-0 h-4 ml-0 opacity-0 group-hover:w-4 group-hover:h-4 group-hover:ml-1.5 group-hover:opacity-100 overflow-hidden'
-                        }`}
+                        className={`flex flex-shrink-0 items-center justify-center transition-all text-zinc-500 hover:text-white rounded-full hover:bg-zinc-800 relative z-[60] ${isSmallScreen
+                            ? (isExpanded ? 'w-4 h-4 ml-1.5 opacity-100' : 'w-0 h-4 ml-0 opacity-0 pointer-events-none overflow-hidden')
+                            : 'w-0 h-4 ml-0 opacity-0 group-hover:w-4 group-hover:h-4 group-hover:ml-1.5 group-hover:opacity-100 overflow-hidden'
+                            }`}
                         title="Remove Profile"
                     >
                         <span className="material-symbols-outlined !text-[12px]">close</span>
@@ -383,9 +382,8 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
             </div>
             {/* Bar grid: tappable on mobile to reveal criterion labels */}
             <div
-                className={`grid grid-cols-5 gap-1.5 w-full relative ${
-                    isSmallScreen ? 'cursor-pointer' : 'group'
-                }`}
+                className={`grid grid-cols-5 gap-1.5 w-full relative ${isSmallScreen ? 'cursor-pointer' : 'group'
+                    }`}
                 onClick={isSmallScreen ? onToggle : undefined}
                 role={isSmallScreen ? 'button' : undefined}
                 aria-expanded={isSmallScreen ? isExpanded : undefined}
@@ -414,8 +412,8 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
                         idx === 0
                             ? 'left-0 translate-x-0 text-left'
                             : idx === 4
-                            ? 'right-8 left-auto translate-x-0 text-right'
-                            : 'left-1/2 -translate-x-1/2 text-center';
+                                ? 'right-8 left-auto translate-x-0 text-right'
+                                : 'left-1/2 -translate-x-1/2 text-center';
 
                     return (
                         <div
@@ -447,11 +445,11 @@ const ProfileRow: React.FC<ProfileRowProps> = ({ data, colorHex, isSmallScreen, 
 };
 
 export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
-  node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen, 
-  onTogglePin, isPinned, pinSequence, onNodeClick, onNavigate, 
-  chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, hasActiveDeepWebSession = false, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, onAddToStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer,
-  isStaticMockup = false, scenes
+    node, details, isLoading, isGlobalLoading, graphData, libraryArtists, seedArtists, onAddArtist, isSmallScreen,
+    onTogglePin, isPinned, pinSequence, onNodeClick, onNavigate,
+    chatHistory, onSendMessage, isChatLoading, chatMode, onChatModeChange, liveMessageCount, hasActiveDeepWebSession = false, onDeleteMessage, onClearChat, isFullScreenMode = false, isHero = false, onAddToStack, onToggleMagazineView, searchQuery, isGuest = false, onAuthRequest, user, userTaste, isAdmin = false,
+    onUpdateTasteProfile, onShowToast, onOpenTasteModal, isActive = true, onStashArtist, onOpenStackDrawer,
+    isStaticMockup = false, scenes
 }) => {
     const handleAddToTaste = async (node: Node, details: NodeDetails) => {
         if (!user) {
@@ -574,7 +572,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
         const forceScroll = () => {
             if (!panelScrollRef.current || !actionIconsRef.current) return;
-            
+
             const panel = panelScrollRef.current;
             const targetOffset = actionIconsRef.current.offsetHeight;
             const maxScroll = panel.scrollHeight - panel.clientHeight;
@@ -588,7 +586,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 rafId = requestAnimationFrame(forceScroll);
             }
         };
-        
+
         rafId = requestAnimationFrame(forceScroll);
 
         return () => {
@@ -606,15 +604,15 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const checkStuck = () => {
             if (!sentinelRef.current) return;
             const rect = sentinelRef.current.getBoundingClientRect();
-            
+
             let boundaryTop = 0;
             if (scrollContainer instanceof Element) {
                 boundaryTop = scrollContainer.getBoundingClientRect().top;
             }
-            
+
             // Add a 1px buffer to ensure smooth trigger
             const isStuck = rect.top <= boundaryTop + 1;
-            
+
             if (isStuck !== lastStuck) {
                 lastStuck = isStuck;
                 setIsHeaderStuck(isStuck);
@@ -674,7 +672,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             document.removeEventListener('pointerdown', handleClickOutside, true);
         };
     }, [expandedProfileId]);
-    
+
     const { queryChips, connectionPeers } = useMemo(() => {
         const chips = isLabelNode ? [
             "What is their legacy in the scene?",
@@ -687,7 +685,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             "What labels are they on?",
             "Recent history?"
         ];
-        
+
         const targetCanonId = stripSceneNamespace(node.canonicalId || node.id);
         const peerLinks = graphData.links.filter(l => {
             if (l.isCrossSceneBridge) return false;
@@ -695,7 +693,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             const tCanon = stripSceneNamespace(typeof l.target === 'object' ? l.target.id : l.target);
             return sCanon === targetCanonId || tCanon === targetCanonId;
         });
-        
+
         const peers = peerLinks.map(l => {
             const sourceId = stripSceneNamespace(typeof l.source === 'object' ? l.source.id : l.source);
             const targetId = stripSceneNamespace(typeof l.target === 'object' ? l.target.id : l.target);
@@ -709,7 +707,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             return str.split(/[-\s]+/).map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
         };
         const connectionPeers = Array.from(new Set(peers)).map(peer => cleanArtistDisplayName(peer as string, graphData.nodes)).sort();
-        
+
         return { queryChips: chips, connectionPeers };
     }, [node.id, isLabelNode, graphData.links, graphData.nodes]);
 
@@ -786,7 +784,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         tiers.push('placeholder');
         return tiers;
     }, [details?.imageUrl]);
-    
+
 
     const chatContainerRef = useRef<HTMLDivElement>(null);
     const prevHistoryLength = useRef(chatHistory.length);
@@ -797,7 +795,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const normalizedArtistNodeId = isArtistNode ? normalizeArtistId(resolvedArtistName) : '';
 
     const isLibraryArtist = isArtistNode && libraryArtistSet.has(normalizedArtistNodeId);
-    
+
     // Guardrail 2: Multi-Scene ROOT Badge Parity
     // Ensure that in a multi-scene project, any artist that is a seed of ANY populated scene
     // (s.seedIds, s.curatedSeedArtists, s.seedArtists, or n.isSceneSeed || n.isSeed) receives isSeedArtist = true.
@@ -883,7 +881,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         if (!userTaste || !Array.isArray(userTaste) || !details) return [];
 
         const activeProfiles = userTaste.filter(p => p.isActive);
-        
+
         return activeProfiles.map(profile => {
             const favLabelActive = !!profile.favoriteLabel?.trim();
             const favGenreActive = !!profile.favoriteGenre?.trim();
@@ -932,7 +930,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 } else if (rawStyle.includes(',')) {
                     // Secondary fallback for legacy comma-separated entries (e.g. "melodic, post")
                     const styleTokens = rawStyle.split(',').map(k => k.trim()).filter(k => k.length > 0);
-                    styleMatched = styleTokens.some(token => 
+                    styleMatched = styleTokens.some(token =>
                         (nodeStyle.length > 0 && nodeStyle.includes(token)) ||
                         genre.includes(token) ||
                         bio.includes(token) ||
@@ -954,7 +952,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 if (foundedStr) {
                     const yearMatch = foundedStr.match(/\b(19\d{2}|20\d{2})\b/);
                     let year = yearMatch ? parseInt(yearMatch[0]) : null;
-                    
+
                     if (!year) {
                         const decadeMatch = foundedStr.match(/\b(\d{2})s\b/);
                         if (decadeMatch) {
@@ -962,7 +960,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             year = decVal >= 50 ? 1900 + decVal : 2000 + decVal;
                         }
                     }
-                    
+
                     if (year) {
                         let isEraMatch = true;
                         if (profile.eraMin !== null && year < profile.eraMin) {
@@ -1023,16 +1021,16 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     };
 
     useEffect(() => {
-      if (chatHistory.length > 0 && (chatHistory.length > prevHistoryLength.current || isChatLoading)) {
-        if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+        if (chatHistory.length > 0 && (chatHistory.length > prevHistoryLength.current || isChatLoading)) {
+            if (chatContainerRef.current) {
+                chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+            }
         }
-      }
-      prevHistoryLength.current = chatHistory.length;
+        prevHistoryLength.current = chatHistory.length;
     }, [chatHistory, isChatLoading]);
 
     const wasPinnedRef = useRef(isPinned);
-    
+
     useEffect(() => {
         if (isFullScreenMode && isPinned && !wasPinnedRef.current) {
             // Card was just pinned in Magazine View — anchor viewport to its top
@@ -1053,9 +1051,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     }, [isPinned, isFullScreenMode, node.id]);
 
     const handleSend = () => {
-      if (!chatInput.trim() || isChatLoading) return;
-      onSendMessage(chatInput);
-      setChatInput('');
+        if (!chatInput.trim() || isChatLoading) return;
+        onSendMessage(chatInput);
+        setChatInput('');
     };
 
     const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -1127,11 +1125,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         ];
 
         const purchase = all.filter(l => /bandcamp|official website/i.test(l.site));
-        const info     = all.filter(l => !/bandcamp|official website/i.test(l.site));
+        const info = all.filter(l => !/bandcamp|official website/i.test(l.site));
         return { purchase, info };
     }, [details?.links, node.id]);
 
-    const headerSizeClass = isFullScreenMode 
+    const headerSizeClass = isFullScreenMode
         ? 'text-3xl lg:text-5xl font-bold tracking-tight'
         : 'text-xl font-medium';
 
@@ -1141,76 +1139,73 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 {/* 1. Action Icons (Not Sticky) — ref measures its rendered height for the dynamic scroll target */}
                 <div ref={actionIconsRef} className={`pt-3 ${isFullScreenMode ? 'px-0 bg-transparent' : 'px-4 bg-zinc-900'} z-20 flex-shrink-0`}>
                     <div className={`flex items-center justify-end gap-1 flex-shrink-0 ${isFullScreenMode ? 'w-fit ml-auto' : ''}`}>
-                            {(isArtistNode || isLabelNode) && (
-                                <button
-                                    onClick={() => {
-                                        if (!user) {
-                                            onAuthRequest?.();
-                                            return;
-                                        }
-                                        onAddToStack(node, links.purchase?.[0]?.url);
-                                        onOpenStackDrawer?.();
-                                    }}
-                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-800"
-                                    title="Save to My Stack"
-                                >
-                                    <StackIcon className="!text-[18px]" />
-                                </button>
-                            )}
-                            {isArtistNode && details && (
-                                <button
-                                    onClick={() => handleAddToTaste(node, details)}
-                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800"
-                                    title="Add to Style"
-                                >
-                                    <Flame size={18} />
-                                </button>
-                            )}
-
-
-                            <button 
-                                onClick={(e) => {
-                                    e.currentTarget.blur();
-                                    onTogglePin();
-                                }} 
-                                className={`relative w-8 h-8 flex flex-shrink-0 items-center justify-center border rounded-xl active:scale-95 transition-all duration-200 leading-none ${
-                                    isPinned 
-                                        ? 'border-zinc-700/50 text-primary bg-zinc-900 hover:text-primary hover:border-zinc-500 hover:bg-zinc-800' 
-                                        : 'border-zinc-800/80 text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800'
-                                }`} 
-                                title={isPinned ? "Unpin Card" : "Pin Card"}
+                        {(isArtistNode || isLabelNode) && (
+                            <button
+                                onClick={() => {
+                                    if (!user) {
+                                        onAuthRequest?.();
+                                        return;
+                                    }
+                                    onAddToStack(node, links.purchase?.[0]?.url);
+                                    onOpenStackDrawer?.();
+                                }}
+                                className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                title="Save to My Stack"
                             >
-                                <Pin className="w-[18px] h-[18px]" />
-                                {pinSequence !== undefined && (
-                                    <div className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 bg-zinc-900 border border-zinc-700 text-[9px] font-bold text-white rounded-full">
-                                        {pinSequence}
-                                    </div>
-                                )}
+                                <StackIcon className="!text-[18px]" />
                             </button>
+                        )}
+                        {isArtistNode && details && (
+                            <button
+                                onClick={() => handleAddToTaste(node, details)}
+                                className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 active:scale-95 leading-none text-zinc-400 hover:text-white hover:bg-zinc-800"
+                                title="Add to Style"
+                            >
+                                <Flame size={18} />
+                            </button>
+                        )}
 
 
-                        </div>
+                        <button
+                            onClick={(e) => {
+                                e.currentTarget.blur();
+                                onTogglePin();
+                            }}
+                            className={`relative w-8 h-8 flex flex-shrink-0 items-center justify-center border rounded-xl active:scale-95 transition-all duration-200 leading-none ${isPinned
+                                ? 'border-zinc-700/50 text-primary bg-zinc-900 hover:text-primary hover:border-zinc-500 hover:bg-zinc-800'
+                                : 'border-zinc-800/80 text-zinc-400 hover:text-white hover:border-zinc-700 hover:bg-zinc-800'
+                                }`}
+                            title={isPinned ? "Unpin Card" : "Pin Card"}
+                        >
+                            <Pin className="w-[18px] h-[18px]" />
+                            {pinSequence !== undefined && (
+                                <div className="absolute -top-1 -right-1 flex items-center justify-center w-4 h-4 bg-zinc-900 border border-zinc-700 text-[9px] font-bold text-white rounded-full">
+                                    {pinSequence}
+                                </div>
+                            )}
+                        </button>
+
+
+                    </div>
                 </div>
 
                 <div ref={sentinelRef} className="w-full h-[1px] -mt-[1px] pointer-events-none" />
                 {/* 2. Artist Name & Pills */}
-                <div 
-                    className={`transition-all duration-300 flex-shrink-0 sticky z-40 w-full ${
-                        isFullScreenMode 
-                            ? isHeaderStuck ? 'top-2' : 'top-0'
-                            : `top-0 border-b ${isHeaderStuck ? 'border-zinc-800/50 bg-zinc-900' : 'border-transparent bg-transparent'}`
-                    }`}
+                <div
+                    className={`transition-all duration-300 flex-shrink-0 sticky z-40 w-full ${isFullScreenMode
+                        ? isHeaderStuck ? 'top-2' : 'top-0'
+                        : `top-0 border-b ${isHeaderStuck ? 'border-zinc-800/50 bg-zinc-900' : 'border-transparent bg-transparent'}`
+                        }`}
                 >
-                    <div className={`transition-all duration-300 ${
-                        isFullScreenMode
-                            ? isHeaderStuck
-                                ? 'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-full px-3 md:px-4 py-1.5 shadow-lg -ml-1 md:-ml-4'
-                                : 'w-full bg-transparent border border-transparent px-0 pt-2 pb-1'
-                            : `w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-1'}`
-                    }`}>
-                    <div className={`flex flex-col ${isHeaderStuck ? 'gap-0' : 'gap-1.5'} min-w-0 flex-grow transition-all duration-300`}>
+                    <div className={`transition-all duration-300 ${isFullScreenMode
+                        ? isHeaderStuck
+                            ? 'w-fit bg-zinc-900/80 backdrop-blur-md border border-zinc-700 rounded-full px-3 md:px-4 py-1.5 shadow-lg -ml-1 md:-ml-4'
+                            : 'w-full bg-transparent border border-transparent px-0 pt-2 pb-1'
+                        : `w-full px-4 ${isHeaderStuck ? 'py-2' : 'pt-2 pb-1'}`
+                        }`}>
+                        <div className={`flex flex-col ${isHeaderStuck ? 'gap-0' : 'gap-1.5'} min-w-0 flex-grow transition-all duration-300`}>
                             <div className="flex items-center gap-2">
-                                <div 
+                                <div
                                     onClick={handleCopyId}
                                     className="group flex items-center gap-2 cursor-copy w-fit transition-all active:scale-[0.98] min-w-0"
                                     title="Click to copy name"
@@ -1240,7 +1235,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 <div className={`flex-grow min-h-0 relative ${isFullScreenMode ? 'pt-6 pb-4 px-0 overflow-x-clip' : 'px-4 pt-6 pb-8'}`}>
                     {isLoading && !isLocked && details && (
                         <div className={`absolute inset-0 z-30 flex flex-col items-center justify-center text-center space-y-8 h-full ${isFullScreenMode ? 'bg-zinc-900/50 backdrop-blur-sm' : 'bg-zinc-900/90 backdrop-blur-sm bg-zinc-900'}`}>
-                            <LoadingSpinner 
+                            <LoadingSpinner
                                 steps={DETAIL_THINKING_STEPS}
                                 subtext="Typically takes 20–30 seconds to dig for details."
                             />
@@ -1261,7 +1256,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </p>
                                 </div>
                                 <p className="text-sm text-zinc-400 max-w-xs leading-relaxed">
-                                    {node.type === 'founded' 
+                                    {node.type === 'founded'
                                         ? "This metadata node represents the year connected artists were formed or active."
                                         : "This metadata node represents the geographic origin of connected artists."
                                     }
@@ -1269,14 +1264,14 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             </div>
                         ) : isLoading ? (
                             <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
-                                <LoadingSpinner 
+                                <LoadingSpinner
                                     steps={DETAIL_THINKING_STEPS}
                                     subtext="Typically takes 20–30 seconds to dig for details."
                                 />
                             </div>
                         ) : isGlobalLoading ? (
                             <div className="flex flex-col items-center justify-center text-center py-12 space-y-8 h-full bg-zinc-900">
-                                <LoadingSpinner 
+                                <LoadingSpinner
                                     steps={["Waiting for Connections to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
                                     subtext="Graph mapping takes priority. Details will follow."
                                 />
@@ -1307,85 +1302,110 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {!isLabelNode && activeTasteProfilesData.length > 0 && (
                                 <div ref={styleBarContainerRef} className="flex flex-col gap-2 w-full -mt-1.5">
 
-                                        <div className="flex flex-col gap-2">
+                                    <div className="flex flex-col gap-2">
 
-                                            {activeTasteProfilesData.map((data) => {
-                                                const hexMap: Record<string, string> = {
-                                                    purple: '#a855f7',
-                                                    teal: '#2dd4bf',
-                                                    sky: '#38bdf8',
-                                                    indigo: '#6366f1',
-                                                    pink: '#ec4899',
-                                                    orange: '#f97316'
-                                                };
-                                                const colorHex = hexMap[data.profile.color] || '#a855f7';
-                                                return (
-                                                    <ProfileRow
-                                                        key={data.profile.id}
-                                                        data={data}
-                                                        colorHex={colorHex}
-                                                        isSmallScreen={isSmallScreen}
-                                                        isExpanded={expandedProfileId === data.profile.id}
-                                                        onToggle={() => setExpandedProfileId(prev =>
-                                                            prev === data.profile.id ? null : data.profile.id
-                                                        )}
-                                                        userTaste={userTaste}
-                                                        onUpdateTasteProfile={onUpdateTasteProfile}
-                                                    />
-                                                );
-                                            })}
-                                            {/* Single Master Header for Sub-labels */}
-                                            <div className="grid grid-cols-5 gap-1.5 w-full text-[8px] font-mono tracking-widest uppercase select-none text-zinc-500 mt-0">
-                                                <span className="text-center truncate">LABEL</span>
-                                                <span className="text-center truncate">GENRE</span>
-                                                <span className="text-center truncate">STYLE</span>
-                                                <span className="text-center truncate">ORIGIN</span>
-                                                <span className="text-center truncate">FOUNDED</span>
-                                            </div>
+                                        {activeTasteProfilesData.map((data) => {
+                                            const hexMap: Record<string, string> = {
+                                                purple: '#a855f7',
+                                                teal: '#2dd4bf',
+                                                sky: '#38bdf8',
+                                                indigo: '#6366f1',
+                                                pink: '#ec4899',
+                                                orange: '#f97316'
+                                            };
+                                            const colorHex = hexMap[data.profile.color] || '#a855f7';
+                                            return (
+                                                <ProfileRow
+                                                    key={data.profile.id}
+                                                    data={data}
+                                                    colorHex={colorHex}
+                                                    isSmallScreen={isSmallScreen}
+                                                    isExpanded={expandedProfileId === data.profile.id}
+                                                    onToggle={() => setExpandedProfileId(prev =>
+                                                        prev === data.profile.id ? null : data.profile.id
+                                                    )}
+                                                    userTaste={userTaste}
+                                                    onUpdateTasteProfile={onUpdateTasteProfile}
+                                                />
+                                            );
+                                        })}
+                                        {/* Single Master Header for Sub-labels */}
+                                        <div className="grid grid-cols-5 gap-1.5 w-full text-[8px] font-mono tracking-widest uppercase select-none text-zinc-500 mt-0">
+                                            <span className="text-center truncate">LABEL</span>
+                                            <span className="text-center truncate">GENRE</span>
+                                            <span className="text-center truncate">STYLE</span>
+                                            <span className="text-center truncate">ORIGIN</span>
+                                            <span className="text-center truncate">FOUNDED</span>
                                         </div>
+                                    </div>
                                 </div>
                             )}
 
                             {!isLabelNode && (
                                 <div className="relative mx-auto w-fit">
-                                {imageTier !== 'placeholder' && currentImageUrl ? (
-                                    <>
-                                        {/* Ambient Glow */}
-                                        <div className={`absolute ${isFullScreenMode ? 'inset-[-20%] blur-2xl' : 'inset-[-15%] rounded-full opacity-35 blur-2xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={isFullScreenMode ? { background: 'radial-gradient(ellipse at center, var(--scene-accent, transparent) 0%, transparent 70%)' } : { backgroundColor: 'var(--scene-accent, transparent)' }} />
-                                        <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
-                                            {/* Temporary Loading Skeleton while image loads */}
-                                            {!imgLoaded && (
-                                                <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
-                                                    <img 
-                                                        src={isLabelNode 
-                                                            ? "https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png"
-                                                            : "https://storage.googleapis.com/zcene-prod-assets/Artist%20background.png"
-                                                        }
-                                                        alt="Background" 
-                                                        className="absolute inset-0 w-full h-full object-cover opacity-30 filter blur-sm scale-105 transition-transform duration-1000 group-hover:scale-100" 
-                                                    />
-                                                    <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-900/60 to-transparent" />
-                                                    <div className="relative z-10 flex flex-col items-center justify-center space-y-2">
-                                                        <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center backdrop-blur-sm group-hover:border-purple-500/50 transition-colors duration-500">
-                                                            <span className="material-symbols-outlined text-zinc-400 group-hover:text-purple-400 transition-colors duration-500 text-2xl">
-                                                                {isLabelNode ? 'album' : 'music_note'}
-                                                            </span>
+                                    {imageTier !== 'placeholder' && currentImageUrl ? (
+                                        <>
+                                            {/* Ambient Glow */}
+                                            <div className={`absolute ${isFullScreenMode ? 'inset-[-20%] blur-2xl' : 'inset-[-15%] rounded-full opacity-35 blur-2xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={isFullScreenMode ? { background: 'radial-gradient(ellipse at center, var(--scene-accent, transparent) 0%, transparent 70%)' } : { backgroundColor: 'var(--scene-accent, transparent)' }} />
+                                            <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
+                                                {/* Temporary Loading Skeleton while image loads */}
+                                                {!imgLoaded && (
+                                                    <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
+                                                        <img
+                                                            src={isLabelNode
+                                                                ? "https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png"
+                                                                : "https://storage.googleapis.com/zcene-prod-assets/Artist%20background.png"
+                                                            }
+                                                            alt="Background"
+                                                            className="absolute inset-0 w-full h-full object-cover opacity-30 filter blur-sm scale-105 transition-transform duration-1000 group-hover:scale-100"
+                                                        />
+                                                        <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-zinc-900/60 to-transparent" />
+                                                        <div className="relative z-10 flex flex-col items-center justify-center space-y-2">
+                                                            <div className="w-12 h-12 rounded-full bg-zinc-800/80 border border-zinc-700/50 flex items-center justify-center backdrop-blur-sm group-hover:border-purple-500/50 transition-colors duration-500">
+                                                                <span className="material-symbols-outlined text-zinc-400 group-hover:text-purple-400 transition-colors duration-500 text-2xl">
+                                                                    {isLabelNode ? 'album' : 'music_note'}
+                                                                </span>
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            )}
+                                                )}
 
-                                            {/* Primary / Secondary Image */}
-                                            <img 
-                                                ref={imgRef}
-                                                src={currentImageUrl} 
-                                                alt={getArtistDisplayName(details, node)} 
-                                                className={`relative w-full h-full object-cover block scale-105 group-hover:scale-100 transition-all duration-1000 ${imgLoaded ? 'opacity-100 z-20' : 'opacity-0 z-0'}`}
-                                                onLoad={() => setImgLoaded(true)}
-                                                onError={handleImageError}
-                                            />
+                                                {/* Primary / Secondary Image */}
+                                                <img
+                                                    ref={imgRef}
+                                                    src={currentImageUrl}
+                                                    alt={getArtistDisplayName(details, node)}
+                                                    className={`relative w-full h-full object-cover block scale-105 group-hover:scale-100 transition-all duration-1000 ${imgLoaded ? 'opacity-100 z-20' : 'opacity-0 z-0'}`}
+                                                    onLoad={() => setImgLoaded(true)}
+                                                    onError={handleImageError}
+                                                />
 
-                                            {/* Architecture V40: 30-Second iTunes Audio Preview Player (Overlaid on artwork) */}
+                                                {/* Architecture V40: 30-Second iTunes Audio Preview Player (Overlaid on artwork) */}
+                                                <AudioPreviewPlayer
+                                                    key={node.id}
+                                                    nodeId={node.id}
+                                                    artistName={getArtistDisplayName(details, node)}
+                                                    previewUrl={details?.previewUrl}
+                                                    previewTrackName={details?.previewTrackName}
+                                                    itunesArtistId={details?.itunesArtistId}
+                                                    onPreviewResolved={(res) => {
+                                                        if (details) {
+                                                            details.previewUrl = res.previewUrl;
+                                                            details.previewTrackName = res.previewTrackName;
+                                                            if (res.itunesArtistId) {
+                                                                details.itunesArtistId = res.itunesArtistId;
+                                                            }
+                                                        }
+                                                    }}
+                                                />
+                                            </div>
+                                        </>
+                                    ) : (
+                                        <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg z-10 flex items-center justify-center ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
+                                            <span className="text-8xl font-black text-white/5 uppercase select-none absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none">
+                                                {extractInitials(getArtistDisplayName(details, node))}
+                                            </span>
+                                            {/* Architecture V40: 30-Second iTunes Audio Preview Player (Overlaid on initials) */}
                                             <AudioPreviewPlayer
                                                 key={node.id}
                                                 nodeId={node.id}
@@ -1404,32 +1424,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 }}
                                             />
                                         </div>
-                                    </>
-                                ) : (
-                                    <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-gradient-to-br from-zinc-800/40 to-zinc-900/80 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg z-10 flex items-center justify-center ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
-                                        <span className="text-8xl font-black text-white/5 uppercase select-none absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none">
-                                            {extractInitials(getArtistDisplayName(details, node))}
-                                        </span>
-                                        {/* Architecture V40: 30-Second iTunes Audio Preview Player (Overlaid on initials) */}
-                                        <AudioPreviewPlayer
-                                            key={node.id}
-                                            nodeId={node.id}
-                                            artistName={getArtistDisplayName(details, node)}
-                                            previewUrl={details?.previewUrl}
-                                            previewTrackName={details?.previewTrackName}
-                                            itunesArtistId={details?.itunesArtistId}
-                                            onPreviewResolved={(res) => {
-                                                if (details) {
-                                                    details.previewUrl = res.previewUrl;
-                                                    details.previewTrackName = res.previewTrackName;
-                                                    if (res.itunesArtistId) {
-                                                        details.itunesArtistId = res.itunesArtistId;
-                                                    }
-                                                }
-                                            }}
-                                        />
-                                    </div>
-                                )}
+                                    )}
                                 </div>
                             )}
 
@@ -1530,9 +1525,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 <h4 className="font-bold text-zinc-500 text-[10px] uppercase tracking-[0.2em]">Bio</h4>
                                 <div className={`leading-relaxed text-zinc-300 markdown-bio ${isFullScreenMode ? 'text-base font-normal' : 'text-sm'} ${isHero ? 'column-count-1 md:column-count-2 md:gap-12' : ''}`}>
                                     <Markdown components={{
-                                        p: ({node, children, ...props}) => <p className="mb-4" {...props}>{renderWithHighlights(children, searchQuery)}</p>,
-                                        strong: ({node, children, ...props}) => <strong className="font-semibold text-white" {...props}>{renderWithHighlights(children, searchQuery)}</strong>,
-                                        li: ({node, children, ...props}) => <li className="marker:text-primary" {...props}>{renderWithHighlights(children, searchQuery)}</li>
+                                        p: ({ node, children, ...props }) => <p className="mb-4" {...props}>{renderWithHighlights(children, searchQuery)}</p>,
+                                        strong: ({ node, children, ...props }) => <strong className="font-semibold text-white" {...props}>{renderWithHighlights(children, searchQuery)}</strong>,
+                                        li: ({ node, children, ...props }) => <li className="marker:text-primary" {...props}>{renderWithHighlights(children, searchQuery)}</li>
                                     }}>{details.summary}</Markdown>
                                 </div>
                             </div>
@@ -1552,24 +1547,24 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <div className="flex flex-wrap gap-2">
                                         {details.details.notableArtists.map(artistName => {
                                             const normalizedArtist = normalizeArtistId(artistName);
-                                            const existingNode = graphData?.nodes.find(n => 
+                                            const existingNode = graphData?.nodes.find(n =>
                                                 n.type === 'artist' && isArtistIdMatch(n.id, artistName)
                                             );
                                             const isExistingInGraph = !!existingNode;
 
                                             if (isGuest) {
-                                              return (
-                                                <div 
-                                                    key={artistName} 
-                                                    className="border border-zinc-800 bg-zinc-900/50 text-zinc-500 py-1.5 px-4 text-sm rounded-xl"
-                                                >
-                                                    <span className="truncate px-0.5 tracking-normal">{artistName}</span>
-                                                </div>
-                                              );
+                                                return (
+                                                    <div
+                                                        key={artistName}
+                                                        className="border border-zinc-800 bg-zinc-900/50 text-zinc-500 py-1.5 px-4 text-sm rounded-xl"
+                                                    >
+                                                        <span className="truncate px-0.5 tracking-normal">{artistName}</span>
+                                                    </div>
+                                                );
                                             }
                                             return (
-                                                <button 
-                                                    key={artistName} 
+                                                <button
+                                                    key={artistName}
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         if (isExistingInGraph) {
@@ -1584,11 +1579,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                             }
                                                         }
                                                     }}
-                                                    className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl cursor-pointer ${
-                                                        isExistingInGraph 
-                                                            ? 'border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700' 
-                                                            : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
-                                                    }`}
+                                                    className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl cursor-pointer ${isExistingInGraph
+                                                        ? 'border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700'
+                                                        : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
+                                                        }`}
                                                 >
                                                     <span className="truncate tracking-normal">{artistName}</span>
                                                     {isExistingInGraph ? (
@@ -1621,7 +1615,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                             {!isStaticMockup && links.purchase.length > 0 && (
                                 <div className="pt-6">
-                                    <button 
+                                    <button
                                         onClick={() => setIsCatalogOpen(!isCatalogOpen)}
                                         className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
                                     >
@@ -1634,59 +1628,59 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         <div className="p-5 bg-primary/5 border-[0.5px] border-primary">
                                             <div className="flex flex-col gap-3">
                                                 {/* Watch on YouTube button (Hidden for labels) */}
-                                            {!isLabelNode && (() => {
-                                                const artistDisplay = getArtistDisplayName(details, node);
-                                                const youtubeVideoId = details.youtubeVideoId;
-                                                const youtubeUrl = youtubeVideoId && youtubeVideoId.length === 11
-                                                    ? `https://www.youtube.com/watch?v=${youtubeVideoId}`
-                                                    : `https://www.youtube.com/results?search_query=${encodeURIComponent(artistDisplay)}+official+music+video`;
+                                                {!isLabelNode && (() => {
+                                                    const artistDisplay = getArtistDisplayName(details, node);
+                                                    const youtubeVideoId = details.youtubeVideoId;
+                                                    const youtubeUrl = youtubeVideoId && youtubeVideoId.length === 11
+                                                        ? `https://www.youtube.com/watch?v=${youtubeVideoId}`
+                                                        : `https://www.youtube.com/results?search_query=${encodeURIComponent(artistDisplay)}+official+music+video`;
 
-                                                return (
-                                                    <a 
-                                                        href={youtubeUrl} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer" 
-                                                        onClick={() => stopGlobalAudio()}
-                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="material-symbols-outlined !text-[18px]">
-                                                                play_circle
-                                                            </span>
-                                                            <span className="px-0.5 tracking-normal text-sm">
-                                                                YouTube
-                                                            </span>
-                                                        </div>
-                                                    </a>
-                                                );
-                                            })()}
-
-                                            {links.purchase.map((link, i) => {
-                                                const isBandcamp = /bandcamp/i.test(link.site);
-                                                return (
-                                                    <a 
-                                                        key={i} 
-                                                        href={link.url} 
-                                                        target="_blank" 
-                                                        rel="noopener noreferrer" 
-                                                        onClick={() => stopGlobalAudio()}
-                                                        className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
-                                                    >
-                                                        <div className="flex items-center gap-3">
-                                                            {isBandcamp ? (
-                                                                <BandcampIcon className="w-[18px] h-[18px] flex-shrink-0" />
-                                                            ) : (
+                                                    return (
+                                                        <a
+                                                            href={youtubeUrl}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={() => stopGlobalAudio()}
+                                                            className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
+                                                        >
+                                                            <div className="flex items-center gap-3">
                                                                 <span className="material-symbols-outlined !text-[18px]">
-                                                                    public
+                                                                    play_circle
                                                                 </span>
-                                                            )}
-                                                            <span className="px-0.5 tracking-normal text-sm">
-                                                                {isBandcamp ? 'Bandcamp' : link.site}
-                                                            </span>
-                                                        </div>
-                                                    </a>
-                                                );
-                                            })}
+                                                                <span className="px-0.5 tracking-normal text-sm">
+                                                                    YouTube
+                                                                </span>
+                                                            </div>
+                                                        </a>
+                                                    );
+                                                })()}
+
+                                                {links.purchase.map((link, i) => {
+                                                    const isBandcamp = /bandcamp/i.test(link.site);
+                                                    return (
+                                                        <a
+                                                            key={i}
+                                                            href={link.url}
+                                                            target="_blank"
+                                                            rel="noopener noreferrer"
+                                                            onClick={() => stopGlobalAudio()}
+                                                            className="flex items-center justify-start px-4 py-2 rounded-xl font-medium transition-all active:scale-[0.98] bg-zinc-900 text-zinc-400 hover:bg-zinc-800 hover:text-white border border-zinc-700 hover:border-zinc-600"
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                {isBandcamp ? (
+                                                                    <BandcampIcon className="w-[18px] h-[18px] flex-shrink-0" />
+                                                                ) : (
+                                                                    <span className="material-symbols-outlined !text-[18px]">
+                                                                        public
+                                                                    </span>
+                                                                )}
+                                                                <span className="px-0.5 tracking-normal text-sm">
+                                                                    {isBandcamp ? 'Bandcamp' : link.site}
+                                                                </span>
+                                                            </div>
+                                                        </a>
+                                                    );
+                                                })}
                                             </div>
                                         </div>
                                     )}
@@ -1695,224 +1689,223 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
                             {!isStaticMockup && (
-                            <div className="pt-6 border-t border-zinc-800">
-                                <button 
-                                    onClick={() => setIsConnectionsOpen(!isConnectionsOpen)}
-                                    className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
-                                >
-                                    <span>Deep Connections</span>
-                                    <span className="material-symbols-outlined !text-[16px]">
-                                        {isConnectionsOpen ? 'expand_less' : 'expand_more'}
-                                    </span>
-                                </button>
-                                {isConnectionsOpen && (
-                                    <>
-                                        {isGuest ? (
-                                    <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-xl border border-zinc-800/80">
-                                        <span className="material-symbols-outlined !text-4xl text-primary/50 mb-3">lock</span>
-                                        <h5 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-200 mb-2">DEEPER CONNECTION</h5>
-                                        <p className="text-sm text-zinc-400 leading-relaxed max-w-xs mx-auto mb-4">
-                                            Unlock our advanced AI assistant features to map deeper relationships across your music canvas.
-                                        </p>
-                                        {user ? (
-                                            <button 
-                                                onClick={() => onAuthRequest?.()}
-                                                className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50`}
-                                            >
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                                                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
-                                                    <line x1="12" y1="11" x2="12" y2="17" />
-                                                    <line x1="9" y1="14" x2="15" y2="14" />
-                                                </svg>
-                                                Save to my Zcenes
-                                            </button>
-                                        ) : (
-                                            <button 
-                                                onClick={() => onAuthRequest?.()}
-                                                className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50`}
-                                            >
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
-                                                    <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
-                                                    <polyline points="10 17 15 12 10 7" />
-                                                    <line x1="15" y1="12" x2="3" y2="12" />
-                                                </svg>
-                                                Sign in to save
-                                            </button>
-                                        )}
-                                    </div>
-                                ) : (
-                                    <div className="flex flex-col">
-                                        <div className="flex flex-col bg-zinc-950/20 border border-zinc-800/50 p-4">
-                                            <div ref={chatContainerRef} className={`max-h-60 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 pr-1 ${chatHistory.length === 0 ? 'hidden' : 'mb-4'}`}>
-                                            {chatHistory.length === 0 ? null : (
-                                            chatHistory.map((msg, i) => (
-                                                <div key={i} className={`flex flex-col group relative ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
-                                                    <div className={`max-w-[90%] px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200 border-r-4 border-primary' : 'bg-zinc-900/50 text-zinc-300 border-l-4 border-zinc-600 shadow-sm'} rounded-xl`}>
-                                                        {msg.text}
-                                                    </div>
-                                                    {msg.timestamp && (
-                                                        <span className="font-mono text-xs text-zinc-300 font-normal mt-1 px-1 flex items-center gap-2">
-                                                            {formatSystemTimestamp(msg.timestamp)}
-                                                            {onDeleteMessage && (
-                                                                <button 
-                                                                    onClick={() => onDeleteMessage(i)}
-                                                                    className="opacity-0 group-hover:opacity-100 text-red-500/70 hover:text-red-400 transition-opacity p-0.5 inline-flex items-center"
-                                                                    title="Delete Message"
-                                                                >
-                                                                    <span className="material-symbols-outlined !text-[12px] leading-none">delete</span>
-                                                                </button>
-                                                            )}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            ))
-                                        )}
-                                        {isChatLoading && (
-                                            <div className="flex items-start">
-                                                <div className="bg-zinc-900 border-l-4 border-primary px-4 py-2 flex items-center gap-2 rounded-xl">
-                                                    <div className="flex gap-1">
-                                                        <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{animationDelay: '0ms'}}></div>
-                                                        <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{animationDelay: '150ms'}}></div>
-                                                        <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{animationDelay: '300ms'}}></div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div className="flex justify-between items-center mb-3">
-                                        <SegmentedTextToggle
-                                            value={chatMode}
-                                            onChange={(val) => onChatModeChange(val as 'instant' | 'live')}
-                                            options={[
-                                                { id: 'instant', label: 'Instant AI' },
-                                                { id: 'live', label: 'Deep Web' }
-                                            ]}
-                                            className="w-[180px] h-8"
-                                        />
-                                        <div className="flex items-center gap-3">
-                                            {onClearChat && chatHistory.length > 0 && (
-                                                <button 
-                                                    onClick={onClearChat}
-                                                    className="px-3 py-1.5 text-[10px] text-zinc-500 hover:text-red-400 hover:bg-red-500/10 uppercase tracking-widest font-semibold rounded-lg transition-colors border border-transparent flex items-center justify-center"
-                                                >
-                                                    Clear Chat
-                                                </button>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div className="relative min-h-[160px] flex flex-col">
-                                        {chatMode === 'live' ? (
-                                            <div className="flex flex-col flex-1 gap-2">
-                                                <div className="relative flex-1 flex flex-col">
-                                                    <textarea
-                                                        value={chatInput}
-                                                        onChange={(e) => setChatInput(e.target.value)}
-                                                        onKeyDown={handleKeyDown}
-                                                        placeholder="Consult Zcene AI..."
-                                                        className="flex-1 w-full h-full bg-zinc-950 border border-zinc-700 py-2 pl-4 pr-16 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none scrollbar-thin scrollbar-thumb-zinc-700"
-                                                    />
-                                                    <div className="absolute right-2 bottom-3 flex flex-col items-center gap-2">
-                                                    {!chatInput.trim() ? (
-                                                        <button 
-                                                            onClick={handleSpeechToText}
-                                                            className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-colors rounded-xl ${isListening ? 'text-primary animate-pulse' : 'text-zinc-500 active:text-zinc-300'}`}
-                                                            title="Speak"
+                                <div className="pt-6 border-t border-zinc-800">
+                                    <button
+                                        onClick={() => setIsConnectionsOpen(!isConnectionsOpen)}
+                                        className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
+                                    >
+                                        <span>Deep Connections</span>
+                                        <span className="material-symbols-outlined !text-[16px]">
+                                            {isConnectionsOpen ? 'expand_less' : 'expand_more'}
+                                        </span>
+                                    </button>
+                                    {isConnectionsOpen && (
+                                        <>
+                                            {isGuest ? (
+                                                <div className="flex flex-col items-center justify-center text-center p-6 bg-zinc-900/50 rounded-xl border border-zinc-800/80">
+                                                    <span className="material-symbols-outlined !text-4xl text-primary/50 mb-3">lock</span>
+                                                    <h5 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-200 mb-2">DEEPER CONNECTION</h5>
+                                                    <p className="text-sm text-zinc-400 leading-relaxed max-w-xs mx-auto mb-4">
+                                                        Unlock our advanced AI assistant features to map deeper relationships across your music canvas.
+                                                    </p>
+                                                    {user ? (
+                                                        <button
+                                                            onClick={() => onAuthRequest?.()}
+                                                            className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50`}
                                                         >
-                                                            <MicIcon className="!text-[22px]" />
+                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                                                                <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+                                                                <line x1="12" y1="11" x2="12" y2="17" />
+                                                                <line x1="9" y1="14" x2="15" y2="14" />
+                                                            </svg>
+                                                            Save to my Zcenes
                                                         </button>
                                                     ) : (
-                                                        <button 
-                                                            onClick={() => setChatInput('')}
-                                                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-500 active:text-white transition-colors rounded-xl"
-                                                            title="Clear message"
+                                                        <button
+                                                            onClick={() => onAuthRequest?.()}
+                                                            className={`w-full flex items-center justify-center gap-2 bg-primary ${isSmallScreen ? 'px-8 py-4 text-lg rounded-2xl' : 'px-6 py-2 text-sm rounded-xl'} font-medium text-brand-black transition-all duration-500 hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50`}
                                                         >
-                                                            <span className="material-symbols-outlined !text-[18px]">close</span>
+                                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="flex-shrink-0">
+                                                                <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4" />
+                                                                <polyline points="10 17 15 12 10 7" />
+                                                                <line x1="15" y1="12" x2="3" y2="12" />
+                                                            </svg>
+                                                            Sign in to save
                                                         </button>
                                                     )}
-                                                    <button 
-                                                        onClick={handleSend}
-                                                        disabled={!chatInput.trim() || isChatLoading}
-                                                        className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-all duration-300 rounded-xl ${
-                                                            !chatInput.trim() || isChatLoading
-                                                                ? 'bg-zinc-800 text-zinc-600'
-                                                                : 'bg-primary text-brand-black active:scale-95'
-                                                        }`}
-                                                        title="Send"
-                                                    >
-                                                        <span className="material-symbols-outlined !text-[22px]">arrow_upward</span>
-                                                    </button>
-                                                    </div>
                                                 </div>
-                                                <div className="flex justify-start px-1">
-                                                    {(() => {
-                                                        const isSessionUnlockedAndActive = hasActiveDeepWebSession && liveMessageCount < 3;
-                                                        const displayedMessagesUsed = isSessionUnlockedAndActive
-                                                            ? Math.min(3, Math.max(0, liveMessageCount))
-                                                            : (hasActiveDeepWebSession && liveMessageCount >= 3 ? 3 : 0);
-                                                        return (
-                                                            <div className="text-[10px] text-zinc-500 font-mono tracking-widest flex items-center gap-1">
-                                                                <span className={`w-1.5 h-1.5 rounded-full ${isSessionUnlockedAndActive ? 'bg-primary' : 'bg-red-500 animate-pulse'}`}></span>
-                                                                {displayedMessagesUsed} / 3 Messages
-                                                            </div>
-                                                        );
-                                                    })()}
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="flex flex-wrap gap-2">
-                                                {queryChips.map((chip, idx) => {
-                                                    const isClicked = clickedChips.has(chip);
-                                                    return (
-                                                    <button 
-                                                        key={idx}
-                                                        onClick={() => {
-                                                            setClickedChips(prev => new Set(prev).add(chip));
-                                                            onSendMessage(chip);
-                                                        }}
-                                                        disabled={isChatLoading}
-                                                        className={`px-4 py-1.5 border transition-colors text-xs rounded-full disabled:opacity-50 text-left flex items-center gap-1 ${
-                                                            isClicked 
-                                                                ? 'bg-zinc-950 border-zinc-800 text-zinc-600 cursor-default' 
-                                                                : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-white'
-                                                        }`}
-                                                    >
-                                                        {chip}
-                                                        {isClicked && <span className="material-symbols-outlined !text-[12px] opacity-70">check</span>}
-                                                    </button>
-                                                )})}
-                                                {connectionPeers.length > 0 && (
-                                                    <div className="relative">
-                                                        <select
-                                                            className="appearance-none px-4 py-1.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:text-white transition-colors text-xs text-zinc-400 rounded-full cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary pr-8"
-                                                            onChange={(e) => {
-                                                                if (e.target.value) {
-                                                                    const query = `What is the connection to ${e.target.value}?`;
-                                                                    setClickedChips(prev => new Set(prev).add(query));
-                                                                    onSendMessage(query);
-                                                                    e.target.value = "";
-                                                                }
-                                                            }}
-                                                        >
-                                                            <option value="">What is the connection to...</option>
-                                                            {connectionPeers.map(peer => (
-                                                                <option key={peer} value={peer}>{peer}</option>
-                                                            ))}
-                                                        </select>
-                                                        <span className="material-symbols-outlined !text-[14px] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">expand_more</span>
-                                                    </div>
-                                                )}
+                                            ) : (
+                                                <div className="flex flex-col">
+                                                    <div className="flex flex-col bg-zinc-950/20 border border-zinc-800/50 p-4">
+                                                        <div ref={chatContainerRef} className={`max-h-60 overflow-y-auto space-y-4 scrollbar-thin scrollbar-thumb-zinc-800 pr-1 ${chatHistory.length === 0 ? 'hidden' : 'mb-4'}`}>
+                                                            {chatHistory.length === 0 ? null : (
+                                                                chatHistory.map((msg, i) => (
+                                                                    <div key={i} className={`flex flex-col group relative ${msg.role === 'user' ? 'items-end' : 'items-start'}`}>
+                                                                        <div className={`max-w-[90%] px-4 py-2 text-sm ${msg.role === 'user' ? 'bg-zinc-800 text-zinc-200 border-r-4 border-primary' : 'bg-zinc-900/50 text-zinc-300 border-l-4 border-zinc-600 shadow-sm'} rounded-xl`}>
+                                                                            {msg.text}
+                                                                        </div>
+                                                                        {msg.timestamp && (
+                                                                            <span className="font-mono text-xs text-zinc-300 font-normal mt-1 px-1 flex items-center gap-2">
+                                                                                {formatSystemTimestamp(msg.timestamp)}
+                                                                                {onDeleteMessage && (
+                                                                                    <button
+                                                                                        onClick={() => onDeleteMessage(i)}
+                                                                                        className="opacity-0 group-hover:opacity-100 text-red-500/70 hover:text-red-400 transition-opacity p-0.5 inline-flex items-center"
+                                                                                        title="Delete Message"
+                                                                                    >
+                                                                                        <span className="material-symbols-outlined !text-[12px] leading-none">delete</span>
+                                                                                    </button>
+                                                                                )}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                            {isChatLoading && (
+                                                                <div className="flex items-start">
+                                                                    <div className="bg-zinc-900 border-l-4 border-primary px-4 py-2 flex items-center gap-2 rounded-xl">
+                                                                        <div className="flex gap-1">
+                                                                            <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                                                                            <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                                                                            <div className="w-1 h-1 bg-primary rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                                                                        </div>
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
 
-                                            </div>
-                                        )}
-                                    </div>
-                                    </div>
-                                    </div>
-                                )}
-                                    </>
-                                )}
-                            </div>
+                                                        <div className="flex justify-between items-center mb-3">
+                                                            <SegmentedTextToggle
+                                                                value={chatMode}
+                                                                onChange={(val) => onChatModeChange(val as 'instant' | 'live')}
+                                                                options={[
+                                                                    { id: 'instant', label: 'Instant AI' },
+                                                                    { id: 'live', label: 'Deep Web' }
+                                                                ]}
+                                                                className="w-[180px] h-8"
+                                                            />
+                                                            <div className="flex items-center gap-3">
+                                                                {onClearChat && chatHistory.length > 0 && (
+                                                                    <button
+                                                                        onClick={onClearChat}
+                                                                        className="px-3 py-1.5 text-[10px] text-zinc-500 hover:text-red-400 hover:bg-red-500/10 uppercase tracking-widest font-semibold rounded-lg transition-colors border border-transparent flex items-center justify-center"
+                                                                    >
+                                                                        Clear Chat
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="relative min-h-[160px] flex flex-col">
+                                                            {chatMode === 'live' ? (
+                                                                <div className="flex flex-col flex-1 gap-2">
+                                                                    <div className="relative flex-1 flex flex-col">
+                                                                        <textarea
+                                                                            value={chatInput}
+                                                                            onChange={(e) => setChatInput(e.target.value)}
+                                                                            onKeyDown={handleKeyDown}
+                                                                            placeholder="Consult Zcene AI..."
+                                                                            className="flex-1 w-full h-full bg-zinc-950 border border-zinc-700 py-2 pl-4 pr-16 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none scrollbar-thin scrollbar-thumb-zinc-700"
+                                                                        />
+                                                                        <div className="absolute right-2 bottom-3 flex flex-col items-center gap-2">
+                                                                            {!chatInput.trim() ? (
+                                                                                <button
+                                                                                    onClick={handleSpeechToText}
+                                                                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-colors rounded-xl ${isListening ? 'text-primary animate-pulse' : 'text-zinc-500 active:text-zinc-300'}`}
+                                                                                    title="Speak"
+                                                                                >
+                                                                                    <MicIcon className="!text-[22px]" />
+                                                                                </button>
+                                                                            ) : (
+                                                                                <button
+                                                                                    onClick={() => setChatInput('')}
+                                                                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-500 active:text-white transition-colors rounded-xl"
+                                                                                    title="Clear message"
+                                                                                >
+                                                                                    <span className="material-symbols-outlined !text-[18px]">close</span>
+                                                                                </button>
+                                                                            )}
+                                                                            <button
+                                                                                onClick={handleSend}
+                                                                                disabled={!chatInput.trim() || isChatLoading}
+                                                                                className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-all duration-300 rounded-xl ${!chatInput.trim() || isChatLoading
+                                                                                    ? 'bg-zinc-800 text-zinc-600'
+                                                                                    : 'bg-primary text-brand-black active:scale-95'
+                                                                                    }`}
+                                                                                title="Send"
+                                                                            >
+                                                                                <span className="material-symbols-outlined !text-[22px]">arrow_upward</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    </div>
+                                                                    <div className="flex justify-start px-1">
+                                                                        {(() => {
+                                                                            const isSessionUnlockedAndActive = hasActiveDeepWebSession && liveMessageCount < 3;
+                                                                            const displayedMessagesUsed = isSessionUnlockedAndActive
+                                                                                ? Math.min(3, Math.max(0, liveMessageCount))
+                                                                                : (hasActiveDeepWebSession && liveMessageCount >= 3 ? 3 : 0);
+                                                                            return (
+                                                                                <div className="text-[10px] text-zinc-500 font-mono tracking-widest flex items-center gap-1">
+                                                                                    <span className={`w-1.5 h-1.5 rounded-full ${isSessionUnlockedAndActive ? 'bg-primary' : 'bg-red-500 animate-pulse'}`}></span>
+                                                                                    {displayedMessagesUsed} / 3 Messages
+                                                                                </div>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {queryChips.map((chip, idx) => {
+                                                                        const isClicked = clickedChips.has(chip);
+                                                                        return (
+                                                                            <button
+                                                                                key={idx}
+                                                                                onClick={() => {
+                                                                                    setClickedChips(prev => new Set(prev).add(chip));
+                                                                                    onSendMessage(chip);
+                                                                                }}
+                                                                                disabled={isChatLoading}
+                                                                                className={`px-4 py-1.5 border transition-colors text-xs rounded-full disabled:opacity-50 text-left flex items-center gap-1 ${isClicked
+                                                                                    ? 'bg-zinc-950 border-zinc-800 text-zinc-600 cursor-default'
+                                                                                    : 'bg-zinc-900 border-zinc-700 text-zinc-400 hover:bg-zinc-800 hover:text-white'
+                                                                                    }`}
+                                                                            >
+                                                                                {chip}
+                                                                                {isClicked && <span className="material-symbols-outlined !text-[12px] opacity-70">check</span>}
+                                                                            </button>
+                                                                        )
+                                                                    })}
+                                                                    {connectionPeers.length > 0 && (
+                                                                        <div className="relative">
+                                                                            <select
+                                                                                className="appearance-none px-4 py-1.5 bg-zinc-900 border border-zinc-700 hover:bg-zinc-800 hover:text-white transition-colors text-xs text-zinc-400 rounded-full cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary pr-8"
+                                                                                onChange={(e) => {
+                                                                                    if (e.target.value) {
+                                                                                        const query = `What is the connection to ${e.target.value}?`;
+                                                                                        setClickedChips(prev => new Set(prev).add(query));
+                                                                                        onSendMessage(query);
+                                                                                        e.target.value = "";
+                                                                                    }
+                                                                                }}
+                                                                            >
+                                                                                <option value="">What is the connection to...</option>
+                                                                                {connectionPeers.map(peer => (
+                                                                                    <option key={peer} value={peer}>{peer}</option>
+                                                                                ))}
+                                                                            </select>
+                                                                            <span className="material-symbols-outlined !text-[14px] absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-zinc-400">expand_more</span>
+                                                                        </div>
+                                                                    )}
+
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </>
+                                    )}
+                                </div>
                             )}
                         </div>
                     )}
@@ -1925,10 +1918,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     if (isFullScreenMode) {
         return (
-            <div 
-              key="magazine-card"
-              className="w-full min-w-[320px] bg-transparent relative break-words h-fit overflow-y-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
-              style={{ '--scene-accent': localDominantColor } as React.CSSProperties}
+            <div
+                key="magazine-card"
+                className="w-full min-w-[320px] bg-transparent relative break-words h-fit overflow-y-visible mb-4 md:mb-6 break-inside-avoid transition-all duration-500"
+                style={{ '--scene-accent': localDominantColor } as React.CSSProperties}
             >
                 {panelContent}
             </div>
@@ -1936,12 +1929,12 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     }
 
     return (
-        <div 
-          key="side-panel"
-          ref={panelScrollRef}
-          className={`w-full min-w-[320px] bg-zinc-900 relative break-words ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'} border border-zinc-900 transition-all duration-500`}
-          style={{ overscrollBehaviorY: 'auto', '--scene-accent': localDominantColor } as React.CSSProperties}
-          onScroll={isStaticMockup ? undefined : (e) => setIsHeaderStuck(e.currentTarget.scrollTop > 10)}
+        <div
+            key="side-panel"
+            ref={panelScrollRef}
+            className={`w-full min-w-[320px] bg-zinc-900 relative break-words ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-800'} border border-zinc-900 transition-all duration-500`}
+            style={{ overscrollBehaviorY: 'auto', '--scene-accent': localDominantColor } as React.CSSProperties}
+            onScroll={isStaticMockup ? undefined : (e) => setIsHeaderStuck(e.currentTarget.scrollTop > 10)}
         >
             {panelContent}
         </div>
@@ -1951,821 +1944,821 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 // --- EDIT ZINE MODE: ADAPTIVE 3-COLUMN EDITORIAL IMAGES ---
 
 export const splitMarkdownIntoEditorialBlocks = (markdown: string): string[] => {
-  if (!markdown || typeof markdown !== 'string') return [];
-  const rawBlocks = markdown
-    .replace(/\r\n/g, '\n')
-    .trim()
-    .split(/\n{2,}/)
-    .map((block) => block.trim())
-    .filter(Boolean);
+    if (!markdown || typeof markdown !== 'string') return [];
+    const rawBlocks = markdown
+        .replace(/\r\n/g, '\n')
+        .trim()
+        .split(/\n{2,}/)
+        .map((block) => block.trim())
+        .filter(Boolean);
 
-  const startsWithListMarker = (block: string) => /^([-*•]|\d+\.)\s/m.test(block.trim());
-  const fused: string[] = [];
+    const startsWithListMarker = (block: string) => /^([-*•]|\d+\.)\s/m.test(block.trim());
+    const fused: string[] = [];
 
-  for (let i = 0; i < rawBlocks.length; i++) {
-    let current = rawBlocks[i];
-    if (
-      current.endsWith(':') &&
-      !startsWithListMarker(current) &&
-      i + 1 < rawBlocks.length &&
-      startsWithListMarker(rawBlocks[i + 1])
-    ) {
-      current = `${current}\n\n${rawBlocks[i + 1]}`;
-      i++;
-      while (i + 1 < rawBlocks.length && startsWithListMarker(rawBlocks[i + 1])) {
-        current = `${current}\n\n${rawBlocks[i + 1]}`;
-        i++;
-      }
+    for (let i = 0; i < rawBlocks.length; i++) {
+        let current = rawBlocks[i];
+        if (
+            current.endsWith(':') &&
+            !startsWithListMarker(current) &&
+            i + 1 < rawBlocks.length &&
+            startsWithListMarker(rawBlocks[i + 1])
+        ) {
+            current = `${current}\n\n${rawBlocks[i + 1]}`;
+            i++;
+            while (i + 1 < rawBlocks.length && startsWithListMarker(rawBlocks[i + 1])) {
+                current = `${current}\n\n${rawBlocks[i + 1]}`;
+                i++;
+            }
+        }
+        fused.push(current);
     }
-    fused.push(current);
-  }
-  return fused;
+    return fused;
 };
 
 const isListHeavyEditorialBlock = (block: string): boolean => {
-  const lines = block.trim().split('\n');
-  return lines.some((line) => /^([-*•]|\d+\.)\s/.test(line.trim()));
+    const lines = block.trim().split('\n');
+    return lines.some((line) => /^([-*•]|\d+\.)\s/.test(line.trim()));
 };
 
 export const partitionBlockIndicesIntoThreeColumns = (blocks: string[]): [number[], number[], number[]] => {
-  if (blocks.length === 0) return [[], [], []];
-  if (blocks.length === 1) return [[0], [], []];
-  if (blocks.length === 2) return [[0], [1], []];
-  if (blocks.length === 3) return [[0], [1], [2]];
+    if (blocks.length === 0) return [[], [], []];
+    if (blocks.length === 1) return [[0], [], []];
+    if (blocks.length === 2) return [[0], [1], []];
+    if (blocks.length === 3) return [[0], [1], [2]];
 
-  // V44 Standard 4-block structure (3 narrative paragraphs + 1 crossover/bullet block):
-  // Anchor Block 0 (Para 1) -> Col 1, Block 1 (Para 2) -> Col 2,
-  // Block 2 (Para 3) + Block 3 (Lead-in/Bullets) -> Col 3.
-  if (blocks.length === 4) {
-    return [[0], [1], [2, 3]];
-  }
-
-  const indices = blocks.map((_, idx) => idx);
-  const lengths = blocks.map((b) => b.length);
-  const prefix: number[] = [0];
-  for (let idx = 0; idx < lengths.length; idx++) {
-    prefix.push(prefix[idx] + lengths[idx]);
-  }
-  const total = prefix[lengths.length];
-
-  let bestI = 1;
-  let bestJ = 2;
-  let bestScore = Infinity;
-
-  for (let i = 1; i < blocks.length - 1; i++) {
-    const col0 = prefix[i];
-    for (let j = i + 1; j < blocks.length; j++) {
-      const col1 = prefix[j] - prefix[i];
-      const col2 = total - prefix[j];
-      const spread = Math.max(col0, col1, col2) - Math.min(col0, col1, col2);
-      // Avoid merging Para 2 + Para 3 into Col 2 when Col 3 would start directly with a bullet list
-      const listAnchorPenalty =
-        j > 2 && !isListHeavyEditorialBlock(blocks[2]) && isListHeavyEditorialBlock(blocks[j])
-          ? 2000
-          : 0;
-      const score = spread + listAnchorPenalty;
-      if (score < bestScore) {
-        bestScore = score;
-        bestI = i;
-        bestJ = j;
-      }
+    // V44 Standard 4-block structure (3 narrative paragraphs + 1 crossover/bullet block):
+    // Anchor Block 0 (Para 1) -> Col 1, Block 1 (Para 2) -> Col 2,
+    // Block 2 (Para 3) + Block 3 (Lead-in/Bullets) -> Col 3.
+    if (blocks.length === 4) {
+        return [[0], [1], [2, 3]];
     }
-  }
 
-  return [
-    indices.slice(0, bestI),
-    indices.slice(bestI, bestJ),
-    indices.slice(bestJ)
-  ];
+    const indices = blocks.map((_, idx) => idx);
+    const lengths = blocks.map((b) => b.length);
+    const prefix: number[] = [0];
+    for (let idx = 0; idx < lengths.length; idx++) {
+        prefix.push(prefix[idx] + lengths[idx]);
+    }
+    const total = prefix[lengths.length];
+
+    let bestI = 1;
+    let bestJ = 2;
+    let bestScore = Infinity;
+
+    for (let i = 1; i < blocks.length - 1; i++) {
+        const col0 = prefix[i];
+        for (let j = i + 1; j < blocks.length; j++) {
+            const col1 = prefix[j] - prefix[i];
+            const col2 = total - prefix[j];
+            const spread = Math.max(col0, col1, col2) - Math.min(col0, col1, col2);
+            // Avoid merging Para 2 + Para 3 into Col 2 when Col 3 would start directly with a bullet list
+            const listAnchorPenalty =
+                j > 2 && !isListHeavyEditorialBlock(blocks[2]) && isListHeavyEditorialBlock(blocks[j])
+                    ? 2000
+                    : 0;
+            const score = spread + listAnchorPenalty;
+            if (score < bestScore) {
+                bestScore = score;
+                bestI = i;
+                bestJ = j;
+            }
+        }
+    }
+
+    return [
+        indices.slice(0, bestI),
+        indices.slice(bestI, bestJ),
+        indices.slice(bestJ)
+    ];
 };
 
 export const partitionBlocksIntoThreeColumns = (blocks: string[]): [string[], string[], string[]] => {
-  const [c0, c1, c2] = partitionBlockIndicesIntoThreeColumns(blocks);
-  return [
-    c0.map((idx) => blocks[idx]),
-    c1.map((idx) => blocks[idx]),
-    c2.map((idx) => blocks[idx]),
-  ];
+    const [c0, c1, c2] = partitionBlockIndicesIntoThreeColumns(blocks);
+    return [
+        c0.map((idx) => blocks[idx]),
+        c1.map((idx) => blocks[idx]),
+        c2.map((idx) => blocks[idx]),
+    ];
 };
 
 type ZineViewportTier = 'mobile' | 'tablet' | 'desktop';
 
 const resolveZineViewportTier = (isSmallScreen: boolean): ZineViewportTier => {
-  if (isSmallScreen) return 'mobile';
-  if (typeof window !== 'undefined' && typeof window.innerWidth === 'number') {
-    if (window.innerWidth < 768) return 'mobile';
-    if (window.innerWidth < 1024) return 'tablet';
-  }
-  return 'desktop';
+    if (isSmallScreen) return 'mobile';
+    if (typeof window !== 'undefined' && typeof window.innerWidth === 'number') {
+        if (window.innerWidth < 768) return 'mobile';
+        if (window.innerWidth < 1024) return 'tablet';
+    }
+    return 'desktop';
 };
 
 const useZineViewportTier = (isSmallScreen: boolean): ZineViewportTier => {
-  const [tier, setTier] = useState<ZineViewportTier>(() => resolveZineViewportTier(isSmallScreen));
+    const [tier, setTier] = useState<ZineViewportTier>(() => resolveZineViewportTier(isSmallScreen));
 
-  useEffect(() => {
-    const updateTier = () => setTier(resolveZineViewportTier(isSmallScreen));
-    updateTier();
-    if (typeof window === 'undefined') return;
-    window.addEventListener('resize', updateTier);
-    return () => window.removeEventListener('resize', updateTier);
-  }, [isSmallScreen]);
+    useEffect(() => {
+        const updateTier = () => setTier(resolveZineViewportTier(isSmallScreen));
+        updateTier();
+        if (typeof window === 'undefined') return;
+        window.addEventListener('resize', updateTier);
+        return () => window.removeEventListener('resize', updateTier);
+    }, [isSmallScreen]);
 
-  return tier;
+    return tier;
 };
 
 interface ZineIntroNoteProps {
-  sectionKey: string;
-  intro?: string;
-  isEditingZine: boolean;
-  onSaveIntro?: (intro: string | null) => void;
+    sectionKey: string;
+    intro?: string;
+    isEditingZine: boolean;
+    onSaveIntro?: (intro: string | null) => void;
 }
 
 const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
-  sectionKey,
-  intro,
-  isEditingZine,
-  onSaveIntro,
+    sectionKey,
+    intro,
+    isEditingZine,
+    onSaveIntro,
 }) => {
-  const cleanIntro = normalizeZineIntro(intro) || '';
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [draftIntro, setDraftIntro] = useState(cleanIntro);
+    const cleanIntro = normalizeZineIntro(intro) || '';
+    const [isEditorOpen, setIsEditorOpen] = useState(false);
+    const [draftIntro, setDraftIntro] = useState(cleanIntro);
 
-  useEffect(() => {
-    if (!isEditingZine) {
-      setIsEditorOpen(false);
-    }
-  }, [isEditingZine]);
+    useEffect(() => {
+        if (!isEditingZine) {
+            setIsEditorOpen(false);
+        }
+    }, [isEditingZine]);
 
-  useEffect(() => {
-    setDraftIntro(cleanIntro);
-  }, [cleanIntro]);
+    useEffect(() => {
+        setDraftIntro(cleanIntro);
+    }, [cleanIntro]);
 
-  if (!isEditingZine || !onSaveIntro) {
-    if (!cleanIntro) return null;
-    return (
-      <blockquote
-        data-testid={`zine-intro-note-${sectionKey}`}
-        className="mb-8 lg:mb-10 pl-4 md:pl-5 border-l-2 border-primary/70 text-base md:text-lg text-zinc-200 italic font-sans leading-relaxed max-w-3xl whitespace-pre-line"
-      >
-        {cleanIntro}
-      </blockquote>
-    );
-  }
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const normalized = normalizeZineIntro(draftIntro) || null;
-    setIsEditorOpen(false);
-    onSaveIntro(normalized);
-  };
-
-  if (isEditorOpen) {
-    return (
-      <form
-        onSubmit={handleSubmit}
-        data-testid={`zine-intro-form-${sectionKey}`}
-        className="mb-8 rounded-xl border border-zinc-700/80 bg-zinc-900/90 p-4 max-w-2xl space-y-3"
-      >
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
-            Curator's Note / Dedication
-          </span>
-          <span className="text-[10px] font-mono text-zinc-500">
-            {draftIntro.length}/600
-          </span>
-        </div>
-        <textarea
-          autoFocus
-          rows={2}
-          maxLength={600}
-          data-testid={`zine-intro-input-${sectionKey}`}
-          placeholder="Optional dedication or curator's intro note below the title..."
-          value={draftIntro}
-          onChange={(e) => setDraftIntro(e.target.value)}
-          className="w-full rounded-xl border border-zinc-700 bg-zinc-950 text-white text-sm p-3 placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none resize-y"
-        />
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            data-testid={`zine-intro-cancel-${sectionKey}`}
-            onClick={() => {
-              setIsEditorOpen(false);
-              setDraftIntro(cleanIntro);
-            }}
-          >
-            Cancel
-          </Button>
-          {cleanIntro && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              data-testid={`zine-intro-remove-${sectionKey}`}
-              onClick={() => {
-                setIsEditorOpen(false);
-                setDraftIntro('');
-                onSaveIntro(null);
-              }}
-              className="!text-red-300 hover:!border-red-500/60"
+    if (!isEditingZine || !onSaveIntro) {
+        if (!cleanIntro) return null;
+        return (
+            <blockquote
+                data-testid={`zine-intro-note-${sectionKey}`}
+                className="mb-8 lg:mb-10 pl-4 md:pl-5 border-l-2 border-primary/70 text-base md:text-lg text-zinc-200 italic font-sans leading-relaxed max-w-3xl whitespace-pre-line"
             >
-              Remove
-            </Button>
-          )}
-          <Button
-            type="submit"
-            variant="primary"
-            size="sm"
-            data-testid={`zine-intro-save-${sectionKey}`}
-          >
-            Save Note
-          </Button>
-        </div>
-      </form>
-    );
-  }
+                {cleanIntro}
+            </blockquote>
+        );
+    }
 
-  if (cleanIntro) {
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const normalized = normalizeZineIntro(draftIntro) || null;
+        setIsEditorOpen(false);
+        onSaveIntro(normalized);
+    };
+
+    if (isEditorOpen) {
+        return (
+            <form
+                onSubmit={handleSubmit}
+                data-testid={`zine-intro-form-${sectionKey}`}
+                className="mb-8 rounded-xl border border-zinc-700/80 bg-zinc-900/90 p-4 max-w-2xl space-y-3"
+            >
+                <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
+                        Curator's Note / Dedication
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-500">
+                        {draftIntro.length}/600
+                    </span>
+                </div>
+                <textarea
+                    autoFocus
+                    rows={2}
+                    maxLength={600}
+                    data-testid={`zine-intro-input-${sectionKey}`}
+                    placeholder="Optional dedication or curator's intro note below the title..."
+                    value={draftIntro}
+                    onChange={(e) => setDraftIntro(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 text-white text-sm p-3 placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none resize-y"
+                />
+                <div className="flex items-center justify-end gap-2">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        data-testid={`zine-intro-cancel-${sectionKey}`}
+                        onClick={() => {
+                            setIsEditorOpen(false);
+                            setDraftIntro(cleanIntro);
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    {cleanIntro && (
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid={`zine-intro-remove-${sectionKey}`}
+                            onClick={() => {
+                                setIsEditorOpen(false);
+                                setDraftIntro('');
+                                onSaveIntro(null);
+                            }}
+                            className="!text-red-300 hover:!border-red-500/60"
+                        >
+                            Remove
+                        </Button>
+                    )}
+                    <Button
+                        type="submit"
+                        variant="primary"
+                        size="sm"
+                        data-testid={`zine-intro-save-${sectionKey}`}
+                    >
+                        Save Note
+                    </Button>
+                </div>
+            </form>
+        );
+    }
+
+    if (cleanIntro) {
+        return (
+            <div className="mb-8 lg:mb-10 max-w-3xl space-y-2.5">
+                <blockquote
+                    data-testid={`zine-intro-note-${sectionKey}`}
+                    className="pl-4 md:pl-5 border-l-2 border-primary/70 text-base md:text-lg text-zinc-200 italic font-sans leading-relaxed whitespace-pre-line"
+                >
+                    {cleanIntro}
+                </blockquote>
+                <div className="flex items-center gap-2 pl-4 md:pl-5">
+                    <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        data-testid={`zine-intro-edit-${sectionKey}`}
+                        onClick={() => {
+                            setDraftIntro(cleanIntro);
+                            setIsEditorOpen(true);
+                        }}
+                    >
+                        Edit Note
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        data-testid={`zine-intro-remove-${sectionKey}`}
+                        onClick={() => onSaveIntro(null)}
+                        className="!text-red-300 hover:!text-red-200"
+                    >
+                        Remove Note
+                    </Button>
+                </div>
+            </div>
+        );
+    }
+
     return (
-      <div className="mb-8 lg:mb-10 max-w-3xl space-y-2.5">
-        <blockquote
-          data-testid={`zine-intro-note-${sectionKey}`}
-          className="pl-4 md:pl-5 border-l-2 border-primary/70 text-base md:text-lg text-zinc-200 italic font-sans leading-relaxed whitespace-pre-line"
-        >
-          {cleanIntro}
-        </blockquote>
-        <div className="flex items-center gap-2 pl-4 md:pl-5">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            data-testid={`zine-intro-edit-${sectionKey}`}
-            onClick={() => {
-              setDraftIntro(cleanIntro);
-              setIsEditorOpen(true);
-            }}
-          >
-            Edit Note
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            data-testid={`zine-intro-remove-${sectionKey}`}
-            onClick={() => onSaveIntro(null)}
-            className="!text-red-300 hover:!text-red-200"
-          >
-            Remove Note
-          </Button>
+        <div className="mb-8">
+            <button
+                type="button"
+                data-testid={`zine-intro-add-${sectionKey}`}
+                onClick={() => {
+                    setDraftIntro('');
+                    setIsEditorOpen(true);
+                }}
+                className="rounded-xl border border-dashed border-zinc-700/80 bg-zinc-900/40 hover:border-primary/60 hover:bg-zinc-900/70 transition-colors px-3.5 py-2 text-xs font-medium text-zinc-400 hover:text-white inline-flex items-center gap-1.5 cursor-pointer"
+            >
+                <span className="material-symbols-outlined !text-[16px]">edit_note</span>
+                <span>+ Add Intro / Dedication Note</span>
+            </button>
         </div>
-      </div>
     );
-  }
-
-  return (
-    <div className="mb-8">
-      <button
-        type="button"
-        data-testid={`zine-intro-add-${sectionKey}`}
-        onClick={() => {
-          setDraftIntro('');
-          setIsEditorOpen(true);
-        }}
-        className="rounded-xl border border-dashed border-zinc-700/80 bg-zinc-900/40 hover:border-primary/60 hover:bg-zinc-900/70 transition-colors px-3.5 py-2 text-xs font-medium text-zinc-400 hover:text-white inline-flex items-center gap-1.5 cursor-pointer"
-      >
-        <span className="material-symbols-outlined !text-[16px]">edit_note</span>
-        <span>+ Add Intro / Dedication Note</span>
-      </button>
-    </div>
-  );
 };
 
 interface ZineColumnImageSlotProps {
-  sectionKey: string;
-  slotIndex: number;
-  totalBlocks: number;
-  slot: ZineImageSlot | null;
-  isEditingZine: boolean;
-  hasFailed: boolean;
-  onMarkFailed: (url: string) => void;
-  onSaveSlot: (entry: ZineEditorialImageEntry) => void;
-  onSwapSlots?: (indexA: number, indexB: number) => void;
+    sectionKey: string;
+    slotIndex: number;
+    totalBlocks: number;
+    slot: ZineImageSlot | null;
+    isEditingZine: boolean;
+    hasFailed: boolean;
+    onMarkFailed: (url: string) => void;
+    onSaveSlot: (entry: ZineEditorialImageEntry) => void;
+    onSwapSlots?: (indexA: number, indexB: number) => void;
 }
 
 const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
-  sectionKey,
-  slotIndex,
-  totalBlocks,
-  slot,
-  isEditingZine,
-  hasFailed,
-  onMarkFailed,
-  onSaveSlot,
-  onSwapSlots,
+    sectionKey,
+    slotIndex,
+    totalBlocks,
+    slot,
+    isEditingZine,
+    hasFailed,
+    onMarkFailed,
+    onSaveSlot,
+    onSwapSlots,
 }) => {
-  const url = slot?.url || '';
-  const caption = slot?.caption || '';
+    const url = slot?.url || '';
+    const caption = slot?.caption || '';
 
-  const [isInputOpen, setIsInputOpen] = useState(false);
-  const [draftUrl, setDraftUrl] = useState(url);
-  const [draftCaption, setDraftCaption] = useState(caption);
-  const [validationError, setValidationError] = useState<string | null>(null);
+    const [isInputOpen, setIsInputOpen] = useState(false);
+    const [draftUrl, setDraftUrl] = useState(url);
+    const [draftCaption, setDraftCaption] = useState(caption);
+    const [validationError, setValidationError] = useState<string | null>(null);
 
-  useEffect(() => {
+    useEffect(() => {
+        if (!isEditingZine) {
+            setIsInputOpen(false);
+            setValidationError(null);
+        }
+    }, [isEditingZine]);
+
+    useEffect(() => {
+        setDraftUrl(url);
+        setDraftCaption(caption);
+    }, [url, caption]);
+
     if (!isEditingZine) {
-      setIsInputOpen(false);
-      setValidationError(null);
+        if (!slot || hasFailed) return null;
+        return (
+            <figure
+                data-testid={`zine-image-figure-${sectionKey}-${slotIndex}`}
+                className="mb-6 rounded-xl border border-zinc-800/80 overflow-hidden bg-zinc-900/50"
+            >
+                <div className="aspect-[16/10] w-full overflow-hidden bg-zinc-950/60">
+                    <img
+                        src={slot.url}
+                        alt={slot.caption || `Block ${slotIndex + 1} editorial photo`}
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                        onError={() => onMarkFailed(slot.url)}
+                        className="w-full h-full object-cover block"
+                    />
+                </div>
+                {slot.caption && (
+                    <figcaption
+                        data-testid={`zine-image-caption-${sectionKey}-${slotIndex}`}
+                        className="px-3.5 py-2 bg-zinc-950/75 border-t border-zinc-800/80 text-xs text-zinc-300 font-medium tracking-tight leading-snug"
+                    >
+                        {slot.caption}
+                    </figcaption>
+                )}
+            </figure>
+        );
     }
-  }, [isEditingZine]);
 
-  useEffect(() => {
-    setDraftUrl(url);
-    setDraftCaption(caption);
-  }, [url, caption]);
+    const handleOpenEditor = () => {
+        setDraftUrl(url);
+        setDraftCaption(caption);
+        setValidationError(null);
+        setIsInputOpen(true);
+    };
 
-  if (!isEditingZine) {
-    if (!slot || hasFailed) return null;
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const trimmed = draftUrl.trim();
+        if (!trimmed) {
+            setValidationError('Enter an https:// image URL or click Remove.');
+            return;
+        }
+        const validated = validateZineImageUrl(trimmed);
+        if (!validated) {
+            setValidationError('URL must start with https:// (http:// and data: URLs are not allowed).');
+            return;
+        }
+        const cleanCaption = draftCaption.replace(/\s+/g, ' ').trim().slice(0, 140);
+        setValidationError(null);
+        setIsInputOpen(false);
+        onSaveSlot(
+            serializeZineImageEntry({
+                url: validated,
+                ...(cleanCaption ? { caption: cleanCaption } : {}),
+            })
+        );
+    };
+
+    if (isInputOpen) {
+        return (
+            <form
+                onSubmit={handleSubmit}
+                data-testid={`zine-slot-form-${sectionKey}-${slotIndex}`}
+                className="mb-6 rounded-xl border border-zinc-700/80 bg-zinc-900/90 p-3.5 space-y-2.5"
+            >
+                <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
+                        Block {slotIndex + 1} Photo
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-500">https:// only</span>
+                </div>
+                <Input
+                    variant="md"
+                    type="url"
+                    autoFocus
+                    data-testid={`zine-slot-input-${sectionKey}-${slotIndex}`}
+                    placeholder="https://example.com/press-photo.jpg"
+                    value={draftUrl}
+                    onChange={(e) => {
+                        setDraftUrl(e.target.value);
+                        if (validationError) setValidationError(null);
+                    }}
+                />
+                <Input
+                    variant="md"
+                    type="text"
+                    maxLength={140}
+                    data-testid={`zine-slot-caption-input-${sectionKey}-${slotIndex}`}
+                    placeholder="Optional caption (e.g. American Football)"
+                    value={draftCaption}
+                    onChange={(e) => setDraftCaption(e.target.value)}
+                />
+                {validationError && (
+                    <p
+                        data-testid={`zine-slot-error-${sectionKey}-${slotIndex}`}
+                        className="text-xs text-red-400 leading-snug"
+                    >
+                        {validationError}
+                    </p>
+                )}
+                <div className="flex items-center justify-end gap-2 pt-0.5">
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        data-testid={`zine-slot-cancel-${sectionKey}-${slotIndex}`}
+                        onClick={() => {
+                            setIsInputOpen(false);
+                            setValidationError(null);
+                            setDraftUrl(url);
+                            setDraftCaption(caption);
+                        }}
+                    >
+                        Cancel
+                    </Button>
+                    {slot && (
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid={`zine-slot-remove-${sectionKey}-${slotIndex}`}
+                            onClick={() => {
+                                setIsInputOpen(false);
+                                setValidationError(null);
+                                onSaveSlot(null);
+                            }}
+                            className="!text-red-300 hover:!border-red-500/60"
+                        >
+                            Remove
+                        </Button>
+                    )}
+                    <Button
+                        type="submit"
+                        variant="primary"
+                        size="sm"
+                        data-testid={`zine-slot-save-${sectionKey}-${slotIndex}`}
+                    >
+                        Save
+                    </Button>
+                </div>
+            </form>
+        );
+    }
+
+    const renderSlotReorderControls = () => {
+        if (!slot) return null;
+        const prevIdx = slotIndex > 0 ? slotIndex - 1 : null;
+        const nextIdx = slotIndex < totalBlocks - 1 ? slotIndex + 1 : null;
+        if (!onSwapSlots || (prevIdx === null && nextIdx === null)) return null;
+        return (
+            <div className="flex items-center gap-1">
+                <button
+                    type="button"
+                    disabled={prevIdx === null}
+                    data-testid={`zine-slot-swap-left-${sectionKey}-${slotIndex}`}
+                    onClick={() => prevIdx !== null && onSwapSlots(slotIndex, prevIdx)}
+                    title="Move image to previous block"
+                    className="w-7 h-7 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 hover:text-white hover:border-zinc-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-xs font-mono transition-colors cursor-pointer"
+                >
+                    ←
+                </button>
+                <button
+                    type="button"
+                    disabled={nextIdx === null}
+                    data-testid={`zine-slot-swap-right-${sectionKey}-${slotIndex}`}
+                    onClick={() => nextIdx !== null && onSwapSlots(slotIndex, nextIdx)}
+                    title="Move image to next block"
+                    className="w-7 h-7 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 hover:text-white hover:border-zinc-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-xs font-mono transition-colors cursor-pointer"
+                >
+                    →
+                </button>
+            </div>
+        );
+    };
+
+    if (slot && hasFailed) {
+        return (
+            <div
+                data-testid={`zine-slot-broken-${sectionKey}-${slotIndex}`}
+                className="mb-6 aspect-[16/10] rounded-xl border border-red-500/40 bg-zinc-900/80 p-4 flex flex-col justify-between"
+            >
+                <div className="space-y-1">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-red-400">
+                        <span className="material-symbols-outlined !text-[16px]">broken_image</span>
+                        <span>Image failed to load</span>
+                    </div>
+                    <p className="text-[11px] font-mono text-zinc-400 truncate" title={slot.url}>
+                        404 or hotlink blocked: {slot.url}
+                    </p>
+                </div>
+                <div className="flex items-center justify-between gap-2 flex-wrap">
+                    {renderSlotReorderControls()}
+                    <div className="flex items-center gap-2">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid={`zine-slot-change-${sectionKey}-${slotIndex}`}
+                            onClick={handleOpenEditor}
+                        >
+                            Change URL
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            data-testid={`zine-slot-remove-${sectionKey}-${slotIndex}`}
+                            onClick={() => onSaveSlot(null)}
+                            className="!text-red-300 hover:!text-red-200"
+                        >
+                            Remove
+                        </Button>
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    if (slot) {
+        return (
+            <figure
+                data-testid={`zine-image-figure-${sectionKey}-${slotIndex}`}
+                className="mb-6 rounded-xl border border-zinc-800/80 overflow-hidden bg-zinc-900/50"
+            >
+                <div className="aspect-[16/10] w-full overflow-hidden bg-zinc-950/60">
+                    <img
+                        src={slot.url}
+                        alt={slot.caption || `Block ${slotIndex + 1} editorial photo`}
+                        referrerPolicy="no-referrer"
+                        loading="lazy"
+                        onError={() => onMarkFailed(slot.url)}
+                        className="w-full h-full object-cover block"
+                    />
+                </div>
+                {slot.caption && (
+                    <figcaption
+                        data-testid={`zine-image-caption-${sectionKey}-${slotIndex}`}
+                        className="px-3 py-1.5 bg-zinc-950/70 border-t border-zinc-800/60 text-xs text-zinc-300 font-medium truncate"
+                    >
+                        {slot.caption}
+                    </figcaption>
+                )}
+                <div className="px-3 py-2 bg-zinc-950/85 border-t border-zinc-800/80 flex items-center justify-between gap-2 flex-wrap">
+                    <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
+                            Block {slotIndex + 1}
+                        </span>
+                        {renderSlotReorderControls()}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid={`zine-slot-change-${sectionKey}-${slotIndex}`}
+                            onClick={handleOpenEditor}
+                        >
+                            Edit
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            data-testid={`zine-slot-remove-${sectionKey}-${slotIndex}`}
+                            onClick={() => onSaveSlot(null)}
+                            className="!text-red-300 hover:!text-red-200"
+                        >
+                            Remove
+                        </Button>
+                    </div>
+                </div>
+            </figure>
+        );
+    }
+
     return (
-      <figure
-        data-testid={`zine-image-figure-${sectionKey}-${slotIndex}`}
-        className="mb-6 rounded-xl border border-zinc-800/80 overflow-hidden bg-zinc-900/50"
-      >
-        <div className="aspect-[16/10] w-full overflow-hidden bg-zinc-950/60">
-          <img
-            src={slot.url}
-            alt={slot.caption || `Block ${slotIndex + 1} editorial photo`}
-            referrerPolicy="no-referrer"
-            loading="lazy"
-            onError={() => onMarkFailed(slot.url)}
-            className="w-full h-full object-cover block"
-          />
-        </div>
-        {slot.caption && (
-          <figcaption
-            data-testid={`zine-image-caption-${sectionKey}-${slotIndex}`}
-            className="px-3.5 py-2 bg-zinc-950/75 border-t border-zinc-800/80 text-xs text-zinc-300 font-medium tracking-tight leading-snug"
-          >
-            {slot.caption}
-          </figcaption>
-        )}
-      </figure>
-    );
-  }
-
-  const handleOpenEditor = () => {
-    setDraftUrl(url);
-    setDraftCaption(caption);
-    setValidationError(null);
-    setIsInputOpen(true);
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = draftUrl.trim();
-    if (!trimmed) {
-      setValidationError('Enter an https:// image URL or click Remove.');
-      return;
-    }
-    const validated = validateZineImageUrl(trimmed);
-    if (!validated) {
-      setValidationError('URL must start with https:// (http:// and data: URLs are not allowed).');
-      return;
-    }
-    const cleanCaption = draftCaption.replace(/\s+/g, ' ').trim().slice(0, 140);
-    setValidationError(null);
-    setIsInputOpen(false);
-    onSaveSlot(
-      serializeZineImageEntry({
-        url: validated,
-        ...(cleanCaption ? { caption: cleanCaption } : {}),
-      })
-    );
-  };
-
-  if (isInputOpen) {
-    return (
-      <form
-        onSubmit={handleSubmit}
-        data-testid={`zine-slot-form-${sectionKey}-${slotIndex}`}
-        className="mb-6 rounded-xl border border-zinc-700/80 bg-zinc-900/90 p-3.5 space-y-2.5"
-      >
-        <div className="flex items-center justify-between">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
-            Block {slotIndex + 1} Photo
-          </span>
-          <span className="text-[10px] font-mono text-zinc-500">https:// only</span>
-        </div>
-        <Input
-          variant="md"
-          type="url"
-          autoFocus
-          data-testid={`zine-slot-input-${sectionKey}-${slotIndex}`}
-          placeholder="https://example.com/press-photo.jpg"
-          value={draftUrl}
-          onChange={(e) => {
-            setDraftUrl(e.target.value);
-            if (validationError) setValidationError(null);
-          }}
-        />
-        <Input
-          variant="md"
-          type="text"
-          maxLength={140}
-          data-testid={`zine-slot-caption-input-${sectionKey}-${slotIndex}`}
-          placeholder="Optional caption (e.g. American Football)"
-          value={draftCaption}
-          onChange={(e) => setDraftCaption(e.target.value)}
-        />
-        {validationError && (
-          <p
-            data-testid={`zine-slot-error-${sectionKey}-${slotIndex}`}
-            className="text-xs text-red-400 leading-snug"
-          >
-            {validationError}
-          </p>
-        )}
-        <div className="flex items-center justify-end gap-2 pt-0.5">
-          <Button
+        <button
             type="button"
-            variant="ghost"
-            size="sm"
-            data-testid={`zine-slot-cancel-${sectionKey}-${slotIndex}`}
-            onClick={() => {
-              setIsInputOpen(false);
-              setValidationError(null);
-              setDraftUrl(url);
-              setDraftCaption(caption);
-            }}
-          >
-            Cancel
-          </Button>
-          {slot && (
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              data-testid={`zine-slot-remove-${sectionKey}-${slotIndex}`}
-              onClick={() => {
-                setIsInputOpen(false);
-                setValidationError(null);
-                onSaveSlot(null);
-              }}
-              className="!text-red-300 hover:!border-red-500/60"
-            >
-              Remove
-            </Button>
-          )}
-          <Button
-            type="submit"
-            variant="primary"
-            size="sm"
-            data-testid={`zine-slot-save-${sectionKey}-${slotIndex}`}
-          >
-            Save
-          </Button>
-        </div>
-      </form>
-    );
-  }
-
-  const renderSlotReorderControls = () => {
-    if (!slot) return null;
-    const prevIdx = slotIndex > 0 ? slotIndex - 1 : null;
-    const nextIdx = slotIndex < totalBlocks - 1 ? slotIndex + 1 : null;
-    if (!onSwapSlots || (prevIdx === null && nextIdx === null)) return null;
-    return (
-      <div className="flex items-center gap-1">
-        <button
-          type="button"
-          disabled={prevIdx === null}
-          data-testid={`zine-slot-swap-left-${sectionKey}-${slotIndex}`}
-          onClick={() => prevIdx !== null && onSwapSlots(slotIndex, prevIdx)}
-          title="Move image to previous block"
-          className="w-7 h-7 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 hover:text-white hover:border-zinc-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-xs font-mono transition-colors cursor-pointer"
+            data-testid={`zine-slot-add-${sectionKey}-${slotIndex}`}
+            onClick={handleOpenEditor}
+            className="mb-6 aspect-[16/10] w-full rounded-xl border border-dashed border-zinc-700/80 bg-zinc-900/30 hover:border-primary/60 hover:bg-zinc-900/60 transition-colors flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white cursor-pointer"
         >
-          ←
-        </button>
-        <button
-          type="button"
-          disabled={nextIdx === null}
-          data-testid={`zine-slot-swap-right-${sectionKey}-${slotIndex}`}
-          onClick={() => nextIdx !== null && onSwapSlots(slotIndex, nextIdx)}
-          title="Move image to next block"
-          className="w-7 h-7 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 hover:text-white hover:border-zinc-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-xs font-mono transition-colors cursor-pointer"
-        >
-          →
-        </button>
-      </div>
-    );
-  };
-
-  if (slot && hasFailed) {
-    return (
-      <div
-        data-testid={`zine-slot-broken-${sectionKey}-${slotIndex}`}
-        className="mb-6 aspect-[16/10] rounded-xl border border-red-500/40 bg-zinc-900/80 p-4 flex flex-col justify-between"
-      >
-        <div className="space-y-1">
-          <div className="flex items-center gap-1.5 text-xs font-medium text-red-400">
-            <span className="material-symbols-outlined !text-[16px]">broken_image</span>
-            <span>Image failed to load</span>
-          </div>
-          <p className="text-[11px] font-mono text-zinc-400 truncate" title={slot.url}>
-            404 or hotlink blocked: {slot.url}
-          </p>
-        </div>
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          {renderSlotReorderControls()}
-          <div className="flex items-center gap-2">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              data-testid={`zine-slot-change-${sectionKey}-${slotIndex}`}
-              onClick={handleOpenEditor}
-            >
-              Change URL
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              data-testid={`zine-slot-remove-${sectionKey}-${slotIndex}`}
-              onClick={() => onSaveSlot(null)}
-              className="!text-red-300 hover:!text-red-200"
-            >
-              Remove
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (slot) {
-    return (
-      <figure
-        data-testid={`zine-image-figure-${sectionKey}-${slotIndex}`}
-        className="mb-6 rounded-xl border border-zinc-800/80 overflow-hidden bg-zinc-900/50"
-      >
-        <div className="aspect-[16/10] w-full overflow-hidden bg-zinc-950/60">
-          <img
-            src={slot.url}
-            alt={slot.caption || `Block ${slotIndex + 1} editorial photo`}
-            referrerPolicy="no-referrer"
-            loading="lazy"
-            onError={() => onMarkFailed(slot.url)}
-            className="w-full h-full object-cover block"
-          />
-        </div>
-        {slot.caption && (
-          <figcaption
-            data-testid={`zine-image-caption-${sectionKey}-${slotIndex}`}
-            className="px-3 py-1.5 bg-zinc-950/70 border-t border-zinc-800/60 text-xs text-zinc-300 font-medium truncate"
-          >
-            {slot.caption}
-          </figcaption>
-        )}
-        <div className="px-3 py-2 bg-zinc-950/85 border-t border-zinc-800/80 flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-2">
-            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
-              Block {slotIndex + 1}
+            <span className="material-symbols-outlined !text-[22px] text-zinc-300">add_photo_alternate</span>
+            <span className="text-xs font-medium">+ Add Image URL</span>
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                Block {slotIndex + 1} • 16:10
             </span>
-            {renderSlotReorderControls()}
-          </div>
-          <div className="flex items-center gap-1.5">
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              data-testid={`zine-slot-change-${sectionKey}-${slotIndex}`}
-              onClick={handleOpenEditor}
-            >
-              Edit
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              data-testid={`zine-slot-remove-${sectionKey}-${slotIndex}`}
-              onClick={() => onSaveSlot(null)}
-              className="!text-red-300 hover:!text-red-200"
-            >
-              Remove
-            </Button>
-          </div>
-        </div>
-      </figure>
+        </button>
     );
-  }
-
-  return (
-    <button
-      type="button"
-      data-testid={`zine-slot-add-${sectionKey}-${slotIndex}`}
-      onClick={handleOpenEditor}
-      className="mb-6 aspect-[16/10] w-full rounded-xl border border-dashed border-zinc-700/80 bg-zinc-900/30 hover:border-primary/60 hover:bg-zinc-900/60 transition-colors flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white cursor-pointer"
-    >
-      <span className="material-symbols-outlined !text-[22px] text-zinc-300">add_photo_alternate</span>
-      <span className="text-xs font-medium">+ Add Image URL</span>
-      <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-        Block {slotIndex + 1} • 16:10
-      </span>
-    </button>
-  );
 };
 
 interface ZineEditorialColumnsProps {
-  sectionKey: string;
-  markdown: string;
-  images?: ZineEditorialImageEntry[];
-  viewportTier: ZineViewportTier;
-  isEditingZine: boolean;
-  failedUrls: Set<string>;
-  onMarkFailed: (url: string) => void;
-  onSaveSlot: (slotIndex: number, entry: ZineEditorialImageEntry) => void;
-  onSwapSlots?: (indexA: number, indexB: number) => void;
-  renderMarkdown: (content: string) => React.ReactNode;
+    sectionKey: string;
+    markdown: string;
+    images?: ZineEditorialImageEntry[];
+    viewportTier: ZineViewportTier;
+    isEditingZine: boolean;
+    failedUrls: Set<string>;
+    onMarkFailed: (url: string) => void;
+    onSaveSlot: (slotIndex: number, entry: ZineEditorialImageEntry) => void;
+    onSwapSlots?: (indexA: number, indexB: number) => void;
+    renderMarkdown: (content: string) => React.ReactNode;
 }
 
 const ZineEditorialColumns: React.FC<ZineEditorialColumnsProps> = ({
-  sectionKey,
-  markdown,
-  images,
-  viewportTier,
-  isEditingZine,
-  failedUrls,
-  onMarkFailed,
-  onSaveSlot,
-  onSwapSlots,
-  renderMarkdown,
+    sectionKey,
+    markdown,
+    images,
+    viewportTier,
+    isEditingZine,
+    failedUrls,
+    onMarkFailed,
+    onSaveSlot,
+    onSwapSlots,
+    renderMarkdown,
 }) => {
-  const blocks = splitMarkdownIntoEditorialBlocks(markdown);
-  const blockCount = Math.min(blocks.length, MAX_ZINE_IMAGE_SLOTS);
-  const normalizedImages = normalizeZineImages(images);
-  const resolvedSlots: (ZineImageSlot | null)[] = Array.from(
-    { length: blockCount },
-    (_, idx) => resolveZineImageSlot(normalizedImages?.[idx])
-  );
-  const hasAnyValidImages = resolvedSlots.some((slot) => slot !== null);
-
-  if (!isEditingZine && !hasAnyValidImages) {
-    return (
-      <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
-        {renderMarkdown(markdown)}
-      </div>
+    const blocks = splitMarkdownIntoEditorialBlocks(markdown);
+    const blockCount = Math.min(blocks.length, MAX_ZINE_IMAGE_SLOTS);
+    const normalizedImages = normalizeZineImages(images);
+    const resolvedSlots: (ZineImageSlot | null)[] = Array.from(
+        { length: blockCount },
+        (_, idx) => resolveZineImageSlot(normalizedImages?.[idx])
     );
-  }
+    const hasAnyValidImages = resolvedSlots.some((slot) => slot !== null);
 
-  const renderBlockUnit = (blockIdx: number) => {
-    const slot = resolvedSlots[blockIdx] ?? null;
-    const blockMarkdown = blocks[blockIdx] || '';
-    const canRenderSlot = blockIdx < MAX_ZINE_IMAGE_SLOTS;
+    if (!isEditingZine && !hasAnyValidImages) {
+        return (
+            <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">
+                {renderMarkdown(markdown)}
+            </div>
+        );
+    }
+
+    const renderBlockUnit = (blockIdx: number) => {
+        const slot = resolvedSlots[blockIdx] ?? null;
+        const blockMarkdown = blocks[blockIdx] || '';
+        const canRenderSlot = blockIdx < MAX_ZINE_IMAGE_SLOTS;
+        return (
+            <div
+                key={`${sectionKey}-block-${blockIdx}`}
+                data-testid={`zine-editorial-block-${sectionKey}-${blockIdx}`}
+                className="min-w-0 flex flex-col"
+            >
+                {canRenderSlot && (
+                    <ZineColumnImageSlot
+                        sectionKey={sectionKey}
+                        slotIndex={blockIdx}
+                        totalBlocks={blockCount}
+                        slot={slot}
+                        isEditingZine={isEditingZine}
+                        hasFailed={Boolean(slot && failedUrls.has(slot.url))}
+                        onMarkFailed={onMarkFailed}
+                        onSaveSlot={(entry) => onSaveSlot(blockIdx, entry)}
+                        onSwapSlots={onSwapSlots}
+                    />
+                )}
+                {blockMarkdown && renderMarkdown(blockMarkdown)}
+            </div>
+        );
+    };
+
+    if (viewportTier === 'mobile') {
+        return (
+            <div
+                data-testid={`zine-editorial-grid-${sectionKey}`}
+                className="markdown-bio flex flex-col font-sans text-base leading-relaxed text-zinc-300"
+            >
+                {blocks.map((_, blockIdx) => renderBlockUnit(blockIdx))}
+            </div>
+        );
+    }
+
+    if (viewportTier === 'tablet') {
+        const leftIndices = blocks.map((_, idx) => idx).filter((idx) => idx % 2 === 0);
+        const rightIndices = blocks.map((_, idx) => idx).filter((idx) => idx % 2 === 1);
+
+        return (
+            <div
+                data-testid={`zine-editorial-grid-${sectionKey}`}
+                className="markdown-bio font-sans text-base leading-relaxed text-zinc-300"
+            >
+                <div
+                    data-testid={`zine-editorial-tablet-columns-${sectionKey}`}
+                    className="grid grid-cols-2 gap-x-10 items-start"
+                >
+                    <div className="min-w-0 flex flex-col">
+                        {leftIndices.map((blockIdx) => renderBlockUnit(blockIdx))}
+                    </div>
+                    <div className="min-w-0 flex flex-col">
+                        {rightIndices.map((blockIdx) => renderBlockUnit(blockIdx))}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
+    const colIndexBuckets = partitionBlockIndicesIntoThreeColumns(blocks);
+
     return (
-      <div
-        key={`${sectionKey}-block-${blockIdx}`}
-        data-testid={`zine-editorial-block-${sectionKey}-${blockIdx}`}
-        className="min-w-0 flex flex-col"
-      >
-        {canRenderSlot && (
-          <ZineColumnImageSlot
-            sectionKey={sectionKey}
-            slotIndex={blockIdx}
-            totalBlocks={blockCount}
-            slot={slot}
-            isEditingZine={isEditingZine}
-            hasFailed={Boolean(slot && failedUrls.has(slot.url))}
-            onMarkFailed={onMarkFailed}
-            onSaveSlot={(entry) => onSaveSlot(blockIdx, entry)}
-            onSwapSlots={onSwapSlots}
-          />
-        )}
-        {blockMarkdown && renderMarkdown(blockMarkdown)}
-      </div>
-    );
-  };
-
-  if (viewportTier === 'mobile') {
-    return (
-      <div
-        data-testid={`zine-editorial-grid-${sectionKey}`}
-        className="markdown-bio flex flex-col font-sans text-base leading-relaxed text-zinc-300"
-      >
-        {blocks.map((_, blockIdx) => renderBlockUnit(blockIdx))}
-      </div>
-    );
-  }
-
-  if (viewportTier === 'tablet') {
-    const leftIndices = blocks.map((_, idx) => idx).filter((idx) => idx % 2 === 0);
-    const rightIndices = blocks.map((_, idx) => idx).filter((idx) => idx % 2 === 1);
-
-    return (
-      <div
-        data-testid={`zine-editorial-grid-${sectionKey}`}
-        className="markdown-bio font-sans text-base leading-relaxed text-zinc-300"
-      >
         <div
-          data-testid={`zine-editorial-tablet-columns-${sectionKey}`}
-          className="grid grid-cols-2 gap-x-10 items-start"
+            data-testid={`zine-editorial-grid-${sectionKey}`}
+            className="markdown-bio grid grid-cols-3 gap-x-12 items-start font-sans text-base leading-relaxed text-zinc-300"
         >
-          <div className="min-w-0 flex flex-col">
-            {leftIndices.map((blockIdx) => renderBlockUnit(blockIdx))}
-          </div>
-          <div className="min-w-0 flex flex-col">
-            {rightIndices.map((blockIdx) => renderBlockUnit(blockIdx))}
-          </div>
+            {([0, 1, 2] as const).map((colIdx) => (
+                <div key={`${sectionKey}-col-${colIdx}`} className="min-w-0 flex flex-col">
+                    {colIndexBuckets[colIdx].map((blockIdx) => renderBlockUnit(blockIdx))}
+                </div>
+            ))}
         </div>
-      </div>
     );
-  }
-
-  const colIndexBuckets = partitionBlockIndicesIntoThreeColumns(blocks);
-
-  return (
-    <div
-      data-testid={`zine-editorial-grid-${sectionKey}`}
-      className="markdown-bio grid grid-cols-3 gap-x-12 items-start font-sans text-base leading-relaxed text-zinc-300"
-    >
-      {([0, 1, 2] as const).map((colIdx) => (
-        <div key={`${sectionKey}-col-${colIdx}`} className="min-w-0 flex flex-col">
-          {colIndexBuckets[colIdx].map((blockIdx) => renderBlockUnit(blockIdx))}
-        </div>
-      ))}
-    </div>
-  );
 };
 
 // --- MAIN COMPONENT: DetailsPanel ---
 interface DetailsPanelProps {
-  selectedNode: Node | null;
-  activeNodes: Node[];
-  detailsCache: Map<string, NodeDetails>;
-  onUpdateDetailsCache?: (cache: Map<string, NodeDetails>) => void;
-  loadingNodeIds: Set<string>;
-  onTogglePinNode: (nodeId: string) => void;
-  pinnedNodes: Set<string>;
-  onRefreshNode: (nodeId: string) => void;
-  error: string | null;
-  systemError: string | null;
-  graphData: GraphData;
-  libraryArtists: string[];
-  seedArtists: string[];
-  onAddArtist: (artistName: string) => void;
-  isCollapsed: boolean;
-  onToggleCollapse: () => void;
-  isSmallScreen: boolean;
-  onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
+    selectedNode: Node | null;
+    activeNodes: Node[];
+    detailsCache: Map<string, NodeDetails>;
+    onUpdateDetailsCache?: (cache: Map<string, NodeDetails>) => void;
+    loadingNodeIds: Set<string>;
+    onTogglePinNode: (nodeId: string) => void;
+    pinnedNodes: Set<string>;
+    onRefreshNode: (nodeId: string) => void;
+    error: string | null;
+    systemError: string | null;
+    graphData: GraphData;
+    libraryArtists: string[];
+    seedArtists: string[];
+    onAddArtist: (artistName: string) => void;
+    isCollapsed: boolean;
+    onToggleCollapse: () => void;
+    isSmallScreen: boolean;
+    onNodeClick: (node: Node | null, forceActionState?: boolean) => void;
 
-  onNavigate: (view: View) => void;
-  isGlobalLoading: boolean;
-  onCancelGlobalLoading: () => void;
-  unreadCount: number;
-  isActive: boolean;
-  collapseBtnRef?: React.RefObject<HTMLButtonElement | null>;
-  isMagazineViewOpen: boolean;
-  onMagazineViewToggle: (isOpen: boolean) => void;
-  chatHistories: Map<string, ChatMessage[]>;
-  onUpdateChatHistories: (histories: Map<string, ChatMessage[]> | ((prev: Map<string, ChatMessage[]>) => Map<string, ChatMessage[]>)) => void;
-  onAddToStack: (node: Node, link?: string) => void;
-  isGuest?: boolean;
-  user?: any;
-  onAuthRequest?: () => void;
-  userTaste?: UserTaste;
-  isAdmin?: boolean;
-  tokenBalance?: number;
-  projectId?: string;
-  onUpdateTasteProfile?: (taste: UserTaste) => Promise<void>;
-  onShowToast?: (message: string) => void;
-  onOpenTasteModal?: () => void;
-  projectName?: string;
-  onStashArtist?: (artistName: string) => void;
-  onOpenStackDrawer?: () => void;
-  activeDeepWebSession?: { sessionId: string; remainingMessages: number } | null;
-  onUpdateDeepWebSession?: (session: { sessionId: string; remainingMessages: number } | null | ((prev: { sessionId: string; remainingMessages: number } | null) => { sessionId: string; remainingMessages: number } | null)) => void;
-  isStaticMockup?: boolean;
-  /** V43 Multi-Scene Layered Zine props */
-  scenes?: ProjectScene[];
-  activeSceneId?: string;
-  overarchingRationale?: string;
-  overarchingZineIntro?: string;
-  overarchingZineImages?: ZineEditorialImageEntry[];
-  onUpdateZineImages?: (target: 'overarching' | string, slotIndex: number, entry: ZineEditorialImageEntry) => void;
-  onSwapZineImages?: (target: 'overarching' | string, indexA: number, indexB: number) => void;
-  onUpdateZineIntro?: (target: 'overarching' | string, intro: string | null) => void;
+    onNavigate: (view: View) => void;
+    isGlobalLoading: boolean;
+    onCancelGlobalLoading: () => void;
+    unreadCount: number;
+    isActive: boolean;
+    collapseBtnRef?: React.RefObject<HTMLButtonElement | null>;
+    isMagazineViewOpen: boolean;
+    onMagazineViewToggle: (isOpen: boolean) => void;
+    chatHistories: Map<string, ChatMessage[]>;
+    onUpdateChatHistories: (histories: Map<string, ChatMessage[]> | ((prev: Map<string, ChatMessage[]>) => Map<string, ChatMessage[]>)) => void;
+    onAddToStack: (node: Node, link?: string) => void;
+    isGuest?: boolean;
+    user?: any;
+    onAuthRequest?: () => void;
+    userTaste?: UserTaste;
+    isAdmin?: boolean;
+    tokenBalance?: number;
+    projectId?: string;
+    onUpdateTasteProfile?: (taste: UserTaste) => Promise<void>;
+    onShowToast?: (message: string) => void;
+    onOpenTasteModal?: () => void;
+    projectName?: string;
+    onStashArtist?: (artistName: string) => void;
+    onOpenStackDrawer?: () => void;
+    activeDeepWebSession?: { sessionId: string; remainingMessages: number } | null;
+    onUpdateDeepWebSession?: (session: { sessionId: string; remainingMessages: number } | null | ((prev: { sessionId: string; remainingMessages: number } | null) => { sessionId: string; remainingMessages: number } | null)) => void;
+    isStaticMockup?: boolean;
+    /** V43 Multi-Scene Layered Zine props */
+    scenes?: ProjectScene[];
+    activeSceneId?: string;
+    overarchingRationale?: string;
+    overarchingZineIntro?: string;
+    overarchingZineImages?: ZineEditorialImageEntry[];
+    onUpdateZineImages?: (target: 'overarching' | string, slotIndex: number, entry: ZineEditorialImageEntry) => void;
+    onSwapZineImages?: (target: 'overarching' | string, indexA: number, indexB: number) => void;
+    onUpdateZineIntro?: (target: 'overarching' | string, intro: string | null) => void;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
-  selectedNode, activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onTogglePinNode, pinnedNodes, onRefreshNode,
-  error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
-  isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
-  isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, onAddToStack,
-  isGuest = false, onAuthRequest, user, userTaste, isAdmin = false, tokenBalance = 0, projectId,
-  onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer,
-  activeDeepWebSession, onUpdateDeepWebSession, isStaticMockup = false,
-  scenes = [], activeSceneId, overarchingRationale,
-  overarchingZineIntro, overarchingZineImages, onUpdateZineImages, onSwapZineImages, onUpdateZineIntro
+    selectedNode, activeNodes, detailsCache, onUpdateDetailsCache, loadingNodeIds, onTogglePinNode, pinnedNodes, onRefreshNode,
+    error, systemError, graphData, libraryArtists, seedArtists, onAddArtist, isCollapsed, onToggleCollapse,
+    isSmallScreen, onNodeClick, onNavigate, isGlobalLoading, onCancelGlobalLoading, unreadCount, isActive, collapseBtnRef,
+    isMagazineViewOpen, onMagazineViewToggle, chatHistories, onUpdateChatHistories, onAddToStack,
+    isGuest = false, onAuthRequest, user, userTaste, isAdmin = false, tokenBalance = 0, projectId,
+    onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer,
+    activeDeepWebSession, onUpdateDeepWebSession, isStaticMockup = false,
+    scenes = [], activeSceneId, overarchingRationale,
+    overarchingZineIntro, overarchingZineImages, onUpdateZineImages, onSwapZineImages, onUpdateZineIntro
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
@@ -2855,14 +2848,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     // JIT Stub Fallback (Rule 17)
     useEffect(() => {
         if (!selectedNode || isGlobalLoading) return;
-        
+
         const normId = normalizeArtistId(selectedNode.id);
         const details = detailsCache.get(normId);
-        
+
         if (details?._isStub && !jitLoadingIds.has(normId) && !loadingNodeIds.has(normId)) {
             console.log(`[JIT Hydration] Intercepted stub for node ${normId}. Triggering live hydration.`);
             setJitLoadingIds(prev => new Set(prev).add(normId));
-            
+
             fetchNodeDetails(selectedNode, graphData, seedArtists.join('::'))
                 .then(newDetails => {
                     if (newDetails && onUpdateDetailsCache) {
@@ -2897,7 +2890,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         recognition.onerror = () => setIsListeningMagazineSearch(false);
         recognition.onend = () => setIsListeningMagazineSearch(false);
     };
-    
+
     const [chatModes, setChatModes] = useState<Map<string, 'instant' | 'live'>>(new Map());
     const getChatMode = (nodeId: string) => chatModes.get(nodeId) || 'instant';
     const [liveMessageCount, setLiveMessageCount] = useState<number>(() => {
@@ -2922,7 +2915,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const deepWebSessionIdRef = useRef<string | null>(null);
 
     const magazineBtnState: 'disabled' | 'attention' | 'neutral' = hasSeenMagazineView ? 'neutral' : 'attention';
-    
+
     const touchStartX = useRef<number | null>(null);
     const touchEndX = useRef<number | null>(null);
     const minSwipeDistance = 50;
@@ -2940,9 +2933,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const isSelectedNodeHydrating = useMemo(() => {
         if (!selectedNode) return false;
         const normId = normalizeArtistId(selectedNode.id);
-        const details = detailsCache.get(selectedNode.id) || 
-                        detailsCache.get(selectedNode.id.toLowerCase()) || 
-                        detailsCache.get(normId);
+        const details = detailsCache.get(selectedNode.id) ||
+            detailsCache.get(selectedNode.id.toLowerCase()) ||
+            detailsCache.get(normId);
         return !details;
     }, [selectedNode, detailsCache]);
 
@@ -3024,7 +3017,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
         const history = (chatHistoriesRef.current || chatHistories).get(nodeId) || [];
         const newHistory = [...history, { role: 'user', text: message, timestamp: Date.now() } as ChatMessage];
-        
+
         onUpdateChatHistories((prev) => {
             const next = new Map(prev);
             next.set(nodeId, newHistory);
@@ -3071,7 +3064,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     if (auth?.currentUser && typeof auth.currentUser.getIdToken === 'function') {
                         idToken = await auth.currentUser.getIdToken();
                     }
-                } catch (_) {}
+                } catch (_) { }
                 const activeSessionId = overrideDeepWebSessionId || deepWebSessionIdRef.current || undefined;
                 const chatPromise = streamNodeChat(
                     currentNode,
@@ -3099,7 +3092,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     }
                 );
 
-                const timeoutPromise = new Promise((_, reject) => 
+                const timeoutPromise = new Promise((_, reject) =>
                     setTimeout(() => reject(new Error("Chat request timed out")), 20000)
                 );
 
@@ -3133,14 +3126,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             }
             const errorMessage = isLeaseExhaustedError
                 ? "Deep Connections session expired or unauthorized. Send again to unlock a 3-message session."
-                : err?.message?.includes("timed out") 
+                : err?.message?.includes("timed out")
                     ? "The AI is taking too long to respond. Your Deep Connections session is still active — please try again."
                     : "Connection interrupted — your Deep Connections session is still active. Please try sending your message again.";
-            
+
             onUpdateChatHistories((prev) => {
                 const next = new Map(prev);
                 next.set(nodeId, [
-                    ...newHistory, 
+                    ...newHistory,
                     { role: 'model', text: errorMessage } as ChatMessage
                 ]);
                 return next;
@@ -3178,9 +3171,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         // display the selectedNode card immediately instead of flashing the spinner.
         if (result.length === 0 && selectedNode) {
             const normId = normalizeArtistId(selectedNode.id);
-            const details = detailsCache.get(selectedNode.id) || 
-                            detailsCache.get(selectedNode.id.toLowerCase()) || 
-                            detailsCache.get(normId);
+            const details = detailsCache.get(selectedNode.id) ||
+                detailsCache.get(selectedNode.id.toLowerCase()) ||
+                detailsCache.get(normId);
             const isLocked = !!(details && details.summary && details.summary.trim().length > 5 && !details._isSentinel);
             if (isLocked) {
                 result = [selectedNode];
@@ -3207,14 +3200,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             // 1. Sort by Pinned State first
             const isAPinned = pinnedNodes.has(a.id) || pinnedNodes.has(a.id.toLowerCase());
             const isBPinned = pinnedNodes.has(b.id) || pinnedNodes.has(b.id.toLowerCase());
-            
+
             if (isAPinned && isBPinned) {
                 let idxA = pinnedSequenceArr.indexOf(a.id);
                 if (idxA === -1) idxA = pinnedSequenceArr.indexOf(a.id.toLowerCase());
-                
+
                 let idxB = pinnedSequenceArr.indexOf(b.id);
                 if (idxB === -1) idxB = pinnedSequenceArr.indexOf(b.id.toLowerCase());
-                
+
                 return idxA - idxB;
             }
             if (isAPinned && !isBPinned) return -1;
@@ -3229,7 +3222,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     if (!isArtistA && isArtistB) return 1;
                     return (a.label || a.id).localeCompare(b.label || b.id);
                 }
-                
+
                 if (magazineSortBy === 'label') {
                     const isLabelA = a.type === 'label';
                     const isLabelB = b.type === 'label';
@@ -3238,7 +3231,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     return (a.label || a.id).localeCompare(b.label || b.id);
                 }
             }
-            
+
             // 3. Canonical Presentation Sort (Audio Flow):
             // Artists strictly precede Record Labels while preserving the original
             // traversal sequence (stable sort returning 0 for identical entity types).
@@ -3269,7 +3262,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
         const resizeObserver = new ResizeObserver(() => centerDot());
         resizeObserver.observe(trackRef.current);
-        
+
         return () => resizeObserver.disconnect();
     }, [viewedIndex, filteredAndSortedNodes.length]);
 
@@ -3307,7 +3300,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         const distance = touchStartX.current - touchEndX.current;
         const isLeftSwipe = distance > minSwipeDistance;
         const isRightSwipe = distance < -minSwipeDistance;
-        
+
         if (isLeftSwipe) handleNext();
         if (isRightSwipe) handlePrev();
     };
@@ -3345,7 +3338,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [viewedNode?.id, isMagazineViewOpen]);
 
-    const viewedNodeDetails = viewedNode 
+    const viewedNodeDetails = viewedNode
         ? (detailsCache.get(viewedNode.id) || detailsCache.get(viewedNode.id.toLowerCase()) || detailsCache.get(normalizeArtistId(viewedNode.id)) || null)
         : null;
     const viewedNodeIsLabel = viewedNode?.type === 'label' || (viewedNodeDetails as any)?.type === 'label' || (viewedNodeDetails?.details as any)?.type === 'label';
@@ -3364,9 +3357,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         const isMetadata = viewedNode.type === 'genre' || viewedNode.type === 'origin' || viewedNode.type === 'founded';
         if (isMetadata) return true;
 
-        const details = detailsCache.get(viewedNode.id) || 
-                        detailsCache.get(viewedNode.id.toLowerCase()) || 
-                        detailsCache.get(normId);
+        const details = detailsCache.get(viewedNode.id) ||
+            detailsCache.get(viewedNode.id.toLowerCase()) ||
+            detailsCache.get(normId);
 
         return !!(details && details.summary && details.summary.trim().length > 0 && !details._isSentinel);
     }, [isGlobalLoading, systemError, viewedNode, filteredAndSortedNodes.length, loadingNodeIds, jitLoadingIds, detailsCache]);
@@ -3435,10 +3428,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const renderZineMarkdown = useCallback((markdownContent: string) => (
         <Markdown
             components={{
-                p: ({node, children, ...props}) => <p className="mb-6" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</p>,
-                strong: ({node, children, ...props}) => <strong className="font-semibold text-white" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</strong>,
-                ul: ({node, ...props}) => <ul className="list-disc pl-5 mb-6 space-y-2" {...props} />,
-                li: ({node, children, ...props}) => <li className="marker:text-primary" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</li>
+                p: ({ node, children, ...props }) => <p className="mb-6" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</p>,
+                strong: ({ node, children, ...props }) => <strong className="font-semibold text-white" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</strong>,
+                ul: ({ node, ...props }) => <ul className="list-disc pl-5 mb-6 space-y-2" {...props} />,
+                li: ({ node, children, ...props }) => <li className="marker:text-primary" {...props}>{renderWithHighlights(children, magazineSearchQuery)}</li>
             }}
         >
             {markdownContent}
@@ -3446,16 +3439,16 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     ), [magazineSearchQuery]);
 
     return (
-        <div 
-          className={`w-full ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-hidden'} flex flex-col bg-zinc-900 relative min-h-0 outline-none transition-colors duration-700`}
-          style={{
-            '--scene-accent': dominantColor,
-            ...(isMagazineViewOpen ? {
-              backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
-            } : {})
-          } as React.CSSProperties}
+        <div
+            className={`w-full ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-hidden'} flex flex-col bg-zinc-900 relative min-h-0 outline-none transition-colors duration-700`}
+            style={{
+                '--scene-accent': dominantColor,
+                ...(isMagazineViewOpen ? {
+                    backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                } : {})
+            } as React.CSSProperties}
         >
             {isSmallScreen ? (
                 <div className={`flex-shrink-0 z-[60] transition-all duration-300 ${isMagazineViewOpen ? `bg-transparent ${LayoutSizes.topHeader} border-b border-zinc-700/50` : 'bg-zinc-900 h-0 overflow-hidden border-transparent'}`}>
@@ -3463,7 +3456,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         <div className="flex items-center gap-2 flex-grow animate-in fade-in slide-in-from-top-2 duration-500">
                             <div className="relative flex-grow max-w-none">
                                 <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
-                                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
+                                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                                     type="search"
                                     placeholder="Search..."
                                     value={magazineSearchQuery}
@@ -3478,7 +3471,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
 
                             <div className="relative shrink-0 w-[104px]">
-                                <Select 
+                                <Select
                                     variant="md"
                                     value={magazineSortBy}
                                     onChange={(e) => setMagazineSortBy(e.target.value as any)}
@@ -3516,7 +3509,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     <div className="flex items-center gap-3 flex-grow max-w-none md:max-w-md">
                                         <div className="relative flex-grow">
                                             <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
-                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
+                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
                                                 type="search"
                                                 placeholder="Search..."
                                                 value={magazineSearchQuery}
@@ -3530,7 +3523,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-2 shrink-0">
-                                            <Select 
+                                            <Select
                                                 variant="md"
                                                 value={magazineSortBy}
                                                 onChange={(e) => setMagazineSortBy(e.target.value as any)}
@@ -3561,7 +3554,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             <span>{isEditingZine ? 'Done' : 'Edit'}</span>
                                         </Button>
                                     )}
-                                    <Button 
+                                    <Button
                                         variant="primary"
                                         size="md"
                                         className="h-9 !px-5"
@@ -3588,10 +3581,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                         )}
                         <div className={`flex items-center gap-0.5 ${isCollapsed ? 'w-8 justify-center' : ''}`}>
-                            <button 
+                            <button
                                 ref={collapseBtnRef}
-                                onClick={onToggleCollapse} 
-                                className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors leading-none pointer-events-auto" 
+                                onClick={onToggleCollapse}
+                                className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors leading-none pointer-events-auto"
                                 title={isCollapsed ? "Expand Deep Cuts" : "Collapse Deep Cuts"}
                             >
                                 <span className="material-symbols-outlined !text-[18px]">{isCollapsed ? 'right_panel_open' : 'right_panel_close'}</span>
@@ -3607,7 +3600,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     </div>
                     <div className="absolute bottom-6 left-0 right-0 flex justify-center px-2">
                         <button onClick={onToggleCollapse} className="group relative" title="View Deep Cuts">
-                             <span className={`h-8 w-8 flex items-center justify-center text-sm font-bold border-2 rounded-md transition-all duration-500 ${unreadCount > 0 && !systemError ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'} group-active:scale-95`}>
+                            <span className={`h-8 w-8 flex items-center justify-center text-sm font-bold border-2 rounded-md transition-all duration-500 ${unreadCount > 0 && !systemError ? 'bg-zinc-900 text-white border-white/20' : 'bg-zinc-800 text-zinc-500 border-zinc-700'} group-active:scale-95`}>
                                 {systemError ? 0 : activeNodes.length}
                             </span>
                         </button>
@@ -3619,17 +3612,17 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         <div className="flex justify-between items-center w-full px-4 py-2 border-b border-zinc-700/50 bg-zinc-900 flex-shrink-0 gap-3">
                             {filteredAndSortedNodes.length > 1 && (
                                 <>
-                                    <button 
-                                        onClick={handlePrev} 
+                                    <button
+                                        onClick={handlePrev}
                                         disabled={viewedIndex <= 0}
                                         className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none select-none outline-none focus:outline-none"
                                     >
                                         <span className="material-symbols-outlined !text-[18px]">chevron_left</span>
                                     </button>
-                                    
+
                                     <div className="flex-1 flex justify-center items-center overflow-hidden px-4">
                                         <div className="relative flex items-center overflow-hidden w-full h-6 max-w-[240px] lg:max-w-[280px]">
-                                            <div 
+                                            <div
                                                 ref={trackRef}
                                                 className="relative flex items-center flex-nowrap overflow-x-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none] w-full h-full"
                                             >
@@ -3638,36 +3631,35 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                         const isLoading = loadingNodeIds.has(node.id) || jitLoadingIds.has(normalizeArtistId(node.id));
                                                         const isActive = i === viewedIndex;
                                                         return (
-                                                            <div 
+                                                            <div
                                                                 key={node.id}
-                                                                ref={isActive ? activeDotRef : null} 
+                                                                ref={isActive ? activeDotRef : null}
                                                                 onClick={() => { setViewedIndex(i); onNodeClick(node, true); }}
                                                                 className="flex items-center justify-center h-full px-[2px] cursor-pointer group"
                                                                 title={`${node.type === 'label' ? cleanLabelDisplayName(node.label || node.id) : cleanArtistDisplayName(node.label || node.id)}${isLoading ? ' (Generating...)' : ''}`}
                                                             >
-                                                                <div 
-                                                                    className={`transition-all flex-shrink-0 rounded-full ${
-                                                                        isActive 
-                                                                            ? 'w-4 h-1 bg-primary' 
-                                                                            : isLoading 
-                                                                                ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse' 
-                                                                                : 'w-1 h-1 bg-zinc-600 group-hover:bg-zinc-400'
-                                                                    }`}
+                                                                <div
+                                                                    className={`transition-all flex-shrink-0 rounded-full ${isActive
+                                                                        ? 'w-4 h-1 bg-primary'
+                                                                        : isLoading
+                                                                            ? 'w-1.5 h-1.5 bg-primary/80 animate-pulse'
+                                                                            : 'w-1 h-1 bg-zinc-600 group-hover:bg-zinc-400'
+                                                                        }`}
                                                                 />
                                                             </div>
                                                         );
                                                     })}
                                                 </div>
                                             </div>
-                                            
+
                                             {/* Gradient fades for the edges */}
                                             <div className="absolute left-0 top-0 bottom-0 w-4 bg-gradient-to-r from-zinc-900 to-transparent pointer-events-none" />
                                             <div className="absolute right-0 top-0 bottom-0 w-4 bg-gradient-to-l from-zinc-900 to-transparent pointer-events-none" />
                                         </div>
                                     </div>
 
-                                    <button 
-                                        onClick={handleNext} 
+                                    <button
+                                        onClick={handleNext}
                                         disabled={viewedIndex === filteredAndSortedNodes.length - 1}
                                         className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-400 hover:text-white hover:bg-zinc-800 active:text-white active:bg-zinc-800 rounded-xl transition-colors disabled:opacity-20 disabled:pointer-events-none leading-none select-none outline-none focus:outline-none"
                                     >
@@ -3678,7 +3670,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         </div>
                     )}
 
-                    <div 
+                    <div
                         id="magazine-scroll-container"
                         className={`${isStaticMockup ? 'overflow-hidden h-auto' : 'flex-grow relative min-h-0'} ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800 overflow-x-clip' : 'overflow-hidden'}`}
                         onScroll={isMagazineViewOpen ? handleScroll : undefined}
@@ -3843,12 +3835,12 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                         )}
                         {/* 4) DEEP CUT CARDS GRID (Z-INDEX 10) */}
-                        <div 
-                            className={`${renderMode === 'magazine' 
-                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-12 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-[calc(env(safe-area-inset-bottom)_+_3rem)] transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}` 
+                        <div
+                            className={`${renderMode === 'magazine'
+                                ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-12 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-[calc(env(safe-area-inset-bottom)_+_3rem)] transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}`
                                 : `flex ${isStaticMockup ? 'h-auto' : 'h-full'} w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`
-                            } relative z-10`}
-                            style={renderMode === 'panel' ? { 
+                                } relative z-10`}
+                            style={renderMode === 'panel' ? {
                                 transform: `translateX(-${viewedIndex * 100}%)`,
                                 overscrollBehaviorX: 'none'
                             } : {}}
@@ -3858,12 +3850,12 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     {(isReconciliationPending || (Boolean(graphData?.nodes && graphData.nodes.length > 0) && !magazineSearchQuery.trim() && seedArtists && seedArtists.length > 0)) && !systemError ? (
                                         <div className="flex flex-col items-center justify-center gap-6">
                                             {isGlobalLoading ? (
-                                                <LoadingSpinner 
+                                                <LoadingSpinner
                                                     steps={["Waiting for Connections to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
                                                     subtext="Graph mapping takes priority. Details will follow."
                                                 />
                                             ) : (
-                                                <LoadingSpinner 
+                                                <LoadingSpinner
                                                     steps={DETAIL_THINKING_STEPS}
                                                     subtext="Typically takes 20–30 seconds to dig for details."
                                                 />
@@ -3889,60 +3881,60 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         const pinSequence = pinSequenceIndex !== -1 ? pinSequenceIndex + 1 : undefined;
 
                                         return (
-                                        <div 
-                                            key={node.id} 
-                                            id={`magazine-card-${node.id}`}
-                                            className={`${renderMode === 'magazine' 
-                                                ? 'inline-block w-full max-w-2xl text-left' 
-                                                : `w-full ${isStaticMockup ? 'h-auto' : 'h-full'} flex-shrink-0 overflow-hidden`}`}
-                                        >
-                                            <NodeDetailsCard
-                                                node={node}
-                                                details={details}
-                                                isLoading={loadingNodeIds.has(node.id) || jitLoadingIds.has(normalizeArtistId(node.id))}
-                                                isGlobalLoading={isGlobalLoading}
-                                                graphData={graphData}
-                                                libraryArtists={libraryArtists}
-                                                seedArtists={allScenesSeedArtists}
-                                                onAddArtist={onAddArtist}
-                                                isSmallScreen={isSmallScreen}
-                                                onTogglePin={() => onTogglePinNode(node.id)}
-                                                isPinned={pinnedNodes.has(node.id) || pinnedNodes.has(node.id.toLowerCase())}
-                                                pinSequence={pinSequence}
-                                                onNodeClick={onNodeClick}
-                                                onNavigate={onNavigate}
-                                                chatHistory={chatHistories.get(node.id) || []}
-                                                onSendMessage={(msg) => handleSendMessage(node.id, msg)}
-                                                isChatLoading={chatLoadingMap.get(node.id) || false}
-                                                chatMode={getChatMode(node.id)}
-                                                onChatModeChange={(mode) => setChatModes(prev => new Map(prev).set(node.id, mode))}
-                                                liveMessageCount={liveMessageCount}
-                                                hasActiveDeepWebSession={Boolean(deepWebSessionIdRef.current)}
-                                                onDeleteMessage={(index) => handleDeleteMessage(node.id, index)}
-                                                onClearChat={() => handleClearChat(node.id)}
-                                                isFullScreenMode={isMagazineViewOpen}
-                                                isHero={isHero}
-                                                onAddToStack={onAddToStack}
-                                                onToggleMagazineView={() => onMagazineViewToggle(!isMagazineViewOpen)}
-                                                searchQuery={isMagazineViewOpen ? magazineSearchQuery : undefined}
-                                                isGuest={isGuest}
-                                                user={user}
-                                                onAuthRequest={onAuthRequest}
-                                                userTaste={userTaste}
-                                                isAdmin={isAdmin}
+                                            <div
+                                                key={node.id}
+                                                id={`magazine-card-${node.id}`}
+                                                className={`${renderMode === 'magazine'
+                                                    ? 'inline-block w-full max-w-2xl text-left'
+                                                    : `w-full ${isStaticMockup ? 'h-auto' : 'h-full'} flex-shrink-0 overflow-hidden`}`}
+                                            >
+                                                <NodeDetailsCard
+                                                    node={node}
+                                                    details={details}
+                                                    isLoading={loadingNodeIds.has(node.id) || jitLoadingIds.has(normalizeArtistId(node.id))}
+                                                    isGlobalLoading={isGlobalLoading}
+                                                    graphData={graphData}
+                                                    libraryArtists={libraryArtists}
+                                                    seedArtists={allScenesSeedArtists}
+                                                    onAddArtist={onAddArtist}
+                                                    isSmallScreen={isSmallScreen}
+                                                    onTogglePin={() => onTogglePinNode(node.id)}
+                                                    isPinned={pinnedNodes.has(node.id) || pinnedNodes.has(node.id.toLowerCase())}
+                                                    pinSequence={pinSequence}
+                                                    onNodeClick={onNodeClick}
+                                                    onNavigate={onNavigate}
+                                                    chatHistory={chatHistories.get(node.id) || []}
+                                                    onSendMessage={(msg) => handleSendMessage(node.id, msg)}
+                                                    isChatLoading={chatLoadingMap.get(node.id) || false}
+                                                    chatMode={getChatMode(node.id)}
+                                                    onChatModeChange={(mode) => setChatModes(prev => new Map(prev).set(node.id, mode))}
+                                                    liveMessageCount={liveMessageCount}
+                                                    hasActiveDeepWebSession={Boolean(deepWebSessionIdRef.current)}
+                                                    onDeleteMessage={(index) => handleDeleteMessage(node.id, index)}
+                                                    onClearChat={() => handleClearChat(node.id)}
+                                                    isFullScreenMode={isMagazineViewOpen}
+                                                    isHero={isHero}
+                                                    onAddToStack={onAddToStack}
+                                                    onToggleMagazineView={() => onMagazineViewToggle(!isMagazineViewOpen)}
+                                                    searchQuery={isMagazineViewOpen ? magazineSearchQuery : undefined}
+                                                    isGuest={isGuest}
+                                                    user={user}
+                                                    onAuthRequest={onAuthRequest}
+                                                    userTaste={userTaste}
+                                                    isAdmin={isAdmin}
 
-                                                onUpdateTasteProfile={onUpdateTasteProfile}
-                                                onShowToast={onShowToast}
-                                                onOpenTasteModal={onOpenTasteModal}
-                                                isActive={node.id === viewedNode?.id}
-                                                onStashArtist={onStashArtist}
-                                                onOpenStackDrawer={onOpenStackDrawer}
-                                                scenes={scenes}
-                                                isStaticMockup={isStaticMockup}
-                                            />
-                                        </div>
-                                    );
-                                })
+                                                    onUpdateTasteProfile={onUpdateTasteProfile}
+                                                    onShowToast={onShowToast}
+                                                    onOpenTasteModal={onOpenTasteModal}
+                                                    isActive={node.id === viewedNode?.id}
+                                                    onStashArtist={onStashArtist}
+                                                    onOpenStackDrawer={onOpenStackDrawer}
+                                                    scenes={scenes}
+                                                    isStaticMockup={isStaticMockup}
+                                                />
+                                            </div>
+                                        );
+                                    })
                                 })()
                             )}
                         </div>
@@ -3954,7 +3946,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
                         {!isStaticMockup && !isMagazineViewOpen && isProfileGenuinelyDisplayed && (
                             <div className={`absolute ${isSmallScreen ? 'bottom-[calc(env(safe-area-inset-bottom)+5.75rem)]' : 'bottom-6'} left-0 right-0 flex justify-center pointer-events-none z-50`}>
-                                <Button 
+                                <Button
                                     variant="primary"
                                     size="md"
                                     onClick={() => {
@@ -3972,8 +3964,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     </div>
                     {isMagazineViewOpen && typeof document !== 'undefined' && createPortal(
                         <div className="fixed bottom-8 left-0 right-0 z-[1050] px-6 md:px-8 pointer-events-none flex items-center justify-between">
-                            <div className="w-12 md:w-16"></div> 
-                            
+                            <div className="w-12 md:w-16"></div>
+
                             {isSmallScreen && (
                                 <Button
                                     variant="primary"
@@ -3987,8 +3979,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             )}
                             {!isSmallScreen && <div className="w-12 md:w-16"></div>}
 
-                            <div 
-                                onClick={scrollToTop} 
+                            <div
+                                onClick={scrollToTop}
                                 className={`w-12 md:w-16 flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-all duration-300 cursor-pointer pointer-events-auto ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
                                 aria-label="Scroll to top"
                             >
@@ -4000,7 +3992,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     )}
                 </div>
             )}
-            
+
             {pendingChatMessage && createPortal(
                 <TokenConfirmationDialog
                     isOpen={true}
@@ -4053,7 +4045,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 />,
                 document.body
             )}
-            
+
         </div>
     );
 };
