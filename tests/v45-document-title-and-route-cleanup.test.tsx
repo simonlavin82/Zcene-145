@@ -14,6 +14,10 @@ describe('V45: Route-Aware document.title Reset & Lingering Project State Cleanu
   });
 
   describe('1. resolveDocumentTitle: Brand vs Project Title Determinism', () => {
+    it('defines BRAND_DOCUMENT_TITLE strictly as "Zcene"', () => {
+      expect(BRAND_DOCUMENT_TITLE).toBe('Zcene');
+    });
+
     it('returns `<Project Title> - Zcene` on active project routes in View.Graph', () => {
       expect(resolveDocumentTitle(View.Graph, true, "Harm's Way")).toBe("Harm's Way - Zcene");
       expect(

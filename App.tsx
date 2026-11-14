@@ -1060,7 +1060,7 @@ const isGraphDataPresent = (data: any): boolean => {
   } catch { return false; }
 };
 
-export const BRAND_DOCUMENT_TITLE = 'Zcene - Own Music Discovery';
+export const BRAND_DOCUMENT_TITLE = 'Zcene';
 
 /**
  * Deterministically resolves the browser tab title based on the active view,
