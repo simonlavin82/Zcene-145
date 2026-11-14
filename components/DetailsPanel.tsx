@@ -1132,7 +1132,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     }, [details?.links, node.id]);
 
     const headerSizeClass = isFullScreenMode 
-        ? 'text-5xl font-bold tracking-tight'
+        ? 'text-3xl lg:text-5xl font-bold tracking-tight'
         : 'text-xl font-medium';
 
     const panelContent = (
@@ -2872,7 +2872,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             DEEP CUTS: {deepCutsCount}
                                         </span>
                                     </div>
-                                    <h1 className="text-5xl md:text-7xl font-bold tracking-tighter text-white mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
+                                    <h1 className="text-4xl lg:text-7xl font-bold tracking-tighter text-white mb-8 lg:mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
                                         {projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(' / ') : 'Zine')}
                                     </h1>
                                     {sanitizedOverarchingRationale ? (
@@ -2928,7 +2928,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                         </span>
                                                     )}
                                                 </div>
-                                                <h2 className="text-3xl md:text-5xl font-bold tracking-tight text-white mb-8 leading-tight" style={{ wordBreak: 'break-word' }}>
+                                                <h2 className="text-3xl lg:text-5xl font-bold tracking-tight text-white mb-6 lg:mb-8 leading-tight" style={{ wordBreak: 'break-word' }}>
                                                     {sceneSeeds.length > 0 ? sceneSeeds.join(' + ') : (cleanArtistDisplayName(scene.title || scene.name, scene.graphData?.nodes) || `Scene ${idx + 1}`)}
                                                 </h2>
                                                 {effectiveSceneCopy && (
@@ -2969,7 +2969,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         DEEP CUTS: {deepCutsCount}
                                     </span>
                                 </div>
-                                <h1 className="text-7xl font-bold tracking-tighter text-white mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
+                                <h1 className="text-4xl lg:text-7xl font-bold tracking-tighter text-white mb-8 lg:mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
                                     {projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(' / ') : 'Zine')}
                                 </h1>
                                 <div className="markdown-bio text-base leading-relaxed text-zinc-300 columns-1 md:columns-2 lg:columns-3 gap-12 font-sans">

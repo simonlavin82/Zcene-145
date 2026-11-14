@@ -1096,6 +1096,123 @@ describe('DetailsPanel', () => {
                 expect(screen.queryByText(/^SCENE/)).not.toBeInTheDocument();
             });
         });
+
+        describe('Mobile Zine Heading Scale Alignment', () => {
+            const ptw: any = { id: 'poison-the-well-us', label: 'Poison The Well', type: 'artist', isSeed: true };
+            const harms: any = { id: 'harms-way-us', label: "Harm's Way", type: 'artist', isSeed: true };
+            const detailsCache = new Map([
+                ['poison-the-well-us', { summary: 'Poison The Well details', details: { artist: 'Poison The Well' } }],
+                ['harms-way-us', { summary: "Harm's Way details", details: { artist: "Harm's Way" } }]
+            ]);
+
+            it('renders responsive classes on single-scene Zine H1 (text-4xl lg:text-7xl font-bold tracking-tighter)', () => {
+                render(
+                    <DetailsPanel
+                        {...defaultProps}
+                        selectedNode={ptw}
+                        activeNodes={[ptw]}
+                        detailsCache={detailsCache}
+                        seedArtists={['Poison The Well']}
+                        scenes={[]}
+                        projectName="Dashboard Confessional"
+                        graphData={{
+                            nodes: [ptw],
+                            links: [],
+                            synthesisRationale: 'Single scene rationale for testing heading scale.'
+                        } as any}
+                        isMagazineViewOpen={true}
+                    />
+                );
+
+                const h1 = screen.getByRole('heading', { level: 1, name: 'Dashboard Confessional' });
+                expect(h1).toHaveClass('text-4xl');
+                expect(h1).toHaveClass('lg:text-7xl');
+                expect(h1).toHaveClass('font-bold');
+                expect(h1).toHaveClass('tracking-tighter');
+            });
+
+            it('renders responsive classes on multi-scene overarching H1 and per-scene H2', () => {
+                const multiScenes: any[] = [
+                    {
+                        id: 'scene-1',
+                        sceneId: 'scene-1',
+                        title: 'Poison The Well',
+                        seedArtists: 'Poison The Well',
+                        synthesisRationale: 'Scene 1 editorial.',
+                        graphData: { nodes: [ptw], links: [] }
+                    },
+                    {
+                        id: 'scene-2',
+                        sceneId: 'scene-2',
+                        title: "Harm's Way",
+                        seedArtists: "Harm's Way",
+                        synthesisRationale: 'Scene 2 editorial.',
+                        graphData: { nodes: [harms], links: [] }
+                    }
+                ];
+
+                render(
+                    <DetailsPanel
+                        {...defaultProps}
+                        selectedNode={ptw}
+                        activeNodes={[ptw, harms]}
+                        detailsCache={detailsCache}
+                        seedArtists={['Poison The Well', "Harm's Way"]}
+                        scenes={multiScenes}
+                        projectName="Multi-Scene Sound System"
+                        overarchingRationale="Overarching rationale connecting Florida and Chicago hardcore."
+                        isMagazineViewOpen={true}
+                    />
+                );
+
+                const overarchingH1 = screen.getByRole('heading', { level: 1, name: 'Multi-Scene Sound System' });
+                expect(overarchingH1).toHaveClass('text-4xl');
+                expect(overarchingH1).toHaveClass('lg:text-7xl');
+                expect(overarchingH1).toHaveClass('font-bold');
+                expect(overarchingH1).toHaveClass('tracking-tighter');
+
+                const sceneH2 = screen.getByRole('heading', { level: 2, name: 'Poison The Well' });
+                expect(sceneH2).toHaveClass('text-3xl');
+                expect(sceneH2).toHaveClass('lg:text-5xl');
+                expect(sceneH2).toHaveClass('font-bold');
+                expect(sceneH2).toHaveClass('tracking-tight');
+            });
+
+            it('renders responsive classes on NodeDetailsCard heading in fullscreen Zine mode (text-3xl lg:text-5xl)', () => {
+                render(
+                    <NodeDetailsCard
+                        node={ptw}
+                        details={{ summary: 'Summary', details: { artist: 'Poison The Well' } } as any}
+                        isLoading={false}
+                        isGlobalLoading={false}
+                        graphData={{ nodes: [ptw], links: [] } as any}
+                        libraryArtists={[]}
+                        seedArtists={['Poison The Well']}
+                        onAddArtist={() => {}}
+                        isSmallScreen={false}
+                        onClose={() => {}}
+                        onNodeClick={() => {}}
+                        onNavigate={() => {}}
+                        chatHistory={[]}
+                        onSendMessage={() => {}}
+                        isChatLoading={false}
+                        chatMode="instant"
+                        onChatModeChange={() => {}}
+                        liveMessageCount={0}
+                        isInStack={false}
+                        onToggleStack={() => {}}
+                        stack={[]}
+                        isFullScreenMode={true}
+                    />
+                );
+
+                const cardHeading = screen.getByRole('heading', { level: 3 });
+                expect(cardHeading).toHaveClass('text-3xl');
+                expect(cardHeading).toHaveClass('lg:text-5xl');
+                expect(cardHeading).toHaveClass('font-bold');
+                expect(cardHeading).toHaveClass('tracking-tight');
+            });
+        });
     });
 });
 

@@ -879,7 +879,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     To restore the large-format editorial impact of the magazine layout, typography sizes are standardized and kept static (non-dynamic) to prevent text shrinkage and layout inconsistencies across cards:
                                 </p>
                                 <ul className="space-y-2 text-sm text-zinc-400 list-disc pl-5">
-                                    <li><strong>Main Artist Header:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-5xl font-bold tracking-tighter</code> (48px static). Longer names wrap naturally onto two lines instead of shrinking.</li>
+                                    <li><strong>Main Artist Header:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-3xl lg:text-5xl font-bold tracking-tight</code> (30px mobile &lt;lg, 48px desktop lg+). Longer names wrap naturally between words instead of mid-word fracturing.</li>
                                     <li><strong>Curator Summary Quote:</strong> Standardized to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-xl font-serif italic text-zinc-100</code> (20px static). Placed tightly beneath metadata tags to eliminate empty layout spacers.</li>
                                 </ul>
                             </div>
@@ -4667,7 +4667,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
                                 <div className="flex items-start justify-between mb-6">
                                     <div className="space-y-2">
-                                        <h3 className="text-xl font-medium text-white">Magazine View (Desktop Only)</h3>
+                                        <h3 className="text-xl font-medium text-white">Magazine View / Zine</h3>
                                         <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
                                             For deep analysis, users can expand the Deep Cut panel into a full-window responsive grid. This view is optimized for large displays, presenting multiple artist profiles in a scrollable, high-density layout similar to a digital music publication.
                                         </p>
