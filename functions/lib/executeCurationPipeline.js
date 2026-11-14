@@ -401,7 +401,10 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     }
                 }
             }
-            const result = await (0, curatorService_1.generateGraphDataBackend)(payload.artists, payload.filters, isComplexGeneration ? undefined : payload.cachedSubgraphsContext, isComplexGeneration ? undefined : payload.baseGraph, disambiguationHintsForPrompt);
+            const displayArtistsForPrompt = resolvedSeedArray.length > 0
+                ? resolvedSeedArray.map(s => s.name || s.id).join('::')
+                : payload.artists;
+            const result = await (0, curatorService_1.generateGraphDataBackend)(displayArtistsForPrompt, payload.filters, isComplexGeneration ? undefined : payload.cachedSubgraphsContext, isComplexGeneration ? undefined : payload.baseGraph, disambiguationHintsForPrompt);
             finalGraph = result.graphData;
             if (result.apiUsage) {
                 usageCollector.push(result.apiUsage.model, result.apiUsage);

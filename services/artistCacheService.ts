@@ -16,9 +16,10 @@ import {
   extractCountrySlug as extractIsoCountrySlug,
   extractTrailingCountryIso,
   stripCountrySlug,
+  canonicalizeEntitySlugWithCountry,
   ISO_TO_COUNTRY_NAME,
 } from '../shared/isoCountries';
-export { stripCountrySlug };
+export { stripCountrySlug, canonicalizeEntitySlugWithCountry };
 import { stripSceneNamespace } from '../shared/multiSceneUtils';
 import { sanitizeNotableArtists, sanitizeAlbumName } from './geminiService';
 
@@ -38,7 +39,7 @@ export const triggerAssetHealing = async (
 ): Promise<any | null> => {
   let normId = entityType === 'label'
     ? normalizeLabelId(displayName || rawId)
-    : normalizeArtistId(rawId);
+    : canonicalizeEntitySlugWithCountry(rawId);
   if (entityType === 'label' && normId === 'century') {
     normId = 'century-media';
   }
@@ -931,8 +932,12 @@ export const writeArtistCacheMany = async (
       if (!countryNorm) countryNorm = "global";
 
       const isLabel = canonicalNode?.type === 'label';
-      const disambiguatedCanonicalId = canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`;
-      const disambiguatedArtistId = artistId.endsWith(`-${countryNorm}`) ? artistId : `${artistId}-${countryNorm}`;
+      const disambiguatedCanonicalId = isLabel || countryNorm === 'global'
+        ? (canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`)
+        : canonicalizeEntitySlugWithCountry(canonicalId, countryNorm);
+      const disambiguatedArtistId = isLabel || countryNorm === 'global'
+        ? (artistId.endsWith(`-${countryNorm}`) ? artistId : `${artistId}-${countryNorm}`)
+        : canonicalizeEntitySlugWithCountry(artistId, countryNorm);
 
       const compositeCanonicalId = buildCompositeCacheKey(disambiguatedCanonicalId, filters);
       const compositeArtistId = buildCompositeCacheKey(disambiguatedArtistId, filters);
@@ -1349,10 +1354,13 @@ export const isCacheExpired = (dataOrTimestamp: any): boolean => {
  * Supports up to 3 levels of redirects to prevent infinite loops.
  */
 export const getEntityDocWithRedirect = async (
-  entityId: string,
+  rawEntityId: string,
   entityType = 'artist',
   depth = 0
 ): Promise<DocumentSnapshot> => {
+  const entityId = (depth === 0 && entityType !== 'label')
+    ? (canonicalizeEntitySlugWithCountry(rawEntityId) || rawEntityId)
+    : rawEntityId;
   const collName = entityType === 'label' ? 'labels' : 'artists';
   const apiPath = entityType === 'label' ? '/api/label/' : '/api/artist/';
   try {

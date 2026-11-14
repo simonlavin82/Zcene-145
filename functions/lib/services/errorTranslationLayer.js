@@ -16,6 +16,13 @@ class ZceneError extends Error {
 exports.ZceneError = ZceneError;
 exports.ERROR_MAPPING_RULES = [
     {
+        scenario: "Deep Web Session Required (403)",
+        rawPattern: "DEEP_WEB_SESSION_REQUIRED",
+        finalMessage: "Deep Connections session required. Unlock a 3-message Deep Connections session to continue.",
+        severity: "system",
+        targetComponent: "GLOBAL TOAST"
+    },
+    {
         scenario: "API Key / Model Mismatch",
         rawPattern: "Requested entity was not found",
         finalMessage: "The requested model refuses to dialogue with this key. Select a new API key below to re-establish the curatorial connection.",

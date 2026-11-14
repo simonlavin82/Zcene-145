@@ -37,9 +37,12 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
     if (!apiKey) {
         throw new https_1.HttpsError("failed-precondition", "GEMINI_API_KEY is not defined in environment secrets.");
     }
-    // [Rule 36] Strict Taxonomy Normalization
+    // [Rule 36] Strict Taxonomy Normalization (strip stacked -usa-us / -usa suffixes to canonical 2-letter ISO)
     let canonicalId = (0, curatorService_1.normalizeArtistId)(entityId);
     const isLabel = entityType === 'label';
+    if (!isLabel) {
+        canonicalId = (0, isoCountries_1.canonicalizeEntitySlugWithCountry)(canonicalId, countrySlug) || canonicalId;
+    }
     if (isLabel) {
         canonicalId = (0, curatorService_1.normalizeLabelId)(entityId); // Strips -records, -music, -group, etc. (preserves -media)
         if (displayName) {

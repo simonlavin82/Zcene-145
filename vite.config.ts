@@ -55,7 +55,10 @@ export default defineConfig(({ mode }) => {
     },
     define: {
       'process.env.API_KEY': env.GEMINI_API_KEY ? JSON.stringify(env.GEMINI_API_KEY) : 'window.GEMINI_API_KEY',
-      'process.env.GEMINI_API_KEY': env.GEMINI_API_KEY ? JSON.stringify(env.GEMINI_API_KEY) : 'window.GEMINI_API_KEY'
+      'process.env.GEMINI_API_KEY': env.GEMINI_API_KEY ? JSON.stringify(env.GEMINI_API_KEY) : 'window.GEMINI_API_KEY',
+      ...(mode !== 'test' ? {
+        'import.meta.env.VITE_USE_CLOUD_CURATION': JSON.stringify(env.VITE_USE_CLOUD_CURATION || 'true')
+      } : {})
     },
     resolve: {
       alias: {

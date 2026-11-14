@@ -33,7 +33,13 @@ import { TOKEN_PRICING } from '../../shared/tokenEconomy';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
 import { BACKEND_REGRESSION_RUNBOOK } from '../../docs/backend-regression-runbook';
 import { ARCHITECTURE_RULES } from '../../components/EnginePage';
-import { applyShareBlacklistMutation } from '../../App';
+import {
+  applyShareBlacklistMutation,
+  USE_CLOUD_CURATION,
+  resolveUseCloudCuration,
+  canonicalizeEntitySlugWithCountry,
+  resolveMultiSceneSeedImageUrls,
+} from '../../App';
 import { PreFlightSeed } from '../../components/SharedModals';
 import { ProjectScene, CrossSceneLink, CanvasNodeRef } from '../../types';
 
@@ -3014,6 +3020,63 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(idealLeftInContainer).toBe(100);
       expect(offsetLeftRelativeToPill).toBe(0);
       expect(idealLeftInContainer + MENU_WIDTH).toBeLessThanOrEqual(containerWidth);
+    });
+  });
+
+  describe('V44 Dashboard Confessional Regression & Cloud Curation Default Guardrails', () => {
+    it('Guardrail 1: USE_CLOUD_CURATION defaults to true even when VITE_USE_CLOUD_CURATION is undefined', () => {
+      expect(import.meta.env.VITE_USE_CLOUD_CURATION).toBeUndefined();
+      expect(USE_CLOUD_CURATION).toBe(true);
+      expect(resolveUseCloudCuration(undefined)).toBe(true);
+      expect(resolveUseCloudCuration('true')).toBe(true);
+      expect(resolveUseCloudCuration('')).toBe(true);
+      expect(resolveUseCloudCuration('false')).toBe(false);
+      expect(resolveUseCloudCuration(false)).toBe(false);
+    });
+
+    it('Step 3: canonicalizeEntitySlugWithCountry & stripCountrySlug eliminate -usa and stacked -usa-us suffixes while preserving 2-letter band names', () => {
+      expect(canonicalizeEntitySlugWithCountry('dashboard-confessional-usa', 'USA')).toBe('dashboard-confessional-us');
+      expect(canonicalizeEntitySlugWithCountry('dashboard-confessional-usa-us', 'us')).toBe('dashboard-confessional-us');
+      expect(canonicalizeEntitySlugWithCountry('brand-new-usa-us')).toBe('brand-new-us');
+      expect(canonicalizeEntitySlugWithCountry('further-seems-forever-usa')).toBe('further-seems-forever-us');
+      expect(canonicalizeEntitySlugWithCountry('end-it', 'us')).toBe('end-it-us');
+      expect(canonicalizeEntitySlugWithCountry('end-it-usa-us', 'us')).toBe('end-it-us');
+      expect(stripCountrySlug('dashboard-confessional-usa-us')).toBe('dashboard-confessional');
+      expect(stripCountrySlug('brand-new-usa')).toBe('brand-new');
+      expect(stripCountrySlug('end-it-us')).toBe('end-it');
+      expect(stripCountrySlug('vein-fm-us')).toBe('vein-fm');
+    });
+
+    it('Step 4: resolveMultiSceneSeedImageUrls resolves seed artwork across bare, -us, and -usa cache keys and computeAutosaveDocSnapshot tracks seedImageUrls', () => {
+      const cache = new Map<string, any>([
+        ['dashboard-confessional-usa', { imageUrl: 'https://is1-ssl.mzstatic.com/image/thumb/dc.jpg' }],
+      ]);
+      expect(resolveMultiSceneSeedImageUrls(['dashboard-confessional-us'], cache)).toEqual([
+        'https://is1-ssl.mzstatic.com/image/thumb/dc.jpg',
+      ]);
+      expect(resolveMultiSceneSeedImageUrls(['Dashboard Confessional'], cache)).toEqual([
+        'https://is1-ssl.mzstatic.com/image/thumb/dc.jpg',
+      ]);
+
+      const snapEmpty = computeAutosaveDocSnapshot({
+        name: 'Dashboard Confessional',
+        seedArtists: 'Dashboard Confessional',
+        seedImageUrls: [null],
+      });
+      const snapUndefined = computeAutosaveDocSnapshot({
+        name: 'Dashboard Confessional',
+        seedArtists: 'Dashboard Confessional',
+      });
+      // Both unhydrated states normalize to empty array so no false-positive idle save fires
+      expect(snapEmpty).toBe(snapUndefined);
+
+      const snapHydrated = computeAutosaveDocSnapshot({
+        name: 'Dashboard Confessional',
+        seedArtists: 'Dashboard Confessional',
+        seedImageUrl: 'https://is1-ssl.mzstatic.com/image/thumb/dc.jpg',
+        seedImageUrls: ['https://is1-ssl.mzstatic.com/image/thumb/dc.jpg'],
+      });
+      expect(snapHydrated).not.toBe(snapEmpty);
     });
   });
 });

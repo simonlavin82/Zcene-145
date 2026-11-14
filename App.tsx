@@ -6,7 +6,8 @@ import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink } from './types';
 import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeduplicatedActiveNodes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
-import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing, stripCountrySlug } from './services/artistCacheService';
+import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing, stripCountrySlug, canonicalizeEntitySlugWithCountry } from './services/artistCacheService';
+export { canonicalizeEntitySlugWithCountry };
 import { qualifyCacheEntry, deriveRoutingDecision, isLocallyRenderable, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
 import { normalizeCountry } from './utils/normalization';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from './utils/projectHydrationFingerprint';
@@ -84,13 +85,19 @@ const formatSeed = (str: string) => {
 
 import { httpsCallable } from 'firebase/functions';
 
+export const resolveUseCloudCuration = (
+  envValue: unknown = import.meta.env.VITE_USE_CLOUD_CURATION
+): boolean => envValue !== 'false' && envValue !== false;
+
+export const USE_CLOUD_CURATION: boolean = import.meta.env.VITE_USE_CLOUD_CURATION !== 'false';
+
 /**
  * V43.1 Multi-Scene Seed Artwork Resolver.
  * Resolves one cover URL per Root Artist across ALL scenes. Previously-frozen URLs
  * (`previousSeedNames` ↔ `previousUrls`) are reused when the detailsCache lacks an entry, so a
  * settled scene's artwork is never dropped while another scene is mapping.
  */
-const resolveMultiSceneSeedImageUrls = (
+export const resolveMultiSceneSeedImageUrls = (
   allSeedNames: string[],
   cache: Map<string, any>,
   previousSeedNames: string[] = [],
@@ -100,18 +107,31 @@ const resolveMultiSceneSeedImageUrls = (
   const prevByNorm = new Map<string, string | null>();
   previousSeedNames.forEach((name, idx) => {
     const url = previousUrls[idx];
-    if (url) prevByNorm.set(normalizeArtistId(name), url);
+    if (url) {
+      const n = normalizeArtistId(name);
+      prevByNorm.set(n, url);
+      const bare = stripCountrySlug(n);
+      if (bare) prevByNorm.set(bare, url);
+    }
   });
   const isValid = (u: any): u is string => typeof u === 'string' && u.trim().length > 0 && u !== 'not-found';
   return allSeedNames.map((seedName, idx) => {
     const norm = normalizeArtistId(seedName);
-    let details = cache.get(norm) || cache.get(seedName.toLowerCase());
+    const bareNorm = stripCountrySlug(norm);
+    let details = cache.get(norm) || cache.get(seedName.toLowerCase()) || (bareNorm ? cache.get(bareNorm) : undefined);
     if (!details) {
-      const fallbackKey = Array.from(cache.keys()).find(k => (k as string).startsWith(norm + '-'));
+      const fallbackKey = Array.from(cache.keys()).find(k => {
+        const kStr = String(k);
+        return (
+          kStr.startsWith(norm + '-') ||
+          (bareNorm && (kStr === bareNorm || kStr.startsWith(bareNorm + '-'))) ||
+          (bareNorm && stripCountrySlug(normalizeArtistId(kStr)) === bareNorm)
+        );
+      });
       if (fallbackKey) details = cache.get(fallbackKey);
     }
     let url = (details as any)?.imageUrl || (details as any)?.details?.imageUrl || null;
-    if (!isValid(url)) url = prevByNorm.get(norm) || null;
+    if (!isValid(url)) url = prevByNorm.get(norm) || (bareNorm ? prevByNorm.get(bareNorm) : null) || null;
     if (idx === 0 && !isValid(url) && firstSeedFallbackUrl) url = firstSeedFallbackUrl;
     return isValid(url) ? url.trim() : null;
   });
@@ -2928,7 +2948,7 @@ const App: React.FC = () => {
         
       if (node.type !== 'label' && connectedCountries.length > 0) {
         const countryNorm = extractCountrySlug(connectedCountries[0]);
-        if (countryNorm && countryNorm !== 'global') disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
+        if (countryNorm && countryNorm !== 'global') disambiguatedCacheId = canonicalizeEntitySlugWithCountry(simpleId, countryNorm);
       }
     }
 
@@ -3369,11 +3389,18 @@ const App: React.FC = () => {
     );
 
     const primarySaveSeedNorm = saveSeedNorms[0] || '';
+    const primarySaveSeedBare = stripCountrySlug(primarySaveSeedNorm);
     let saveImageDetails = null;
     if (primarySaveSeedNorm) {
-      saveImageDetails = detailsCache.get(primarySaveSeedNorm) || detailsCache.get((seedList[0] || '').toLowerCase());
+      saveImageDetails =
+        detailsCache.get(primarySaveSeedNorm) ||
+        (primarySaveSeedBare ? detailsCache.get(primarySaveSeedBare) : undefined) ||
+        detailsCache.get((seedList[0] || '').toLowerCase());
       if (!saveImageDetails) {
-        const fallbackKey = Array.from(detailsCache.keys()).find(k => (k as string).startsWith(primarySaveSeedNorm + '-'));
+        const fallbackKey = Array.from(detailsCache.keys()).find(k => {
+          const kStr = k as string;
+          return kStr.startsWith(primarySaveSeedNorm + '-') || (primarySaveSeedBare && kStr.startsWith(primarySaveSeedBare + '-'));
+        });
         if (fallbackKey) {
           saveImageDetails = detailsCache.get(fallbackKey);
         }
@@ -4526,6 +4553,9 @@ const App: React.FC = () => {
                 const resolvedId = normalizeArtistId(preFlightSeed.candidateId);
                 resolvedArtistSeeds[i] = resolvedId;
                 activeSeedNames[resolvedId] = cleanDisplayName;
+                activeSeedNames[normalizeArtistId(searchId)] = cleanDisplayName;
+                activeDisambiguationHints[resolvedId] = rawCountryName;
+                if (preFlightSeed.genre) activeDisambiguationGenres[resolvedId] = preFlightSeed.genre;
                 if (resolvedId !== searchId) {
                   activeOriginalQueries[resolvedId] = searchId;
                 } else if (preFlightSeed.originalQuery) {
@@ -4593,8 +4623,28 @@ const App: React.FC = () => {
       }
       
       
+      const resolveSeedDisplayName = (rawSeed: string): string => {
+        const trimmed = (rawSeed || '').trim();
+        if (!trimmed) return '';
+        const norm = normalizeArtistId(trimmed);
+        const bare = stripCountrySlug(norm);
+        return (
+          activeSeedNames[trimmed] ||
+          activeSeedNames[norm] ||
+          activeSeedNames[trimmed.toLowerCase()] ||
+          (bare ? activeSeedNames[bare] : undefined) ||
+          trimmed
+        );
+      };
+      const displayArtists = artists
+        .split('::')
+        .map(resolveSeedDisplayName)
+        .filter(Boolean)
+        .join('::') || artists;
+      const resolvedSeedIds = artistList.map(a => normalizeArtistId(a));
+
       // 4. Database Minting (Step Zero)
-      let freshlyMintedProjectId = null;
+      let freshlyMintedProjectId: string | null = null;
       if (user && !currentProjectId && !isGuest && !isRegeneration && !graphToEnhance) {
         const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
         const newId = newDocRef.id;
@@ -4605,7 +4655,7 @@ const App: React.FC = () => {
 
         let defaultName = projectName || "Untitled Zcene";
         if (!projectName || projectName === "Untitled Zcene" || isLiveSynthesisTemp) {
-          const seeds = artists.split('::').map(s => s.trim()).filter(Boolean);
+          const seeds = displayArtists.split('::').map(s => s.trim()).filter(Boolean);
           if (seeds.length > 1) {
             defaultName = seeds.map(formatSeed).join(' + ');
           } else if (seeds.length === 1) {
@@ -4615,9 +4665,9 @@ const App: React.FC = () => {
 
         const stepZeroScene: ProjectScene = normalizeProjectScene({
           ...createEmptyScene(0),
-          seedArtists: artists,
-          seedIds: artistList.map(a => normalizeArtistId(a)),
-          seedArtistIds: artistList.map(a => normalizeArtistId(a)),
+          seedArtists: displayArtists,
+          seedIds: resolvedSeedIds,
+          seedArtistIds: resolvedSeedIds,
           discoveryFilters: activeDiscoveryFilters,
           status: 'curating'
         }, 0);
@@ -4628,7 +4678,7 @@ const App: React.FC = () => {
 
         await setDoc(newDocRef, {
           name: defaultName,
-          seedArtists: artists,
+          seedArtists: displayArtists,
           graphData: JSON.stringify({ nodes: [], links: [] }),
           activeNodes: [],
           detailsCache: '[]',
@@ -4650,6 +4700,8 @@ const App: React.FC = () => {
         });
         console.log(`[Step Zero] Minted new project: ${newId} AFTER validation gates`);
       }
+
+      const activeProjId = freshlyMintedProjectId || explicitProjectId || currentProjectIdRef.current || currentProjectId || undefined;
 
       // Concurrently fetch baseline cache ...
       if (isLiveSynthesis) {
@@ -4761,7 +4813,7 @@ const App: React.FC = () => {
 
     // Synchronously update scenesRef.current and setScenes for the active scene BEFORE executeCurationPipeline is invoked
     {
-      const nextSeedIds = artistList.map(a => normalizeArtistId(a));
+      const nextSeedIds = resolvedSeedIds;
       const baseScenesList = scenesRef.current.length > 0 ? [...scenesRef.current] : [createEmptyScene(0)];
       let sIdx = baseScenesList.findIndex(s => (s.sceneId || s.id) === activeSceneKey);
       if (sIdx === -1) {
@@ -4772,7 +4824,7 @@ const App: React.FC = () => {
         id: activeSceneKey,
         sceneId: activeSceneKey,
         sceneIndex: sIdx,
-        seedArtists: artists,
+        seedArtists: displayArtists,
         seedIds: nextSeedIds,
         seedArtistIds: nextSeedIds,
         discoveryFilters: activeDiscoveryFilters
@@ -4781,7 +4833,7 @@ const App: React.FC = () => {
       setScenes(baseScenesList);
     }
 
-    setIsLoading(true); setError(null); setSeedArtists(artists);
+    setIsLoading(true); setError(null); setSeedArtists(displayArtists);
     isFetchingDetailsRef.current = false;
     fetchingNodeIdsRef.current.clear();
     setLoadingNodeIds(new Set());
@@ -5080,7 +5132,7 @@ const App: React.FC = () => {
           if (!allQualified || needsAssetHydration) {
             console.log(`[Front Gate Cache] Cache hit missing assets. Silent background revalidation queued (Smart Bypass).`);
             // Trigger Smart Bypass without blocking the UI
-            if (import.meta.env.VITE_USE_CLOUD_CURATION === 'true' && user?.uid) {
+            if (import.meta.env.VITE_USE_CLOUD_CURATION !== 'false' && user?.uid) {
               generateGraphDataViaCloudJob(
                 artists,
                 activeDiscoveryFilters,
@@ -5100,7 +5152,7 @@ const App: React.FC = () => {
                     console.warn("Failed to parse detailsCache from silent cloud job:", e);
                   }
                 },
-                explicitProjectId || currentProjectIdRef.current || currentProjectId || undefined,
+                activeProjId || explicitProjectId || currentProjectIdRef.current || currentProjectId || undefined,
                 `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
                 activeDisambiguationHints,
                 activeDisambiguationGenres,
@@ -5433,7 +5485,7 @@ const App: React.FC = () => {
         }
 
         // Call Gemini ONLY for the missing and enrichment artists
-        const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION === 'true';
+        const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION !== 'false';
         let partialGraphPromise;
         let partialActiveJobId: string | undefined = undefined;
         if (useCloudCuration && user?.uid) {
@@ -5745,7 +5797,7 @@ const App: React.FC = () => {
     });
 
 
-      const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION === 'true';
+      const useCloudCuration = import.meta.env.VITE_USE_CLOUD_CURATION !== 'false';
       let graphPromise;
       let activeJobId: string | undefined = undefined;
       if (useCloudCuration && user?.uid) {
@@ -5753,7 +5805,7 @@ const App: React.FC = () => {
         const jobId = `job-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
 
         // Stateful Project UX: Update project document immediately before running job
-        const activeProjectId = currentProjectIdRef.current || currentProjectId;
+        const activeProjectId = activeProjId || currentProjectIdRef.current || currentProjectId;
         if (activeProjectId && !isGuest) {
           const projectPath = `users/${user.uid}/projects/${activeProjectId}`;
           
@@ -5766,11 +5818,11 @@ const App: React.FC = () => {
           const allSceneSeedStrs = scenesRef.current.length > 1
             ? Array.from(new Set([
                 ...scenesRef.current.filter(s => (s.sceneId || s.id) !== targetSceneId).flatMap(s => toSeedArtistsArray(s.seedArtists)),
-                ...toSeedArtistsArray(artists)
+                ...toSeedArtistsArray(displayArtists)
               ]))
-            : toSeedArtistsArray(artists);
+            : toSeedArtistsArray(displayArtists);
           // V43.1: top-level seedArtists is project-scoped (all scenes), never only the active scene.
-          const projectScopedSeedArtists = allSceneSeedStrs.length > 0 ? allSceneSeedStrs.join('::') : artists;
+          const projectScopedSeedArtists = allSceneSeedStrs.length > 0 ? allSceneSeedStrs.join('::') : displayArtists;
           if (isNewOrUntitled || (isLiveSynthesisTemp && !isRegeneration) || scenesRef.current.length > 1) {
             defaultName = generateProjectTitleFromScenes(scenesRef.current, detailsCacheRef.current as Map<string, any>);
           }
@@ -5830,9 +5882,9 @@ const App: React.FC = () => {
                 id: targetSceneIdForJob,
                 sceneId: targetSceneIdForJob,
                 sceneIndex: idx,
-                seedArtists: artists,
-                seedIds: artistList.map(a => normalizeArtistId(a)),
-                seedArtistIds: artistList.map(a => normalizeArtistId(a)),
+                seedArtists: displayArtists,
+                seedIds: resolvedSeedIds,
+                seedArtistIds: resolvedSeedIds,
                 discoveryFilters: activeDiscoveryFilters,
                 status: 'curating'
               }, idx)
@@ -5841,7 +5893,7 @@ const App: React.FC = () => {
         scenesRef.current = synchronizedScenesForJob;
 
         graphPromise = generateGraphDataViaCloudJob(
-          artists, // Raw display names to prevent LLM hallucinations
+          artists, // Raw display names or resolved canonical seed IDs paired with activeSeedNames
           activeDiscoveryFilters,
           user.uid,
           controller?.signal,
@@ -5858,7 +5910,7 @@ const App: React.FC = () => {
               console.warn("Failed to parse detailsCache from cloud job:", e);
             }
           },
-          explicitProjectId || currentProjectIdRef.current || currentProjectId || undefined,
+          activeProjId || explicitProjectId || currentProjectIdRef.current || currentProjectId || undefined,
           jobId,
           activeDisambiguationHints,
           activeDisambiguationGenres,
@@ -5898,7 +5950,7 @@ const App: React.FC = () => {
       // If we are using the cloud worker pipeline on a saved project, we MUST ignore this HTTP 200 OK 
       // structural payload. The UI state will remain locked (isLoading = true) until the background 
       // worker fully hydrates the graph and the onSnapshot listener detects status === 'completed'.
-      if (useCloudCuration && user?.uid && (currentProjectId || currentProjectIdRef.current) && !isGuest && activeJobId) {
+      if (useCloudCuration && user?.uid && (activeProjId || currentProjectId || currentProjectIdRef.current) && !isGuest && activeJobId) {
         console.log(`[Render Lock] Structural payload received (200 OK) with activeJobId ${activeJobId}. Bypassing legacy state merge. Awaiting background hydration.`);
         return; 
       }
@@ -5912,18 +5964,26 @@ const App: React.FC = () => {
       const mappedSeeds = artists.split('::').map(a => {
         const trimmed = a.trim();
         const canonicalNode = findCanonicalNodeForArtist(trimmed, newData.nodes);
-        if (canonicalNode && normalizeArtistId(canonicalNode.id) !== normalizeArtistId(trimmed)) {
+        const normNodeBase = canonicalNode ? stripCountrySlug(canonicalizeEntitySlugWithCountry(canonicalNode.id)) : '';
+        const normTrimmedBase = stripCountrySlug(canonicalizeEntitySlugWithCountry(trimmed));
+        const normLabelBase = canonicalNode?.label ? stripCountrySlug(normalizeArtistId(canonicalNode.label)) : normNodeBase;
+        if (
+          canonicalNode &&
+          normNodeBase !== normTrimmedBase &&
+          normLabelBase !== normTrimmedBase
+        ) {
           seedUpdated = true;
-          canonicalSeedIds.push(canonicalNode.id);
-          showToast(`Did you mean ${canonicalNode.label || canonicalNode.id}? Resolved '${trimmed}' to '${canonicalNode.label || canonicalNode.id}'.`);
+          canonicalSeedIds.push(canonicalizeEntitySlugWithCountry(canonicalNode.id) || canonicalNode.id);
+          const displayTrimmed = resolveSeedDisplayName(trimmed);
+          showToast(`Did you mean ${canonicalNode.label || canonicalNode.id}? Resolved '${displayTrimmed}' to '${canonicalNode.label || canonicalNode.id}'.`);
           return canonicalNode.label || canonicalNode.id;
         }
-        canonicalSeedIds.push(trimmed);
-        return trimmed;
+        canonicalSeedIds.push(canonicalNode ? (canonicalizeEntitySlugWithCountry(canonicalNode.id) || canonicalNode.id) : trimmed);
+        return resolveSeedDisplayName(trimmed);
       });
 
-      let resolvedArtists = artists;
-      let resolvedArtistList = artistList;
+      let resolvedArtists = displayArtists;
+      let resolvedArtistList = canonicalSeedIds.map(a => canonicalizeEntitySlugWithCountry(a) || normalizeArtistId(a));
       let mutatedNewData = { ...newData };
       let mutatedPruned = pruned ? { ...pruned } : null;
 
@@ -6157,9 +6217,30 @@ const App: React.FC = () => {
 
       setLastAppliedFilters(activeDiscoveryFilters);
 
+      const targetProjId = activeProjId || currentProjectIdRef.current || currentProjectId;
+      const targetSceneIdForGuard = activeSceneIdRef.current || 'scene-1';
+      if (scenesRef.current.length > 0) {
+        const sIdx = Math.max(0, scenesRef.current.findIndex(s => (s.sceneId || s.id) === targetSceneIdForGuard));
+        const updatedScenes = [...scenesRef.current];
+        updatedScenes[sIdx] = normalizeProjectScene({
+          ...updatedScenes[sIdx],
+          id: targetSceneIdForGuard,
+          sceneId: targetSceneIdForGuard,
+          sceneIndex: sIdx,
+          seedArtists: resolvedArtists,
+          seedIds: resolvedArtistList.map(a => normalizeArtistId(a)),
+          seedArtistIds: resolvedArtistList.map(a => normalizeArtistId(a)),
+          graphData: final,
+          synthesisRationale: final.synthesisRationale || updatedScenes[sIdx]?.synthesisRationale || '',
+          status: activeJobId ? 'curating' : 'ready'
+        }, sIdx);
+        scenesRef.current = updatedScenes;
+        setScenes(updatedScenes);
+      }
+
       // Phase 3 Hydration Guard
-      if (currentProjectIdRef.current && user && !isGuest) {
-        const projectPath = `users/${user.uid}/projects/${currentProjectIdRef.current}`;
+      if (targetProjId && user && !isGuest) {
+        const projectPath = `users/${user.uid}/projects/${targetProjId}`;
         try {
           if (selectedNodeData) {
               const nodeIndex = final.nodes.findIndex((n: any) => n.id === selectedNodeData.id);
@@ -6195,6 +6276,14 @@ const App: React.FC = () => {
     } catch (err: any) {
       sessionTokenApprovedRef.current = false;
       curationSessionIdRef.current = null;
+      const errProjId = explicitProjectId || currentProjectIdRef.current || currentProjectId;
+      if (errProjId && user && !isGuest) {
+        const hasNodes = Boolean(graphDataRef.current?.nodes && graphDataRef.current.nodes.length > 0);
+        updateDoc(doc(db, `users/${user.uid}/projects/${errProjId}`), {
+          status: hasNodes ? 'completed' : 'idle',
+          updatedAt: serverTimestamp()
+        }).catch(() => {});
+      }
       if (err.name !== 'AbortError' && !(controller && controller.signal.aborted)) {
         if (err.message && err.message.includes("discover any relational bridges")) {
           setFilterGuidanceState({
@@ -6551,11 +6640,11 @@ const App: React.FC = () => {
         .filter((no: any) => no && no.type === 'country')
         .map((no: any) => no.label || stripSceneNamespace(no.canonicalId || no.id));
 
-      let cacheId = simpleId;
+      let cacheId = n.type === 'label' ? simpleId : (canonicalizeEntitySlugWithCountry(simpleId) || simpleId);
       if (n.type !== 'label' && connectedCountries.length > 0) {
         const countryNorm = extractCountrySlug(connectedCountries[0]);
         if (countryNorm && countryNorm !== 'global') {
-          cacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
+          cacheId = canonicalizeEntitySlugWithCountry(simpleId, countryNorm);
         }
       }
 
@@ -8447,7 +8536,7 @@ const App: React.FC = () => {
     // pipeline (Firestore / zcene-backend-proxy). The frontend must never call
     // Gemini directly. Missing data means hydration is still in-flight; show a
     // skeleton, not a panic fetch.
-    const isCloudCurationMode = import.meta.env.VITE_USE_CLOUD_CURATION === 'true';
+    const isCloudCurationMode = import.meta.env.VITE_USE_CLOUD_CURATION !== 'false';
 
     const shouldMock = (import.meta.env.VITE_USE_MOCKS === 'true') || (import.meta.env.VITE_USE_MOCKS !== 'false' && (isLocal || import.meta.env.DEV));
     if (shouldMock || isCloudCurationMode) {
@@ -8618,7 +8707,7 @@ const App: React.FC = () => {
             
           if (connectedCountries.length > 0) {
             const countryNorm = extractCountrySlug(connectedCountries[0]);
-            if (countryNorm && countryNorm !== 'global') disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
+            if (countryNorm && countryNorm !== 'global') disambiguatedCacheId = canonicalizeEntitySlugWithCountry(simpleId, countryNorm);
           }
         }
 
@@ -8709,7 +8798,7 @@ const App: React.FC = () => {
           let disambiguatedCacheId = simpleId;
           if (connectedCountries.length > 0) {
             const countryNorm = extractCountrySlug(connectedCountries[0]);
-            if (countryNorm && countryNorm !== 'global') disambiguatedCacheId = simpleId.endsWith(`-${countryNorm}`) ? simpleId : `${simpleId}-${countryNorm}`;
+            if (countryNorm && countryNorm !== 'global') disambiguatedCacheId = canonicalizeEntitySlugWithCountry(simpleId, countryNorm);
           }
 
           const cachedVal = detailsCache.get(disambiguatedCacheId) || detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase());
@@ -8965,7 +9054,7 @@ const App: React.FC = () => {
                     let canonicalId = canonicalNameFromDetails ? normalizeArtistId(canonicalNameFromDetails) : simpleId;
                     if (freshCountries.length > 0) {
                       const countryNorm = extractCountrySlug(freshCountries[0]);
-                      if (countryNorm && countryNorm !== 'global') canonicalId = canonicalId.endsWith(`-${countryNorm}`) ? canonicalId : `${canonicalId}-${countryNorm}`;
+                      if (countryNorm && countryNorm !== 'global') canonicalId = canonicalizeEntitySlugWithCountry(canonicalId, countryNorm);
                     }
                     const isAlias = canonicalId !== cacheId;
 

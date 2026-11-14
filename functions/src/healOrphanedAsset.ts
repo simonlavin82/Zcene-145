@@ -16,6 +16,7 @@ import {
   extractTrailingCountryIso,
   normalizeIsoCode,
   doesOriginMatchExpectedIso,
+  canonicalizeEntitySlugWithCountry,
   ISO_TO_COUNTRY_NAME
 } from "./shared/isoCountries";
 import { isFullyQualifiedEntityProfile } from "./services/cacheQualification";
@@ -54,9 +55,12 @@ export const healOrphanedAsset = onCall({
     throw new HttpsError("failed-precondition", "GEMINI_API_KEY is not defined in environment secrets.");
   }
 
-  // [Rule 36] Strict Taxonomy Normalization
+  // [Rule 36] Strict Taxonomy Normalization (strip stacked -usa-us / -usa suffixes to canonical 2-letter ISO)
   let canonicalId = normalizeArtistId(entityId);
   const isLabel = entityType === 'label';
+  if (!isLabel) {
+    canonicalId = canonicalizeEntitySlugWithCountry(canonicalId, countrySlug) || canonicalId;
+  }
   if (isLabel) {
     canonicalId = normalizeLabelId(entityId); // Strips -records, -music, -group, etc. (preserves -media)
     if (displayName) {

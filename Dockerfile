@@ -19,5 +19,6 @@ EXPOSE 8080
 
 # Configure environment fallback variable and launch via node production handler
 ENV PORT=8080
+ENV VITE_USE_CLOUD_CURATION=true
 # Launch via node production handler (which now includes the API proxy)
 CMD ["node", "server.js"]

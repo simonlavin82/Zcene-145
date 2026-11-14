@@ -8,7 +8,7 @@
  * resolving strictly to a 2-letter lowercase ISO-3166-1 alpha-2 code or 'global'.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.shouldAdoptCanonicalSlugCandidate = exports.inferNodeOriginsFromCountryLinks = exports.inspectSlugDedupAmbiguity = exports.canonicalizeArtistSlugWithOrigin = exports.isCanonicalCountrySlugOrCode = exports.areCountryIsosCompatible = exports.doesOriginMatchExpectedIso = exports.stripCountrySlug = exports.extractTrailingCountryIso = exports.normalizeIsoCode = exports.extractAllOriginIsos = exports.extractCountrySlug = exports.COUNTRY_ISO_MAP = exports.ISO_TO_COUNTRY_NAME = void 0;
+exports.shouldAdoptCanonicalSlugCandidate = exports.inferNodeOriginsFromCountryLinks = exports.inspectSlugDedupAmbiguity = exports.canonicalizeArtistSlugWithOrigin = exports.canonicalizeEntitySlugWithCountry = exports.isCanonicalCountrySlugOrCode = exports.areCountryIsosCompatible = exports.doesOriginMatchExpectedIso = exports.stripCountrySlug = exports.extractTrailingCountryIso = exports.normalizeIsoCode = exports.extractAllOriginIsos = exports.extractCountrySlug = exports.COUNTRY_ISO_MAP = exports.ISO_TO_COUNTRY_NAME = void 0;
 exports.isEntitySeedMatch = isEntitySeedMatch;
 exports.ISO_TO_COUNTRY_NAME = {
     ad: 'Andorra',
@@ -589,6 +589,51 @@ const FULL_WORD_COUNTRY_SUFFIXES = (() => {
         'russian-federation': 'ru',
         'united-arab-emirates': 'ae',
         'uae': 'ae',
+        'gbr': 'gb',
+        'can': 'ca',
+        'aus': 'au',
+        'deu': 'de',
+        'ger': 'de',
+        'fra': 'fr',
+        'swe': 'se',
+        'nor': 'no',
+        'ita': 'it',
+        'esp': 'es',
+        'bra': 'br',
+        'mex': 'mx',
+        'jpn': 'jp',
+        'kor': 'kr',
+        'tha': 'th',
+        'nld': 'nl',
+        'che': 'ch',
+        'sui': 'ch',
+        'aut': 'at',
+        'bel': 'be',
+        'dnk': 'dk',
+        'fin': 'fi',
+        'irl': 'ie',
+        'isl': 'is',
+        'nzl': 'nz',
+        'pol': 'pl',
+        'prt': 'pt',
+        'rus': 'ru',
+        'zaf': 'za',
+        'arg': 'ar',
+        'chl': 'cl',
+        'col': 'co',
+        'per': 'pe',
+        'idn': 'id',
+        'phl': 'ph',
+        'mys': 'my',
+        'sgp': 'sg',
+        'ind': 'in',
+        'chn': 'cn',
+        'twn': 'tw',
+        'hkg': 'hk',
+        'ukr': 'ua',
+        'grc': 'gr',
+        'tur': 'tr',
+        'isr': 'il',
     };
     for (const [slug, iso] of Object.entries(explicitFullSlugs)) {
         slugToIso.set(slug, iso);
@@ -745,25 +790,15 @@ const extractTrailingCountryIso = (id) => {
     return null;
 };
 exports.extractTrailingCountryIso = extractTrailingCountryIso;
-/**
- * Strips a single trailing country routing suffix (`-th`, `-us`, `-uk`, `-global`, `-thailand`,
- * `-united-states`, etc.) from an entity slug or label when preceded by `-` or `_`.
- * Preserves normal spaced artist names like "End It" (since ' It' is space-separated, not '-it').
- */
-const stripCountrySlug = (name) => {
-    if (!name || typeof name !== 'string')
-        return '';
-    const cleanName = name.trim();
-    if (!cleanName)
-        return '';
+const stripSingleCountrySlugPass = (cleanName) => {
     const lower = cleanName.toLowerCase();
     if (lower.length > 7 && (lower.endsWith('-global') || lower.endsWith('_global'))) {
-        return cleanName.slice(0, cleanName.length - 7);
+        return { prefix: cleanName.slice(0, cleanName.length - 7), strippedIso: 'global' };
     }
-    for (const { suffix } of FULL_WORD_COUNTRY_SUFFIXES) {
+    for (const { suffix, iso } of FULL_WORD_COUNTRY_SUFFIXES) {
         const underscoreVariant = `_${suffix.slice(1)}`;
         if (lower.length > suffix.length && (lower.endsWith(suffix) || lower.endsWith(underscoreVariant))) {
-            return cleanName.slice(0, cleanName.length - suffix.length);
+            return { prefix: cleanName.slice(0, cleanName.length - suffix.length), strippedIso: iso };
         }
     }
     const twoLetterMatch = cleanName.match(/^(.+)[-_]([a-zA-Z]{2})$/);
@@ -771,10 +806,43 @@ const stripCountrySlug = (name) => {
         const prefix = twoLetterMatch[1];
         const code = twoLetterMatch[2].toLowerCase();
         if (prefix.length > 0 && (code === 'uk' || Boolean(exports.ISO_TO_COUNTRY_NAME[code]))) {
-            return prefix;
+            return { prefix, strippedIso: code === 'uk' ? 'gb' : code };
         }
     }
-    return cleanName;
+    return { prefix: cleanName, strippedIso: null };
+};
+/**
+ * Strips trailing country routing suffix(es) (`-th`, `-us`, `-uk`, `-global`, `-thailand`,
+ * `-usa`, `-usa-us`, `-united-states`, etc.) from an entity slug or label when preceded by `-` or `_`.
+ * Preserves normal spaced artist names like "End It" (since ' It' is space-separated, not '-it')
+ * and hyphenated artist names like `end-it-us` -> `end-it` (stops because `-it` != `-us`).
+ */
+const stripCountrySlug = (name) => {
+    if (!name || typeof name !== 'string')
+        return '';
+    const cleanName = name.trim();
+    if (!cleanName)
+        return '';
+    const firstPass = stripSingleCountrySlugPass(cleanName);
+    if (!firstPass.strippedIso || firstPass.prefix === cleanName) {
+        return cleanName;
+    }
+    let current = firstPass.prefix;
+    const targetIso = firstPass.strippedIso;
+    let guard = 0;
+    while (guard++ < 3) {
+        const nextPass = stripSingleCountrySlugPass(current);
+        if (!nextPass.strippedIso || nextPass.prefix === current)
+            break;
+        const isNonTwoLetter = !/[-_][a-zA-Z]{2}$/.test(current);
+        if (nextPass.strippedIso === targetIso || targetIso === 'global' || isNonTwoLetter) {
+            current = nextPass.prefix;
+        }
+        else {
+            break;
+        }
+    }
+    return current;
 };
 exports.stripCountrySlug = stripCountrySlug;
 /**
@@ -895,11 +963,44 @@ function isEntitySeedMatch(seedNorm, candidateNorm) {
     return false;
 }
 /**
+ * Canonicalizes an entity slug with a country code or origin string ([Rule 2] & [Rule 36]):
+ * - Strips any trailing 2-letter or 3-letter/full-word country suffix (including stacked `-usa-us` or `-usa`)
+ *   before appending the canonical 2-letter ISO-3166-1 alpha-2 code (`-us`).
+ * - Preserves spaced/hyphenated band names ending in 2-letter ISO words when origin differs
+ *   (e.g., `"end-it"` + `"us"` -> `"end-it-us"`).
+ */
+const canonicalizeEntitySlugWithCountry = (rawId, countrySlugOrOrigin) => {
+    const normId = normalizeEntitySlugInternal(rawId);
+    if (!normId)
+        return '';
+    const explicitIso = countrySlugOrOrigin ? (0, exports.normalizeIsoCode)(countrySlugOrOrigin) : null;
+    const resolvedIso = explicitIso || (0, exports.extractTrailingCountryIso)(normId);
+    if (!resolvedIso)
+        return normId;
+    let baseId = normId;
+    let guard = 0;
+    while (guard++ < 4) {
+        const trailingIso = (0, exports.extractTrailingCountryIso)(baseId);
+        const isLegacyOrNonCanonicalSuffix = Boolean(trailingIso) && (!/-[a-z]{2}$/i.test(baseId) || baseId.endsWith('-uk'));
+        if (trailingIso && ((0, exports.areCountryIsosCompatible)(trailingIso, resolvedIso) || isLegacyOrNonCanonicalSuffix)) {
+            const pass = stripSingleCountrySlugPass(baseId);
+            if (!pass.strippedIso || pass.prefix === baseId)
+                break;
+            baseId = pass.prefix;
+        }
+        else {
+            break;
+        }
+    }
+    return baseId.endsWith(`-${resolvedIso}`) ? baseId : `${baseId}-${resolvedIso}`;
+};
+exports.canonicalizeEntitySlugWithCountry = canonicalizeEntitySlugWithCountry;
+/**
  * Canonicalizes an artist slug with an origin hint ([Rule 2] & [Rule 36]):
  * - Preserves spaced/hyphenated band names ending in 2-letter ISO words when origin differs
  *   (e.g., `"end-it"` + `"Baltimore, MD, USA"` -> `"end-it-us"`).
- * - Replaces legacy full-country-word suffixes or `-uk` aliases cleanly
- *   (e.g., `"klear-thailand"` + `"Bangkok, Thailand"` -> `"klear-th"`, `"architects-uk"` + `"UK"` -> `"architects-gb"`).
+ * - Replaces legacy full-country-word suffixes, 3-letter suffixes, stacked `-usa-us`, or `-uk` aliases cleanly
+ *   (e.g., `"klear-thailand"` + `"Bangkok, Thailand"` -> `"klear-th"`, `"brand-new-usa-us"` + `"USA"` -> `"brand-new-us"`).
  */
 const canonicalizeArtistSlugWithOrigin = (rawId, origin) => {
     const normId = normalizeEntitySlugInternal(rawId);
@@ -908,14 +1009,7 @@ const canonicalizeArtistSlugWithOrigin = (rawId, origin) => {
     const originSlug = (0, exports.extractCountrySlug)(origin);
     if (!originSlug || originSlug === 'global')
         return normId;
-    if (normId.endsWith(`-${originSlug}`))
-        return normId;
-    const trailingIso = (0, exports.extractTrailingCountryIso)(normId);
-    const isLegacyFullWordSuffix = Boolean(trailingIso) && !/-[a-z]{2}$/i.test(normId);
-    const baseId = (trailingIso && ((0, exports.areCountryIsosCompatible)(trailingIso, originSlug) || isLegacyFullWordSuffix))
-        ? (0, exports.stripCountrySlug)(normId)
-        : normId;
-    return baseId.endsWith(`-${originSlug}`) ? baseId : `${baseId}-${originSlug}`;
+    return (0, exports.canonicalizeEntitySlugWithCountry)(normId, originSlug);
 };
 exports.canonicalizeArtistSlugWithOrigin = canonicalizeArtistSlugWithOrigin;
 /**

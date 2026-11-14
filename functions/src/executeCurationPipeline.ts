@@ -469,8 +469,12 @@ export const executeCurationPipeline = onCall({
       }
     }
 
+    const displayArtistsForPrompt = resolvedSeedArray.length > 0
+      ? resolvedSeedArray.map(s => s.name || s.id).join('::')
+      : payload.artists;
+
     const result = await generateGraphDataBackend(
-      payload.artists, 
+      displayArtistsForPrompt, 
       payload.filters, 
       isComplexGeneration ? undefined : payload.cachedSubgraphsContext, 
       isComplexGeneration ? undefined : payload.baseGraph, 

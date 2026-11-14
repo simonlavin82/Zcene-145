@@ -97,10 +97,16 @@ export const computeAutosaveDocSnapshot = (data: any): string => {
 
   const activeNodes = Array.isArray(data.activeNodes) ? [...data.activeNodes].map(String).sort() : [];
   const pinnedNodes = Array.isArray(data.pinnedNodes) ? [...data.pinnedNodes].map(String).sort() : [];
+  const rawSeedImageUrls = Array.isArray(data.seedImageUrls)
+    ? data.seedImageUrls.map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
+    : [];
+  const seedImageUrls = rawSeedImageUrls.some(Boolean) ? rawSeedImageUrls : [];
 
   return JSON.stringify({
     name: data.name || '',
     seedArtists: data.seedArtists || '',
+    seedImageUrl: typeof data.seedImageUrl === 'string' ? data.seedImageUrl.trim() : '',
+    seedImageUrls,
     scenes: normalizeJson(data.scenes, '[]'),
     overarchingRationale: data.overarchingRationale || '',
     crossSceneLinks: normalizeJson(data.crossSceneLinks, '[]'),
