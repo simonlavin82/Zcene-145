@@ -3,7 +3,16 @@ import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, St
 import { User, db } from '../services/firebase';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
-import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, stripCountrySlug } from '../services/artistCacheService';
+import {
+  normalizeArtistId,
+  normalizeLabelId,
+  titleCaseArtistId,
+  cleanArtistDisplayName,
+  cleanLabelDisplayName,
+  stripCountrySlug,
+  searchGlobalArtistSuggestions,
+  GlobalArtistSuggestion,
+} from '../services/artistCacheService';
 import { hasActiveDiscoveryFilters, sanitizeAnchorLabelInput } from '../services/cacheQualification';
 import { toSeedArtistsArray, stripSceneNamespace, MAX_SCENES_PER_PROJECT, computeClampedDropdownLeft } from '../shared/multiSceneUtils';
 import HelpPage from './HelpPage';
@@ -1904,11 +1913,47 @@ const GraphPage: React.FC<GraphPageProps> = ({
     }
   };
 
+  const [globalSuggestions, setGlobalSuggestions] = useState<GlobalArtistSuggestion[]>([]);
+  const [isSearchingGlobal, setIsSearchingGlobal] = useState(false);
+
+  useEffect(() => {
+    const trimmed = searchTerm.trim();
+    if (trimmed.length < 2) {
+      setGlobalSuggestions([]);
+      setIsSearchingGlobal(false);
+      return;
+    }
+
+    setIsSearchingGlobal(true);
+    let isCancelled = false;
+
+    const timer = setTimeout(async () => {
+      try {
+        const results = await searchGlobalArtistSuggestions(trimmed);
+        if (!isCancelled) {
+          setGlobalSuggestions(results);
+          setIsSearchingGlobal(false);
+        }
+      } catch (err) {
+        if (!isCancelled) {
+          setGlobalSuggestions([]);
+          setIsSearchingGlobal(false);
+        }
+      }
+    }, 200);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [searchTerm]);
+
   const matchingLibraryArtists = useMemo(() => {
     const query = searchTerm.trim().toLowerCase();
     if (!query || !libraryArtists || libraryArtists.length === 0) return [];
 
     const selectedNorms = new Set(selectedSeedArtists.map(s => normalizeArtistId(s.name)));
+    const seenNorms = new Set<string>();
 
     const startsWithMatches: ParsedArtist[] = [];
     const containsMatches: ParsedArtist[] = [];
@@ -1916,7 +1961,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
     for (const artist of libraryArtists) {
       if (!artist || !artist.name) continue;
       const norm = normalizeArtistId(artist.name);
-      if (selectedNorms.has(norm)) continue;
+      if (!norm || selectedNorms.has(norm) || seenNorms.has(norm)) continue;
+      seenNorms.add(norm);
 
       const lowerName = artist.name.toLowerCase();
       if (lowerName.startsWith(query)) {
@@ -1932,7 +1978,72 @@ const GraphPage: React.FC<GraphPageProps> = ({
     return [...startsWithMatches, ...containsMatches].slice(0, 15);
   }, [libraryArtists, searchTerm, selectedSeedArtists]);
 
+  // Guardrail 2: Suppress duplicate rows across Personal Library & Global Archive
+  const filteredGlobalSuggestions = useMemo(() => {
+    if (!globalSuggestions || globalSuggestions.length === 0) return [];
+
+    const selectedNorms = new Set(selectedSeedArtists.map(s => normalizeArtistId(s.name)));
+    const libraryNorms = new Set(matchingLibraryArtists.map(a => normalizeArtistId(a.name)));
+
+    return globalSuggestions.filter(suggestion => {
+      const norm = normalizeArtistId(suggestion.name);
+      if (!norm) return false;
+
+      // Always filter out if already selected as a seed
+      if (selectedNorms.has(norm)) return false;
+
+      // If already displayed in matchingLibraryArtists:
+      // Suppress unless the stub is explicitly ambiguous with multiple candidates
+      if (libraryNorms.has(norm) && !suggestion.isAmbiguous) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [globalSuggestions, selectedSeedArtists, matchingLibraryArtists]);
+
+  type CombinedSuggestionItem =
+    | { type: 'library'; artist: ParsedArtist }
+    | { type: 'global'; suggestion: GlobalArtistSuggestion };
+
+  const combinedSuggestions: CombinedSuggestionItem[] = useMemo(() => {
+    const items: CombinedSuggestionItem[] = [];
+    matchingLibraryArtists.forEach(artist => {
+      items.push({ type: 'library', artist });
+    });
+    filteredGlobalSuggestions.forEach(suggestion => {
+      items.push({ type: 'global', suggestion });
+    });
+    return items;
+  }, [matchingLibraryArtists, filteredGlobalSuggestions]);
+
   const handleSelectLibraryArtist = (artistName: string) => {
+    const normName = normalizeArtistId(artistName);
+    const isAlreadySelected = selectedSeedArtists.some(a => normalizeArtistId(a.name) === normName);
+    if (isAlreadySelected) {
+      setSearchTerm('');
+      setIsSeedDropdownOpen(false);
+      setHighlightedSeedIndex(-1);
+      return;
+    }
+    if (selectedSeedArtists.length >= MAX_SEED_ARTISTS) {
+      setShowLimitDialog(true);
+      return;
+    }
+    setSelectedSeedArtists(prev => {
+      const next = [...prev, { name: artistName, enabled: true }];
+      notifySeedArtistsChange(next);
+      return next;
+    });
+    setSearchTerm('');
+    setIsSeedDropdownOpen(false);
+    setHighlightedSeedIndex(-1);
+    if (!onboardingProgress.step1) updateOnboarding('step1');
+    artistInputRef.current?.focus();
+  };
+
+  const handleSelectGlobalArtist = (suggestion: GlobalArtistSuggestion) => {
+    const artistName = suggestion.name;
     const normName = normalizeArtistId(artistName);
     const isAlreadySelected = selectedSeedArtists.some(a => normalizeArtistId(a.name) === normName);
     if (isAlreadySelected) {
@@ -1961,22 +2072,27 @@ const GraphPage: React.FC<GraphPageProps> = ({
     if (!isSeedDropdownOpen) return;
 
     if (e.key === 'ArrowDown') {
-      if (matchingLibraryArtists.length === 0) return;
+      if (combinedSuggestions.length === 0) return;
       e.preventDefault();
       setHighlightedSeedIndex(prev => 
-        prev < matchingLibraryArtists.length - 1 ? prev + 1 : 0
+        prev < combinedSuggestions.length - 1 ? prev + 1 : 0
       );
     } else if (e.key === 'ArrowUp') {
-      if (matchingLibraryArtists.length === 0) return;
+      if (combinedSuggestions.length === 0) return;
       e.preventDefault();
       setHighlightedSeedIndex(prev => 
-        prev > 0 ? prev - 1 : matchingLibraryArtists.length - 1
+        prev > 0 ? prev - 1 : combinedSuggestions.length - 1
       );
     } else if (e.key === 'Enter') {
-      if (highlightedSeedIndex >= 0 && highlightedSeedIndex < matchingLibraryArtists.length) {
+      if (highlightedSeedIndex >= 0 && highlightedSeedIndex < combinedSuggestions.length) {
         e.preventDefault();
         e.stopPropagation();
-        handleSelectLibraryArtist(matchingLibraryArtists[highlightedSeedIndex].name);
+        const item = combinedSuggestions[highlightedSeedIndex];
+        if (item.type === 'library') {
+          handleSelectLibraryArtist(item.artist.name);
+        } else {
+          handleSelectGlobalArtist(item.suggestion);
+        }
       }
       // If highlightedSeedIndex === -1, default form submission handleAddFromSearch handles custom seed
     } else if (e.key === 'Escape') {
@@ -2373,7 +2489,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                       ref={artistInputRef}
                       onFocus={() => {
                         if (!onboardingProgress.step1) updateOnboarding('step1');
-                        if (searchTerm.trim().length > 0 && libraryArtists.length > 0) {
+                        if (searchTerm.trim().length > 0) {
                           setIsSeedDropdownOpen(true);
                         }
                       }}
@@ -2383,14 +2499,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
                       value={searchTerm}
                       onChange={(e) => {
                         setSearchTerm(e.target.value);
-                        if (libraryArtists.length > 0) {
-                          setIsSeedDropdownOpen(true);
-                          setHighlightedSeedIndex(-1);
-                        }
+                        setIsSeedDropdownOpen(true);
+                        setHighlightedSeedIndex(-1);
                       }}
                       role="combobox"
                       aria-autocomplete="list"
-                      aria-expanded={isSeedDropdownOpen && libraryArtists.length > 0 && searchTerm.trim().length > 0}
+                      aria-expanded={isSeedDropdownOpen && searchTerm.trim().length > 0}
                       aria-controls="seed-autocomplete-list"
                       className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-20 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                     />
@@ -2421,53 +2535,131 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     </div>
                   </form>
 
-                  {/* Inline Library Autocomplete Dropdown */}
-                  {isSeedDropdownOpen && libraryArtists.length > 0 && searchTerm.trim().length > 0 && (
+                  {/* Blended Autocomplete Dropdown (From Your Library & Global Archive) */}
+                  {isSeedDropdownOpen && searchTerm.trim().length > 0 && (
                     <div
                       id="seed-autocomplete-list"
                       role="listbox"
-                      className="absolute top-full left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-2xl py-1"
+                      className="absolute top-full left-0 right-0 z-40 mt-1 max-h-64 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-2xl py-1 divide-y divide-zinc-800/40"
                     >
-                      {matchingLibraryArtists.length > 0 ? (
-                        matchingLibraryArtists.map((artist, idx) => {
-                          const isHighlighted = idx === highlightedSeedIndex;
-                            const normalizedId = normalizeArtistId(artist.name);
-                            const artistGenres = artistGenreMap.get(normalizedId) || artistGenreMap.get(artist.name) || artistGenreMap.get(artist.name.trim());
-                            const primaryGenre = artistGenres && artistGenres.size > 0 ? Array.from(artistGenres)[0] : null;
+                      {combinedSuggestions.length > 0 ? (
+                        <>
+                          {/* Section 1: FROM YOUR LIBRARY */}
+                          {matchingLibraryArtists.length > 0 && (
+                            <div>
+                              <div className="px-3.5 py-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest bg-zinc-950 flex items-center justify-between sticky top-0 z-10 border-b border-zinc-800/60">
+                                <span>From Your Library</span>
+                                <span className="font-mono text-[9px] text-zinc-600">{matchingLibraryArtists.length}</span>
+                              </div>
+                              {matchingLibraryArtists.map((artist, idx) => {
+                                const isHighlighted = idx === highlightedSeedIndex;
+                                const normalizedId = normalizeArtistId(artist.name);
+                                const artistGenres = artistGenreMap.get(normalizedId) || artistGenreMap.get(artist.name) || artistGenreMap.get(artist.name.trim());
+                                const primaryGenre = artistGenres && artistGenres.size > 0 ? Array.from(artistGenres)[0] : null;
 
-                            return (
-                              <button
-                                key={artist.name}
-                                role="option"
-                                aria-selected={isHighlighted}
-                                type="button"
-                                ref={(el) => {
-                                  if (isHighlighted && el) {
-                                    el.scrollIntoView({ block: 'nearest' });
-                                  }
-                                }}
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => handleSelectLibraryArtist(artist.name)}
-                                onMouseEnter={() => setHighlightedSeedIndex(idx)}
-                                className={`w-full text-left px-3.5 py-2.5 text-sm flex items-center justify-between gap-2.5 transition-colors ${
-                                  isHighlighted
-                                    ? 'bg-zinc-800 text-white'
-                                    : 'text-zinc-300 hover:bg-zinc-800/70 hover:text-white'
-                                }`}
-                              >
-                                <span className="truncate font-medium">{artist.name}</span>
-                                {primaryGenre && (
-                                  <span className="text-[10px] text-zinc-500 font-mono flex-shrink-0 uppercase tracking-wider">
-                                    {primaryGenre}
-                                  </span>
-                                )}
-                              </button>
-                            );
-                        })
+                                return (
+                                  <button
+                                    key={`lib-${artist.name}-${idx}`}
+                                    role="option"
+                                    aria-selected={isHighlighted}
+                                    type="button"
+                                    ref={(el) => {
+                                      if (isHighlighted && el) {
+                                        el.scrollIntoView({ block: 'nearest' });
+                                      }
+                                    }}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => handleSelectLibraryArtist(artist.name)}
+                                    onMouseEnter={() => setHighlightedSeedIndex(idx)}
+                                    className={`w-full text-left px-3.5 py-2 text-sm flex items-center justify-between gap-2.5 transition-colors ${
+                                      isHighlighted
+                                        ? 'bg-zinc-800 text-white'
+                                        : 'text-zinc-300 hover:bg-zinc-800/70 hover:text-white'
+                                    }`}
+                                  >
+                                    <span className="truncate font-medium">{artist.name}</span>
+                                    {primaryGenre && (
+                                      <span className="text-[10px] text-zinc-500 font-mono flex-shrink-0 uppercase tracking-wider">
+                                        {primaryGenre}
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+
+                          {/* Section 2: GLOBAL ARCHIVE */}
+                          {filteredGlobalSuggestions.length > 0 && (
+                            <div>
+                              <div className="px-3.5 py-1.5 text-[10px] font-semibold text-zinc-500 uppercase tracking-widest bg-zinc-950 flex items-center justify-between sticky top-0 z-10 border-b border-zinc-800/60">
+                                <span>Global Archive</span>
+                                <div className="flex items-center gap-1.5">
+                                  {isSearchingGlobal && (
+                                    <span className="material-symbols-outlined !text-[12px] animate-spin text-zinc-500">progress_activity</span>
+                                  )}
+                                  <span className="font-mono text-[9px] text-zinc-600">{filteredGlobalSuggestions.length}</span>
+                                </div>
+                              </div>
+                              {filteredGlobalSuggestions.map((suggestion, gIdx) => {
+                                const globalOverallIdx = matchingLibraryArtists.length + gIdx;
+                                const isHighlighted = globalOverallIdx === highlightedSeedIndex;
+                                const metaBadge = [suggestion.origin, suggestion.genre].filter(Boolean).join(' • ');
+
+                                return (
+                                  <button
+                                    key={`glob-${suggestion.id}-${gIdx}`}
+                                    role="option"
+                                    aria-selected={isHighlighted}
+                                    type="button"
+                                    title={suggestion.disambiguationSnippet || undefined}
+                                    ref={(el) => {
+                                      if (isHighlighted && el) {
+                                        el.scrollIntoView({ block: 'nearest' });
+                                      }
+                                    }}
+                                    onMouseDown={(e) => e.preventDefault()}
+                                    onClick={() => handleSelectGlobalArtist(suggestion)}
+                                    onMouseEnter={() => setHighlightedSeedIndex(globalOverallIdx)}
+                                    className={`w-full text-left px-3.5 py-2 text-sm flex items-center justify-between gap-2.5 transition-colors ${
+                                      isHighlighted
+                                        ? 'bg-zinc-800 text-white'
+                                        : 'text-zinc-300 hover:bg-zinc-800/70 hover:text-white'
+                                    }`}
+                                  >
+                                    <div className="min-w-0 flex-1 truncate">
+                                      <span className="truncate font-medium text-white">{suggestion.name}</span>
+                                      {suggestion.disambiguationSnippet && suggestion.isAmbiguous && (
+                                        <p className="text-[11px] text-zinc-400 truncate font-normal mt-0.5">
+                                          {suggestion.disambiguationSnippet}
+                                        </p>
+                                      )}
+                                    </div>
+                                    <div className="flex items-center gap-1.5 flex-shrink-0">
+                                      {metaBadge && (
+                                        <span className="text-[10px] text-zinc-400 font-mono uppercase tracking-wider truncate max-w-[160px]">
+                                          {metaBadge}
+                                        </span>
+                                      )}
+                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 text-zinc-400 font-mono tracking-wider">
+                                        ARCHIVE
+                                      </span>
+                                    </div>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </>
+                      ) : isSearchingGlobal ? (
+                        <div className="px-3.5 py-3 text-xs text-zinc-400 flex items-center gap-2">
+                          <span className="material-symbols-outlined !text-[14px] animate-spin text-zinc-400">progress_activity</span>
+                          <span>Searching global archive...</span>
+                        </div>
                       ) : (
                         <div className="px-3 py-2.5 text-xs text-zinc-400 flex flex-col gap-1">
                           <div className="text-[11px] text-zinc-400">
-                            No matching artists in your library.
+                            No matching artists in your library or global archive.
                           </div>
                           <div className="text-[10px] text-zinc-500">
                             Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[9px]">Enter</kbd> or click <span className="text-zinc-300 font-bold">+</span> to add as custom root.

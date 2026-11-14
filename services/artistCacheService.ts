@@ -10,6 +10,12 @@ import {
   FieldValue,
   Timestamp,
   DocumentSnapshot,
+  collection,
+  query,
+  where,
+  limit,
+  getDocs,
+  documentId,
 } from 'firebase/firestore';
 import { GraphData, Node, Link, ArtistCacheEntry, DiscoveryFilters, NodeDetails } from '../types';
 import {
@@ -1694,4 +1700,200 @@ export const enforceArtistCacheSchema = (payload: any): void => {
     }
   }
 };
+
+// ─── GLOBAL ARTIST AUTOCOMPLETE SUGGESTIONS (V44) ───────────────────────────
+
+export interface GlobalArtistSuggestion {
+  id: string; // canonical ID, e.g. "25hours-th" or "100-demons-us"
+  canonicalId: string;
+  name: string; // clean display name, e.g. "25hours" or "100 Demons"
+  origin?: string;
+  genre?: string;
+  disambiguationSnippet?: string;
+  isStub?: boolean;
+  isAmbiguous?: boolean;
+}
+
+const MAX_PREFIX_CACHE_SIZE = 100;
+const prefixSuggestionCache = new Map<string, GlobalArtistSuggestion[]>();
+
+/**
+ * Resets the in-memory prefix suggestion cache (primarily for unit testing).
+ */
+export const clearPrefixSuggestionCache = (): void => {
+  prefixSuggestionCache.clear();
+};
+
+/**
+ * Searches the global /artists Firestore collection for prefix matches on the document ID / slug.
+ * Safely unpacks router stubs (_isStub: true, candidates: [...]) and non-stub canonical documents,
+ * deduplicating them by canonical ID while preserving multi-country ambiguous homonyms.
+ */
+export const searchGlobalArtistSuggestions = async (
+  queryStr: string,
+  limitCount = 10
+): Promise<GlobalArtistSuggestion[]> => {
+  const slugPrefix = normalizeArtistId(queryStr);
+  if (!slugPrefix || slugPrefix.length < 2) return [];
+
+  // Check in-memory session cache
+  if (prefixSuggestionCache.has(slugPrefix)) {
+    return prefixSuggestionCache.get(slugPrefix)!;
+  }
+
+  try {
+    const q = query(
+      collection(db, 'artists'),
+      where(documentId(), '>=', slugPrefix),
+      where(documentId(), '<=', slugPrefix + '\uf8ff'),
+      limit(limitCount)
+    );
+
+    const snapshot = await getDocs(q);
+    const suggestionMap = new Map<string, GlobalArtistSuggestion>();
+
+    for (const docSnap of snapshot.docs) {
+      const docId = docSnap.id;
+      // Guardrail 1: Filter out internal or system documents
+      if (!docId || docId.startsWith('_') || docId.startsWith('.') || docId === 'connection' || docId.includes('system')) {
+        continue;
+      }
+
+      const data = docSnap.data();
+      if (!data) continue;
+
+      const isStub = Boolean(data._isStub);
+
+      if (isStub) {
+        const isAmbiguous = Boolean(data.isAmbiguous);
+        const candidates: any[] = Array.isArray(data.candidates) ? data.candidates : [];
+
+        if (candidates.length > 0) {
+          for (const cand of candidates) {
+            if (!cand || typeof cand !== 'object') continue;
+            const candId = typeof cand.id === 'string' && cand.id.trim() ? cand.id.trim() : docId;
+            const rawName = cand.name || cand.artist || cand.label || data.artistId || docId;
+            const cleanName = cleanArtistDisplayName(rawName);
+            if (!cleanName) continue;
+
+            const origin = (cand.origin && cand.origin !== 'Unknown' && cand.origin !== 'Unknown Origin')
+              ? String(cand.origin).trim()
+              : undefined;
+            const genre = (cand.genre && cand.genre !== 'Unknown')
+              ? String(cand.genre).trim()
+              : undefined;
+            const snippet = cand.disambiguationSnippet ? String(cand.disambiguationSnippet).trim() : undefined;
+
+            if (!suggestionMap.has(candId)) {
+              suggestionMap.set(candId, {
+                id: candId,
+                canonicalId: candId,
+                name: cleanName,
+                origin,
+                genre,
+                disambiguationSnippet: snippet,
+                isStub: true,
+                isAmbiguous,
+              });
+            } else {
+              // Enrich existing entry if origin/genre/snippet missing
+              const existing = suggestionMap.get(candId)!;
+              if (!existing.origin && origin) existing.origin = origin;
+              if (!existing.genre && genre) existing.genre = genre;
+              if (!existing.disambiguationSnippet && snippet) existing.disambiguationSnippet = snippet;
+            }
+          }
+        } else if (data.redirectTo && typeof data.redirectTo === 'string') {
+          const redirectId = data.redirectTo.trim();
+          const cleanName = cleanArtistDisplayName(data.artistId || docId);
+          if (cleanName && !suggestionMap.has(redirectId)) {
+            suggestionMap.set(redirectId, {
+              id: redirectId,
+              canonicalId: redirectId,
+              name: cleanName,
+              isStub: true,
+              isAmbiguous: false,
+            });
+          }
+        }
+      } else {
+        // Guardrail 1: Non-stub canonical document
+        const canonicalId = typeof data.cacheKey === 'string' && data.cacheKey.trim()
+          ? data.cacheKey.trim()
+          : docId;
+
+        let detailsArtist: string | undefined;
+        let detailsOrigin: string | undefined;
+        let detailsGenre: string | undefined;
+
+        if (data.detailsCache) {
+          try {
+            const parsed = typeof data.detailsCache === 'string'
+              ? JSON.parse(data.detailsCache)
+              : data.detailsCache;
+            const detailsObj = Array.isArray(parsed)
+              ? (Array.isArray(parsed[0]) ? parsed[0][1] : parsed[0])
+              : parsed;
+            const d = detailsObj?.details || detailsObj;
+            if (d) {
+              if (d.artist && typeof d.artist === 'string') detailsArtist = d.artist.trim();
+              if (d.name && typeof d.name === 'string' && !detailsArtist) detailsArtist = d.name.trim();
+              if (d.origin && typeof d.origin === 'string') detailsOrigin = d.origin.trim();
+              if (d.location && typeof d.location === 'string' && !detailsOrigin) detailsOrigin = d.location.trim();
+              if (d.genre && typeof d.genre === 'string') detailsGenre = d.genre.trim();
+            }
+          } catch (e) {
+            // Safe JSON parse error handling
+          }
+        }
+
+        const rawName = data.seedArtists || detailsArtist || data.artistId || docId;
+        const cleanName = cleanArtistDisplayName(rawName);
+        if (!cleanName) continue;
+
+        const origin = (detailsOrigin && detailsOrigin !== 'Unknown' && detailsOrigin !== 'Unknown Origin')
+          ? detailsOrigin
+          : undefined;
+        const genre = (detailsGenre && detailsGenre !== 'Unknown')
+          ? detailsGenre
+          : undefined;
+
+        if (!suggestionMap.has(canonicalId)) {
+          suggestionMap.set(canonicalId, {
+            id: canonicalId,
+            canonicalId,
+            name: cleanName,
+            origin,
+            genre,
+            isStub: false,
+            isAmbiguous: false,
+          });
+        } else {
+          // If already added via router stub candidate, enrich missing metadata
+          const existing = suggestionMap.get(canonicalId)!;
+          if (!existing.origin && origin) existing.origin = origin;
+          if (!existing.genre && genre) existing.genre = genre;
+          if (existing.name.toLowerCase() === canonicalId.toLowerCase() && cleanName) {
+            existing.name = cleanName;
+          }
+        }
+      }
+    }
+
+    const results = Array.from(suggestionMap.values());
+
+    // Manage bounded in-memory cache
+    if (prefixSuggestionCache.size >= MAX_PREFIX_CACHE_SIZE) {
+      const firstKey = prefixSuggestionCache.keys().next().value;
+      if (firstKey) prefixSuggestionCache.delete(firstKey);
+    }
+    prefixSuggestionCache.set(slugPrefix, results);
+
+    return results;
+  } catch (err) {
+    console.warn('[searchGlobalArtistSuggestions] Firestore prefix query failed:', err);
+    return [];
+  }
+};
+
 

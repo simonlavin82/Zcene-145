@@ -3595,6 +3595,37 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
+                            {/* Blended Autocomplete Dropdown (ROOTS Panel) */}
+                            <div>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Blended Autocomplete Dropdown (ROOTS & Seed Input)</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 border border-primary/20 rounded-full">Debounce: 200ms</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Prefix Cache: 100 entries</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Dual-Section: Library + Archive</span>
+                                    </div>
+                                </div>
+                                <div className="p-6 bg-zinc-900/30 rounded-none border border-zinc-800 space-y-4">
+                                    <p className="text-sm text-zinc-300 leading-relaxed max-w-3xl">
+                                        The ROOTS <strong>Add artist</strong> autocomplete seamlessly blends a user&apos;s uploaded personal music library (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">libraryArtists</code>) with the global Firestore catalog (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">/artists</code>) in a unified dropdown.
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                                        <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
+                                            <p className="text-[10px] font-semibold text-primary uppercase tracking-widest mb-1">From Your Library</p>
+                                            <p className="text-xs text-zinc-400 leading-relaxed">Prioritized at the top of the dropdown. Case-insensitively deduplicated via <code className="text-[11px] text-zinc-300 font-mono">seenNorms</code> to collapse duplicate case variants into a single pristine title with genre tag.</p>
+                                        </div>
+                                        <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
+                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1">Global Archive</p>
+                                            <p className="text-xs text-zinc-400 leading-relaxed">Queries Firestore via debounced 200ms slug-prefix query (<code className="text-[11px] text-zinc-300 font-mono">documentId() &gt;= slugPrefix</code>) with an in-memory session cache. Displays <code className="text-[11px] text-zinc-300 font-mono">[ORIGIN • GENRE]</code> and preserves distinct homonyms.</p>
+                                        </div>
+                                        <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
+                                            <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1">Cross-Tier Deduplication</p>
+                                            <p className="text-xs text-zinc-400 leading-relaxed">Suppresses duplicate rows if a global artist is already displayed under Library or in selected seeds, while maintaining seamless unified keyboard navigation (<kbd className="text-[9px] bg-zinc-800 text-zinc-300 px-1 py-0.5 rounded font-mono">↑</kbd> <kbd className="text-[9px] bg-zinc-800 text-zinc-300 px-1 py-0.5 rounded font-mono">↓</kbd> <kbd className="text-[9px] bg-zinc-800 text-zinc-300 px-1 py-0.5 rounded font-mono">Enter</kbd>).</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
                             {/* Dropdowns */}
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
