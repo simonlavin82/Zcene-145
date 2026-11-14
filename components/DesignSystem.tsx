@@ -4709,7 +4709,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-2">
                                         <h3 className="text-xl font-medium text-white">Magazine View / Zine</h3>
                                         <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                            For deep analysis, users can expand the Deep Cut panel into a full-window responsive editorial layout and card grid. Unedited sections retain pure 3-column magazine text flow (`columns-3`), while project owners can toggle `[ Edit ]` in the Zine sticky bar to curate up to 3 column-width `https://` editorial photos (`aspect-[16/10]`, `rounded-xl border border-zinc-800/80 overflow-hidden bg-zinc-900/50`, `referrerPolicy="no-referrer"`) per editorial section, interleaving naturally in mobile single-column reading order.
+                                            For deep analysis, users can expand the Deep Cut panel into a full-window responsive editorial layout and card grid. Unedited sections retain pure 3-column magazine text flow (`columns-3`), while project owners can toggle `[ Edit ]` in the Zine sticky bar to add an optional Intro / Dedication note and curate up to 3 column-width `https://` editorial photos (`aspect-[16/10]`, `rounded-xl border border-zinc-800/80 overflow-hidden bg-zinc-900/50`, `referrerPolicy="no-referrer"`) with optional captions, one-click `←`/`→` column swap, and `↑ Top` / `↓ Block 2` placement toggles across a responsive 3/2/1 independent flex-column layout (eliminating tablet dead gaps and pairing photos above their matching paragraphs on mobile).
                                         </p>
                                     </div>
                                     <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400 border border-zinc-700">
@@ -4723,11 +4723,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">State & Layout</p>
-                                        <p className="text-sm text-zinc-300">Fixed overlay at z-[1000]; Adaptive 3-Column Editorial Bucket Grid (`grid-cols-3`) when active or populated.</p>
+                                        <p className="text-sm text-zinc-300">Fixed overlay at z-[1000]; 3/2/1 Responsive Flex-Column Engine (3 desktop cols, 2 tablet flex cols, 1 sequential mobile col), `ZineIntroNote`, and optional image captions.</p>
                                     </div>
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Logic & Resilience</p>
-                                        <p className="text-sm text-zinc-300">Auto-marks visible nodes Read; Reading Mode collapses `onError` images cleanly, guests never see Edit controls.</p>
+                                        <p className="text-sm text-zinc-300">Backward-compatible URL string & `ZineImageSlot` hydration; Reading Mode collapses `onError` images cleanly; guests never see Edit controls.</p>
                                     </div>
                                 </div>
                             </div>

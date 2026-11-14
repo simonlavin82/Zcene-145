@@ -29,7 +29,10 @@ import {
   resolveCrossSceneTargetName,
   computeClampedDropdownLeft,
   validateZineImageUrl,
+  resolveZineImageSlot,
+  serializeZineImageEntry,
   normalizeZineImages,
+  normalizeZineIntro,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
@@ -3300,6 +3303,121 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         overarchingZineImages: ['https://i.scdn.co/image/cb812efb7d836138', null, null],
       });
       expect(fpAfter).not.toBe(fpBefore);
+    });
+
+    it('supports backward-compatible ZineImageSlot metadata, captions, blockOffset, and ZineIntro normalization in schema and snapshots', () => {
+      // Plain URL string vs minimal object resolve consistently and serialize compactly
+      expect(resolveZineImageSlot('https://i.scdn.co/image/af.jpg')).toEqual({
+        url: 'https://i.scdn.co/image/af.jpg',
+      });
+      expect(
+        resolveZineImageSlot({
+          url: 'https://i.guim.co.uk/band.jpg',
+          caption: '  American   Football (1999)  ',
+          blockOffset: 1,
+        })
+      ).toEqual({
+        url: 'https://i.guim.co.uk/band.jpg',
+        caption: 'American Football (1999)',
+        blockOffset: 1,
+      });
+      expect(resolveZineImageSlot({ url: 'http://insecure.example.com/a.jpg', caption: 'Bad' })).toBeNull();
+
+      expect(serializeZineImageEntry({ url: 'https://i.scdn.co/image/af.jpg' })).toBe(
+        'https://i.scdn.co/image/af.jpg'
+      );
+      expect(
+        serializeZineImageEntry({
+          url: 'https://i.scdn.co/image/af.jpg',
+          caption: 'American Football',
+        })
+      ).toEqual({
+        url: 'https://i.scdn.co/image/af.jpg',
+        caption: 'American Football',
+      });
+
+      // Mixed string + ZineImageSlot array normalization & scene.zineIntro persistence
+      expect(
+        normalizeZineImages([
+          'https://i.scdn.co/image/col1.jpg',
+          { url: 'https://i.guim.co.uk/col2.jpg', caption: 'Rocking Horse Winner', blockOffset: 1 },
+          { url: 'https://encrypted-tbn0.gstatic.com/col3.jpg', caption: '   ' },
+        ])
+      ).toEqual([
+        'https://i.scdn.co/image/col1.jpg',
+        { url: 'https://i.guim.co.uk/col2.jpg', caption: 'Rocking Horse Winner', blockOffset: 1 },
+        'https://encrypted-tbn0.gstatic.com/col3.jpg',
+      ]);
+
+      expect(normalizeZineIntro(undefined)).toBeUndefined();
+      expect(normalizeZineIntro('   \n\n   ')).toBeUndefined();
+      expect(normalizeZineIntro('  Line 1\r\n\r\n\r\nLine 2  ')).toBe('Line 1\n\nLine 2');
+      expect(normalizeZineIntro('x'.repeat(700))?.length).toBe(600);
+
+      const baseScene = normalizeProjectScene(
+        {
+          id: 'scene-1',
+          sceneId: 'scene-1',
+          seedArtists: 'American Football',
+          zineIntro: '   \n ',
+          zineImages: ['https://i.scdn.co/image/col1.jpg', null, null],
+          graphData: {
+            nodes: [{ id: 'scene-1::american-football', label: 'American Football', type: 'artist' }],
+            links: [],
+          },
+          status: 'completed',
+        },
+        0
+      );
+      expect(baseScene.zineIntro).toBeUndefined();
+
+      const snapPlain = computeAutosaveDocSnapshot({
+        name: 'American Football',
+        seedArtists: 'American Football',
+        overarchingZineIntro: '   ',
+        overarchingZineImages: ['https://i.scdn.co/image/col1.jpg', null, null],
+        scenes: [baseScene],
+      });
+      const snapEquivalentObj = computeAutosaveDocSnapshot({
+        name: 'American Football',
+        seedArtists: 'American Football',
+        overarchingZineImages: [{ url: 'https://i.scdn.co/image/col1.jpg' }, null, null],
+        scenes: [baseScene],
+      });
+      expect(snapEquivalentObj).toBe(snapPlain);
+
+      const snapWithCaptionAndIntro = computeAutosaveDocSnapshot({
+        name: 'American Football',
+        seedArtists: 'American Football',
+        overarchingZineIntro: 'For the 1999 Midwest circuit.',
+        overarchingZineImages: [
+          { url: 'https://i.scdn.co/image/col1.jpg', caption: 'American Football' },
+          null,
+          null,
+        ],
+        scenes: [
+          normalizeProjectScene(
+            {
+              ...baseScene,
+              zineIntro: 'Scene 1 curator dedication.',
+              zineImages: [{ url: 'https://i.scdn.co/image/col1.jpg', blockOffset: 1 }, null, null],
+            },
+            0
+          ),
+        ],
+      });
+      expect(snapWithCaptionAndIntro).not.toBe(snapPlain);
+
+      const fpBefore = computeProjectHydrationFingerprint('proj-1', {
+        scenes: [baseScene],
+        overarchingZineImages: ['https://i.scdn.co/image/col1.jpg', null, null],
+      });
+      const fpAfterIntroAndOffset = computeProjectHydrationFingerprint('proj-1', {
+        scenes: [baseScene],
+        overarchingZineIntro: 'For the 1999 Midwest circuit.',
+        overarchingZineImages: [{ url: 'https://i.scdn.co/image/col1.jpg', blockOffset: 1 }, null, null],
+      });
+      expect(fpAfterIntroAndOffset).not.toBe(fpBefore);
     });
   });
 });

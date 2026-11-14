@@ -312,16 +312,22 @@ describe('Architecture V42.1: Blank-Input Escape Hatch UX, Warm Ambiguous 3rd-Ho
     it('always applies pointer-events: none to desktop hover tooltips even when connections.length > 3', async () => {
       global.ResizeObserver = class {
         cb: any;
+        observed = new Set<any>();
         constructor(cb: any) {
           this.cb = cb;
         }
         observe(target: any) {
-          if (this.cb) {
+          if (this.cb && !this.observed.has(target)) {
+            this.observed.add(target);
             this.cb([{ contentRect: { width: 800, height: 600 }, target }]);
           }
         }
-        unobserve() {}
-        disconnect() {}
+        unobserve(target: any) {
+          this.observed.delete(target);
+        }
+        disconnect() {
+          this.observed.clear();
+        }
       } as any;
 
       const mockNode = {

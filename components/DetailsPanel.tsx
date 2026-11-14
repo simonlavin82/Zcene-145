@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
-import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, ProjectScene, COST_PER_AI_CALL } from '../types';
-import { stripSceneNamespace, toSeedArtistsArray, normalizeCanonicalEntityId, validateZineImageUrl } from '../shared/multiSceneUtils';
+import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, ProjectScene, ZineEditorialImageEntry, ZineImageSlot, COST_PER_AI_CALL } from '../types';
+import { stripSceneNamespace, toSeedArtistsArray, normalizeCanonicalEntityId, resolveZineImageSlot, serializeZineImageEntry, validateZineImageUrl, normalizeZineIntro } from '../shared/multiSceneUtils';
 import { streamNodeChat, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
 import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch, stripCountrySlug } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
@@ -1952,12 +1952,39 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 export const splitMarkdownIntoEditorialBlocks = (markdown: string): string[] => {
   if (!markdown || typeof markdown !== 'string') return [];
-  return markdown
+  const rawBlocks = markdown
     .replace(/\r\n/g, '\n')
     .trim()
     .split(/\n{2,}/)
     .map((block) => block.trim())
     .filter(Boolean);
+
+  const startsWithListMarker = (block: string) => /^([-*•]|\d+\.)\s/m.test(block.trim());
+  const fused: string[] = [];
+
+  for (let i = 0; i < rawBlocks.length; i++) {
+    let current = rawBlocks[i];
+    if (
+      current.endsWith(':') &&
+      !startsWithListMarker(current) &&
+      i + 1 < rawBlocks.length &&
+      startsWithListMarker(rawBlocks[i + 1])
+    ) {
+      current = `${current}\n\n${rawBlocks[i + 1]}`;
+      i++;
+      while (i + 1 < rawBlocks.length && startsWithListMarker(rawBlocks[i + 1])) {
+        current = `${current}\n\n${rawBlocks[i + 1]}`;
+        i++;
+      }
+    }
+    fused.push(current);
+  }
+  return fused;
+};
+
+const isListHeavyEditorialBlock = (block: string): boolean => {
+  const lines = block.trim().split('\n');
+  return lines.some((line) => /^([-*•]|\d+\.)\s/.test(line.trim()));
 };
 
 export const partitionBlocksIntoThreeColumns = (blocks: string[]): [string[], string[], string[]] => {
@@ -1965,6 +1992,13 @@ export const partitionBlocksIntoThreeColumns = (blocks: string[]): [string[], st
   if (blocks.length === 1) return [blocks, [], []];
   if (blocks.length === 2) return [[blocks[0]], [blocks[1]], []];
   if (blocks.length === 3) return [[blocks[0]], [blocks[1]], [blocks[2]]];
+
+  // V44 Standard 4-block structure (3 narrative paragraphs + 1 crossover/bullet block):
+  // Anchor Para 1 -> Col 1, Para 2 -> Col 2, Para 3 -> Col 3 (above Bullets) so Image 3
+  // always pairs directly with Paragraph 3 across Desktop, Tablet, and Mobile.
+  if (blocks.length === 4) {
+    return [[blocks[0]], [blocks[1]], [blocks[2], blocks[3]]];
+  }
 
   const lengths = blocks.map((b) => b.length);
   const prefix: number[] = [0];
@@ -1975,7 +2009,7 @@ export const partitionBlocksIntoThreeColumns = (blocks: string[]): [string[], st
 
   let bestI = 1;
   let bestJ = 2;
-  let bestSpread = Infinity;
+  let bestScore = Infinity;
 
   for (let i = 1; i < blocks.length - 1; i++) {
     const col0 = prefix[i];
@@ -1983,8 +2017,14 @@ export const partitionBlocksIntoThreeColumns = (blocks: string[]): [string[], st
       const col1 = prefix[j] - prefix[i];
       const col2 = total - prefix[j];
       const spread = Math.max(col0, col1, col2) - Math.min(col0, col1, col2);
-      if (spread < bestSpread) {
-        bestSpread = spread;
+      // Avoid merging Para 2 + Para 3 into Col 2 when Col 3 would start directly with a bullet list
+      const listAnchorPenalty =
+        j > 2 && !isListHeavyEditorialBlock(blocks[2]) && isListHeavyEditorialBlock(blocks[j])
+          ? 2000
+          : 0;
+      const score = spread + listAnchorPenalty;
+      if (score < bestScore) {
+        bestScore = score;
         bestI = i;
         bestJ = j;
       }
@@ -1998,29 +2038,229 @@ export const partitionBlocksIntoThreeColumns = (blocks: string[]): [string[], st
   ];
 };
 
+type ZineViewportTier = 'mobile' | 'tablet' | 'desktop';
+
+const resolveZineViewportTier = (isSmallScreen: boolean): ZineViewportTier => {
+  if (isSmallScreen) return 'mobile';
+  if (typeof window !== 'undefined' && typeof window.innerWidth === 'number') {
+    if (window.innerWidth < 768) return 'mobile';
+    if (window.innerWidth < 1024) return 'tablet';
+  }
+  return 'desktop';
+};
+
+const useZineViewportTier = (isSmallScreen: boolean): ZineViewportTier => {
+  const [tier, setTier] = useState<ZineViewportTier>(() => resolveZineViewportTier(isSmallScreen));
+
+  useEffect(() => {
+    const updateTier = () => setTier(resolveZineViewportTier(isSmallScreen));
+    updateTier();
+    if (typeof window === 'undefined') return;
+    window.addEventListener('resize', updateTier);
+    return () => window.removeEventListener('resize', updateTier);
+  }, [isSmallScreen]);
+
+  return tier;
+};
+
+interface ZineIntroNoteProps {
+  sectionKey: string;
+  intro?: string;
+  isEditingZine: boolean;
+  onSaveIntro?: (intro: string | null) => void;
+}
+
+const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
+  sectionKey,
+  intro,
+  isEditingZine,
+  onSaveIntro,
+}) => {
+  const cleanIntro = normalizeZineIntro(intro) || '';
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [draftIntro, setDraftIntro] = useState(cleanIntro);
+
+  useEffect(() => {
+    if (!isEditingZine) {
+      setIsEditorOpen(false);
+    }
+  }, [isEditingZine]);
+
+  useEffect(() => {
+    setDraftIntro(cleanIntro);
+  }, [cleanIntro]);
+
+  if (!isEditingZine || !onSaveIntro) {
+    if (!cleanIntro) return null;
+    return (
+      <blockquote
+        data-testid={`zine-intro-note-${sectionKey}`}
+        className="mb-8 lg:mb-10 pl-4 md:pl-5 border-l-2 border-primary/70 text-base md:text-lg text-zinc-200 italic font-sans leading-relaxed max-w-3xl whitespace-pre-line"
+      >
+        {cleanIntro}
+      </blockquote>
+    );
+  }
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    const normalized = normalizeZineIntro(draftIntro) || null;
+    setIsEditorOpen(false);
+    onSaveIntro(normalized);
+  };
+
+  if (isEditorOpen) {
+    return (
+      <form
+        onSubmit={handleSubmit}
+        data-testid={`zine-intro-form-${sectionKey}`}
+        className="mb-8 rounded-xl border border-zinc-700/80 bg-zinc-900/90 p-4 max-w-2xl space-y-3"
+      >
+        <div className="flex items-center justify-between">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
+            Curator's Note / Dedication
+          </span>
+          <span className="text-[10px] font-mono text-zinc-500">
+            {draftIntro.length}/600
+          </span>
+        </div>
+        <textarea
+          autoFocus
+          rows={2}
+          maxLength={600}
+          data-testid={`zine-intro-input-${sectionKey}`}
+          placeholder="Optional dedication or curator's intro note below the title..."
+          value={draftIntro}
+          onChange={(e) => setDraftIntro(e.target.value)}
+          className="w-full rounded-xl border border-zinc-700 bg-zinc-950 text-white text-sm p-3 placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none resize-y"
+        />
+        <div className="flex items-center justify-end gap-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            data-testid={`zine-intro-cancel-${sectionKey}`}
+            onClick={() => {
+              setIsEditorOpen(false);
+              setDraftIntro(cleanIntro);
+            }}
+          >
+            Cancel
+          </Button>
+          {cleanIntro && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              data-testid={`zine-intro-remove-${sectionKey}`}
+              onClick={() => {
+                setIsEditorOpen(false);
+                setDraftIntro('');
+                onSaveIntro(null);
+              }}
+              className="!text-red-300 hover:!border-red-500/60"
+            >
+              Remove
+            </Button>
+          )}
+          <Button
+            type="submit"
+            variant="primary"
+            size="sm"
+            data-testid={`zine-intro-save-${sectionKey}`}
+          >
+            Save Note
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
+  if (cleanIntro) {
+    return (
+      <div className="mb-8 lg:mb-10 max-w-3xl space-y-2.5">
+        <blockquote
+          data-testid={`zine-intro-note-${sectionKey}`}
+          className="pl-4 md:pl-5 border-l-2 border-primary/70 text-base md:text-lg text-zinc-200 italic font-sans leading-relaxed whitespace-pre-line"
+        >
+          {cleanIntro}
+        </blockquote>
+        <div className="flex items-center gap-2 pl-4 md:pl-5">
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            data-testid={`zine-intro-edit-${sectionKey}`}
+            onClick={() => {
+              setDraftIntro(cleanIntro);
+              setIsEditorOpen(true);
+            }}
+          >
+            Edit Note
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            data-testid={`zine-intro-remove-${sectionKey}`}
+            onClick={() => onSaveIntro(null)}
+            className="!text-red-300 hover:!text-red-200"
+          >
+            Remove Note
+          </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mb-8">
+      <button
+        type="button"
+        data-testid={`zine-intro-add-${sectionKey}`}
+        onClick={() => {
+          setDraftIntro('');
+          setIsEditorOpen(true);
+        }}
+        className="rounded-xl border border-dashed border-zinc-700/80 bg-zinc-900/40 hover:border-primary/60 hover:bg-zinc-900/70 transition-colors px-3.5 py-2 text-xs font-medium text-zinc-400 hover:text-white inline-flex items-center gap-1.5 cursor-pointer"
+      >
+        <span className="material-symbols-outlined !text-[16px]">edit_note</span>
+        <span>+ Add Intro / Dedication Note</span>
+      </button>
+    </div>
+  );
+};
+
 interface ZineColumnImageSlotProps {
   sectionKey: string;
   slotIndex: 0 | 1 | 2;
-  url: string | null;
+  slot: ZineImageSlot | null;
   isEditingZine: boolean;
   hasFailed: boolean;
+  canToggleBlockOffset: boolean;
   onMarkFailed: (url: string) => void;
-  onSaveUrl: (url: string) => void;
-  onRemoveUrl: () => void;
+  onSaveSlot: (entry: ZineEditorialImageEntry) => void;
+  onSwapSlots?: (indexA: 0 | 1 | 2, indexB: 0 | 1 | 2) => void;
 }
 
 const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
   sectionKey,
   slotIndex,
-  url,
+  slot,
   isEditingZine,
   hasFailed,
+  canToggleBlockOffset,
   onMarkFailed,
-  onSaveUrl,
-  onRemoveUrl,
+  onSaveSlot,
+  onSwapSlots,
 }) => {
+  const url = slot?.url || '';
+  const caption = slot?.caption || '';
+  const blockOffset: 0 | 1 = slot?.blockOffset === 1 ? 1 : 0;
+
   const [isInputOpen, setIsInputOpen] = useState(false);
-  const [draftUrl, setDraftUrl] = useState(url || '');
+  const [draftUrl, setDraftUrl] = useState(url);
+  const [draftCaption, setDraftCaption] = useState(caption);
   const [validationError, setValidationError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -2031,11 +2271,12 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
   }, [isEditingZine]);
 
   useEffect(() => {
-    setDraftUrl(url || '');
-  }, [url]);
+    setDraftUrl(url);
+    setDraftCaption(caption);
+  }, [url, caption]);
 
   if (!isEditingZine) {
-    if (!url || hasFailed) return null;
+    if (!slot || hasFailed) return null;
     return (
       <figure
         data-testid={`zine-image-figure-${sectionKey}-${slotIndex}`}
@@ -2043,20 +2284,29 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
       >
         <div className="aspect-[16/10] w-full overflow-hidden bg-zinc-950/60">
           <img
-            src={url}
-            alt={`Column ${slotIndex + 1} editorial photo`}
+            src={slot.url}
+            alt={slot.caption || `Column ${slotIndex + 1} editorial photo`}
             referrerPolicy="no-referrer"
             loading="lazy"
-            onError={() => onMarkFailed(url)}
+            onError={() => onMarkFailed(slot.url)}
             className="w-full h-full object-cover block"
           />
         </div>
+        {slot.caption && (
+          <figcaption
+            data-testid={`zine-image-caption-${sectionKey}-${slotIndex}`}
+            className="px-3.5 py-2 bg-zinc-950/75 border-t border-zinc-800/80 text-xs text-zinc-300 font-medium tracking-tight leading-snug"
+          >
+            {slot.caption}
+          </figcaption>
+        )}
       </figure>
     );
   }
 
   const handleOpenEditor = () => {
-    setDraftUrl(url || '');
+    setDraftUrl(url);
+    setDraftCaption(caption);
     setValidationError(null);
     setIsInputOpen(true);
   };
@@ -2073,9 +2323,16 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
       setValidationError('URL must start with https:// (http:// and data: URLs are not allowed).');
       return;
     }
+    const cleanCaption = draftCaption.replace(/\s+/g, ' ').trim().slice(0, 140);
     setValidationError(null);
     setIsInputOpen(false);
-    onSaveUrl(validated);
+    onSaveSlot(
+      serializeZineImageEntry({
+        url: validated,
+        ...(cleanCaption ? { caption: cleanCaption } : {}),
+        ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
+      })
+    );
   };
 
   if (isInputOpen) {
@@ -2083,11 +2340,11 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
       <form
         onSubmit={handleSubmit}
         data-testid={`zine-slot-form-${sectionKey}-${slotIndex}`}
-        className="mb-6 rounded-xl border border-zinc-700/80 bg-zinc-900/90 p-3.5 space-y-3"
+        className="mb-6 rounded-xl border border-zinc-700/80 bg-zinc-900/90 p-3.5 space-y-2.5"
       >
         <div className="flex items-center justify-between">
           <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
-            Column {slotIndex + 1} Photo URL
+            Column {slotIndex + 1} Photo
           </span>
           <span className="text-[10px] font-mono text-zinc-500">https:// only</span>
         </div>
@@ -2103,6 +2360,15 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
             if (validationError) setValidationError(null);
           }}
         />
+        <Input
+          variant="md"
+          type="text"
+          maxLength={140}
+          data-testid={`zine-slot-caption-input-${sectionKey}-${slotIndex}`}
+          placeholder="Optional caption (e.g. American Football)"
+          value={draftCaption}
+          onChange={(e) => setDraftCaption(e.target.value)}
+        />
         {validationError && (
           <p
             data-testid={`zine-slot-error-${sectionKey}-${slotIndex}`}
@@ -2111,7 +2377,7 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
             {validationError}
           </p>
         )}
-        <div className="flex items-center justify-end gap-2">
+        <div className="flex items-center justify-end gap-2 pt-0.5">
           <Button
             type="button"
             variant="ghost"
@@ -2120,12 +2386,13 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
             onClick={() => {
               setIsInputOpen(false);
               setValidationError(null);
-              setDraftUrl(url || '');
+              setDraftUrl(url);
+              setDraftCaption(caption);
             }}
           >
             Cancel
           </Button>
-          {url && (
+          {slot && (
             <Button
               type="button"
               variant="secondary"
@@ -2134,7 +2401,7 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
               onClick={() => {
                 setIsInputOpen(false);
                 setValidationError(null);
-                onRemoveUrl();
+                onSaveSlot(null);
               }}
               className="!text-red-300 hover:!border-red-500/60"
             >
@@ -2154,7 +2421,59 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
     );
   }
 
-  if (url && hasFailed) {
+  const renderSlotReorderControls = () => {
+    if (!slot) return null;
+    const prevIdx = slotIndex > 0 ? ((slotIndex - 1) as 0 | 1 | 2) : null;
+    const nextIdx = slotIndex < 2 ? ((slotIndex + 1) as 0 | 1 | 2) : null;
+    return (
+      <div className="flex items-center gap-1">
+        {onSwapSlots && (
+          <>
+            <button
+              type="button"
+              disabled={prevIdx === null}
+              data-testid={`zine-slot-swap-left-${sectionKey}-${slotIndex}`}
+              onClick={() => prevIdx !== null && onSwapSlots(slotIndex, prevIdx)}
+              title="Move image left one column"
+              className="w-7 h-7 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 hover:text-white hover:border-zinc-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-xs font-mono transition-colors cursor-pointer"
+            >
+              ←
+            </button>
+            <button
+              type="button"
+              disabled={nextIdx === null}
+              data-testid={`zine-slot-swap-right-${sectionKey}-${slotIndex}`}
+              onClick={() => nextIdx !== null && onSwapSlots(slotIndex, nextIdx)}
+              title="Move image right one column"
+              className="w-7 h-7 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 hover:text-white hover:border-zinc-500 disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center text-xs font-mono transition-colors cursor-pointer"
+            >
+              →
+            </button>
+          </>
+        )}
+        {canToggleBlockOffset && (
+          <button
+            type="button"
+            data-testid={`zine-slot-placement-${sectionKey}-${slotIndex}`}
+            onClick={() =>
+              onSaveSlot(
+                serializeZineImageEntry({
+                  ...slot,
+                  blockOffset: blockOffset === 1 ? undefined : 1,
+                })
+              )
+            }
+            title={blockOffset === 1 ? 'Place photo at top of column' : 'Place photo above second block'}
+            className="h-7 px-2 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 hover:text-white hover:border-zinc-500 flex items-center justify-center text-[10px] font-mono transition-colors cursor-pointer"
+          >
+            {blockOffset === 1 ? '↑ Top' : '↓ Block 2'}
+          </button>
+        )}
+      </div>
+    );
+  };
+
+  if (slot && hasFailed) {
     return (
       <div
         data-testid={`zine-slot-broken-${sectionKey}-${slotIndex}`}
@@ -2165,56 +2484,13 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
             <span className="material-symbols-outlined !text-[16px]">broken_image</span>
             <span>Image failed to load</span>
           </div>
-          <p className="text-[11px] font-mono text-zinc-400 truncate" title={url}>
-            404 or hotlink blocked: {url}
+          <p className="text-[11px] font-mono text-zinc-400 truncate" title={slot.url}>
+            404 or hotlink blocked: {slot.url}
           </p>
         </div>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            data-testid={`zine-slot-change-${sectionKey}-${slotIndex}`}
-            onClick={handleOpenEditor}
-          >
-            Change URL
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            data-testid={`zine-slot-remove-${sectionKey}-${slotIndex}`}
-            onClick={onRemoveUrl}
-            className="!text-red-300 hover:!text-red-200"
-          >
-            Remove
-          </Button>
-        </div>
-      </div>
-    );
-  }
-
-  if (url) {
-    return (
-      <figure
-        data-testid={`zine-image-figure-${sectionKey}-${slotIndex}`}
-        className="mb-6 rounded-xl border border-zinc-800/80 overflow-hidden bg-zinc-900/50"
-      >
-        <div className="aspect-[16/10] w-full overflow-hidden bg-zinc-950/60">
-          <img
-            src={url}
-            alt={`Column ${slotIndex + 1} editorial photo`}
-            referrerPolicy="no-referrer"
-            loading="lazy"
-            onError={() => onMarkFailed(url)}
-            className="w-full h-full object-cover block"
-          />
-        </div>
-        <div className="px-3 py-2 bg-zinc-950/80 border-t border-zinc-800/80 flex items-center justify-between gap-2">
-          <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
-            Column {slotIndex + 1}
-          </span>
-          <div className="flex items-center gap-1.5">
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          {renderSlotReorderControls()}
+          <div className="flex items-center gap-2">
             <Button
               type="button"
               variant="secondary"
@@ -2229,7 +2505,64 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
               variant="ghost"
               size="sm"
               data-testid={`zine-slot-remove-${sectionKey}-${slotIndex}`}
-              onClick={onRemoveUrl}
+              onClick={() => onSaveSlot(null)}
+              className="!text-red-300 hover:!text-red-200"
+            >
+              Remove
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (slot) {
+    return (
+      <figure
+        data-testid={`zine-image-figure-${sectionKey}-${slotIndex}`}
+        className="mb-6 rounded-xl border border-zinc-800/80 overflow-hidden bg-zinc-900/50"
+      >
+        <div className="aspect-[16/10] w-full overflow-hidden bg-zinc-950/60">
+          <img
+            src={slot.url}
+            alt={slot.caption || `Column ${slotIndex + 1} editorial photo`}
+            referrerPolicy="no-referrer"
+            loading="lazy"
+            onError={() => onMarkFailed(slot.url)}
+            className="w-full h-full object-cover block"
+          />
+        </div>
+        {slot.caption && (
+          <figcaption
+            data-testid={`zine-image-caption-${sectionKey}-${slotIndex}`}
+            className="px-3 py-1.5 bg-zinc-950/70 border-t border-zinc-800/60 text-xs text-zinc-300 font-medium truncate"
+          >
+            {slot.caption}
+          </figcaption>
+        )}
+        <div className="px-3 py-2 bg-zinc-950/85 border-t border-zinc-800/80 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
+              Col {slotIndex + 1}
+            </span>
+            {renderSlotReorderControls()}
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              data-testid={`zine-slot-change-${sectionKey}-${slotIndex}`}
+              onClick={handleOpenEditor}
+            >
+              Edit
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              data-testid={`zine-slot-remove-${sectionKey}-${slotIndex}`}
+              onClick={() => onSaveSlot(null)}
               className="!text-red-300 hover:!text-red-200"
             >
               Remove
@@ -2259,11 +2592,13 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
 interface ZineEditorialColumnsProps {
   sectionKey: string;
   markdown: string;
-  images?: (string | null)[];
+  images?: ZineEditorialImageEntry[];
+  viewportTier: ZineViewportTier;
   isEditingZine: boolean;
   failedUrls: Set<string>;
   onMarkFailed: (url: string) => void;
-  onSaveSlotUrl: (slotIndex: 0 | 1 | 2, url: string | null) => void;
+  onSaveSlot: (slotIndex: 0 | 1 | 2, entry: ZineEditorialImageEntry) => void;
+  onSwapSlots?: (indexA: 0 | 1 | 2, indexB: 0 | 1 | 2) => void;
   renderMarkdown: (content: string) => React.ReactNode;
 }
 
@@ -2271,18 +2606,20 @@ const ZineEditorialColumns: React.FC<ZineEditorialColumnsProps> = ({
   sectionKey,
   markdown,
   images,
+  viewportTier,
   isEditingZine,
   failedUrls,
   onMarkFailed,
-  onSaveSlotUrl,
+  onSaveSlot,
+  onSwapSlots,
   renderMarkdown,
 }) => {
-  const normalizedSlotUrls: [string | null, string | null, string | null] = [
-    validateZineImageUrl(images?.[0]),
-    validateZineImageUrl(images?.[1]),
-    validateZineImageUrl(images?.[2])
+  const resolvedSlots: [ZineImageSlot | null, ZineImageSlot | null, ZineImageSlot | null] = [
+    resolveZineImageSlot(images?.[0]),
+    resolveZineImageSlot(images?.[1]),
+    resolveZineImageSlot(images?.[2]),
   ];
-  const hasAnyValidImages = normalizedSlotUrls.some((u) => u !== null);
+  const hasAnyValidImages = resolvedSlots.some((slot) => slot !== null);
 
   if (!isEditingZine && !hasAnyValidImages) {
     return (
@@ -2295,24 +2632,105 @@ const ZineEditorialColumns: React.FC<ZineEditorialColumnsProps> = ({
   const blocks = splitMarkdownIntoEditorialBlocks(markdown);
   const columnBuckets = partitionBlocksIntoThreeColumns(blocks);
 
+  const renderSlot = (colIdx: 0 | 1 | 2) => {
+    const slot = resolvedSlots[colIdx];
+    return (
+      <ZineColumnImageSlot
+        sectionKey={sectionKey}
+        slotIndex={colIdx}
+        slot={slot}
+        isEditingZine={isEditingZine}
+        hasFailed={Boolean(slot && failedUrls.has(slot.url))}
+        canToggleBlockOffset={columnBuckets[colIdx].length >= 2}
+        onMarkFailed={onMarkFailed}
+        onSaveSlot={(entry) => onSaveSlot(colIdx, entry)}
+        onSwapSlots={onSwapSlots}
+      />
+    );
+  };
+
+  const renderColumnContent = (colIdx: 0 | 1 | 2, blocksToRender: string[], includeSlot: boolean) => {
+    const slot = resolvedSlots[colIdx];
+    const placeAfterFirstBlock = includeSlot && slot?.blockOffset === 1 && blocksToRender.length >= 2;
+    if (placeAfterFirstBlock) {
+      return (
+        <>
+          {renderMarkdown(blocksToRender[0])}
+          {renderSlot(colIdx)}
+          {renderMarkdown(blocksToRender.slice(1).join('\n\n'))}
+        </>
+      );
+    }
+    return (
+      <>
+        {includeSlot && renderSlot(colIdx)}
+        {blocksToRender.length > 0 && renderMarkdown(blocksToRender.join('\n\n'))}
+      </>
+    );
+  };
+
+  if (viewportTier === 'mobile') {
+    return (
+      <div
+        data-testid={`zine-editorial-grid-${sectionKey}`}
+        className="markdown-bio flex flex-col font-sans text-base leading-relaxed text-zinc-300"
+      >
+        {([0, 1, 2] as const).map((colIdx) => (
+          <div key={`${sectionKey}-mob-${colIdx}`} className="min-w-0 flex flex-col">
+            {renderColumnContent(colIdx, columnBuckets[colIdx], true)}
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (viewportTier === 'tablet') {
+    const col2Blocks = columnBuckets[2];
+    const splitCol2 = col2Blocks.length >= 2;
+    const col2SlotAfterFirst = resolvedSlots[2]?.blockOffset === 1 && splitCol2;
+    const leftExtraBlocks = splitCol2 ? [col2Blocks[0]] : col2Blocks;
+    const rightExtraBlocks = splitCol2 ? col2Blocks.slice(1) : [];
+
+    return (
+      <div
+        data-testid={`zine-editorial-grid-${sectionKey}`}
+        className="markdown-bio font-sans text-base leading-relaxed text-zinc-300"
+      >
+        <div
+          data-testid={`zine-editorial-tablet-columns-${sectionKey}`}
+          className="grid grid-cols-2 gap-x-10 items-start"
+        >
+          <div className="min-w-0 flex flex-col">
+            {renderColumnContent(0, columnBuckets[0], true)}
+            {(leftExtraBlocks.length > 0 || !col2SlotAfterFirst) && (
+              <div className="mt-2 min-w-0 flex flex-col">
+                {!col2SlotAfterFirst && renderSlot(2)}
+                {leftExtraBlocks.length > 0 && renderMarkdown(leftExtraBlocks.join('\n\n'))}
+              </div>
+            )}
+          </div>
+          <div className="min-w-0 flex flex-col">
+            {renderColumnContent(1, columnBuckets[1], true)}
+            {(col2SlotAfterFirst || rightExtraBlocks.length > 0) && (
+              <div className="mt-2 min-w-0 flex flex-col">
+                {col2SlotAfterFirst && renderSlot(2)}
+                {rightExtraBlocks.length > 0 && renderMarkdown(rightExtraBlocks.join('\n\n'))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       data-testid={`zine-editorial-grid-${sectionKey}`}
-      className="markdown-bio grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-12 gap-y-6 items-start font-sans text-base leading-relaxed text-zinc-300"
+      className="markdown-bio grid grid-cols-3 gap-x-12 items-start font-sans text-base leading-relaxed text-zinc-300"
     >
       {([0, 1, 2] as const).map((colIdx) => (
         <div key={`${sectionKey}-col-${colIdx}`} className="min-w-0 flex flex-col">
-          <ZineColumnImageSlot
-            sectionKey={sectionKey}
-            slotIndex={colIdx}
-            url={normalizedSlotUrls[colIdx]}
-            isEditingZine={isEditingZine}
-            hasFailed={Boolean(normalizedSlotUrls[colIdx] && failedUrls.has(normalizedSlotUrls[colIdx]!))}
-            onMarkFailed={onMarkFailed}
-            onSaveUrl={(nextUrl) => onSaveSlotUrl(colIdx, nextUrl)}
-            onRemoveUrl={() => onSaveSlotUrl(colIdx, null)}
-          />
-          {columnBuckets[colIdx].length > 0 && renderMarkdown(columnBuckets[colIdx].join('\n\n'))}
+          {renderColumnContent(colIdx, columnBuckets[colIdx], true)}
         </div>
       ))}
     </div>
@@ -2371,8 +2789,11 @@ interface DetailsPanelProps {
   scenes?: ProjectScene[];
   activeSceneId?: string;
   overarchingRationale?: string;
-  overarchingZineImages?: (string | null)[];
-  onUpdateZineImages?: (target: 'overarching' | string, slotIndex: 0 | 1 | 2, url: string | null) => void;
+  overarchingZineIntro?: string;
+  overarchingZineImages?: ZineEditorialImageEntry[];
+  onUpdateZineImages?: (target: 'overarching' | string, slotIndex: 0 | 1 | 2, entry: ZineEditorialImageEntry) => void;
+  onSwapZineImages?: (target: 'overarching' | string, indexA: 0 | 1 | 2, indexB: 0 | 1 | 2) => void;
+  onUpdateZineIntro?: (target: 'overarching' | string, intro: string | null) => void;
 }
 
 export const DetailsPanel: React.FC<DetailsPanelProps> = ({
@@ -2384,7 +2805,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
   onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer,
   activeDeepWebSession, onUpdateDeepWebSession, isStaticMockup = false,
   scenes = [], activeSceneId, overarchingRationale,
-  overarchingZineImages, onUpdateZineImages
+  overarchingZineIntro, overarchingZineImages, onUpdateZineImages, onSwapZineImages, onUpdateZineIntro
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
@@ -2399,6 +2820,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [showScrollTop, setShowScrollTop] = useState(false);
     const [isEditingZine, setIsEditingZine] = useState(false);
     const [failedZineImageUrls, setFailedZineImageUrls] = useState<Set<string>>(new Set());
+    const zineViewportTier = useZineViewportTier(isSmallScreen);
 
     const canEditZine = Boolean(!isGuest && user && !isStaticMockup && !isGlobalLoading && onUpdateZineImages);
 
@@ -2420,17 +2842,18 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const handleSaveZineImageSlot = useCallback((
         target: 'overarching' | string,
         slotIndex: 0 | 1 | 2,
-        url: string | null
+        entry: ZineEditorialImageEntry
     ) => {
-        if (url) {
+        const nextUrl = typeof entry === 'string' ? entry : entry?.url;
+        if (nextUrl) {
             setFailedZineImageUrls((prev) => {
-                if (!prev.has(url)) return prev;
+                if (!prev.has(nextUrl)) return prev;
                 const next = new Set(prev);
-                next.delete(url);
+                next.delete(nextUrl);
                 return next;
             });
         }
-        onUpdateZineImages?.(target, slotIndex, url);
+        onUpdateZineImages?.(target, slotIndex, entry);
     }, [onUpdateZineImages]);
 
     // Auto-stop preview audio whenever Deep Cuts panel is collapsed
@@ -3326,18 +3749,26 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             DEEP CUTS: {deepCutsCount}
                                         </span>
                                     </div>
-                                    <h1 className="text-4xl lg:text-7xl font-bold tracking-tighter text-white mb-8 lg:mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
+                                    <h1 className="text-4xl lg:text-7xl font-bold tracking-tighter text-white mb-6 lg:mb-8 leading-tight" style={{ wordBreak: 'break-word' }}>
                                         {projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(' / ') : 'Zine')}
                                     </h1>
+                                    <ZineIntroNote
+                                        sectionKey="overarching"
+                                        intro={overarchingZineIntro}
+                                        isEditingZine={isEditingZine}
+                                        onSaveIntro={onUpdateZineIntro ? (nextIntro) => onUpdateZineIntro('overarching', nextIntro) : undefined}
+                                    />
                                     {sanitizedOverarchingRationale ? (
                                         <ZineEditorialColumns
                                             sectionKey="overarching"
                                             markdown={sanitizedOverarchingRationale}
                                             images={overarchingZineImages}
+                                            viewportTier={zineViewportTier}
                                             isEditingZine={isEditingZine}
                                             failedUrls={failedZineImageUrls}
                                             onMarkFailed={handleMarkZineImageFailed}
-                                            onSaveSlotUrl={(slotIndex, nextUrl) => handleSaveZineImageSlot('overarching', slotIndex, nextUrl)}
+                                            onSaveSlot={(slotIndex, entry) => handleSaveZineImageSlot('overarching', slotIndex, entry)}
+                                            onSwapSlots={onSwapZineImages ? (idxA, idxB) => onSwapZineImages('overarching', idxA, idxB) : undefined}
                                             renderMarkdown={renderZineMarkdown}
                                         />
                                     ) : (
@@ -3380,18 +3811,26 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                         </span>
                                                     )}
                                                 </div>
-                                                <h2 className="text-3xl lg:text-5xl font-bold tracking-tight text-white mb-6 lg:mb-8 leading-tight" style={{ wordBreak: 'break-word' }}>
+                                                <h2 className="text-3xl lg:text-5xl font-bold tracking-tight text-white mb-5 lg:mb-6 leading-tight" style={{ wordBreak: 'break-word' }}>
                                                     {sceneSeeds.length > 0 ? sceneSeeds.join(' + ') : (cleanArtistDisplayName(scene.title || scene.name, scene.graphData?.nodes) || `Scene ${idx + 1}`)}
                                                 </h2>
+                                                <ZineIntroNote
+                                                    sectionKey={sceneKey}
+                                                    intro={scene.zineIntro}
+                                                    isEditingZine={isEditingZine}
+                                                    onSaveIntro={onUpdateZineIntro ? (nextIntro) => onUpdateZineIntro(sceneKey, nextIntro) : undefined}
+                                                />
                                                 {effectiveSceneCopy && (
                                                     <ZineEditorialColumns
                                                         sectionKey={sceneKey}
                                                         markdown={effectiveSceneCopy}
                                                         images={scene.zineImages}
+                                                        viewportTier={zineViewportTier}
                                                         isEditingZine={isEditingZine}
                                                         failedUrls={failedZineImageUrls}
                                                         onMarkFailed={handleMarkZineImageFailed}
-                                                        onSaveSlotUrl={(slotIndex, nextUrl) => handleSaveZineImageSlot(sceneKey, slotIndex, nextUrl)}
+                                                        onSaveSlot={(slotIndex, entry) => handleSaveZineImageSlot(sceneKey, slotIndex, entry)}
+                                                        onSwapSlots={onSwapZineImages ? (idxA, idxB) => onSwapZineImages(sceneKey, idxA, idxB) : undefined}
                                                         renderMarkdown={renderZineMarkdown}
                                                     />
                                                 )}
@@ -3419,17 +3858,25 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         DEEP CUTS: {deepCutsCount}
                                     </span>
                                 </div>
-                                <h1 className="text-4xl lg:text-7xl font-bold tracking-tighter text-white mb-8 lg:mb-10 leading-tight" style={{ wordBreak: 'break-word' }}>
+                                <h1 className="text-4xl lg:text-7xl font-bold tracking-tighter text-white mb-6 lg:mb-8 leading-tight" style={{ wordBreak: 'break-word' }}>
                                     {projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(' / ') : 'Zine')}
                                 </h1>
+                                <ZineIntroNote
+                                    sectionKey={scenes[0]?.sceneId || scenes[0]?.id || 'scene-1'}
+                                    intro={scenes[0]?.zineIntro}
+                                    isEditingZine={isEditingZine}
+                                    onSaveIntro={onUpdateZineIntro ? (nextIntro) => onUpdateZineIntro(scenes[0]?.sceneId || scenes[0]?.id || 'scene-1', nextIntro) : undefined}
+                                />
                                 <ZineEditorialColumns
                                     sectionKey={scenes[0]?.sceneId || scenes[0]?.id || 'scene-1'}
                                     markdown={sanitizedRationaleText}
                                     images={scenes[0]?.zineImages}
+                                    viewportTier={zineViewportTier}
                                     isEditingZine={isEditingZine}
                                     failedUrls={failedZineImageUrls}
                                     onMarkFailed={handleMarkZineImageFailed}
-                                    onSaveSlotUrl={(slotIndex, nextUrl) => handleSaveZineImageSlot(scenes[0]?.sceneId || scenes[0]?.id || 'scene-1', slotIndex, nextUrl)}
+                                    onSaveSlot={(slotIndex, entry) => handleSaveZineImageSlot(scenes[0]?.sceneId || scenes[0]?.id || 'scene-1', slotIndex, entry)}
+                                    onSwapSlots={onSwapZineImages ? (idxA, idxB) => onSwapZineImages(scenes[0]?.sceneId || scenes[0]?.id || 'scene-1', idxA, idxB) : undefined}
                                     renderMarkdown={renderZineMarkdown}
                                 />
                             </div>

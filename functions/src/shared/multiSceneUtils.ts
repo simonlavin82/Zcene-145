@@ -7,6 +7,8 @@ import {
   CanvasNodeRef,
   SceneCenterOffset,
   DiscoveryFilters,
+  ZineImageSlot,
+  ZineEditorialImageEntry,
 } from '../types';
 import { stripCountrySlug } from './isoCountries';
 
@@ -288,12 +290,60 @@ export function validateZineImageUrl(raw: unknown): string | null {
 }
 
 /**
- * Normalizes up to 3 column-width Zine editorial image URLs into [col0, col1, col2].
+ * Resolves either a plain https:// string or a { url, caption, blockOffset } object
+ * into a normalized ZineImageSlot, or null if invalid.
+ */
+export function resolveZineImageSlot(raw: unknown): ZineImageSlot | null {
+  if (typeof raw === 'string') {
+    const validUrl = validateZineImageUrl(raw);
+    return validUrl ? { url: validUrl } : null;
+  }
+  if (!raw || typeof raw !== 'object') return null;
+  const candidate = raw as Record<string, unknown>;
+  const validUrl = validateZineImageUrl(candidate.url);
+  if (!validUrl) return null;
+
+  const caption =
+    typeof candidate.caption === 'string'
+      ? candidate.caption.replace(/\s+/g, ' ').trim().slice(0, 140)
+      : '';
+  const blockOffset: 1 | undefined = candidate.blockOffset === 1 ? 1 : undefined;
+
+  return {
+    url: validUrl,
+    ...(caption ? { caption } : {}),
+    ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
+  };
+}
+
+/**
+ * Serializes a ZineImageSlot back into plain URL string (when no caption/offset)
+ * or compact object entry for backward-compatible Firestore persistence.
+ */
+export function serializeZineImageEntry(
+  slot: ZineImageSlot | null | undefined
+): ZineEditorialImageEntry {
+  if (!slot || !slot.url) return null;
+  const caption =
+    typeof slot.caption === 'string'
+      ? slot.caption.replace(/\s+/g, ' ').trim().slice(0, 140)
+      : '';
+  const blockOffset: 1 | undefined = slot.blockOffset === 1 ? 1 : undefined;
+  if (!caption && blockOffset !== 1) return slot.url;
+  return {
+    url: slot.url,
+    ...(caption ? { caption } : {}),
+    ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
+  };
+}
+
+/**
+ * Normalizes up to 3 column-width Zine editorial image entries (strings or ZineImageSlot objects).
  * Returns undefined if all 3 slots are null so unedited scenes incur zero overhead.
  */
 export function normalizeZineImages(
   raw: unknown
-): [string | null, string | null, string | null] | undefined {
+): [ZineEditorialImageEntry, ZineEditorialImageEntry, ZineEditorialImageEntry] | undefined {
   let arr: unknown = raw;
   if (typeof raw === 'string') {
     const trimmed = raw.trim();
@@ -305,12 +355,22 @@ export function normalizeZineImages(
     }
   }
   if (!Array.isArray(arr)) return undefined;
-  const tuple: [string | null, string | null, string | null] = [
-    validateZineImageUrl(arr[0]),
-    validateZineImageUrl(arr[1]),
-    validateZineImageUrl(arr[2]),
+  const tuple: [ZineEditorialImageEntry, ZineEditorialImageEntry, ZineEditorialImageEntry] = [
+    serializeZineImageEntry(resolveZineImageSlot(arr[0])),
+    serializeZineImageEntry(resolveZineImageSlot(arr[1])),
+    serializeZineImageEntry(resolveZineImageSlot(arr[2])),
   ];
-  return tuple.some(Boolean) ? tuple : undefined;
+  return tuple.some((entry) => entry !== null) ? tuple : undefined;
+}
+
+/**
+ * Normalizes an optional Zine Curator's Note / Intro dedication paragraph.
+ * Returns undefined when empty so unedited Zines incur zero overhead.
+ */
+export function normalizeZineIntro(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const cleaned = raw.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 600);
+  return cleaned.length > 0 ? cleaned : undefined;
 }
 
 /**
@@ -486,6 +546,7 @@ export function normalizeProjectScene(
     }
   }
 
+  const normalizedZineIntro = normalizeZineIntro((s as any).zineIntro);
   const normalizedZineImages = normalizeZineImages((s as any).zineImages);
 
   return {
@@ -506,6 +567,7 @@ export function normalizeProjectScene(
     curatedDiscoveryFilters,
     graphData,
     synthesisRationale: s.synthesisRationale || graphData.synthesisRationale || '',
+    ...(normalizedZineIntro ? { zineIntro: normalizedZineIntro } : {}),
     ...(normalizedZineImages ? { zineImages: normalizedZineImages } : {}),
     artistSnippets: s.artistSnippets && typeof s.artistSnippets === 'object' ? s.artistSnippets : {},
     centerOffset,

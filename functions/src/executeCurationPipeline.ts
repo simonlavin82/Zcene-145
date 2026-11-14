@@ -666,6 +666,7 @@ export const executeCurationPipeline = onCall({
         discoveryFilters: payload.filters || {},
         graphData: finalGraph,
         synthesisRationale: finalGraph.synthesisRationale || "",
+        ...(prevTargetScene?.zineIntro ? { zineIntro: prevTargetScene.zineIntro } : {}),
         ...(prevTargetScene?.zineImages ? { zineImages: prevTargetScene.zineImages } : {}),
         artistSnippets: {},
         centerOffset: getSceneCenterOffset(targetSceneIndex),

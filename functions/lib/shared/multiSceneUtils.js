@@ -15,7 +15,10 @@ exports.toSeedArtistsArray = toSeedArtistsArray;
 exports.toSeedArtistsString = toSeedArtistsString;
 exports.isCanonicalSeedMatch = isCanonicalSeedMatch;
 exports.validateZineImageUrl = validateZineImageUrl;
+exports.resolveZineImageSlot = resolveZineImageSlot;
+exports.serializeZineImageEntry = serializeZineImageEntry;
 exports.normalizeZineImages = normalizeZineImages;
+exports.normalizeZineIntro = normalizeZineIntro;
 exports.normalizeProjectScene = normalizeProjectScene;
 exports.createEmptyProjectScene = createEmptyProjectScene;
 exports.getSceneDisplayName = getSceneDisplayName;
@@ -317,7 +320,51 @@ function validateZineImageUrl(raw) {
     }
 }
 /**
- * Normalizes up to 3 column-width Zine editorial image URLs into [col0, col1, col2].
+ * Resolves either a plain https:// string or a { url, caption, blockOffset } object
+ * into a normalized ZineImageSlot, or null if invalid.
+ */
+function resolveZineImageSlot(raw) {
+    if (typeof raw === 'string') {
+        const validUrl = validateZineImageUrl(raw);
+        return validUrl ? { url: validUrl } : null;
+    }
+    if (!raw || typeof raw !== 'object')
+        return null;
+    const candidate = raw;
+    const validUrl = validateZineImageUrl(candidate.url);
+    if (!validUrl)
+        return null;
+    const caption = typeof candidate.caption === 'string'
+        ? candidate.caption.replace(/\s+/g, ' ').trim().slice(0, 140)
+        : '';
+    const blockOffset = candidate.blockOffset === 1 ? 1 : undefined;
+    return {
+        url: validUrl,
+        ...(caption ? { caption } : {}),
+        ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
+    };
+}
+/**
+ * Serializes a ZineImageSlot back into plain URL string (when no caption/offset)
+ * or compact object entry for backward-compatible Firestore persistence.
+ */
+function serializeZineImageEntry(slot) {
+    if (!slot || !slot.url)
+        return null;
+    const caption = typeof slot.caption === 'string'
+        ? slot.caption.replace(/\s+/g, ' ').trim().slice(0, 140)
+        : '';
+    const blockOffset = slot.blockOffset === 1 ? 1 : undefined;
+    if (!caption && blockOffset !== 1)
+        return slot.url;
+    return {
+        url: slot.url,
+        ...(caption ? { caption } : {}),
+        ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
+    };
+}
+/**
+ * Normalizes up to 3 column-width Zine editorial image entries (strings or ZineImageSlot objects).
  * Returns undefined if all 3 slots are null so unedited scenes incur zero overhead.
  */
 function normalizeZineImages(raw) {
@@ -336,11 +383,21 @@ function normalizeZineImages(raw) {
     if (!Array.isArray(arr))
         return undefined;
     const tuple = [
-        validateZineImageUrl(arr[0]),
-        validateZineImageUrl(arr[1]),
-        validateZineImageUrl(arr[2]),
+        serializeZineImageEntry(resolveZineImageSlot(arr[0])),
+        serializeZineImageEntry(resolveZineImageSlot(arr[1])),
+        serializeZineImageEntry(resolveZineImageSlot(arr[2])),
     ];
-    return tuple.some(Boolean) ? tuple : undefined;
+    return tuple.some((entry) => entry !== null) ? tuple : undefined;
+}
+/**
+ * Normalizes an optional Zine Curator's Note / Intro dedication paragraph.
+ * Returns undefined when empty so unedited Zines incur zero overhead.
+ */
+function normalizeZineIntro(raw) {
+    if (typeof raw !== 'string')
+        return undefined;
+    const cleaned = raw.replace(/\r\n/g, '\n').replace(/\n{3,}/g, '\n\n').trim().slice(0, 600);
+    return cleaned.length > 0 ? cleaned : undefined;
 }
 /**
  * Canonicalizes a `ProjectScene` object so that `sceneId` & `id`, `title` & `name`,
@@ -493,6 +550,7 @@ function normalizeProjectScene(raw, fallbackIndex = 0) {
             graphData = { ...graphData, nodes: graphData.nodes.map((n) => shiftNodeX(n, nodeShift)) };
         }
     }
+    const normalizedZineIntro = normalizeZineIntro(s.zineIntro);
     const normalizedZineImages = normalizeZineImages(s.zineImages);
     return {
         id: sceneId,
@@ -512,6 +570,7 @@ function normalizeProjectScene(raw, fallbackIndex = 0) {
         curatedDiscoveryFilters,
         graphData,
         synthesisRationale: s.synthesisRationale || graphData.synthesisRationale || '',
+        ...(normalizedZineIntro ? { zineIntro: normalizedZineIntro } : {}),
         ...(normalizedZineImages ? { zineImages: normalizedZineImages } : {}),
         artistSnippets: s.artistSnippets && typeof s.artistSnippets === 'object' ? s.artistSnippets : {},
         centerOffset,

@@ -203,13 +203,15 @@ const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistsOrSet: Set<s
   return depths;
 };
 
+const EMPTY_SCENES: ProjectScene[] = [];
+
 const MusicGraph: React.FC<MusicGraphProps> = ({
   data, libraryArtists, seedArtists, onNodeClick, selectedNode, peekedNode, isSmallScreen,
   isPassiveSelection = false,
   activeFilters, searchQuery, setSearchQuery, toggleFilter,
   legendConfig, legendOrder,
   legendRef, onInteraction, onLegendInteraction, isGuest,
-  detailsCache, isActive = false, scenes = [], activeSceneId, focusedSceneCluster, onSimulationComplete, onCoordinatesSettled
+  detailsCache, isActive = false, scenes = EMPTY_SCENES, activeSceneId, focusedSceneCluster, onSimulationComplete, onCoordinatesSettled
 }) => {
   const isPassiveSelectionRef = useRef(isPassiveSelection);
   useEffect(() => {

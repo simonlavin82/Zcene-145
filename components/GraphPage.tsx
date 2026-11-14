@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
-import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste, CanvasNodeRef, ProjectScene, CrossSceneLink, ERA_MIN_BOUND, ERA_MAX_BOUND, CANONICAL_COUNTRIES_22, CANONICAL_GENRE_TAXONOMY, CANONICAL_GENRES_FLAT } from '../types';
+import { GraphData, Node, ParsedArtist, View, NodeDetails, Link, ChatMessage, StackItem, DiscoveryFilters, UserTaste, CanvasNodeRef, ProjectScene, CrossSceneLink, ZineEditorialImageEntry, ERA_MIN_BOUND, ERA_MAX_BOUND, CANONICAL_COUNTRIES_22, CANONICAL_GENRE_TAXONOMY, CANONICAL_GENRES_FLAT } from '../types';
 import { User, db } from '../services/firebase';
 import { collection, getDocs, limit, query } from 'firebase/firestore';
 import { motion, AnimatePresence } from 'motion/react';
@@ -132,8 +132,11 @@ interface GraphPageProps {
   onRemoveScene?: (sceneId: string) => void;
   onRenameScene?: (sceneId: string, customName: string) => void;
   overarchingRationale?: string;
-  overarchingZineImages?: (string | null)[];
-  onUpdateZineImages?: (target: 'overarching' | string, slotIndex: 0 | 1 | 2, url: string | null) => void;
+  overarchingZineIntro?: string;
+  overarchingZineImages?: ZineEditorialImageEntry[];
+  onUpdateZineImages?: (target: 'overarching' | string, slotIndex: 0 | 1 | 2, entry: ZineEditorialImageEntry) => void;
+  onSwapZineImages?: (target: 'overarching' | string, indexA: 0 | 1 | 2, indexB: 0 | 1 | 2) => void;
+  onUpdateZineIntro?: (target: 'overarching' | string, intro: string | null) => void;
   crossSceneLinks?: CrossSceneLink[];
   isPassiveSelection?: boolean;
 }
@@ -1191,8 +1194,11 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onRemoveScene,
   onRenameScene,
   overarchingRationale,
+  overarchingZineIntro,
   overarchingZineImages,
   onUpdateZineImages,
+  onSwapZineImages,
+  onUpdateZineIntro,
   crossSceneLinks,
   isPassiveSelection = false,
 }) => {
@@ -2608,8 +2614,11 @@ const GraphPage: React.FC<GraphPageProps> = ({
           scenes={scenes}
           activeSceneId={activeSceneId}
           overarchingRationale={overarchingRationale}
+          overarchingZineIntro={overarchingZineIntro}
           overarchingZineImages={overarchingZineImages}
           onUpdateZineImages={onUpdateZineImages}
+          onSwapZineImages={onSwapZineImages}
+          onUpdateZineIntro={onUpdateZineIntro}
           activeDeepWebSession={effectiveDeepWebSession}
           onUpdateDeepWebSession={setDeepWebSession}
           selectedNode={selectedNode} 

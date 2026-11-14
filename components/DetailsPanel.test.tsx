@@ -1432,6 +1432,267 @@ describe('DetailsPanel', () => {
             fireEvent.click(screen.getByTestId('zine-slot-remove-scene-2-2'));
             expect(onUpdateZineImages).toHaveBeenCalledWith('scene-2', 2, null);
         });
+
+        it('fuses colon lead-in + bullet lists and pairs Image 3 with Para 3 across Desktop (3-col), Tablet (2 flex cols), and Mobile (1-col)', () => {
+            const fourBlockEditorial = [
+                'In Chicago, **American Football** slowed punk into twilight across shimmering telecasters and odd meters.',
+                'In South Florida, **Rocking Horse Winner** traded breakdowns for soaring indie rock hooks.',
+                'From that crucible, **Dashboard Confessional** turned bedroom confessions into anthems alongside Further Seems Forever.',
+                'The secret architecture of this evolution relies on a few critical crossover points:\n\n* **The Get Up Kids** bridged Midwest emo into pop-punk velocity.\n* **Rainer Maria** elevated dual-vocal Midwestern indie rock.',
+            ].join('\n\n');
+
+            const images: [string, string, string] = [
+                'https://i.guim.co.uk/af.jpg',
+                'https://i.scdn.co/rhw.jpg',
+                'https://encrypted-tbn0.gstatic.com/dc.jpg',
+            ];
+
+            const originalInnerWidth = window.innerWidth;
+            try {
+                // 1. Desktop (1280px): 3 independent vertical columns, Image 3 paired above Dashboard Confessional + Lead-in + Bullets
+                Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1280 });
+                fireEvent(window, new Event('resize'));
+                const { rerender } = render(
+                    <DetailsPanel
+                        {...baseProps({
+                            isSmallScreen: false,
+                            overarchingRationale: fourBlockEditorial,
+                            overarchingZineImages: images,
+                        })}
+                    />
+                );
+
+                const desktopGrid = screen.getByTestId('zine-editorial-grid-overarching');
+                expect(desktopGrid).toHaveClass('grid-cols-3');
+                expect(desktopGrid.children).toHaveLength(3);
+                expect(desktopGrid.children[1].textContent).toContain('Rocking Horse Winner');
+                expect(desktopGrid.children[1].textContent).not.toContain('Dashboard Confessional');
+                expect(desktopGrid.children[2].innerHTML).toContain('https://encrypted-tbn0.gstatic.com/dc.jpg');
+                expect(desktopGrid.children[2].textContent).toContain('Dashboard Confessional');
+                expect(desktopGrid.children[2].textContent).toContain('The secret architecture of this evolution relies on a few critical crossover points:');
+                expect(desktopGrid.children[2].textContent).toContain('The Get Up Kids');
+
+                // 2. Tablet (820px): 2 independent vertical flex columns ([Col 0, Col 2 Primary] left & [Col 1, Col 2 Trailing] right)
+                Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 820 });
+                fireEvent(window, new Event('resize'));
+                rerender(
+                    <DetailsPanel
+                        {...baseProps({
+                            isSmallScreen: false,
+                            overarchingRationale: fourBlockEditorial,
+                            overarchingZineImages: images,
+                        })}
+                    />
+                );
+
+                const tabletCols = screen.getByTestId('zine-editorial-tablet-columns-overarching');
+                expect(tabletCols).toHaveClass('grid-cols-2');
+                expect(tabletCols.children).toHaveLength(2);
+                const leftColHtml = tabletCols.children[0].innerHTML;
+                const rightColHtml = tabletCols.children[1].innerHTML;
+                expect(leftColHtml).toContain('American Football');
+                expect(leftColHtml).toContain('https://encrypted-tbn0.gstatic.com/dc.jpg');
+                expect(leftColHtml).toContain('Dashboard Confessional');
+                expect(leftColHtml.indexOf('https://encrypted-tbn0.gstatic.com/dc.jpg')).toBeLessThan(
+                    leftColHtml.indexOf('Dashboard Confessional')
+                );
+                expect(rightColHtml).toContain('Rocking Horse Winner');
+                expect(rightColHtml).toContain('The Get Up Kids');
+
+                // 3. Mobile (isSmallScreen = true): Sequential Image 1 -> Para 1 -> Image 2 -> Para 2 -> Image 3 -> Para 3 -> Bullets
+                rerender(
+                    <DetailsPanel
+                        {...baseProps({
+                            isSmallScreen: true,
+                            overarchingRationale: fourBlockEditorial,
+                            overarchingZineImages: images,
+                        })}
+                    />
+                );
+
+                const mobileHtml = screen.getByTestId('zine-editorial-grid-overarching').innerHTML;
+                const i1 = mobileHtml.indexOf('https://i.guim.co.uk/af.jpg');
+                const p1 = mobileHtml.indexOf('American Football');
+                const i2 = mobileHtml.indexOf('https://i.scdn.co/rhw.jpg');
+                const p2 = mobileHtml.indexOf('Rocking Horse Winner');
+                const i3 = mobileHtml.indexOf('https://encrypted-tbn0.gstatic.com/dc.jpg');
+                const p3 = mobileHtml.indexOf('Dashboard Confessional');
+                const b4 = mobileHtml.indexOf('The Get Up Kids');
+                expect(i1).toBeGreaterThan(-1);
+                expect(i1).toBeLessThan(p1);
+                expect(p1).toBeLessThan(i2);
+                expect(i2).toBeLessThan(p2);
+                expect(p2).toBeLessThan(i3);
+                expect(i3).toBeLessThan(p3);
+                expect(p3).toBeLessThan(b4);
+            } finally {
+                Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: originalInnerWidth });
+            }
+        });
+
+        it('hydrates mixed URL strings and ZineImageSlot captions, renders <figcaption>, and supports optional caption saving', () => {
+            const onUpdateZineImages = vi.fn();
+            const sixBlockEditorial = [
+                'Block 1 covers American Football.',
+                'Block 2 covers Owls.',
+                'Block 3 covers Rocking Horse Winner in Florida.',
+                'Block 4 covers Discount and Hey Mercedes.',
+                'Block 5 covers Dashboard Confessional.',
+                'Block 6 covers Further Seems Forever.',
+            ].join('\n\n');
+
+            const originalInnerWidth = window.innerWidth;
+            try {
+                Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 1280 });
+                render(
+                    <DetailsPanel
+                        {...baseProps({
+                            overarchingRationale: sixBlockEditorial,
+                            overarchingZineImages: [
+                                'https://i.guim.co.uk/af.jpg',
+                                {
+                                    url: 'https://i.scdn.co/rhw.jpg',
+                                    caption: 'Rocking Horse Winner (1999)',
+                                    blockOffset: 1,
+                                },
+                                null,
+                            ],
+                            onUpdateZineImages,
+                        })}
+                    />
+                );
+
+                // Plain URL string slot has no caption, ZineImageSlot caption renders <figcaption>
+                expect(screen.queryByTestId('zine-image-caption-overarching-0')).not.toBeInTheDocument();
+                expect(screen.getByTestId('zine-image-caption-overarching-1')).toHaveTextContent('Rocking Horse Winner (1999)');
+
+                // Column 2 has blockOffset: 1, so Block 3 renders BEFORE Image 2, then Block 4 renders AFTER Image 2
+                const col2Html = screen.getByTestId('zine-editorial-grid-overarching').children[1].innerHTML;
+                expect(col2Html.indexOf('Block 3 covers Rocking Horse Winner')).toBeLessThan(
+                    col2Html.indexOf('https://i.scdn.co/rhw.jpg')
+                );
+                expect(col2Html.indexOf('https://i.scdn.co/rhw.jpg')).toBeLessThan(
+                    col2Html.indexOf('Block 4 covers Discount')
+                );
+
+                // Edit Column 1 slot to add a caption
+                fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+                fireEvent.click(screen.getByTestId('zine-slot-change-overarching-0'));
+                fireEvent.change(screen.getByTestId('zine-slot-caption-input-overarching-0'), {
+                    target: { value: 'American Football — Urbana' },
+                });
+                fireEvent.click(screen.getByTestId('zine-slot-save-overarching-0'));
+
+                expect(onUpdateZineImages).toHaveBeenCalledWith('overarching', 0, {
+                    url: 'https://i.guim.co.uk/af.jpg',
+                    caption: 'American Football — Urbana',
+                });
+            } finally {
+                Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: originalInnerWidth });
+            }
+        });
+
+        it('supports one-click ← / → column swap and ↑ Top / ↓ Block 2 placement controls in Edit Mode', () => {
+            const onUpdateZineImages = vi.fn();
+            const onSwapZineImages = vi.fn();
+            const sixBlockEditorial = Array.from({ length: 6 }, (_, i) => `Paragraph ${i + 1} explores the scene.`).join('\n\n');
+
+            render(
+                <DetailsPanel
+                    {...baseProps({
+                        overarchingRationale: sixBlockEditorial,
+                        overarchingZineImages: [
+                            'https://a.example.com/1.jpg',
+                            'https://b.example.com/2.jpg',
+                            null,
+                        ],
+                        onUpdateZineImages,
+                        onSwapZineImages,
+                    })}
+                />
+            );
+
+            fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+
+            const swapLeft0 = screen.getByTestId('zine-slot-swap-left-overarching-0') as HTMLButtonElement;
+            const swapRight0 = screen.getByTestId('zine-slot-swap-right-overarching-0') as HTMLButtonElement;
+            expect(swapLeft0.disabled).toBe(true);
+            expect(swapRight0.disabled).toBe(false);
+
+            fireEvent.click(swapRight0);
+            expect(onSwapZineImages).toHaveBeenCalledWith('overarching', 0, 1);
+
+            fireEvent.click(screen.getByTestId('zine-slot-swap-left-overarching-1'));
+            expect(onSwapZineImages).toHaveBeenCalledWith('overarching', 1, 0);
+
+            const placementBtn0 = screen.getByTestId('zine-slot-placement-overarching-0');
+            expect(placementBtn0).toHaveTextContent('↓ Block 2');
+            fireEvent.click(placementBtn0);
+            expect(onUpdateZineImages).toHaveBeenCalledWith('overarching', 0, {
+                url: 'https://a.example.com/1.jpg',
+                blockOffset: 1,
+            });
+        });
+
+        it('keeps empty Intro / Dedication hidden in Reading/Guest Mode and allows owners to add, edit, and remove it', () => {
+            const onUpdateZineIntro = vi.fn();
+            const { rerender } = render(
+                <DetailsPanel
+                    {...baseProps({
+                        onUpdateZineIntro,
+                    })}
+                />
+            );
+
+            // Empty intro stays invisible outside Edit Mode
+            expect(screen.queryByTestId('zine-intro-note-overarching')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('zine-intro-add-overarching')).not.toBeInTheDocument();
+
+            // Owner enters Edit Mode and saves a dedication note
+            fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+            fireEvent.click(screen.getByTestId('zine-intro-add-overarching'));
+            fireEvent.change(screen.getByTestId('zine-intro-input-overarching'), {
+                target: { value: 'For the 1999 Champaign & Pompano Beach basement tape circle.' },
+            });
+            fireEvent.click(screen.getByTestId('zine-intro-save-overarching'));
+
+            expect(onUpdateZineIntro).toHaveBeenCalledWith(
+                'overarching',
+                'For the 1999 Champaign & Pompano Beach basement tape circle.'
+            );
+
+            // Exit Edit Mode and verify note renders cleanly in Guest Mode without Edit controls
+            fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+            rerender(
+                <DetailsPanel
+                    {...baseProps({
+                        isGuest: true,
+                        overarchingZineIntro: 'For the 1999 Champaign & Pompano Beach basement tape circle.',
+                        onUpdateZineIntro,
+                    })}
+                />
+            );
+
+            expect(screen.getByTestId('zine-intro-note-overarching')).toHaveTextContent(
+                'For the 1999 Champaign & Pompano Beach basement tape circle.'
+            );
+            expect(screen.queryByTestId('zine-intro-edit-overarching')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('zine-intro-remove-overarching')).not.toBeInTheDocument();
+
+            // Re-enter owner Edit Mode and click Remove Note
+            rerender(
+                <DetailsPanel
+                    {...baseProps({
+                        isGuest: false,
+                        overarchingZineIntro: 'For the 1999 Champaign & Pompano Beach basement tape circle.',
+                        onUpdateZineIntro,
+                    })}
+                />
+            );
+            fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+            fireEvent.click(screen.getByTestId('zine-intro-remove-overarching'));
+            expect(onUpdateZineIntro).toHaveBeenCalledWith('overarching', null);
+        });
     });
 });
 

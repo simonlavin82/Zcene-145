@@ -55,18 +55,44 @@ export const computeProjectHydrationFingerprint = (
         Array.isArray(data.artistIds) ? [...data.artistIds].map(String).sort().join(',') : '',
         Array.isArray(data.labelIds) ? [...data.labelIds].map(String).sort().join(',') : '',
       ].join(';');
+  const normalizeZineEntry = (entry: any) => {
+    if (typeof entry === 'string') {
+      const trimmed = entry.trim();
+      return trimmed || null;
+    }
+    if (entry && typeof entry === 'object' && typeof entry.url === 'string' && entry.url.trim()) {
+      const url = entry.url.trim();
+      const caption = typeof entry.caption === 'string' ? entry.caption.replace(/\s+/g, ' ').trim().slice(0, 140) : '';
+      const blockOffset = entry.blockOffset === 1 ? 1 : undefined;
+      if (!caption && blockOffset !== 1) return url;
+      return {
+        url,
+        ...(caption ? { caption } : {}),
+        ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
+      };
+    }
+    return null;
+  };
   const rawOverarchingImages = Array.isArray(data.overarchingZineImages)
-    ? data.overarchingZineImages.slice(0, 3).map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
+    ? [
+        normalizeZineEntry(data.overarchingZineImages[0]),
+        normalizeZineEntry(data.overarchingZineImages[1]),
+        normalizeZineEntry(data.overarchingZineImages[2]),
+      ]
     : [];
-  const hasOverarchingImages = rawOverarchingImages.some(Boolean);
+  const hasOverarchingImages = rawOverarchingImages.some((entry) => entry !== null);
+  const normalizedOverarchingIntro =
+    typeof data.overarchingZineIntro === 'string' ? data.overarchingZineIntro.trim() : '';
   const multiSceneSig =
-    data.overarchingRationale || data.scenes || data.crossSceneLinks || hasOverarchingImages
+    data.overarchingRationale || data.scenes || data.crossSceneLinks || hasOverarchingImages || normalizedOverarchingIntro
       ? fnv1aHash(
           `${String(data.overarchingRationale ?? '')}|${
             typeof data.scenes === 'string' ? data.scenes : JSON.stringify(data.scenes ?? '')
           }|${
             typeof data.crossSceneLinks === 'string' ? data.crossSceneLinks : JSON.stringify(data.crossSceneLinks ?? '')
-          }${hasOverarchingImages ? `|${JSON.stringify(rawOverarchingImages)}` : ''}`
+          }${hasOverarchingImages ? `|${JSON.stringify(rawOverarchingImages)}` : ''}${
+            normalizedOverarchingIntro ? `|${normalizedOverarchingIntro}` : ''
+          }`
         )
       : '';
   const canonicalPayload = [
@@ -105,12 +131,36 @@ export const computeAutosaveDocSnapshot = (data: any): string => {
     ? data.seedImageUrls.map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
     : [];
   const seedImageUrls = rawSeedImageUrls.some(Boolean) ? rawSeedImageUrls : [];
+  const normalizeSnapshotZineEntry = (entry: any) => {
+    if (typeof entry === 'string') {
+      const trimmed = entry.trim();
+      return trimmed || null;
+    }
+    if (entry && typeof entry === 'object' && typeof entry.url === 'string' && entry.url.trim()) {
+      const url = entry.url.trim();
+      const caption = typeof entry.caption === 'string' ? entry.caption.replace(/\s+/g, ' ').trim().slice(0, 140) : '';
+      const blockOffset = entry.blockOffset === 1 ? 1 : undefined;
+      if (!caption && blockOffset !== 1) return url;
+      return {
+        url,
+        ...(caption ? { caption } : {}),
+        ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
+      };
+    }
+    return null;
+  };
   const rawOverarchingZineImages = Array.isArray(data.overarchingZineImages)
-    ? data.overarchingZineImages.slice(0, 3).map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
+    ? [
+        normalizeSnapshotZineEntry(data.overarchingZineImages[0]),
+        normalizeSnapshotZineEntry(data.overarchingZineImages[1]),
+        normalizeSnapshotZineEntry(data.overarchingZineImages[2]),
+      ]
     : [];
-  const overarchingZineImages = rawOverarchingZineImages.some(Boolean)
-    ? [rawOverarchingZineImages[0] ?? null, rawOverarchingZineImages[1] ?? null, rawOverarchingZineImages[2] ?? null]
+  const overarchingZineImages = rawOverarchingZineImages.some((entry) => entry !== null)
+    ? rawOverarchingZineImages
     : [];
+  const overarchingZineIntro =
+    typeof data.overarchingZineIntro === 'string' ? data.overarchingZineIntro.trim() : '';
 
   return JSON.stringify({
     name: data.name || '',
@@ -119,6 +169,7 @@ export const computeAutosaveDocSnapshot = (data: any): string => {
     seedImageUrls,
     scenes: normalizeJson(data.scenes, '[]'),
     overarchingRationale: data.overarchingRationale || '',
+    overarchingZineIntro,
     overarchingZineImages,
     crossSceneLinks: normalizeJson(data.crossSceneLinks, '[]'),
     discoveryFilters: normalizeJson(data.discoveryFilters, '{}'),
