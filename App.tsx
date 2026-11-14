@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink, ZineEditorialImageEntry } from './types';
-import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeduplicatedActiveNodes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, normalizeZineImages, normalizeZineIntro, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT } from './shared/multiSceneUtils';
+import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeduplicatedActiveNodes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, normalizeZineImages, normalizeZineIntro, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT, MAX_ZINE_IMAGE_SLOTS } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing, stripCountrySlug, canonicalizeEntitySlugWithCountry } from './services/artistCacheService';
 export { canonicalizeEntitySlugWithCountry };
@@ -2106,16 +2106,19 @@ const App: React.FC = () => {
 
   const handleUpdateZineImages = useCallback((
     target: 'overarching' | string,
-    slotIndex: 0 | 1 | 2,
+    slotIndex: number,
     entry: ZineEditorialImageEntry
   ) => {
+    if (!Number.isInteger(slotIndex) || slotIndex < 0 || slotIndex >= MAX_ZINE_IMAGE_SLOTS) {
+      return;
+    }
     const applySlotUpdate = (current?: ZineEditorialImageEntry[]): ZineEditorialImageEntry[] => {
-      const normalized = normalizeZineImages(current) || [null, null, null];
-      const nextSlots: [ZineEditorialImageEntry, ZineEditorialImageEntry, ZineEditorialImageEntry] = [
-        normalized[0] ?? null,
-        normalized[1] ?? null,
-        normalized[2] ?? null
-      ];
+      const normalized = normalizeZineImages(current) || [];
+      const targetLen = Math.min(MAX_ZINE_IMAGE_SLOTS, Math.max(normalized.length, slotIndex + 1));
+      const nextSlots: ZineEditorialImageEntry[] = Array.from(
+        { length: targetLen },
+        (_, idx) => normalized[idx] ?? null
+      );
       nextSlots[slotIndex] = entry;
       return normalizeZineImages(nextSlots) || [];
     };
@@ -2135,19 +2138,29 @@ const App: React.FC = () => {
 
   const handleSwapZineImages = useCallback((
     target: 'overarching' | string,
-    indexA: 0 | 1 | 2,
-    indexB: 0 | 1 | 2
+    indexA: number,
+    indexB: number
   ) => {
-    if (indexA === indexB) return;
+    if (
+      indexA === indexB ||
+      !Number.isInteger(indexA) ||
+      !Number.isInteger(indexB) ||
+      indexA < 0 ||
+      indexB < 0 ||
+      indexA >= MAX_ZINE_IMAGE_SLOTS ||
+      indexB >= MAX_ZINE_IMAGE_SLOTS
+    ) {
+      return;
+    }
     const applySlotSwap = (current?: ZineEditorialImageEntry[]): ZineEditorialImageEntry[] => {
-      const normalized = normalizeZineImages(current) || [null, null, null];
-      const nextSlots: [ZineEditorialImageEntry, ZineEditorialImageEntry, ZineEditorialImageEntry] = [
-        normalized[0] ?? null,
-        normalized[1] ?? null,
-        normalized[2] ?? null
-      ];
-      const tmp = nextSlots[indexA];
-      nextSlots[indexA] = nextSlots[indexB];
+      const normalized = normalizeZineImages(current) || [];
+      const targetLen = Math.min(MAX_ZINE_IMAGE_SLOTS, Math.max(normalized.length, indexA + 1, indexB + 1));
+      const nextSlots: ZineEditorialImageEntry[] = Array.from(
+        { length: targetLen },
+        (_, idx) => normalized[idx] ?? null
+      );
+      const tmp = nextSlots[indexA] ?? null;
+      nextSlots[indexA] = nextSlots[indexB] ?? null;
       nextSlots[indexB] = tmp;
       return normalizeZineImages(nextSlots) || [];
     };

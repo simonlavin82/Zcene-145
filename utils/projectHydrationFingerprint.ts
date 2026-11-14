@@ -1,3 +1,51 @@
+import { MAX_ZINE_IMAGE_SLOTS } from '../shared/multiSceneUtils';
+
+const normalizeZineEntryForSnapshot = (entry: any): { url: string; caption?: string; hasLegacyOffset: boolean } | null => {
+  if (typeof entry === 'string') {
+    const trimmed = entry.trim();
+    return trimmed ? { url: trimmed, hasLegacyOffset: false } : null;
+  }
+  if (entry && typeof entry === 'object' && typeof entry.url === 'string' && entry.url.trim()) {
+    const url = entry.url.trim();
+    const caption = typeof entry.caption === 'string' ? entry.caption.replace(/\s+/g, ' ').trim().slice(0, 140) : '';
+    return {
+      url,
+      ...(caption ? { caption } : {}),
+      hasLegacyOffset: entry.blockOffset === 1,
+    };
+  }
+  return null;
+};
+
+const normalizeZineImagesForSnapshot = (raw: unknown): Array<string | { url: string; caption: string } | null> => {
+  if (!Array.isArray(raw)) return [];
+  const limit = Math.min(raw.length, MAX_ZINE_IMAGE_SLOTS);
+  const slots: Array<{ url: string; caption?: string } | null> = Array.from({ length: MAX_ZINE_IMAGE_SLOTS }, () => null);
+  for (let i = 0; i < limit; i++) {
+    const resolved = normalizeZineEntryForSnapshot(raw[i]);
+    if (!resolved) continue;
+    if (
+      resolved.hasLegacyOffset &&
+      i + 1 < MAX_ZINE_IMAGE_SLOTS &&
+      !normalizeZineEntryForSnapshot(raw[i + 1]) &&
+      slots[i + 1] === null
+    ) {
+      slots[i + 1] = { url: resolved.url, ...(resolved.caption ? { caption: resolved.caption } : {}) };
+    } else if (slots[i] === null) {
+      slots[i] = { url: resolved.url, ...(resolved.caption ? { caption: resolved.caption } : {}) };
+    }
+  }
+  const serialized = slots.map((slot) => {
+    if (!slot) return null;
+    if (!slot.caption) return slot.url;
+    return { url: slot.url, caption: slot.caption };
+  });
+  while (serialized.length > 0 && serialized[serialized.length - 1] === null) {
+    serialized.pop();
+  }
+  return serialized;
+};
+
 const fnv1aHash = (input: string): string => {
   let hash = 0x811c9dc5;
   for (let i = 0; i < input.length; i++) {
@@ -55,32 +103,8 @@ export const computeProjectHydrationFingerprint = (
         Array.isArray(data.artistIds) ? [...data.artistIds].map(String).sort().join(',') : '',
         Array.isArray(data.labelIds) ? [...data.labelIds].map(String).sort().join(',') : '',
       ].join(';');
-  const normalizeZineEntry = (entry: any) => {
-    if (typeof entry === 'string') {
-      const trimmed = entry.trim();
-      return trimmed || null;
-    }
-    if (entry && typeof entry === 'object' && typeof entry.url === 'string' && entry.url.trim()) {
-      const url = entry.url.trim();
-      const caption = typeof entry.caption === 'string' ? entry.caption.replace(/\s+/g, ' ').trim().slice(0, 140) : '';
-      const blockOffset = entry.blockOffset === 1 ? 1 : undefined;
-      if (!caption && blockOffset !== 1) return url;
-      return {
-        url,
-        ...(caption ? { caption } : {}),
-        ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
-      };
-    }
-    return null;
-  };
-  const rawOverarchingImages = Array.isArray(data.overarchingZineImages)
-    ? [
-        normalizeZineEntry(data.overarchingZineImages[0]),
-        normalizeZineEntry(data.overarchingZineImages[1]),
-        normalizeZineEntry(data.overarchingZineImages[2]),
-      ]
-    : [];
-  const hasOverarchingImages = rawOverarchingImages.some((entry) => entry !== null);
+  const rawOverarchingImages = normalizeZineImagesForSnapshot(data.overarchingZineImages);
+  const hasOverarchingImages = rawOverarchingImages.length > 0;
   const normalizedOverarchingIntro =
     typeof data.overarchingZineIntro === 'string' ? data.overarchingZineIntro.trim() : '';
   const multiSceneSig =
@@ -131,34 +155,7 @@ export const computeAutosaveDocSnapshot = (data: any): string => {
     ? data.seedImageUrls.map((u: any) => (typeof u === 'string' && u.trim() ? u.trim() : null))
     : [];
   const seedImageUrls = rawSeedImageUrls.some(Boolean) ? rawSeedImageUrls : [];
-  const normalizeSnapshotZineEntry = (entry: any) => {
-    if (typeof entry === 'string') {
-      const trimmed = entry.trim();
-      return trimmed || null;
-    }
-    if (entry && typeof entry === 'object' && typeof entry.url === 'string' && entry.url.trim()) {
-      const url = entry.url.trim();
-      const caption = typeof entry.caption === 'string' ? entry.caption.replace(/\s+/g, ' ').trim().slice(0, 140) : '';
-      const blockOffset = entry.blockOffset === 1 ? 1 : undefined;
-      if (!caption && blockOffset !== 1) return url;
-      return {
-        url,
-        ...(caption ? { caption } : {}),
-        ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
-      };
-    }
-    return null;
-  };
-  const rawOverarchingZineImages = Array.isArray(data.overarchingZineImages)
-    ? [
-        normalizeSnapshotZineEntry(data.overarchingZineImages[0]),
-        normalizeSnapshotZineEntry(data.overarchingZineImages[1]),
-        normalizeSnapshotZineEntry(data.overarchingZineImages[2]),
-      ]
-    : [];
-  const overarchingZineImages = rawOverarchingZineImages.some((entry) => entry !== null)
-    ? rawOverarchingZineImages
-    : [];
+  const overarchingZineImages = normalizeZineImagesForSnapshot(data.overarchingZineImages);
   const overarchingZineIntro =
     typeof data.overarchingZineIntro === 'string' ? data.overarchingZineIntro.trim() : '';
 

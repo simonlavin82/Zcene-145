@@ -134,8 +134,8 @@ interface GraphPageProps {
   overarchingRationale?: string;
   overarchingZineIntro?: string;
   overarchingZineImages?: ZineEditorialImageEntry[];
-  onUpdateZineImages?: (target: 'overarching' | string, slotIndex: 0 | 1 | 2, entry: ZineEditorialImageEntry) => void;
-  onSwapZineImages?: (target: 'overarching' | string, indexA: 0 | 1 | 2, indexB: 0 | 1 | 2) => void;
+  onUpdateZineImages?: (target: 'overarching' | string, slotIndex: number, entry: ZineEditorialImageEntry) => void;
+  onSwapZineImages?: (target: 'overarching' | string, indexA: number, indexB: number) => void;
   onUpdateZineIntro?: (target: 'overarching' | string, intro: string | null) => void;
   crossSceneLinks?: CrossSceneLink[];
   isPassiveSelection?: boolean;

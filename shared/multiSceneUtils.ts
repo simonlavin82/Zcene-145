@@ -289,9 +289,11 @@ export function validateZineImageUrl(raw: unknown): string | null {
   }
 }
 
+export const MAX_ZINE_IMAGE_SLOTS = 8;
+
 /**
- * Resolves either a plain https:// string or a { url, caption, blockOffset } object
- * into a normalized ZineImageSlot, or null if invalid.
+ * Resolves either a plain https:// string or a { url, caption } object
+ * into a normalized ZineImageSlot, or null if invalid (stripping deprecated blockOffset).
  */
 export function resolveZineImageSlot(raw: unknown): ZineImageSlot | null {
   if (typeof raw === 'string') {
@@ -307,18 +309,16 @@ export function resolveZineImageSlot(raw: unknown): ZineImageSlot | null {
     typeof candidate.caption === 'string'
       ? candidate.caption.replace(/\s+/g, ' ').trim().slice(0, 140)
       : '';
-  const blockOffset: 1 | undefined = candidate.blockOffset === 1 ? 1 : undefined;
 
   return {
     url: validUrl,
     ...(caption ? { caption } : {}),
-    ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
   };
 }
 
 /**
- * Serializes a ZineImageSlot back into plain URL string (when no caption/offset)
- * or compact object entry for backward-compatible Firestore persistence.
+ * Serializes a ZineImageSlot back into plain URL string (when no caption)
+ * or compact { url, caption } object for backward-compatible Firestore persistence.
  */
 export function serializeZineImageEntry(
   slot: ZineImageSlot | null | undefined
@@ -328,22 +328,21 @@ export function serializeZineImageEntry(
     typeof slot.caption === 'string'
       ? slot.caption.replace(/\s+/g, ' ').trim().slice(0, 140)
       : '';
-  const blockOffset: 1 | undefined = slot.blockOffset === 1 ? 1 : undefined;
-  if (!caption && blockOffset !== 1) return slot.url;
+  if (!caption) return slot.url;
   return {
     url: slot.url,
-    ...(caption ? { caption } : {}),
-    ...(blockOffset === 1 ? { blockOffset: 1 } : {}),
+    caption,
   };
 }
 
 /**
- * Normalizes up to 3 column-width Zine editorial image entries (strings or ZineImageSlot objects).
- * Returns undefined if all 3 slots are null so unedited scenes incur zero overhead.
+ * Normalizes up to MAX_ZINE_IMAGE_SLOTS (8) per-block Zine editorial image entries.
+ * Transparently migrates any legacy entry with blockOffset === 1 at index i to i + 1
+ * when slot i + 1 is empty, trims trailing nulls, and returns undefined when all slots are null.
  */
 export function normalizeZineImages(
   raw: unknown
-): [ZineEditorialImageEntry, ZineEditorialImageEntry, ZineEditorialImageEntry] | undefined {
+): ZineEditorialImageEntry[] | undefined {
   let arr: unknown = raw;
   if (typeof raw === 'string') {
     const trimmed = raw.trim();
@@ -355,12 +354,33 @@ export function normalizeZineImages(
     }
   }
   if (!Array.isArray(arr)) return undefined;
-  const tuple: [ZineEditorialImageEntry, ZineEditorialImageEntry, ZineEditorialImageEntry] = [
-    serializeZineImageEntry(resolveZineImageSlot(arr[0])),
-    serializeZineImageEntry(resolveZineImageSlot(arr[1])),
-    serializeZineImageEntry(resolveZineImageSlot(arr[2])),
-  ];
-  return tuple.some((entry) => entry !== null) ? tuple : undefined;
+
+  const limit = Math.min(arr.length, MAX_ZINE_IMAGE_SLOTS);
+  const slots: (ZineImageSlot | null)[] = Array.from({ length: MAX_ZINE_IMAGE_SLOTS }, () => null);
+
+  for (let i = 0; i < limit; i++) {
+    const resolved = resolveZineImageSlot(arr[i]);
+    if (!resolved) continue;
+    const hasLegacyOffset = Boolean(
+      arr[i] && typeof arr[i] === 'object' && (arr[i] as Record<string, unknown>).blockOffset === 1
+    );
+    if (
+      hasLegacyOffset &&
+      i + 1 < MAX_ZINE_IMAGE_SLOTS &&
+      !resolveZineImageSlot(arr[i + 1]) &&
+      slots[i + 1] === null
+    ) {
+      slots[i + 1] = resolved;
+    } else if (slots[i] === null) {
+      slots[i] = resolved;
+    }
+  }
+
+  const serialized: ZineEditorialImageEntry[] = slots.map((slot) => serializeZineImageEntry(slot));
+  while (serialized.length > 0 && serialized[serialized.length - 1] === null) {
+    serialized.pop();
+  }
+  return serialized.length > 0 ? serialized : undefined;
 }
 
 /**

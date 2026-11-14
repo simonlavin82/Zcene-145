@@ -138,6 +138,7 @@ export interface SceneCenterOffset {
 export interface ZineImageSlot {
   url: string;
   caption?: string;
+  /** @deprecated Legacy column-level offset; migrated to block-indexed slot i + 1 by normalizeZineImages */
   blockOffset?: 0 | 1;
 }
 
@@ -161,7 +162,7 @@ export interface ProjectScene {
   graphData: GraphData;               // Un-namespaced canonical scene topology
   synthesisRationale: string;         // Scene-specific Zine editorial markdown
   zineIntro?: string;                 // Optional owner-curated intro / dedication note for this Scene's Zine editorial
-  zineImages?: ZineEditorialImages;   // Optional up to 3 column-width Zine editorial image slots (url | { url, caption, blockOffset })
+  zineImages?: ZineEditorialImages;   // Optional up to MAX_ZINE_IMAGE_SLOTS (8) per-block Zine editorial image slots (url | { url, caption })
   artistSnippets?: Record<string, string>; // Scene-specific 1-sentence epicenter hooks keyed by canonical ID
   centerOffset: SceneCenterOffset;    // { x: 1000 + sceneIndex * 1050, y: 1000 }
   status: 'unmapped' | 'curating' | 'ready' | 'failed' | 'completed' | 'idle';
@@ -258,7 +259,7 @@ export interface Project {
   activeSceneId?: string;                          // Currently focused Scene in ROOTS panel (e.g. 'scene-1')
   overarchingRationale?: string | null;            // Master Overarching Zine Editorial (when scenes.length >= 2)
   overarchingZineIntro?: string | null;            // Optional owner-curated intro / dedication note below H1 Zine title
-  overarchingZineImages?: ZineEditorialImages;     // Optional up to 3 column-width image slots for Overarching Zine editorial
+  overarchingZineImages?: ZineEditorialImages;     // Optional up to MAX_ZINE_IMAGE_SLOTS (8) per-block image slots for Overarching Zine editorial
   crossSceneLinks?: string | CrossSceneLink[] | null; // Deterministic identity + AI sonic_lineage cross-scene bridges
   seedArtistIds?: string[];                        // Union of all scene.seedIds across all scenes
   sceneCount?: number;

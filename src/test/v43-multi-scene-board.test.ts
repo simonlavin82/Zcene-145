@@ -28,6 +28,7 @@ import {
   getSceneDisplayName,
   resolveCrossSceneTargetName,
   computeClampedDropdownLeft,
+  MAX_ZINE_IMAGE_SLOTS,
   validateZineImageUrl,
   resolveZineImageSlot,
   serializeZineImageEntry,
@@ -3195,7 +3196,8 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(validateZineImageUrl('not a url')).toBeNull();
     });
 
-    it('normalizeZineImages preserves up to 3 sparse column slots and returns undefined when all slots are empty/invalid', () => {
+    it('normalizeZineImages preserves up to MAX_ZINE_IMAGE_SLOTS (8) sparse block slots, trims trailing nulls, and returns undefined when all slots are empty/invalid', () => {
+      expect(MAX_ZINE_IMAGE_SLOTS).toBe(8);
       expect(normalizeZineImages(undefined)).toBeUndefined();
       expect(normalizeZineImages([])).toBeUndefined();
       expect(normalizeZineImages([null, null, null])).toBeUndefined();
@@ -3203,23 +3205,14 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
 
       expect(
         normalizeZineImages([null, 'https://i.scdn.co/image/col2.jpg', 'http://bad.example.com/x.jpg'])
-      ).toEqual([null, 'https://i.scdn.co/image/col2.jpg', null]);
+      ).toEqual([null, 'https://i.scdn.co/image/col2.jpg']);
 
       expect(
-        normalizeZineImages([
-          'https://col1.example.com/1.jpg',
-          'https://col2.example.com/2.jpg',
-          'https://col3.example.com/3.jpg',
-          'https://col4-ignored.example.com/4.jpg',
-        ])
-      ).toEqual([
-        'https://col1.example.com/1.jpg',
-        'https://col2.example.com/2.jpg',
-        'https://col3.example.com/3.jpg',
-      ]);
+        normalizeZineImages(Array.from({ length: 10 }, (_, idx) => `https://cdn.example.com/${idx + 1}.jpg`))
+      ).toEqual(Array.from({ length: 8 }, (_, idx) => `https://cdn.example.com/${idx + 1}.jpg`));
     });
 
-    it('normalizeProjectScene persists valid scene.zineImages across serialization and omits empty/all-null arrays', () => {
+    it('normalizeProjectScene persists valid scene.zineImages (including Block 4+ and trimmed nulls) across serialization and omits empty/all-null arrays', () => {
       const withImages = normalizeProjectScene(
         {
           id: 'scene-1',
@@ -3229,7 +3222,18 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         },
         0
       );
-      expect(withImages.zineImages).toEqual([null, 'https://i.guim.co.uk/af.jpg', null]);
+      expect(withImages.zineImages).toEqual([null, 'https://i.guim.co.uk/af.jpg']);
+
+      const withBlock4Image = normalizeProjectScene(
+        {
+          id: 'scene-1',
+          sceneId: 'scene-1',
+          seedArtists: 'American Football',
+          zineImages: [null, null, null, 'https://i.guim.co.uk/dc.jpg'],
+        },
+        0
+      );
+      expect(withBlock4Image.zineImages).toEqual([null, null, null, 'https://i.guim.co.uk/dc.jpg']);
 
       const withoutImages = normalizeProjectScene(
         {
@@ -3243,13 +3247,13 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(withoutImages.zineImages).toBeUndefined();
     });
 
-    it('computeAutosaveDocSnapshot and computeProjectHydrationFingerprint track overarchingZineImages and scene.zineImages without false-positive idle writes', () => {
+    it('computeAutosaveDocSnapshot and computeProjectHydrationFingerprint track overarchingZineImages and scene.zineImages (including Block 4+ slots) without false-positive idle writes', () => {
       const baseScene = normalizeProjectScene(
         {
           id: 'scene-1',
           sceneId: 'scene-1',
           seedArtists: 'Dashboard Confessional',
-          synthesisRationale: 'Paragraph one.\n\nParagraph two.\n\nParagraph three.',
+          synthesisRationale: 'Paragraph one.\n\nParagraph two.\n\nParagraph three.\n\n* Bullet four.',
           graphData: {
             nodes: [{ id: 'scene-1::dashboard-confessional', label: 'Dashboard Confessional', type: 'artist' }],
             links: [],
@@ -3279,11 +3283,27 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         scenes: [baseScene],
       });
       expect(withOverarchingImage).not.toBe(uneditedUndefined);
+      expect(
+        computeAutosaveDocSnapshot({
+          name: 'Dashboard Confessional',
+          seedArtists: 'Dashboard Confessional',
+          overarchingZineImages: ['https://i.scdn.co/image/cb812efb7d836138'],
+          scenes: [baseScene],
+        })
+      ).toBe(withOverarchingImage);
+
+      const withBlock4Image = computeAutosaveDocSnapshot({
+        name: 'Dashboard Confessional',
+        seedArtists: 'Dashboard Confessional',
+        overarchingZineImages: ['https://i.scdn.co/image/cb812efb7d836138', null, null, 'https://i.guim.co.uk/block4.jpg'],
+        scenes: [baseScene],
+      });
+      expect(withBlock4Image).not.toBe(withOverarchingImage);
 
       const sceneWithImage = normalizeProjectScene(
         {
           ...baseScene,
-          zineImages: [null, null, 'https://i.guim.co.uk/band.jpg'],
+          zineImages: [null, null, null, 'https://i.guim.co.uk/band.jpg'],
         },
         0
       );
@@ -3296,17 +3316,17 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
 
       const fpBefore = computeProjectHydrationFingerprint('proj-1', {
         scenes: [baseScene],
-        overarchingZineImages: [],
+        overarchingZineImages: ['https://i.scdn.co/image/cb812efb7d836138'],
       });
-      const fpAfter = computeProjectHydrationFingerprint('proj-1', {
+      const fpAfterBlock4 = computeProjectHydrationFingerprint('proj-1', {
         scenes: [baseScene],
-        overarchingZineImages: ['https://i.scdn.co/image/cb812efb7d836138', null, null],
+        overarchingZineImages: ['https://i.scdn.co/image/cb812efb7d836138', null, null, 'https://i.guim.co.uk/block4.jpg'],
       });
-      expect(fpAfter).not.toBe(fpBefore);
+      expect(fpAfterBlock4).not.toBe(fpBefore);
     });
 
-    it('supports backward-compatible ZineImageSlot metadata, captions, blockOffset, and ZineIntro normalization in schema and snapshots', () => {
-      // Plain URL string vs minimal object resolve consistently and serialize compactly
+    it('supports backward-compatible ZineImageSlot metadata, captions, transparent legacy blockOffset: 1 migration, and ZineIntro normalization in schema and snapshots', () => {
+      // Plain URL string vs minimal object resolve consistently (stripping deprecated blockOffset) and serialize compactly
       expect(resolveZineImageSlot('https://i.scdn.co/image/af.jpg')).toEqual({
         url: 'https://i.scdn.co/image/af.jpg',
       });
@@ -3319,7 +3339,6 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       ).toEqual({
         url: 'https://i.guim.co.uk/band.jpg',
         caption: 'American Football (1999)',
-        blockOffset: 1,
       });
       expect(resolveZineImageSlot({ url: 'http://insecure.example.com/a.jpg', caption: 'Bad' })).toBeNull();
 
@@ -3336,7 +3355,18 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         caption: 'American Football',
       });
 
-      // Mixed string + ZineImageSlot array normalization & scene.zineIntro persistence
+      // Legacy blockOffset: 1 migrates from index i to i + 1 when i + 1 is empty, and stays at i when i + 1 is occupied
+      expect(
+        normalizeZineImages([
+          'https://i.scdn.co/image/col1.jpg',
+          { url: 'https://i.guim.co.uk/col2.jpg', caption: 'Rocking Horse Winner', blockOffset: 1 },
+          null,
+        ])
+      ).toEqual([
+        'https://i.scdn.co/image/col1.jpg',
+        null,
+        { url: 'https://i.guim.co.uk/col2.jpg', caption: 'Rocking Horse Winner' },
+      ]);
       expect(
         normalizeZineImages([
           'https://i.scdn.co/image/col1.jpg',
@@ -3345,7 +3375,7 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         ])
       ).toEqual([
         'https://i.scdn.co/image/col1.jpg',
-        { url: 'https://i.guim.co.uk/col2.jpg', caption: 'Rocking Horse Winner', blockOffset: 1 },
+        { url: 'https://i.guim.co.uk/col2.jpg', caption: 'Rocking Horse Winner' },
         'https://encrypted-tbn0.gstatic.com/col3.jpg',
       ]);
 
@@ -3370,6 +3400,7 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         0
       );
       expect(baseScene.zineIntro).toBeUndefined();
+      expect(baseScene.zineImages).toEqual(['https://i.scdn.co/image/col1.jpg']);
 
       const snapPlain = computeAutosaveDocSnapshot({
         name: 'American Football',
@@ -3381,7 +3412,7 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       const snapEquivalentObj = computeAutosaveDocSnapshot({
         name: 'American Football',
         seedArtists: 'American Football',
-        overarchingZineImages: [{ url: 'https://i.scdn.co/image/col1.jpg' }, null, null],
+        overarchingZineImages: [{ url: 'https://i.scdn.co/image/col1.jpg' }],
         scenes: [baseScene],
       });
       expect(snapEquivalentObj).toBe(snapPlain);
@@ -3412,12 +3443,12 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         scenes: [baseScene],
         overarchingZineImages: ['https://i.scdn.co/image/col1.jpg', null, null],
       });
-      const fpAfterIntroAndOffset = computeProjectHydrationFingerprint('proj-1', {
+      const fpAfterIntroAndMigratedOffset = computeProjectHydrationFingerprint('proj-1', {
         scenes: [baseScene],
         overarchingZineIntro: 'For the 1999 Midwest circuit.',
         overarchingZineImages: [{ url: 'https://i.scdn.co/image/col1.jpg', blockOffset: 1 }, null, null],
       });
-      expect(fpAfterIntroAndOffset).not.toBe(fpBefore);
+      expect(fpAfterIntroAndMigratedOffset).not.toBe(fpBefore);
     });
   });
 });
