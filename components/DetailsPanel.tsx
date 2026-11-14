@@ -36,6 +36,51 @@ export const getArtistDisplayName = (details: any, node: any): string => {
     return cleanArtistDisplayName(node?.id || '');
 };
 
+const INVALID_GENRE_SENTINELS = new Set([
+    'unknown',
+    'unknown genre',
+    'not listed',
+    'various',
+    'various genres',
+    'n/a',
+    'na',
+    'none',
+    'not available',
+    'null',
+    'undefined',
+    'tbd',
+    '-',
+    '—',
+]);
+
+/**
+ * Extracts the primary genre from a potentially compound or sentinel string
+ * for search disambiguation, preserving natural casing.
+ */
+export const extractSearchGenre = (rawGenre?: string | null): string => {
+    if (!rawGenre || typeof rawGenre !== 'string') return '';
+    const trimmed = rawGenre.trim();
+    if (!trimmed || INVALID_GENRE_SENTINELS.has(trimmed.toLowerCase())) {
+        return '';
+    }
+    const primary = trimmed.split(/[/,;|]/)[0]?.trim() || '';
+    if (!primary || INVALID_GENRE_SENTINELS.has(primary.toLowerCase())) {
+        return '';
+    }
+    return primary;
+};
+
+/**
+ * Builds a deterministic YouTube search URL enriched with the artist's primary genre
+ * when available for better disambiguation of lesser-known or single-word artists.
+ */
+export const buildYoutubeSearchUrl = (artistDisplay: string, rawGenre?: string | null): string => {
+    const cleanArtist = artistDisplay.trim();
+    const genre = extractSearchGenre(rawGenre);
+    const baseUrl = `https://www.youtube.com/results?search_query=${encodeURIComponent(cleanArtist)}+official+music+video`;
+    return genre ? `${baseUrl}+${encodeURIComponent(genre)}` : baseUrl;
+};
+
 
 declare global {
     interface Window {
@@ -1127,7 +1172,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const purchase = all.filter(l => /bandcamp|official website/i.test(l.site));
         const info = all.filter(l => !/bandcamp|official website/i.test(l.site));
         return { purchase, info };
-    }, [details?.links, node.id]);
+    }, [details?.links, details?.details?.artist, node.id, node.label]);
 
     const headerSizeClass = isFullScreenMode
         ? 'text-3xl lg:text-5xl font-bold tracking-tight'
@@ -1630,10 +1675,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 {/* Watch on YouTube button (Hidden for labels) */}
                                                 {!isLabelNode && (() => {
                                                     const artistDisplay = getArtistDisplayName(details, node);
+                                                    const rawGenre = details.details?.genre || (node as any)?.genre;
                                                     const youtubeVideoId = details.youtubeVideoId;
                                                     const youtubeUrl = youtubeVideoId && youtubeVideoId.length === 11
                                                         ? `https://www.youtube.com/watch?v=${youtubeVideoId}`
-                                                        : `https://www.youtube.com/results?search_query=${encodeURIComponent(artistDisplay)}+official+music+video`;
+                                                        : buildYoutubeSearchUrl(artistDisplay, rawGenre);
 
                                                     return (
                                                         <a

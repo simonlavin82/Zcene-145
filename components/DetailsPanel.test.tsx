@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { NodeDetailsCard, DetailsPanel } from './DetailsPanel';
+import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUrl } from './DetailsPanel';
 import { streamNodeChat } from '../services/geminiService';
 
 vi.mock('react-markdown', () => ({
@@ -88,6 +88,123 @@ describe('DetailsPanel', () => {
 
         const officialLink = (await screen.findByText('Official Website')).closest('a');
         expect(officialLink).toHaveAttribute('href', 'https://www.google.com/search?q=Static%20Dress+official+website');
+    });
+
+    describe('YouTube search link genre disambiguation', () => {
+        it('extractSearchGenre extracts primary genre and filters sentinel/empty values', () => {
+            expect(extractSearchGenre('Metalcore')).toBe('Metalcore');
+            expect(extractSearchGenre('Hardcore Punk / Metalcore')).toBe('Hardcore Punk');
+            expect(extractSearchGenre('Contemporary Christian Music, Christian Rock')).toBe('Contemporary Christian Music');
+            expect(extractSearchGenre('Unknown')).toBe('');
+            expect(extractSearchGenre('Not listed')).toBe('');
+            expect(extractSearchGenre('Various')).toBe('');
+            expect(extractSearchGenre('N/A')).toBe('');
+            expect(extractSearchGenre('')).toBe('');
+            expect(extractSearchGenre(undefined)).toBe('');
+            expect(extractSearchGenre(null)).toBe('');
+        });
+
+        it('buildYoutubeSearchUrl appends primary genre when valid and omits it when sentinel/empty', () => {
+            expect(buildYoutubeSearchUrl('Cataract', 'Metalcore')).toBe(
+                'https://www.youtube.com/results?search_query=Cataract+official+music+video+Metalcore'
+            );
+            expect(buildYoutubeSearchUrl('Turnstile', 'Hardcore Punk / Metalcore')).toBe(
+                'https://www.youtube.com/results?search_query=Turnstile+official+music+video+Hardcore%20Punk'
+            );
+            expect(buildYoutubeSearchUrl('Static Dress', 'Unknown')).toBe(
+                'https://www.youtube.com/results?search_query=Static%20Dress+official+music+video'
+            );
+            expect(buildYoutubeSearchUrl('Static Dress', 'Not listed')).toBe(
+                'https://www.youtube.com/results?search_query=Static%20Dress+official+music+video'
+            );
+            expect(buildYoutubeSearchUrl('Static Dress', undefined)).toBe(
+                'https://www.youtube.com/results?search_query=Static%20Dress+official+music+video'
+            );
+        });
+
+        it('renders genre-enriched YouTube search link on NodeDetailsCard when youtubeVideoId is absent', async () => {
+            const mockNode = { id: 'cataract-ch', type: 'artist', label: 'Cataract' };
+            const mockDetails = {
+                summary: 'Cataract was an influential Swiss metalcore band formed in Zurich in 1998.',
+                details: {
+                    artist: 'Cataract',
+                    genre: 'Metalcore',
+                },
+                links: [],
+            };
+
+            render(
+                <NodeDetailsCard
+                    node={mockNode as any}
+                    details={mockDetails as any}
+                    isLoading={false}
+                    isGlobalLoading={false}
+                    graphData={{ nodes: [], links: [] } as any}
+                    libraryArtists={[]}
+                    seedArtists={[]}
+                    onAddArtist={() => {}}
+                    isSmallScreen={false}
+                    onTogglePin={() => {}}
+                    isPinned={false}
+                    onNodeClick={() => {}}
+                    onNavigate={() => {}}
+                    chatHistory={[]}
+                    onSendMessage={() => {}}
+                    isChatLoading={false}
+                    chatMode="instant"
+                    onChatModeChange={() => {}}
+                    liveMessageCount={0}
+                    onAddToStack={() => {}}
+                />
+            );
+
+            const youtubeLink = (await screen.findByText('YouTube')).closest('a');
+            expect(youtubeLink).toHaveAttribute(
+                'href',
+                'https://www.youtube.com/results?search_query=Cataract+official+music+video+Metalcore'
+            );
+        });
+
+        it('preserves direct watch?v= link on NodeDetailsCard when an 11-character youtubeVideoId is present', async () => {
+            const mockNode = { id: 'cataract-ch', type: 'artist', label: 'Cataract' };
+            const mockDetails = {
+                summary: 'Cataract was an influential Swiss metalcore band formed in Zurich in 1998.',
+                details: {
+                    artist: 'Cataract',
+                    genre: 'Metalcore',
+                },
+                youtubeVideoId: 'dQw4w9WgXcQ',
+                links: [],
+            };
+
+            render(
+                <NodeDetailsCard
+                    node={mockNode as any}
+                    details={mockDetails as any}
+                    isLoading={false}
+                    isGlobalLoading={false}
+                    graphData={{ nodes: [], links: [] } as any}
+                    libraryArtists={[]}
+                    seedArtists={[]}
+                    onAddArtist={() => {}}
+                    isSmallScreen={false}
+                    onTogglePin={() => {}}
+                    isPinned={false}
+                    onNodeClick={() => {}}
+                    onNavigate={() => {}}
+                    chatHistory={[]}
+                    onSendMessage={() => {}}
+                    isChatLoading={false}
+                    chatMode="instant"
+                    onChatModeChange={() => {}}
+                    liveMessageCount={0}
+                    onAddToStack={() => {}}
+                />
+            );
+
+            const youtubeLink = (await screen.findByText('YouTube')).closest('a');
+            expect(youtubeLink).toHaveAttribute('href', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+        });
     });
 
     it('renders a 2-row layout displaying Label, Genre, Style, Origin, and Founded for an artist node with an associated label', async () => {
