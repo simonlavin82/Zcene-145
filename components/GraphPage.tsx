@@ -12,6 +12,7 @@ import {
   stripCountrySlug,
   searchGlobalArtistSuggestions,
   GlobalArtistSuggestion,
+  getPrimaryGenreLabel,
 } from '../services/artistCacheService';
 import { hasActiveDiscoveryFilters, sanitizeAnchorLabelInput } from '../services/cacheQualification';
 import { toSeedArtistsArray, stripSceneNamespace, MAX_SCENES_PER_PROJECT, computeClampedDropdownLeft } from '../shared/multiSceneUtils';
@@ -1978,12 +1979,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
     return [...startsWithMatches, ...containsMatches].slice(0, 15);
   }, [libraryArtists, searchTerm, selectedSeedArtists]);
 
-  // Guardrail 2: Suppress duplicate rows across Personal Library & Global Archive
+  // Deduplicate Global Autocomplete Suggestions by Normalized Artist Name & Suppress Library Overlaps
   const filteredGlobalSuggestions = useMemo(() => {
     if (!globalSuggestions || globalSuggestions.length === 0) return [];
 
     const selectedNorms = new Set(selectedSeedArtists.map(s => normalizeArtistId(s.name)));
     const libraryNorms = new Set(matchingLibraryArtists.map(a => normalizeArtistId(a.name)));
+    const seenGlobalNorms = new Set<string>();
 
     return globalSuggestions.filter(suggestion => {
       const norm = normalizeArtistId(suggestion.name);
@@ -1992,11 +1994,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
       // Always filter out if already selected as a seed
       if (selectedNorms.has(norm)) return false;
 
-      // If already displayed in matchingLibraryArtists:
-      // Suppress unless the stub is explicitly ambiguous with multiple candidates
-      if (libraryNorms.has(norm) && !suggestion.isAmbiguous) {
-        return false;
-      }
+      // Always suppress if already displayed in FROM YOUR LIBRARY
+      if (libraryNorms.has(norm)) return false;
+
+      // Deduplicate by normalized artist name so homonym stubs only appear once
+      if (seenGlobalNorms.has(norm)) return false;
+      seenGlobalNorms.add(norm);
 
       return true;
     });
@@ -2555,7 +2558,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                 const isHighlighted = idx === highlightedSeedIndex;
                                 const normalizedId = normalizeArtistId(artist.name);
                                 const artistGenres = artistGenreMap.get(normalizedId) || artistGenreMap.get(artist.name) || artistGenreMap.get(artist.name.trim());
-                                const primaryGenre = artistGenres && artistGenres.size > 0 ? Array.from(artistGenres)[0] : null;
+                                const primaryGenreRaw = artistGenres && artistGenres.size > 0 ? Array.from(artistGenres)[0] : null;
+                                const primaryGenre = getPrimaryGenreLabel(typeof primaryGenreRaw === 'string' ? primaryGenreRaw : null);
 
                                 return (
                                   <button
@@ -2571,15 +2575,15 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     onMouseDown={(e) => e.preventDefault()}
                                     onClick={() => handleSelectLibraryArtist(artist.name)}
                                     onMouseEnter={() => setHighlightedSeedIndex(idx)}
-                                    className={`w-full text-left px-3.5 py-2 text-sm flex items-center justify-between gap-2.5 transition-colors ${
+                                    className={`group w-full text-left px-3.5 py-2 text-sm flex items-center justify-between gap-2.5 transition-colors ${
                                       isHighlighted
                                         ? 'bg-zinc-800 text-white'
                                         : 'text-zinc-300 hover:bg-zinc-800/70 hover:text-white'
                                     }`}
                                   >
-                                    <span className="truncate font-medium">{artist.name}</span>
+                                    <span className="truncate font-medium text-zinc-200 group-hover:text-white">{artist.name}</span>
                                     {primaryGenre && (
-                                      <span className="text-[10px] text-zinc-500 font-mono flex-shrink-0 uppercase tracking-wider">
+                                      <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 shrink-0 ml-2">
                                         {primaryGenre}
                                       </span>
                                     )}
@@ -2604,7 +2608,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                               {filteredGlobalSuggestions.map((suggestion, gIdx) => {
                                 const globalOverallIdx = matchingLibraryArtists.length + gIdx;
                                 const isHighlighted = globalOverallIdx === highlightedSeedIndex;
-                                const metaBadge = [suggestion.origin, suggestion.genre].filter(Boolean).join(' • ');
+                                const primaryGenre = getPrimaryGenreLabel(suggestion.genre) || suggestion.genre;
 
                                 return (
                                   <button
@@ -2612,7 +2616,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     role="option"
                                     aria-selected={isHighlighted}
                                     type="button"
-                                    title={suggestion.disambiguationSnippet || undefined}
                                     ref={(el) => {
                                       if (isHighlighted && el) {
                                         el.scrollIntoView({ block: 'nearest' });
@@ -2621,30 +2624,18 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     onMouseDown={(e) => e.preventDefault()}
                                     onClick={() => handleSelectGlobalArtist(suggestion)}
                                     onMouseEnter={() => setHighlightedSeedIndex(globalOverallIdx)}
-                                    className={`w-full text-left px-3.5 py-2 text-sm flex items-center justify-between gap-2.5 transition-colors ${
+                                    className={`group w-full text-left px-3.5 py-2 text-sm flex items-center justify-between gap-2.5 transition-colors ${
                                       isHighlighted
                                         ? 'bg-zinc-800 text-white'
                                         : 'text-zinc-300 hover:bg-zinc-800/70 hover:text-white'
                                     }`}
                                   >
-                                    <div className="min-w-0 flex-1 truncate">
-                                      <span className="truncate font-medium text-white">{suggestion.name}</span>
-                                      {suggestion.disambiguationSnippet && suggestion.isAmbiguous && (
-                                        <p className="text-[11px] text-zinc-400 truncate font-normal mt-0.5">
-                                          {suggestion.disambiguationSnippet}
-                                        </p>
-                                      )}
-                                    </div>
-                                    <div className="flex items-center gap-1.5 flex-shrink-0">
-                                      {metaBadge && (
-                                        <span className="text-[10px] text-zinc-400 font-mono uppercase tracking-wider truncate max-w-[160px]">
-                                          {metaBadge}
-                                        </span>
-                                      )}
-                                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-zinc-800/80 border border-zinc-700/60 text-zinc-400 font-mono tracking-wider">
-                                        ARCHIVE
+                                    <span className="truncate font-medium text-zinc-200 group-hover:text-white">{suggestion.name}</span>
+                                    {primaryGenre && (
+                                      <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-500 shrink-0 ml-2">
+                                        {primaryGenre}
                                       </span>
-                                    </div>
+                                    )}
                                   </button>
                                 );
                               })}

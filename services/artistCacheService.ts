@@ -1718,6 +1718,18 @@ const MAX_PREFIX_CACHE_SIZE = 100;
 const prefixSuggestionCache = new Map<string, GlobalArtistSuggestion[]>();
 
 /**
+ * Normalizes a raw genre string into a concise, uppercase primary genre segment
+ * taking only the first segment before any '/' or ',' delimiter (e.g. "Hardcore Punk / Metalcore" -> "HARDCORE PUNK").
+ */
+export const getPrimaryGenreLabel = (rawGenre?: string | null): string | null => {
+  if (!rawGenre || typeof rawGenre !== 'string') return null;
+  const trimmed = rawGenre.trim();
+  if (!trimmed || trimmed.toLowerCase() === 'unknown' || trimmed.toLowerCase() === 'unknown genre') return null;
+  const primarySegment = trimmed.split(/[/,]/)[0].trim();
+  return primarySegment ? primarySegment.toUpperCase() : null;
+};
+
+/**
  * Resets the in-memory prefix suggestion cache (primarily for unit testing).
  */
 export const clearPrefixSuggestionCache = (): void => {
@@ -1727,7 +1739,7 @@ export const clearPrefixSuggestionCache = (): void => {
 /**
  * Searches the global /artists Firestore collection for prefix matches on the document ID / slug.
  * Safely unpacks router stubs (_isStub: true, candidates: [...]) and non-stub canonical documents,
- * deduplicating them by canonical ID while preserving multi-country ambiguous homonyms.
+ * deduplicating them by normalized artist name so each artist appears exactly once with their primary genre.
  */
 export const searchGlobalArtistSuggestions = async (
   queryStr: string,
@@ -1776,44 +1788,51 @@ export const searchGlobalArtistSuggestions = async (
             const cleanName = cleanArtistDisplayName(rawName);
             if (!cleanName) continue;
 
+            const normKey = normalizeArtistId(cleanName);
+            if (!normKey) continue;
+
             const origin = (cand.origin && cand.origin !== 'Unknown' && cand.origin !== 'Unknown Origin')
               ? String(cand.origin).trim()
               : undefined;
-            const genre = (cand.genre && cand.genre !== 'Unknown')
+            const rawGenre = (cand.genre && cand.genre !== 'Unknown')
               ? String(cand.genre).trim()
               : undefined;
+            const primaryGenre = getPrimaryGenreLabel(rawGenre) || undefined;
             const snippet = cand.disambiguationSnippet ? String(cand.disambiguationSnippet).trim() : undefined;
 
-            if (!suggestionMap.has(candId)) {
-              suggestionMap.set(candId, {
+            if (!suggestionMap.has(normKey)) {
+              suggestionMap.set(normKey, {
                 id: candId,
                 canonicalId: candId,
                 name: cleanName,
                 origin,
-                genre,
+                genre: primaryGenre,
                 disambiguationSnippet: snippet,
                 isStub: true,
                 isAmbiguous,
               });
             } else {
-              // Enrich existing entry if origin/genre/snippet missing
-              const existing = suggestionMap.get(candId)!;
+              // Enrich existing entry if genre/origin/snippet was missing
+              const existing = suggestionMap.get(normKey)!;
+              if (!existing.genre && primaryGenre) existing.genre = primaryGenre;
               if (!existing.origin && origin) existing.origin = origin;
-              if (!existing.genre && genre) existing.genre = genre;
               if (!existing.disambiguationSnippet && snippet) existing.disambiguationSnippet = snippet;
             }
           }
         } else if (data.redirectTo && typeof data.redirectTo === 'string') {
           const redirectId = data.redirectTo.trim();
           const cleanName = cleanArtistDisplayName(data.artistId || docId);
-          if (cleanName && !suggestionMap.has(redirectId)) {
-            suggestionMap.set(redirectId, {
-              id: redirectId,
-              canonicalId: redirectId,
-              name: cleanName,
-              isStub: true,
-              isAmbiguous: false,
-            });
+          if (cleanName) {
+            const normKey = normalizeArtistId(cleanName);
+            if (normKey && !suggestionMap.has(normKey)) {
+              suggestionMap.set(normKey, {
+                id: redirectId,
+                canonicalId: redirectId,
+                name: cleanName,
+                isStub: true,
+                isAmbiguous: false,
+              });
+            }
           }
         }
       } else {
@@ -1851,28 +1870,29 @@ export const searchGlobalArtistSuggestions = async (
         const cleanName = cleanArtistDisplayName(rawName);
         if (!cleanName) continue;
 
+        const normKey = normalizeArtistId(cleanName);
+        if (!normKey) continue;
+
         const origin = (detailsOrigin && detailsOrigin !== 'Unknown' && detailsOrigin !== 'Unknown Origin')
           ? detailsOrigin
           : undefined;
-        const genre = (detailsGenre && detailsGenre !== 'Unknown')
-          ? detailsGenre
-          : undefined;
+        const primaryGenre = getPrimaryGenreLabel(detailsGenre) || undefined;
 
-        if (!suggestionMap.has(canonicalId)) {
-          suggestionMap.set(canonicalId, {
+        if (!suggestionMap.has(normKey)) {
+          suggestionMap.set(normKey, {
             id: canonicalId,
             canonicalId,
             name: cleanName,
             origin,
-            genre,
+            genre: primaryGenre,
             isStub: false,
             isAmbiguous: false,
           });
         } else {
           // If already added via router stub candidate, enrich missing metadata
-          const existing = suggestionMap.get(canonicalId)!;
+          const existing = suggestionMap.get(normKey)!;
+          if (!existing.genre && primaryGenre) existing.genre = primaryGenre;
           if (!existing.origin && origin) existing.origin = origin;
-          if (!existing.genre && genre) existing.genre = genre;
           if (existing.name.toLowerCase() === canonicalId.toLowerCase() && cleanName) {
             existing.name = cleanName;
           }

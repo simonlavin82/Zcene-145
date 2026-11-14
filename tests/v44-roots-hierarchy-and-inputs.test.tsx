@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import '@testing-library/jest-dom';
 import GraphPage from '../components/GraphPage';
 import { InputSizes } from '../components/DesignSystem';
-import { searchGlobalArtistSuggestions, clearPrefixSuggestionCache } from '../services/artistCacheService';
+import { searchGlobalArtistSuggestions, clearPrefixSuggestionCache, getPrimaryGenreLabel } from '../services/artistCacheService';
 
 const mockGetDocs = vi.fn();
 const mockGetDoc = vi.fn();
@@ -359,13 +359,25 @@ describe('V44 Blended Library + Global /artists Autocomplete & Deduplication', (
       canonicalId: '25hours-th',
       name: '25hours',
       origin: 'Thailand',
-      genre: 'Indie Pop',
+      genre: 'INDIE POP',
       isStub: true,
       isAmbiguous: false,
     });
   });
 
-  it('searchGlobalArtistSuggestions preserves ambiguous homonyms across multiple candidates (e.g. paradox-de vs paradox-th)', async () => {
+  it('getPrimaryGenreLabel extracts uppercase primary genre before / or , and filters out unknowns', () => {
+    expect(getPrimaryGenreLabel('Hardcore Punk / Metalcore')).toBe('HARDCORE PUNK');
+    expect(getPrimaryGenreLabel('Post-Grunge, Alternative Rock')).toBe('POST-GRUNGE');
+    expect(getPrimaryGenreLabel('Pop / Rock')).toBe('POP');
+    expect(getPrimaryGenreLabel('Indie')).toBe('INDIE');
+    expect(getPrimaryGenreLabel('Unknown')).toBeNull();
+    expect(getPrimaryGenreLabel('Unknown Genre')).toBeNull();
+    expect(getPrimaryGenreLabel('')).toBeNull();
+    expect(getPrimaryGenreLabel(null)).toBeNull();
+    expect(getPrimaryGenreLabel(undefined)).toBeNull();
+  });
+
+  it('searchGlobalArtistSuggestions deduplicates homonyms by normalized artist name into a single suggestion with primary genre (e.g. Paradox)', async () => {
     const mockDocs = [
       {
         id: 'paradox',
@@ -415,19 +427,10 @@ describe('V44 Blended Library + Global /artists Autocomplete & Deduplication', (
 
     const suggestions = await searchGlobalArtistSuggestions('para');
 
-    expect(suggestions).toHaveLength(2);
-    const deMatch = suggestions.find(s => s.canonicalId === 'paradox-de');
-    const thMatch = suggestions.find(s => s.canonicalId === 'paradox-th');
-
-    expect(deMatch).toBeDefined();
-    expect(deMatch?.origin).toBe('Germany');
-    expect(deMatch?.genre).toBe('Thrash Metal');
-    expect(deMatch?.isAmbiguous).toBe(true);
-
-    expect(thMatch).toBeDefined();
-    expect(thMatch?.origin).toBe('Thailand');
-    expect(thMatch?.genre).toBe('Indie Rock');
-    expect(thMatch?.isAmbiguous).toBe(true);
+    expect(suggestions).toHaveLength(1);
+    expect(suggestions[0].name).toBe('Paradox');
+    expect(suggestions[0].genre).toBe('THRASH METAL');
+    expect(suggestions[0].origin).toBe('Germany');
   });
 
   it('allows users with libraryArtists = [] to see Global Archive suggestions when typing into Add artist', async () => {
@@ -467,7 +470,8 @@ describe('V44 Blended Library + Global /artists Autocomplete & Deduplication', (
     await waitFor(() => {
       expect(screen.getByText('Global Archive')).toBeInTheDocument();
       expect(screen.getByText('25hours')).toBeInTheDocument();
-      expect(screen.getByText('ARCHIVE')).toBeInTheDocument();
+      expect(screen.getByText('INDIE POP')).toBeInTheDocument();
+      expect(screen.queryByText('ARCHIVE')).not.toBeInTheDocument();
     });
   });
 });

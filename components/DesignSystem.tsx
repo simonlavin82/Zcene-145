@@ -3616,7 +3616,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                             <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1">Global Archive</p>
-                                            <p className="text-xs text-zinc-400 leading-relaxed">Queries Firestore via debounced 200ms slug-prefix query (<code className="text-[11px] text-zinc-300 font-mono">documentId() &gt;= slugPrefix</code>) with an in-memory session cache. Displays <code className="text-[11px] text-zinc-300 font-mono">[ORIGIN • GENRE]</code> and preserves distinct homonyms.</p>
+                                            <p className="text-xs text-zinc-400 leading-relaxed">Queries Firestore via debounced 200ms slug-prefix query (<code className="text-[11px] text-zinc-300 font-mono">documentId() &gt;= slugPrefix</code>) with an in-memory session cache. Matches the library row layout 1:1 with clean <code className="text-[11px] text-zinc-300 font-mono">[ Artist Name | GENRE ]</code> presentation and normalized name deduplication.</p>
                                         </div>
                                         <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                             <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest mb-1">Cross-Tier Deduplication</p>
