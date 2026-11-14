@@ -971,7 +971,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     }
                   }
                 }}
-                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
               />
             </ModalBody>
 

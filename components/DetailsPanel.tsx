@@ -2663,7 +2663,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     placeholder="Search..."
                                     value={magazineSearchQuery}
                                     onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                    className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.md.magazineSearch}`}
+                                    className={`w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.md.magazineSearch}`}
                                 />
                                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                     {magazineSearchQuery && (
@@ -2700,7 +2700,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 placeholder="Search..."
                                                 value={magazineSearchQuery}
                                                 onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.md.magazineSearch}`}
+                                                className={`w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.md.magazineSearch}`}
                                             />
                                             <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                                 {magazineSearchQuery && (

@@ -30,10 +30,12 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                 <div className="flex-grow flex flex-col min-h-0 bg-zinc-900 overflow-hidden">
                     <div className="flex-grow overflow-y-auto scrollbar-none">
                         <div className="px-4 pt-4 pb-2">
-                            <div className="mb-3">
-                                <button className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 border border-zinc-800/80 rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 active:scale-95 transition-all text-xs font-medium leading-none">
-                                    <span className="material-symbols-outlined !text-[16px]">queue_music</span>
-                                    Select from Library (142)
+                            <div className="flex items-center justify-between mb-3">
+                                <h3 className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">Artists</h3>
+                                <button className="h-7 flex items-center gap-1.5 px-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white transition-all text-[11px] font-medium leading-none cursor-pointer active:scale-95 group">
+                                    <span className="material-symbols-outlined !text-[14px]">queue_music</span>
+                                    <span>Library</span>
+                                    <span className="text-[10px] font-mono px-1 rounded bg-zinc-800 text-zinc-400 group-hover:text-zinc-200">142</span>
                                 </button>
                             </div>
                             <div className="relative">
@@ -41,27 +43,23 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                                     type="search"
                                     value="The Get Up Kids"
                                     readOnly
-                                    placeholder="Add roots"
-                                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                                    placeholder="Add artist"
+                                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-20 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                                 />
                                 <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                                     <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none">
                                         <span className="material-symbols-outlined !text-[18px]">mic</span>
                                     </button>
                                     <button
-                                        className="flex items-center justify-center rounded-xl bg-white text-brand-black w-7 h-7 flex-shrink-0 hover:scale-110 transition-all"
+                                        className="flex items-center justify-center rounded-xl bg-white text-brand-black w-8 h-8 flex-shrink-0 hover:scale-105 active:scale-95 transition-all"
                                     >
                                         <span className="material-symbols-outlined !text-lg">add</span>
                                     </button>
                                 </div>
                             </div>
-                        </div>
-
-                        <div className="px-4 pt-2 pb-4">
-                            <h3 className="text-[10px] font-medium mb-2 uppercase tracking-widest text-zinc-500">Artists</h3>
-                            <div className="space-y-1">
+                            <div className="space-y-1 pt-3">
                                 <div className="flex items-center gap-1 group">
-                                    <div className="flex items-center gap-3 flex-grow overflow-hidden text-left p-2 rounded-xl bg-zinc-700/60 text-white backdrop-blur-sm transition-all border border-transparent">
+                                    <div className="h-10 flex items-center gap-3 flex-grow overflow-hidden text-left px-3 rounded-xl bg-zinc-700/60 text-white backdrop-blur-sm transition-all border border-transparent">
                                         <span className="material-symbols-outlined !text-[18px] text-primary">check_circle</span>
                                         <span className="text-sm font-medium select-none truncate">The Get Up Kids</span>
                                     </div>
@@ -70,7 +68,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                                     </button>
                                 </div>
                                 <div className="flex items-center gap-1 group">
-                                    <div className="flex items-center gap-3 flex-grow overflow-hidden text-left p-2 rounded-xl bg-zinc-700/60 text-white backdrop-blur-sm transition-all border border-transparent">
+                                    <div className="h-10 flex items-center gap-3 flex-grow overflow-hidden text-left px-3 rounded-xl bg-zinc-700/60 text-white backdrop-blur-sm transition-all border border-transparent">
                                         <span className="material-symbols-outlined !text-[18px] text-primary">check_circle</span>
                                         <span className="text-sm font-medium select-none truncate">Jimmy Eat World</span>
                                     </div>

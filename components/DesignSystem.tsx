@@ -46,13 +46,13 @@ export const InputSizes = {
     selectIcon: '!text-[16px] right-2'
   },
   md: {
-    base: 'py-2 text-sm',
-    search: 'py-2 pl-4 pr-12 text-sm',
-    magazineSearch: 'py-2 pl-10 pr-12 text-sm',
+    base: 'h-10 py-2 text-sm',
+    search: 'h-10 py-2 pl-4 pr-12 text-sm',
+    magazineSearch: 'h-10 py-2 pl-10 pr-12 text-sm',
     iconBtn: 'w-8 h-8 rounded-[10px]',
     icon: '!text-[18px]',
     leftIcon: '!text-[18px] left-3 z-10 pointer-events-none',
-    select: 'py-2 pl-4 pr-10 text-sm',
+    select: 'h-10 py-2 pl-4 pr-10 text-sm',
     selectIcon: '!text-[18px] right-3'
   }
 };
@@ -2385,7 +2385,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
                                 <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    Pill-shaped utility buttons used for secondary workflows like file imports, library access, or non-destructive actions within compact control headers.
+                                    Pill-shaped utility buttons used for secondary workflows like file imports, library access, or non-destructive actions within compact control headers. (Note: Panel header utility action buttons such as <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">+ Add Scene</code> and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Library [1084]</code> utilize the rounded-xl Header Utility Button pattern with <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">h-7 px-2.5 rounded-xl text-[11px]</code> for structural parity).
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-8 bg-zinc-900/30 p-8 rounded-xl border border-zinc-800">
                                      <div className="space-y-4">
@@ -3536,7 +3536,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                 type="text" 
                                                 placeholder="Standard Input (md)" 
-                                                className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${InputSizes.md.base} px-4`} 
+                                                className={`w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none ${InputSizes.md.base} px-4`} 
                                             /> 
                                             <Select variant="md" defaultValue="none">
                                                 <option value="none">Standard Select (md)</option>
@@ -3544,7 +3544,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div>
                                             <h4 className="text-sm font-semibold text-zinc-200 uppercase tracking-widest">Standard (md)</h4>
-                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code></p>
+                                            <p className="text-xs text-zinc-500 mt-1 font-mono"><code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">h-10</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">py-2</code> <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">text-sm</code></p>
                                             <p className="text-xs text-zinc-400 mt-2">The default size for all main forms and primary layout inputs.</p>
                                         </div>
                                     </div>
@@ -3564,11 +3564,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                                 type="search" 
                                                 placeholder="Search..." 
-                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
                                                 disabled
                                             />
                                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                                                <button className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-500 hover:text-white transition-colors leading-none" title="Search by voice">
+                                                <button className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-500 hover:text-white transition-colors leading-none" title="Search by voice">
                                                     <MicIcon className="!text-[18px]" />
                                                 </button>
                                             </div>
@@ -3582,11 +3582,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 type="search" 
                                                 placeholder="Search..." 
                                                 defaultValue="Spaced"
-                                                className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                                                className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
                                                 disabled
                                             />
                                             <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                                                <button className="w-8 h-8 flex items-center justify-center rounded-[10px] text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search">
+                                                <button className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search">
                                                     <span className="material-symbols-outlined !text-[18px]">close</span>
                                                 </button>
                                             </div>
@@ -3601,7 +3601,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200">Dropdowns & Selects</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px / py-2.5</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 40px / h-10</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
                                     </div>
@@ -3610,7 +3610,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-4">
                                         <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Standard Select</p>
                                         <div className="relative">
-                                            <select className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2.5 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer">
+                                            <select className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-zinc-300 py-2 px-4 text-sm focus:ring-1 focus:ring-primary focus:outline-none cursor-pointer">
                                                 <option>Sort by Relevance</option>
                                                 <option>Sort by Date</option>
                                                 <option>Sort by Name</option>
@@ -3646,7 +3646,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200">Input States</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Radius: 12px / rounded-xl</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 38px / py-2</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: 40px / h-10</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Padding: px-4 py-2</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Font: 14px / text-sm</span>
                                     </div>
@@ -3657,7 +3657,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                             type="text" 
                                             defaultValue="Active Focus" 
-                                            className="w-full appearance-none rounded-xl border border-primary bg-zinc-950 py-2 px-4 text-sm text-white ring-1 ring-primary outline-none" 
+                                            className="w-full h-10 appearance-none rounded-xl border border-primary bg-zinc-950 py-2 px-4 text-sm text-white ring-1 ring-primary outline-none" 
                                         />
                                     </div>
                                     <div className="space-y-4">
@@ -3665,7 +3665,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
                                             type="text" 
                                             defaultValue="Invalid Entry" 
-                                            className="w-full appearance-none rounded-xl border-red-500 bg-zinc-950 py-2 px-4 text-sm text-white focus:ring-1 focus:ring-red-500 outline-none" 
+                                            className="w-full h-10 appearance-none rounded-xl border-red-500 bg-zinc-950 py-2 px-4 text-sm text-white focus:ring-1 focus:ring-red-500 outline-none" 
                                         />
                                         <p className="text-[10px] text-red-500 font-medium">Please enter a valid artist name.</p>
                                     </div>
@@ -3675,7 +3675,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             disabled
                                             type="text" 
                                             placeholder="Locked Input" 
-                                            className="w-full appearance-none rounded-xl border border-zinc-800 bg-zinc-950 py-2 px-4 text-sm text-zinc-600 cursor-not-allowed outline-none" 
+                                            className="w-full h-10 appearance-none rounded-xl border border-zinc-800 bg-zinc-950 py-2 px-4 text-sm text-zinc-600 cursor-not-allowed outline-none" 
                                         />
                                     </div>
                                 </div>
@@ -4237,21 +4237,61 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
 
                                     <h3 className="text-xl font-medium text-zinc-200 mt-12 mb-6">Scene Switcher Pill Menu</h3>
-                                    <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex flex-col items-center gap-6">
-                                        <div className="flex items-center gap-3">
-                                            <div className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-zinc-800 text-primary border border-zinc-700 ring-1 ring-primary/30 shadow-sm z-[70]">
-                                                <span>Scene 1</span>
-                                                <span className="text-[10px] font-mono px-1 rounded bg-primary/15 text-primary">1</span>
-                                                <div className="relative inline-flex items-center">
-                                                    <div className="w-5 h-5 -mr-1 rounded flex items-center justify-center text-white bg-zinc-800">
-                                                        <span className="material-symbols-outlined !text-[15px]">more_vert</span>
+                                    <div className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 flex flex-col items-center gap-6 w-full max-w-md">
+                                        <div className="w-full space-y-4">
+                                            {/* Section 1: Scenes Header & Pills */}
+                                            <div className="pb-3 border-b border-zinc-800/80 space-y-2">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">Scenes</h4>
+                                                    <button className="h-7 flex items-center gap-1.5 px-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white transition-all text-[11px] font-medium leading-none cursor-pointer">
+                                                        <span className="material-symbols-outlined !text-[14px]">add</span>
+                                                        <span>Add Scene</span>
+                                                    </button>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-zinc-800 text-primary border border-zinc-700 ring-1 ring-primary/30 shadow-sm z-[70]">
+                                                        <span>Scene 1</span>
+                                                        <span className="text-[10px] font-mono px-1 rounded bg-primary/15 text-primary">1</span>
+                                                        <div className="relative inline-flex items-center">
+                                                            <div className="w-5 h-5 -mr-1 rounded flex items-center justify-center text-white bg-zinc-800">
+                                                                <span className="material-symbols-outlined !text-[15px]">more_vert</span>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
                                             </div>
-                                            <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 text-xs font-medium leading-none">
-                                                <span className="material-symbols-outlined !text-[16px]">queue_music</span>
-                                                Select from Library (1084)
-                                            </button>
+
+                                            {/* Section 2: Artists Header & Controls */}
+                                            <div className="space-y-3">
+                                                <div className="flex items-center justify-between">
+                                                    <h4 className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">Artists</h4>
+                                                    <button className="h-7 flex items-center gap-1.5 px-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white transition-all text-[11px] font-medium leading-none cursor-pointer group">
+                                                        <span className="material-symbols-outlined !text-[14px]">queue_music</span>
+                                                        <span>Library</span>
+                                                        <span className="text-[10px] font-mono px-1 rounded bg-zinc-800 text-zinc-400 group-hover:text-zinc-200">1084</span>
+                                                    </button>
+                                                </div>
+                                                <div className="relative">
+                                                    <input
+                                                        readOnly
+                                                        value=""
+                                                        placeholder="Add artist"
+                                                        className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-20 text-sm font-normal text-white placeholder:text-zinc-500 focus:outline-none"
+                                                    />
+                                                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                                                        <div className="flex items-center justify-center rounded-xl bg-white text-brand-black w-8 h-8">
+                                                            <span className="material-symbols-outlined !text-lg">add</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-1">
+                                                    <div className="h-10 flex items-center gap-3 flex-grow overflow-hidden text-left px-3 rounded-xl bg-zinc-700/60 text-white backdrop-blur-sm">
+                                                        <span className="material-symbols-outlined !text-[18px] text-primary">check_circle</span>
+                                                        <span className="text-sm select-none truncate">Rocking Horse Winner</span>
+                                                    </div>
+                                                    <div className="text-zinc-500 w-8 h-8 flex items-center justify-center rounded-xl"><span className="material-symbols-outlined !text-[18px]">remove_circle</span></div>
+                                                </div>
+                                            </div>
                                         </div>
 
                                         <div className="w-48 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black text-left">
@@ -4307,8 +4347,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <p className="text-sm text-zinc-400">Scene switcher pills feature a compact 3-dot <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">more_vert</code> trigger (!text-[15px]) opening a standardized Option 2 dropdown (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">w-48 p-1.5</code>, <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">px-3.5 py-2.5 text-sm</code>, and 18px icons). Within narrow drawer sidebars (e.g. ROOTS), pills dynamically align the menu (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">left-0</code> on initial pill, <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">right-0</code> on trailing pills) and elevate to <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">z-[70]</code> to prevent horizontal clipping by drawer scroll containers.</p>
                                         </div>
                                         <div className="space-y-1">
-                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Toolbar Button Parity</h4>
-                                            <p className="text-sm text-zinc-400">Toolbar action buttons (such as <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">+ Add Scene</code>, <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Select from Library</code>, and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Import Music Library</code>) share identical button architecture (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white text-xs font-medium</code>) for consistent visual weight across panels.</p>
+                                            <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Header Utility Button Parity</h4>
+                                            <p className="text-sm text-zinc-400">Header utility action buttons (such as <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">+ Add Scene</code>, <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Library [1084]</code>, and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Import Library</code>) share identical button architecture (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">h-7 px-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white text-[11px] font-medium leading-none</code>) with compact monospace count badges (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-[10px] font-mono px-1 rounded bg-zinc-800 text-zinc-400</code>) for consistent visual weight across panels.</p>
                                         </div>
                                     </div>
                                 </div>

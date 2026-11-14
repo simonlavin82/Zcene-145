@@ -398,7 +398,7 @@ export const MyTasteDialog: React.FC<{
                   type="text" 
                   value={activeProfile.name}
                   onChange={(e) => updateProfile('name', e.target.value)}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                  className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
                 />
               </div>
               
@@ -428,7 +428,7 @@ export const MyTasteDialog: React.FC<{
                         }
                       }
                     }}
-                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
                   />
                   {isLabelOpen && (() => {
                     const rawTyped = activeProfile.favoriteLabel ?? '';
@@ -490,7 +490,7 @@ export const MyTasteDialog: React.FC<{
                       updateProfile('favoriteGenre', e.target.value);
                       setIsGenreOpen(true);
                     }}
-                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
                   />
                   {isGenreOpen && (
                     <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
@@ -544,7 +544,7 @@ export const MyTasteDialog: React.FC<{
                       updateProfile('style', e.target.value);
                       setIsStyleOpen(true);
                     }}
-                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
                   />
                   {isStyleOpen && (
                     <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
@@ -598,7 +598,7 @@ export const MyTasteDialog: React.FC<{
                       updateProfile('favoriteOrigin', e.target.value);
                       setIsOriginOpen(true);
                     }}
-                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
+                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200" 
                   />
                   {isOriginOpen && (() => {
                     const q = (activeProfile.favoriteOrigin || '').trim().toLowerCase();
@@ -1490,7 +1490,7 @@ export const CountryFilterDropdown: React.FC<CountryFilterDropdownProps> = ({ va
             onChange(e.target.value);
             setIsOpen(true);
           }}
-          className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2.5 pl-4 pr-10 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
+          className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-10 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200"
         />
         <button
           type="button"
@@ -1944,7 +1944,7 @@ export const FilterGuidanceModal: React.FC<{
                     placeholder="Min Year"
                     value={filters.foundedAfter || ''}
                     onChange={(e) => updateField('foundedAfter', e.target.value ? parseInt(e.target.value) : undefined)}
-                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
                 <div className="space-y-1">
@@ -1953,7 +1953,7 @@ export const FilterGuidanceModal: React.FC<{
                     placeholder="Max Year"
                     value={filters.foundedBefore || ''}
                     onChange={(e) => updateField('foundedBefore', e.target.value ? parseInt(e.target.value) : undefined)}
-                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all duration-200 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                   />
                 </div>
               </div>
@@ -1966,7 +1966,7 @@ export const FilterGuidanceModal: React.FC<{
                 placeholder="e.g. Hardcore Punk, Grunge"
                 value={filters.includeGenres?.join(', ') || ''}
                 onChange={(e) => updateField('includeGenres', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                className="w-full h-10 bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
               />
             </div>
 
@@ -1977,7 +1977,7 @@ export const FilterGuidanceModal: React.FC<{
                 placeholder="e.g. Canada, UK"
                 value={filters.includeOrigins?.join(', ') || ''}
                 onChange={(e) => updateField('includeOrigins', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                className="w-full h-10 bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
               />
             </div>
             
@@ -1988,7 +1988,7 @@ export const FilterGuidanceModal: React.FC<{
                 placeholder="e.g. Australia"
                 value={filters.excludeOrigins?.join(', ') || ''}
                 onChange={(e) => updateField('excludeOrigins', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                className="w-full h-10 bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
               />
             </div>
             
@@ -1999,7 +1999,7 @@ export const FilterGuidanceModal: React.FC<{
                 placeholder="e.g. Sub Pop, Dischord Records"
                 value={filters.anchorLabels?.join(', ') || ''}
                 onChange={(e) => updateField('anchorLabels', e.target.value.split(',').map(s => s.trim()).filter(Boolean))}
-                className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                className="w-full h-10 bg-zinc-950 border border-zinc-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
               />
             </div>
 

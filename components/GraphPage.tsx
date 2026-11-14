@@ -632,7 +632,7 @@ const DiscoveryFiltersPanel: React.FC<{
                     setOriginQuery(e.target.value);
                     setIsOriginDropdownOpen(true);
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                  className="w-full h-10 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
                 {isOriginDropdownOpen && (
                   <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
@@ -707,7 +707,7 @@ const DiscoveryFiltersPanel: React.FC<{
                     setGenreQuery(e.target.value);
                     setIsGenreDropdownOpen(true);
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                  className="w-full h-10 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
                 {isGenreDropdownOpen && (
                   <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
@@ -793,7 +793,7 @@ const DiscoveryFiltersPanel: React.FC<{
                       handleAddLabel(cleanedTypedLabel);
                     }
                   }}
-                  className="w-full bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                  className="w-full h-10 bg-zinc-950 border border-zinc-700 rounded-xl px-4 py-2 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
                 />
                 {isLabelDropdownOpen && (filteredLabelSuggestions.length > 0 || canCreateCustomLabel) && (
                   <div className="absolute z-30 mt-1 w-full max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-xl py-1.5 space-y-0.5">
@@ -1055,7 +1055,7 @@ const LibraryDialog: React.FC<{
                         placeholder="Search your library..."
                         value={searchTerm}
                         onChange={(e) => setSearchTerm(e.target.value)}
-                        className={`w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none font-normal ${InputSizes.md.magazineSearch}`}
+                        className={`w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none font-normal ${InputSizes.md.magazineSearch}`}
                     />
                     {searchTerm && (
                         <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
@@ -2174,10 +2174,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
                       data-testid="add-scene-button"
                       onClick={onAddScene}
                       disabled={isAddSceneDisabled}
-                      className={`flex items-center gap-1 px-2.5 py-1 rounded-xl border text-[11px] font-medium transition-all ${
+                      className={`h-7 flex items-center gap-1.5 px-2.5 rounded-xl border text-[11px] font-medium transition-all leading-none ${
                         scenes.length >= MAX_SCENES_PER_PROJECT || hasUncuratedScene
                           ? 'border-zinc-800 bg-zinc-900/40 text-zinc-600 cursor-not-allowed opacity-60'
-                          : 'border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed'
+                          : 'border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group'
                       }`}
                       title={addSceneTooltip}
                     >
@@ -2320,161 +2320,176 @@ const GraphPage: React.FC<GraphPageProps> = ({
               </div>
             )}
             <div className="px-4 pt-4 pb-2">
-            {!isGuest && (
-              <div className="mb-3">
-                {libraryArtists.length > 0 ? (
-                    <button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white active:scale-95 transition-all text-xs font-medium leading-none cursor-pointer">
-                      <span className="material-symbols-outlined !text-[16px]">queue_music</span>
-                      Select from Library ({libraryArtists.length})
-                    </button>
-                ) : (
-                    <button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white active:scale-95 transition-all text-xs font-medium leading-none cursor-pointer">
-                      <span className="material-symbols-outlined !text-[16px]">upload</span>
-                      Import Music Library
-                    </button>
-                )}
-              </div>
-            )}
-            {!isGuest && (
-              <div ref={seedInputContainerRef} className="relative">
-                <form onSubmit={handleAddFromSearch} className="relative">
-                  <input
-                    autoComplete="off"
-                    data-1p-ignore="true"
-                    data-lpignore="true"
-                    data-testid="seed-input"
-                    ref={artistInputRef}
-                    onFocus={() => {
-                      if (!onboardingProgress.step1) updateOnboarding('step1');
-                      if (searchTerm.trim().length > 0 && libraryArtists.length > 0) {
-                        setIsSeedDropdownOpen(true);
-                      }
-                    }}
-                    onKeyDown={handleSeedInputKeyDown}
-                    type="search"
-                    placeholder="Add artist"
-                    value={searchTerm}
-                    onChange={(e) => {
-                      setSearchTerm(e.target.value);
-                      if (libraryArtists.length > 0) {
-                        setIsSeedDropdownOpen(true);
-                        setHighlightedSeedIndex(-1);
-                      }
-                    }}
-                    role="combobox"
-                    aria-autocomplete="list"
-                    aria-expanded={isSeedDropdownOpen && libraryArtists.length > 0 && searchTerm.trim().length > 0}
-                    aria-controls="seed-autocomplete-list"
-                    className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-12 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
-                  />
-                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                    {searchTerm && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setSearchTerm('');
-                          setIsSeedDropdownOpen(false);
-                          setHighlightedSeedIndex(-1);
-                        }}
-                        className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none"
-                        aria-label="Clear search"
-                      >
-                        <span className="material-symbols-outlined !text-[18px]">close</span>
-                      </button>
-                    )}
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                  Artists
+                </h3>
+                {!isGuest && (
+                  libraryArtists.length > 0 ? (
                     <button
-                      data-testid="curate-button"
-                      type="submit"
-                      disabled={!searchTerm.trim()}
-                      className={`flex items-center justify-center rounded-xl w-7 h-7 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-white text-brand-black hover:scale-110 active:scale-95'}`}
-                      aria-label="Add artist"
+                      type="button"
+                      onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }}
+                      className="h-7 flex items-center gap-1.5 px-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white transition-all text-[11px] font-medium leading-none cursor-pointer active:scale-95 group"
+                      title="Open Music Library"
                     >
-                      <span className="material-symbols-outlined !text-lg">add</span>
+                      <span className="material-symbols-outlined !text-[14px]">queue_music</span>
+                      <span>Library</span>
+                      <span className="text-[10px] font-mono px-1 rounded bg-zinc-800 text-zinc-400 group-hover:text-zinc-200">
+                        {libraryArtists.length}
+                      </span>
                     </button>
-                  </div>
-                </form>
-
-                {/* Inline Library Autocomplete Dropdown */}
-                {isSeedDropdownOpen && libraryArtists.length > 0 && searchTerm.trim().length > 0 && (
-                  <div
-                    id="seed-autocomplete-list"
-                    role="listbox"
-                    className="absolute top-full left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-2xl py-1"
-                  >
-                    {matchingLibraryArtists.length > 0 ? (
-                      matchingLibraryArtists.map((artist, idx) => {
-                        const isHighlighted = idx === highlightedSeedIndex;
-                          const normalizedId = normalizeArtistId(artist.name);
-                          const artistGenres = artistGenreMap.get(normalizedId) || artistGenreMap.get(artist.name) || artistGenreMap.get(artist.name.trim());
-                          const primaryGenre = artistGenres && artistGenres.size > 0 ? Array.from(artistGenres)[0] : null;
-
-                          return (
-                            <button
-                              key={artist.name}
-                              role="option"
-                              aria-selected={isHighlighted}
-                              type="button"
-                              ref={(el) => {
-                                if (isHighlighted && el) {
-                                  el.scrollIntoView({ block: 'nearest' });
-                                }
-                              }}
-                              onMouseDown={(e) => e.preventDefault()}
-                              onClick={() => handleSelectLibraryArtist(artist.name)}
-                              onMouseEnter={() => setHighlightedSeedIndex(idx)}
-                              className={`w-full text-left px-3.5 py-2.5 text-sm flex items-center justify-between gap-2.5 transition-colors ${
-                                isHighlighted
-                                  ? 'bg-zinc-800 text-white'
-                                  : 'text-zinc-300 hover:bg-zinc-800/70 hover:text-white'
-                              }`}
-                            >
-                              <span className="truncate font-medium">{artist.name}</span>
-                              {primaryGenre && (
-                                <span className="text-[10px] text-zinc-500 font-mono flex-shrink-0 uppercase tracking-wider">
-                                  {primaryGenre}
-                                </span>
-                              )}
-                            </button>
-                          );
-                      })
-                    ) : (
-                      <div className="px-3 py-2.5 text-xs text-zinc-400 flex flex-col gap-1">
-                        <div className="text-[11px] text-zinc-400">
-                          No matching artists in your library.
-                        </div>
-                        <div className="text-[10px] text-zinc-500">
-                          Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[9px]">Enter</kbd> or click <span className="text-zinc-300 font-bold">+</span> to add as custom root.
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }}
+                      className="h-7 flex items-center gap-1.5 px-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white transition-all text-[11px] font-medium leading-none cursor-pointer active:scale-95"
+                      title="Import Music Library"
+                    >
+                      <span className="material-symbols-outlined !text-[14px]">upload</span>
+                      <span>Import Library</span>
+                    </button>
+                  )
                 )}
               </div>
-            )}
-          </div>
-          {selectedSeedArtists.length > 0 && (
-            <div className="px-4 pt-2 pb-4">
-                <h3 className="text-[10px] font-medium mb-2 uppercase tracking-widest text-zinc-500">Artists</h3>
-              <div className="space-y-1">
-                {selectedSeedArtists.map(artist => (
-                  <div key={artist.name} className="flex items-center gap-1 group">
-                    <button 
-                      onClick={() => handleToggleArtist(artist.name)}
-                      className={`flex items-center gap-3 flex-grow overflow-hidden text-left p-2 rounded-xl backdrop-blur-sm transition-all ${
-                        artist.enabled ? 'bg-zinc-700/60 text-white' : 'bg-zinc-800/20 text-zinc-500'
-                      }`}
+
+              {!isGuest && (
+                <div ref={seedInputContainerRef} className="relative">
+                  <form onSubmit={handleAddFromSearch} className="relative">
+                    <input
+                      autoComplete="off"
+                      data-1p-ignore="true"
+                      data-lpignore="true"
+                      data-testid="seed-input"
+                      ref={artistInputRef}
+                      onFocus={() => {
+                        if (!onboardingProgress.step1) updateOnboarding('step1');
+                        if (searchTerm.trim().length > 0 && libraryArtists.length > 0) {
+                          setIsSeedDropdownOpen(true);
+                        }
+                      }}
+                      onKeyDown={handleSeedInputKeyDown}
+                      type="search"
+                      placeholder="Add artist"
+                      value={searchTerm}
+                      onChange={(e) => {
+                        setSearchTerm(e.target.value);
+                        if (libraryArtists.length > 0) {
+                          setIsSeedDropdownOpen(true);
+                          setHighlightedSeedIndex(-1);
+                        }
+                      }}
+                      role="combobox"
+                      aria-autocomplete="list"
+                      aria-expanded={isSeedDropdownOpen && libraryArtists.length > 0 && searchTerm.trim().length > 0}
+                      aria-controls="seed-autocomplete-list"
+                      className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-4 pr-20 text-sm font-normal text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all"
+                    />
+                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                      {searchTerm && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setSearchTerm('');
+                            setIsSeedDropdownOpen(false);
+                            setHighlightedSeedIndex(-1);
+                          }}
+                          className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none"
+                          aria-label="Clear search"
+                        >
+                          <span className="material-symbols-outlined !text-[18px]">close</span>
+                        </button>
+                      )}
+                      <button
+                        data-testid="curate-button"
+                        type="submit"
+                        disabled={!searchTerm.trim()}
+                        className={`flex items-center justify-center rounded-xl w-8 h-8 flex-shrink-0 transition-all duration-300 disabled:cursor-not-allowed leading-none ${!searchTerm.trim() ? 'bg-zinc-800 text-zinc-600' : 'bg-white text-brand-black hover:scale-105 active:scale-95'}`}
+                        aria-label="Add artist"
+                      >
+                        <span className="material-symbols-outlined !text-lg">add</span>
+                      </button>
+                    </div>
+                  </form>
+
+                  {/* Inline Library Autocomplete Dropdown */}
+                  {isSeedDropdownOpen && libraryArtists.length > 0 && searchTerm.trim().length > 0 && (
+                    <div
+                      id="seed-autocomplete-list"
+                      role="listbox"
+                      className="absolute top-full left-0 right-0 z-40 mt-1 max-h-56 overflow-y-auto bg-zinc-950 border border-zinc-700 rounded-xl shadow-2xl py-1"
                     >
-                      <span className={`material-symbols-outlined !text-[18px] transition-colors ${artist.enabled ? 'text-primary' : 'text-zinc-600'}`}>
-                        {artist.enabled ? 'check_circle' : 'radio_button_unchecked'}
-                      </span>
-                      <span className="text-sm select-none truncate">{cleanArtistDisplayName(artist.name, data?.nodes)}</span>
-                    </button>
-                    <button onClick={() => handleRemoveArtist(artist.name)} className="flex-shrink-0 text-zinc-500 w-8 h-8 flex items-center justify-center rounded-xl hover:text-red-400 transition-colors leading-none" title={`Remove ${cleanArtistDisplayName(artist.name, data?.nodes)}`}><span className="material-symbols-outlined !text-[18px]">remove_circle</span></button>
-                  </div>
-                ))}
-              </div>
+                      {matchingLibraryArtists.length > 0 ? (
+                        matchingLibraryArtists.map((artist, idx) => {
+                          const isHighlighted = idx === highlightedSeedIndex;
+                            const normalizedId = normalizeArtistId(artist.name);
+                            const artistGenres = artistGenreMap.get(normalizedId) || artistGenreMap.get(artist.name) || artistGenreMap.get(artist.name.trim());
+                            const primaryGenre = artistGenres && artistGenres.size > 0 ? Array.from(artistGenres)[0] : null;
+
+                            return (
+                              <button
+                                key={artist.name}
+                                role="option"
+                                aria-selected={isHighlighted}
+                                type="button"
+                                ref={(el) => {
+                                  if (isHighlighted && el) {
+                                    el.scrollIntoView({ block: 'nearest' });
+                                  }
+                                }}
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => handleSelectLibraryArtist(artist.name)}
+                                onMouseEnter={() => setHighlightedSeedIndex(idx)}
+                                className={`w-full text-left px-3.5 py-2.5 text-sm flex items-center justify-between gap-2.5 transition-colors ${
+                                  isHighlighted
+                                    ? 'bg-zinc-800 text-white'
+                                    : 'text-zinc-300 hover:bg-zinc-800/70 hover:text-white'
+                                }`}
+                              >
+                                <span className="truncate font-medium">{artist.name}</span>
+                                {primaryGenre && (
+                                  <span className="text-[10px] text-zinc-500 font-mono flex-shrink-0 uppercase tracking-wider">
+                                    {primaryGenre}
+                                  </span>
+                                )}
+                              </button>
+                            );
+                        })
+                      ) : (
+                        <div className="px-3 py-2.5 text-xs text-zinc-400 flex flex-col gap-1">
+                          <div className="text-[11px] text-zinc-400">
+                            No matching artists in your library.
+                          </div>
+                          <div className="text-[10px] text-zinc-500">
+                            Press <kbd className="px-1 py-0.5 rounded bg-zinc-800 text-zinc-300 font-mono text-[9px]">Enter</kbd> or click <span className="text-zinc-300 font-bold">+</span> to add as custom root.
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {selectedSeedArtists.length > 0 && (
+                <div className="space-y-1 pt-3">
+                  {selectedSeedArtists.map(artist => (
+                    <div key={artist.name} className="flex items-center gap-1 group">
+                      <button 
+                        onClick={() => handleToggleArtist(artist.name)}
+                        className={`h-10 flex items-center gap-3 flex-grow overflow-hidden text-left px-3 rounded-xl backdrop-blur-sm transition-all ${
+                          artist.enabled ? 'bg-zinc-700/60 text-white' : 'bg-zinc-800/20 text-zinc-500'
+                        }`}
+                      >
+                        <span className={`material-symbols-outlined !text-[18px] transition-colors ${artist.enabled ? 'text-primary' : 'text-zinc-600'}`}>
+                          {artist.enabled ? 'check_circle' : 'radio_button_unchecked'}
+                        </span>
+                        <span className="text-sm select-none truncate">{cleanArtistDisplayName(artist.name, data?.nodes)}</span>
+                      </button>
+                      <button onClick={() => handleRemoveArtist(artist.name)} className="flex-shrink-0 text-zinc-500 w-8 h-8 flex items-center justify-center rounded-xl hover:text-red-400 transition-colors leading-none" title={`Remove ${cleanArtistDisplayName(artist.name, data?.nodes)}`}><span className="material-symbols-outlined !text-[18px]">remove_circle</span></button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
 
           <DiscoveryFiltersPanel 
             filters={discoveryFilters} 
@@ -2767,7 +2782,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                       setSceneToRename(null);
                     }
                   }}
-                  className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
+                  className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 px-4 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
                 />
               </ModalBody>
 
@@ -2893,7 +2908,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 <aside style={{ width: `${leftPanelWidth}px` }} className={`relative h-full z-50 flex flex-col flex-shrink-0 bg-zinc-900 border border-zinc-600/50 transition-all duration-300 ease-in-out overflow-hidden min-h-0 rounded-2xl ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     {!isLeftPanelCollapsed && (<div onMouseDown={handleMouseDown('left')} className="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none touch-none z-[100] group" aria-label="Resize left panel" role="separator"><div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div></div>)}
                     <div className={`${LayoutSizes.headerBar} flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] ${isLeftPanelCollapsed ? 'justify-center px-1' : 'justify-between px-4'}`}>{!isLeftPanelCollapsed && (<div className="flex items-center gap-2 overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Roots</h2><span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm ${artistIndicatorStyles}`}>{enabledArtistsCount}</span></div>)}<button onClick={handleToggleLeftPanel} className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none pointer-events-auto" title={isLeftPanelCollapsed ? "Expand Panel" : "Collapse Panel"}><span className="material-symbols-outlined !text-[18px]">{isLeftPanelCollapsed ? 'left_panel_open' : 'left_panel_close'}</span></button></div>
-                    {isLeftPanelCollapsed ? (<div className="flex-grow flex-col items-center justify-between py-6 text-zinc-400"><div className="flex flex-col items-center gap-y-6">{ libraryArtists.length > 0 ? (<button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Select from Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">queue_music</span></button>) : (<button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Import Music Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">upload</span></button>)}</div><div className="absolute bottom-6 left-1/2 -translate-x-1/2"><button onClick={handleApplyChanges} disabled={!isArtistPending || isLoading || isOverLimit || isPreFlightChecking} className="group" title={createButtonLabel}><span className={`h-8 w-8 rounded-md flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${artistIndicatorStyles} ${enabledArtistsCount === 0 ? 'opacity-100' : 'group-active:scale-95'}`}>{enabledArtistsCount}</span></button></div></div>) : ( <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">{ArtistsPanelContent}</div> )}
+                    {isLeftPanelCollapsed ? (<div className="flex-grow flex-col items-center justify-between py-6 text-zinc-400"><div className="flex flex-col items-center gap-y-6">{ libraryArtists.length > 0 ? (<button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">queue_music</span></button>) : (<button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Import Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">upload</span></button>)}</div><div className="absolute bottom-6 left-1/2 -translate-x-1/2"><button onClick={handleApplyChanges} disabled={!isArtistPending || isLoading || isOverLimit || isPreFlightChecking} className="group" title={createButtonLabel}><span className={`h-8 w-8 rounded-md flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${artistIndicatorStyles} ${enabledArtistsCount === 0 ? 'opacity-100' : 'group-active:scale-95'}`}>{enabledArtistsCount}</span></button></div></div>) : ( <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">{ArtistsPanelContent}</div> )}
                 </aside>
 
                 <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
