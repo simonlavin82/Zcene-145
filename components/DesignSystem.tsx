@@ -3925,7 +3925,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-2">
                                         <p className="text-sm text-white font-semibold">Action State</p>
-                                        <p className="text-xs text-zinc-400 leading-relaxed">Used when new data is available or the user needs to take a primary action (e.g., Update Zcene, Unread Deep Cut cards). Uses high-contrast monochrome tones.</p>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">Used when new data is available or the user needs to take a primary action (e.g., Update Zcene, Unread Deep Cut cards, un-illustrated Zine sections on [ ✎ Edit (N) ]). Uses high-contrast monochrome tones.</p>
                                     </div>
                                     <div className="space-y-2">
                                         <p className="text-sm text-zinc-500 font-semibold">Passive State</p>
@@ -4740,7 +4740,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="space-y-2">
                                         <h3 className="text-xl font-medium text-white">Magazine View / Zine</h3>
                                         <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                            For deep analysis, users can expand the Deep Cut panel into a full-window responsive editorial layout and card grid. Unedited sections retain pure 3-column magazine text flow (`columns-3`), while project owners can toggle `[ Edit ]` in the Zine sticky bar to add an optional Intro / Dedication note and curate per-block `https://` editorial photos (up to 8 semantic text blocks via `MAX_ZINE_IMAGE_SLOTS`, each `aspect-[16/10]`, `rounded-xl border border-zinc-800/80 overflow-hidden bg-zinc-900/50`, `referrerPolicy="no-referrer"`) directly above `Block 1`..`Block N` with optional captions and one-click `←`/`→` block swap across a responsive 3/2/1 independent flex-column layout (eliminating tablet dead gaps via even/odd block distribution and pairing every photo directly above its matching semantic text block across all viewports).
+                                            For deep analysis, users can expand the Deep Cut panel into a full-window responsive editorial layout and card grid. Unedited sections retain pure 3-column magazine text flow (`columns-3`), while project owners can toggle `[ Edit ]` in the Zine sticky bar to add an optional Intro / Dedication note and curate per-block `https://` editorial photos (up to 8 semantic text blocks via `MAX_ZINE_IMAGE_SLOTS`, each `aspect-[16/10]`, `rounded-xl border border-zinc-800/80 overflow-hidden bg-zinc-900/50`, `referrerPolicy="no-referrer"`) directly above `Block 1`..`Block N` with optional captions and one-click `←`/`→` block swap across a responsive 3/2/1 independent flex-column layout (eliminating tablet dead gaps via even/odd block distribution and pairing every photo directly above its matching semantic text block across all viewports). Features the **Zine Editorial Image Curation Assistant**: Section 15 Action State contextual indicator badge `[ ✎ Edit (N) ]` tracking un-illustrated sections, Block-Aware Google Images artist quick-search chips (`udm=2`) with Root Artist Block 1 priority and strict `type === 'artist'` filtering (excluding genres/labels), and 1-click URL editor opening + editable auto-caption pre-filling.
                                         </p>
                                     </div>
                                     <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400 border border-zinc-700">
@@ -4750,15 +4750,15 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Trigger</p>
-                                        <p className="text-sm text-zinc-300">open_in_full icon in Deep Cut header; owner-only `[ Edit ]` / `[ Done ]` toggle paired with `[ Close ]` using matched `h-9 !px-5` (`rounded-xl`, `text-sm`, `!text-[18px]` icon) Zine header action geometry.</p>
+                                        <p className="text-sm text-zinc-300">open_in_full icon in Deep Cut header; owner-only `[ Edit ]` / `[ Done ]` toggle with Section 15 Action State indicator badge (`[ ✎ Edit (N) ]`) paired with `[ Close ]` using matched `h-9 !px-5` (`rounded-xl`, `text-sm`, `!text-[18px]` icon) Zine header action geometry.</p>
                                     </div>
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">State & Layout</p>
-                                        <p className="text-sm text-zinc-300">Fixed overlay at z-[1000]; Per-Block 3/2/1 Flex-Column Engine (3 balanced desktop cols, 2 even/odd tablet cols, 1 sequential mobile col), `ZineIntroNote`, optional image captions, and per-scene metadata pill pairing (`SCENE N` un-renamed / `SCENE: &lt;CUSTOM_NAME&gt;` renamed alongside `ROOTS: &lt;SEEDS&gt;`).</p>
+                                        <p className="text-sm text-zinc-300">Fixed overlay at z-[1000]; Per-Block 3/2/1 Flex-Column Engine (3 balanced desktop cols, 2 even/odd tablet cols, 1 sequential mobile col), `ZineIntroNote`, optional image captions, Block-Aware Google Images search chips (`udm=2`) with Block 1 Root Artist anchor, and per-scene metadata pill pairing (`SCENE N` un-renamed / `SCENE: &lt;CUSTOM_NAME&gt;` renamed alongside `ROOTS: &lt;SEEDS&gt;`).</p>
                                     </div>
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Logic & Resilience</p>
-                                        <p className="text-sm text-zinc-300">Backward-compatible URL string & `ZineImageSlot` hydration (migrating legacy `blockOffset: 1` & trimming trailing nulls); Reading Mode collapses `onError` images cleanly.</p>
+                                        <p className="text-sm text-zinc-300">Backward-compatible URL string & `ZineImageSlot` hydration (migrating legacy `blockOffset: 1` & trimming trailing nulls); 1-click chip search + editable caption pre-filling; Reading Mode collapses `onError` images cleanly.</p>
                                     </div>
                                 </div>
                             </div>

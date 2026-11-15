@@ -33,7 +33,7 @@ npx vitest run tests/v38-token-economy.test.tsx
 # Run V40 iTunes 30s Audio Preview & lifecycle regression tests
 npx vitest run tests/v40-itunes-preview.test.tsx
 
-# Run DetailsPanel 3-column layout & style tests
+# Run DetailsPanel 3-column layout, style & Zine Editorial Image Curation Assistant tests
 npx vitest run components/DetailsPanel.test.tsx
 
 # Run V42 Global 249-Country ISO-3166 Registry & Disambiguation Lock tests

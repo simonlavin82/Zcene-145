@@ -81,6 +81,171 @@ export const buildYoutubeSearchUrl = (artistDisplay: string, rawGenre?: string |
     return genre ? `${baseUrl}+${encodeURIComponent(genre)}` : baseUrl;
 };
 
+export interface BlockArtistChip {
+    name: string;
+    genre: string;
+    canonicalId: string;
+}
+
+/**
+ * Builds a deterministic Google Images search URL using modern udm=2 parameter,
+ * disambiguating band names with their resolved primary genre.
+ */
+export const buildGoogleImagesSearchUrl = (artistName: string, rawGenre?: string | null): string => {
+    const cleanArtist = artistName.trim();
+    const genre = extractSearchGenre(rawGenre);
+    const query = `${cleanArtist} band ${genre}`.replace(/\s+/g, ' ').trim();
+    return `https://www.google.com/search?udm=2&q=${encodeURIComponent(query)}`;
+};
+
+/**
+ * Extracts 1–3 artist entities for a specific editorial markdown block.
+ * Bolded entities (**Entity**) are extracted and matched case-insensitively strictly against artistNodes
+ * where node.type === 'artist' (excluding bolded genres and record labels).
+ * When slotIndex === 0 (Block 1), the section's Root Artist(s) are anchored first in the chip list.
+ */
+export const extractBlockArtistChips = (
+    blockMarkdown: string,
+    artistNodes: Node[],
+    detailsCache: Map<string, NodeDetails>,
+    priorityArtistNames?: string[]
+): BlockArtistChip[] => {
+    const validArtistNodes = (artistNodes || []).filter((n) => n && n.type === 'artist');
+
+    const resolveArtistMatch = (rawName: string): { displayName: string; genre: string; canonicalId: string } | null => {
+        const trimmed = (rawName || '').trim();
+        if (!trimmed) return null;
+        const norm = normalizeArtistId(trimmed).toLowerCase();
+        const strippedNorm = stripCountrySlug(norm).toLowerCase();
+
+        // Match against valid artist nodes
+        const matchedNode = validArtistNodes.find((n) => {
+            const nodeLabelNorm = normalizeArtistId(n.label || '').toLowerCase();
+            const nodeCanonRaw = stripSceneNamespace(n.canonicalId || n.id || '');
+            const nodeCanonNorm = normalizeArtistId(nodeCanonRaw).toLowerCase();
+            const nodeCanonStripped = stripCountrySlug(nodeCanonNorm).toLowerCase();
+            return (
+                nodeLabelNorm === norm ||
+                nodeCanonNorm === norm ||
+                nodeCanonStripped === strippedNorm ||
+                nodeLabelNorm === strippedNorm
+            );
+        });
+
+        // Check if there is an explicit non-artist node match (e.g. genre or label) in artistNodes
+        const nonArtistMatch = (artistNodes || []).find((n) => {
+            if (!n || n.type === 'artist') return false;
+            const nodeLabelNorm = normalizeArtistId(n.label || '').toLowerCase();
+            const nodeCanonRaw = stripSceneNamespace(n.canonicalId || n.id || '');
+            const nodeCanonNorm = normalizeArtistId(nodeCanonRaw).toLowerCase();
+            return nodeLabelNorm === norm || nodeCanonNorm === norm;
+        });
+
+        if (nonArtistMatch && !matchedNode) {
+            return null;
+        }
+
+        // DetailsCache lookup
+        let details: NodeDetails | undefined;
+        const lookupKeys = [
+            matchedNode?.id,
+            matchedNode?.id?.toLowerCase(),
+            matchedNode?.canonicalId,
+            matchedNode ? stripSceneNamespace(matchedNode.canonicalId || matchedNode.id) : undefined,
+            norm,
+            strippedNorm,
+        ].filter(Boolean) as string[];
+
+        for (const k of lookupKeys) {
+            if (detailsCache.has(k)) {
+                details = detailsCache.get(k);
+                break;
+            }
+        }
+
+        // If neither node nor details found, this is not an artist in our scene
+        if (!matchedNode && !details) {
+            return null;
+        }
+
+        const canonId = matchedNode
+            ? stripSceneNamespace(matchedNode.canonicalId || matchedNode.id)
+            : strippedNorm || norm;
+        const displayName = cleanArtistDisplayName(
+            details?.details?.artist || matchedNode?.label || titleCaseArtistId(strippedNorm || norm),
+            validArtistNodes
+        );
+        const rawGenre = details?.details?.genre || (matchedNode as any)?.genre || '';
+        const genre = extractSearchGenre(rawGenre);
+
+        return {
+            displayName,
+            genre,
+            canonicalId: canonId,
+        };
+    };
+
+    const chips: BlockArtistChip[] = [];
+    const seenCanonIds = new Set<string>();
+
+    const addChip = (resolved: { displayName: string; genre: string; canonicalId: string }) => {
+        const idKey = normalizeArtistId(resolved.canonicalId || resolved.displayName).toLowerCase();
+        if (!idKey || seenCanonIds.has(idKey)) return false;
+        seenCanonIds.add(idKey);
+        chips.push({
+            name: resolved.displayName,
+            genre: resolved.genre,
+            canonicalId: resolved.canonicalId || idKey,
+        });
+        return true;
+    };
+
+    // 1) Priority Artist Anchors (e.g. Root Artist in Block 1)
+    if (priorityArtistNames && priorityArtistNames.length > 0) {
+        for (const pName of priorityArtistNames) {
+            if (chips.length >= 3) break;
+            const resolved = resolveArtistMatch(pName);
+            if (resolved) {
+                addChip(resolved);
+            } else {
+                // If not in validArtistNodes or detailsCache (e.g. isolated test or minimal graph),
+                // verify it doesn't match an explicit non-artist node
+                const normP = normalizeArtistId(pName).toLowerCase();
+                const nonArtistMatch = (artistNodes || []).find((n) => {
+                    if (!n || n.type === 'artist') return false;
+                    return normalizeArtistId(n.label || '').toLowerCase() === normP;
+                });
+                if (!nonArtistMatch) {
+                    const cleanP = cleanArtistDisplayName(pName, validArtistNodes);
+                    addChip({
+                        displayName: cleanP,
+                        genre: '',
+                        canonicalId: normP,
+                    });
+                }
+            }
+        }
+    }
+
+    // 2) Extract bolded entities from blockMarkdown: **Entity**
+    if (blockMarkdown && chips.length < 3) {
+        const boldRegex = /\*\*([^*]+)\*\*/g;
+        let match: RegExpExecArray | null;
+        while ((match = boldRegex.exec(blockMarkdown)) !== null) {
+            if (chips.length >= 3) break;
+            const entityText = match[1]?.trim();
+            if (!entityText) continue;
+
+            const resolved = resolveArtistMatch(entityText);
+            if (resolved) {
+                addChip(resolved);
+            }
+        }
+    }
+
+    return chips.slice(0, 3);
+};
+
 
 declare global {
     interface Window {
@@ -2287,6 +2452,7 @@ interface ZineColumnImageSlotProps {
     slot: ZineImageSlot | null;
     isEditingZine: boolean;
     hasFailed: boolean;
+    blockChips?: BlockArtistChip[];
     onMarkFailed: (url: string) => void;
     onSaveSlot: (entry: ZineEditorialImageEntry) => void;
     onSwapSlots?: (indexA: number, indexB: number) => void;
@@ -2299,6 +2465,7 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
     slot,
     isEditingZine,
     hasFailed,
+    blockChips,
     onMarkFailed,
     onSaveSlot,
     onSwapSlots,
@@ -2310,6 +2477,9 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
     const [draftUrl, setDraftUrl] = useState(url);
     const [draftCaption, setDraftCaption] = useState(caption);
     const [validationError, setValidationError] = useState<string | null>(null);
+    const urlInputRef = useRef<HTMLInputElement | null>(null);
+
+    const chips = blockChips || [];
 
     useEffect(() => {
         if (!isEditingZine) {
@@ -2322,6 +2492,20 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
         setDraftUrl(url);
         setDraftCaption(caption);
     }, [url, caption]);
+
+    const handleChipClick = (chip: BlockArtistChip, e?: React.MouseEvent) => {
+        if (e) {
+            e.stopPropagation();
+        }
+        const searchUrl = buildGoogleImagesSearchUrl(chip.name, chip.genre);
+        window.open(searchUrl, '_blank', 'noopener,noreferrer');
+        setValidationError(null);
+        setDraftCaption(chip.name);
+        setIsInputOpen(true);
+        setTimeout(() => {
+            urlInputRef.current?.focus();
+        }, 0);
+    };
 
     if (!isEditingZine) {
         if (!slot || hasFailed) return null;
@@ -2395,7 +2579,31 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
                     </span>
                     <span className="text-[10px] font-mono text-zinc-500">https:// only</span>
                 </div>
+                {chips.length > 0 && (
+                    <div
+                        data-testid={`zine-slot-chips-${sectionKey}-${slotIndex}`}
+                        className="flex items-center gap-1.5 flex-wrap pt-0.5"
+                    >
+                        <span className="text-[10px] uppercase font-mono tracking-wider text-zinc-500">
+                            Search:
+                        </span>
+                        {chips.map((chip) => (
+                            <button
+                                key={chip.canonicalId}
+                                type="button"
+                                data-testid={`zine-chip-search-${sectionKey}-${slotIndex}-${chip.canonicalId}`}
+                                onClick={(e) => handleChipClick(chip, e)}
+                                title={`Open Google Images for ${chip.name} and pre-fill caption`}
+                                className="h-6 px-2.5 rounded-lg border border-zinc-700/80 bg-zinc-800/80 hover:bg-zinc-700 hover:text-white text-zinc-300 text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                            >
+                                <span className="material-symbols-outlined !text-[12px] text-zinc-400">search</span>
+                                <span>{chip.name}</span>
+                            </button>
+                        ))}
+                    </div>
+                )}
                 <Input
+                    ref={urlInputRef}
                     variant="md"
                     type="url"
                     autoFocus
@@ -2600,18 +2808,48 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
     }
 
     return (
-        <button
-            type="button"
+        <div
+            role="button"
+            tabIndex={0}
             data-testid={`zine-slot-add-${sectionKey}-${slotIndex}`}
             onClick={handleOpenEditor}
-            className="mb-6 aspect-[16/10] w-full rounded-xl border border-dashed border-zinc-700/80 bg-zinc-900/30 hover:border-primary/60 hover:bg-zinc-900/60 transition-colors flex flex-col items-center justify-center gap-1.5 text-zinc-400 hover:text-white cursor-pointer"
+            onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleOpenEditor();
+                }
+            }}
+            className="mb-6 aspect-[16/10] w-full rounded-xl border border-dashed border-zinc-700/80 bg-zinc-900/30 hover:border-primary/60 hover:bg-zinc-900/60 transition-colors flex flex-col items-center justify-center gap-2 p-4 text-zinc-400 hover:text-white cursor-pointer select-none"
         >
-            <span className="material-symbols-outlined !text-[22px] text-zinc-300">add_photo_alternate</span>
-            <span className="text-xs font-medium">+ Add Image URL</span>
-            <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
-                Block {slotIndex + 1} • 16:10
-            </span>
-        </button>
+            <div className="flex flex-col items-center justify-center gap-1 pointer-events-none">
+                <span className="material-symbols-outlined !text-[22px] text-zinc-300">add_photo_alternate</span>
+                <span className="text-xs font-medium">+ Add Image URL</span>
+                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">
+                    Block {slotIndex + 1} • 16:10
+                </span>
+            </div>
+            {chips.length > 0 && (
+                <div
+                    data-testid={`zine-slot-chips-${sectionKey}-${slotIndex}`}
+                    className="flex items-center justify-center gap-1.5 flex-wrap pt-1 pointer-events-auto"
+                    onClick={(e) => e.stopPropagation()}
+                >
+                    {chips.map((chip) => (
+                        <button
+                            key={chip.canonicalId}
+                            type="button"
+                            data-testid={`zine-chip-search-${sectionKey}-${slotIndex}-${chip.canonicalId}`}
+                            onClick={(e) => handleChipClick(chip, e)}
+                            title={`Open Google Images for ${chip.name} and pre-fill caption`}
+                            className="h-6 px-2.5 rounded-lg border border-zinc-700/80 bg-zinc-800/90 hover:bg-zinc-700 hover:text-white text-zinc-300 text-[11px] font-medium transition-colors flex items-center gap-1 cursor-pointer"
+                        >
+                            <span className="material-symbols-outlined !text-[12px] text-zinc-400">search</span>
+                            <span>{chip.name}</span>
+                        </button>
+                    ))}
+                </div>
+            )}
+        </div>
     );
 };
 
@@ -2622,6 +2860,9 @@ interface ZineEditorialColumnsProps {
     viewportTier: ZineViewportTier;
     isEditingZine: boolean;
     failedUrls: Set<string>;
+    artistNodes?: Node[];
+    detailsCache?: Map<string, NodeDetails>;
+    priorityArtistNames?: string[];
     onMarkFailed: (url: string) => void;
     onSaveSlot: (slotIndex: number, entry: ZineEditorialImageEntry) => void;
     onSwapSlots?: (indexA: number, indexB: number) => void;
@@ -2635,6 +2876,9 @@ const ZineEditorialColumns: React.FC<ZineEditorialColumnsProps> = ({
     viewportTier,
     isEditingZine,
     failedUrls,
+    artistNodes,
+    detailsCache,
+    priorityArtistNames,
     onMarkFailed,
     onSaveSlot,
     onSwapSlots,
@@ -2661,6 +2905,14 @@ const ZineEditorialColumns: React.FC<ZineEditorialColumnsProps> = ({
         const slot = resolvedSlots[blockIdx] ?? null;
         const blockMarkdown = blocks[blockIdx] || '';
         const canRenderSlot = blockIdx < MAX_ZINE_IMAGE_SLOTS;
+        const blockChips = isEditingZine
+            ? extractBlockArtistChips(
+                  blockMarkdown,
+                  artistNodes || [],
+                  detailsCache || new Map(),
+                  blockIdx === 0 ? priorityArtistNames : undefined
+              )
+            : [];
         return (
             <div
                 key={`${sectionKey}-block-${blockIdx}`}
@@ -2675,6 +2927,7 @@ const ZineEditorialColumns: React.FC<ZineEditorialColumnsProps> = ({
                         slot={slot}
                         isEditingZine={isEditingZine}
                         hasFailed={Boolean(slot && failedUrls.has(slot.url))}
+                        blockChips={blockChips}
                         onMarkFailed={onMarkFailed}
                         onSaveSlot={(entry) => onSaveSlot(blockIdx, entry)}
                         onSwapSlots={onSwapSlots}
@@ -3471,6 +3724,64 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         return sanitizeRationaleMarkdown(overarchingRationale);
     }, [overarchingRationale, sanitizeRationaleMarkdown]);
 
+    const allZineArtistNodes = useMemo(() => {
+        const nodeMap = new Map<string, Node>();
+        const ingestNodes = (nodes?: Node[]) => {
+            if (!nodes) return;
+            for (const n of nodes) {
+                if (n && n.type === 'artist') {
+                    const id = n.id || n.canonicalId || n.label;
+                    if (id && !nodeMap.has(id)) {
+                        nodeMap.set(id, n);
+                    }
+                }
+            }
+        };
+        ingestNodes(activeNodes);
+        ingestNodes(graphData?.nodes);
+        for (const scene of scenes) {
+            ingestNodes(scene.graphData?.nodes);
+        }
+        return Array.from(nodeMap.values());
+    }, [activeNodes, graphData?.nodes, scenes]);
+
+    const unillustratedSectionsCount = useMemo(() => {
+        const hasCuratedImages = (images?: ZineEditorialImageEntry[]): boolean => {
+            if (!images || !Array.isArray(images)) return false;
+            return images.some((img) => Boolean(resolveZineImageSlot(img)?.url));
+        };
+
+        if (scenes.length <= 1) {
+            const singleScene = scenes[0];
+            const singleCopy = sanitizedRationaleText;
+            if (!singleCopy || !singleCopy.trim()) return 0;
+            const singleImages = singleScene?.zineImages;
+            return hasCuratedImages(singleImages) ? 0 : 1;
+        }
+
+        let count = 0;
+        // 1) Overarching section
+        if (sanitizedOverarchingRationale && sanitizedOverarchingRationale.trim()) {
+            if (!hasCuratedImages(overarchingZineImages)) {
+                count += 1;
+            }
+        }
+        // 2) Populated scene sections
+        for (const scene of scenes) {
+            const rawSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+            const sceneRationale = sanitizeRationaleMarkdown(scene.synthesisRationale, scene.graphData?.nodes?.length);
+            const firstSeedNorm = rawSeeds[0] ? normalizeArtistId(rawSeeds[0]) : '';
+            const seedDetailsFallback = firstSeedNorm ? detailsCache.get(firstSeedNorm)?.summary : '';
+            const effectiveSceneCopy = sceneRationale || seedDetailsFallback || '';
+            if (effectiveSceneCopy && effectiveSceneCopy.trim()) {
+                if (!hasCuratedImages(scene.zineImages)) {
+                    count += 1;
+                }
+            }
+        }
+        return count;
+    }, [scenes, sanitizedRationaleText, sanitizedOverarchingRationale, overarchingZineImages, sanitizeRationaleMarkdown, detailsCache]);
+
     const renderZineMarkdown = useCallback((markdownContent: string) => (
         <Markdown
             components={{
@@ -3534,13 +3845,21 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     type="button"
                                     data-testid="zine-edit-toggle-btn-mobile"
                                     onClick={() => setIsEditingZine((prev) => !prev)}
-                                    className={`h-10 px-3 shrink-0 ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
+                                    className={`h-10 px-3 shrink-0 flex items-center gap-1.5 ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
                                     title={isEditingZine ? 'Done Editing Zine' : 'Edit Zine Images'}
                                 >
                                     <span className="material-symbols-outlined !text-[18px]">
                                         {isEditingZine ? 'check' : 'edit'}
                                     </span>
                                     <span>{isEditingZine ? 'Done' : 'Edit'}</span>
+                                    {!isEditingZine && unillustratedSectionsCount > 0 && (
+                                        <span
+                                            data-testid="zine-edit-suggestion-badge"
+                                            className="h-5 min-w-[20px] px-1 rounded-lg flex items-center justify-center text-[9px] font-semibold border bg-zinc-900 text-white border-white/20"
+                                        >
+                                            {unillustratedSectionsCount}
+                                        </span>
+                                    )}
                                 </Button>
                             )}
                         </div>
@@ -3591,13 +3910,21 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             type="button"
                                             data-testid="zine-edit-toggle-btn"
                                             onClick={() => setIsEditingZine((prev) => !prev)}
-                                            className={`h-9 !px-5 ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
+                                            className={`h-9 !px-5 flex items-center gap-1.5 ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
                                             title={isEditingZine ? 'Done Editing Zine' : 'Edit Zine Images'}
                                         >
                                             <span className="material-symbols-outlined !text-[18px]">
                                                 {isEditingZine ? 'check' : 'edit'}
                                             </span>
                                             <span>{isEditingZine ? 'Done' : 'Edit'}</span>
+                                            {!isEditingZine && unillustratedSectionsCount > 0 && (
+                                                <span
+                                                    data-testid="zine-edit-suggestion-badge"
+                                                    className="h-5 min-w-[20px] px-1 rounded-lg flex items-center justify-center text-[9px] font-semibold border bg-zinc-900 text-white border-white/20"
+                                                >
+                                                    {unillustratedSectionsCount}
+                                                </span>
+                                            )}
                                         </Button>
                                     )}
                                     <Button
@@ -3765,6 +4092,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             viewportTier={zineViewportTier}
                                             isEditingZine={isEditingZine}
                                             failedUrls={failedZineImageUrls}
+                                            artistNodes={allZineArtistNodes}
+                                            detailsCache={detailsCache}
+                                            priorityArtistNames={allScenesSeedArtists}
                                             onMarkFailed={handleMarkZineImageFailed}
                                             onSaveSlot={(slotIndex, entry) => handleSaveZineImageSlot('overarching', slotIndex, entry)}
                                             onSwapSlots={onSwapZineImages ? (idxA, idxB) => onSwapZineImages('overarching', idxA, idxB) : undefined}
@@ -3827,6 +4157,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                         viewportTier={zineViewportTier}
                                                         isEditingZine={isEditingZine}
                                                         failedUrls={failedZineImageUrls}
+                                                        artistNodes={allZineArtistNodes}
+                                                        detailsCache={detailsCache}
+                                                        priorityArtistNames={sceneSeeds}
                                                         onMarkFailed={handleMarkZineImageFailed}
                                                         onSaveSlot={(slotIndex, entry) => handleSaveZineImageSlot(sceneKey, slotIndex, entry)}
                                                         onSwapSlots={onSwapZineImages ? (idxA, idxB) => onSwapZineImages(sceneKey, idxA, idxB) : undefined}
@@ -3873,6 +4206,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     viewportTier={zineViewportTier}
                                     isEditingZine={isEditingZine}
                                     failedUrls={failedZineImageUrls}
+                                    artistNodes={allZineArtistNodes}
+                                    detailsCache={detailsCache}
+                                    priorityArtistNames={allScenesSeedArtists.length > 0 ? allScenesSeedArtists : toSeedArtistsArray(seedArtists)}
                                     onMarkFailed={handleMarkZineImageFailed}
                                     onSaveSlot={(slotIndex, entry) => handleSaveZineImageSlot(scenes[0]?.sceneId || scenes[0]?.id || 'scene-1', slotIndex, entry)}
                                     onSwapSlots={onSwapZineImages ? (idxA, idxB) => onSwapZineImages(scenes[0]?.sceneId || scenes[0]?.id || 'scene-1', idxA, idxB) : undefined}

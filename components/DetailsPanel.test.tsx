@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUrl } from './DetailsPanel';
+import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUrl, extractBlockArtistChips, buildGoogleImagesSearchUrl } from './DetailsPanel';
 import { streamNodeChat } from '../services/geminiService';
 
 vi.mock('react-markdown', () => ({
@@ -1879,6 +1879,217 @@ describe('DetailsPanel', () => {
             fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
             fireEvent.click(screen.getByTestId('zine-intro-remove-overarching'));
             expect(onUpdateZineIntro).toHaveBeenCalledWith('overarching', null);
+        });
+
+        describe('Zine Editorial Image Curation Assistant (Block-Aware Search Chips & Contextual Indicator Badge)', () => {
+            describe('buildGoogleImagesSearchUrl', () => {
+                it('constructs modern udm=2 Google Images URL with genre disambiguation', () => {
+                    const url = buildGoogleImagesSearchUrl("Harm's Way", "Hardcore Punk / Metalcore");
+                    expect(url).toBe("https://www.google.com/search?udm=2&q=Harm's%20Way%20band%20Hardcore%20Punk");
+                });
+
+                it('falls back cleanly to artist + band when genre is empty or sentinel', () => {
+                    const url = buildGoogleImagesSearchUrl("Nails", "unknown");
+                    expect(url).toBe('https://www.google.com/search?udm=2&q=Nails%20band');
+                });
+            });
+
+            describe('extractBlockArtistChips', () => {
+                const mockArtistNodes: any[] = [
+                    { id: 'harms-way-us', label: "Harm's Way", type: 'artist' },
+                    { id: 'jesus-piece-us', label: 'Jesus Piece', type: 'artist' },
+                    { id: 'xibalba-us', label: 'Xibalba', type: 'artist' },
+                    { id: 'knocked-loose-us', label: 'Knocked Loose', type: 'artist' },
+                    { id: 'powerviolence', label: 'Powerviolence', type: 'genre' },
+                    { id: 'closed-casket-activities', label: 'Closed Casket Activities', type: 'label' },
+                ];
+
+                const mockCache = new Map<string, any>();
+                mockCache.set('harms-way-us', {
+                    id: 'harms-way-us',
+                    details: { artist: "Harm's Way", genre: 'Hardcore Punk / Metalcore' },
+                });
+                mockCache.set('jesus-piece-us', {
+                    id: 'jesus-piece-us',
+                    details: { artist: 'Jesus Piece', genre: 'Metallic Hardcore / Beatdown' },
+                });
+                mockCache.set('xibalba-us', {
+                    id: 'xibalba-us',
+                    details: { artist: 'Xibalba', genre: 'Death Metal / Hardcore' },
+                });
+                mockCache.set('knocked-loose-us', {
+                    id: 'knocked-loose-us',
+                    details: { artist: 'Knocked Loose', genre: 'Metalcore' },
+                });
+
+                it('extracts bold entities strictly matching type === artist and excludes genres and labels', () => {
+                    const markdown = "Chicago, where **Harm's Way** pulled apart their fast-paced **powerviolence** origins. Supported by **Closed Casket Activities**, meanwhile **Jesus Piece** weaponized low-end frequencies.";
+                    const chips = extractBlockArtistChips(markdown, mockArtistNodes, mockCache);
+                    expect(chips).toHaveLength(2);
+                    expect(chips[0].name).toBe("Harm's Way");
+                    expect(chips[0].genre).toBe("Hardcore Punk");
+                    expect(chips[1].name).toBe("Jesus Piece");
+                    expect(chips[1].genre).toBe("Metallic Hardcore");
+                    expect(chips.every(c => c.name !== 'Powerviolence' && c.name !== 'Closed Casket Activities')).toBe(true);
+                });
+
+                it('anchors priority Root Artist first in Block 1 and caps total chips at 3', () => {
+                    const markdown = 'As the scene expanded, **Xibalba**, **Jesus Piece**, and **Knocked Loose** dragged heavy breakdowns to global festival stages.';
+                    // Pass Harm's Way as priority root artist
+                    const chips = extractBlockArtistChips(markdown, mockArtistNodes, mockCache, ["Harm's Way"]);
+                    expect(chips).toHaveLength(3);
+                    expect(chips[0].name).toBe("Harm's Way"); // Root artist anchored first
+                    expect(chips[1].name).toBe("Xibalba");
+                    expect(chips[2].name).toBe("Jesus Piece");
+                    // Knocked Loose omitted because capped at 3
+                });
+
+                it('deduplicates entities when priority artist is also mentioned in markdown', () => {
+                    const markdown = "Chicago pioneers **Harm's Way** led the vanguard alongside **Jesus Piece**.";
+                    const chips = extractBlockArtistChips(markdown, mockArtistNodes, mockCache, ["Harm's Way"]);
+                    expect(chips).toHaveLength(2);
+                    expect(chips[0].name).toBe("Harm's Way");
+                    expect(chips[1].name).toBe("Jesus Piece");
+                });
+            });
+
+            describe('Contextual Indicator Badge & 1-Click Search Chip Actions', () => {
+                it('displays the un-illustrated section badge on [ ✎ Edit (N) ], hides in Edit Mode, and hides when images are curated', () => {
+                    const singleSceneCopy = "Chicago hardcore pioneers **Harm's Way** built mechanical juggernauts.";
+                    const { rerender } = render(
+                        <DetailsPanel
+                            {...baseProps({
+                                scenes: [{
+                                    id: 'scene-1',
+                                    sceneId: 'scene-1',
+                                    title: "Harm's Way",
+                                    synthesisRationale: singleSceneCopy,
+                                    zineImages: [],
+                                }],
+                                overarchingRationale: undefined,
+                            })}
+                        />
+                    );
+
+                    // In reading mode with 0 curated images, badge displays 1
+                    const badge = screen.getByTestId('zine-edit-suggestion-badge');
+                    expect(badge).toBeInTheDocument();
+                    expect(badge).toHaveTextContent('1');
+                    expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveClass('h-9');
+                    expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveClass('!px-5');
+
+                    // Enter edit mode -> badge hides and button shows 'Done'
+                    fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+                    expect(screen.queryByTestId('zine-edit-suggestion-badge')).not.toBeInTheDocument();
+                    expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveTextContent('Done');
+
+                    // Exit edit mode and rerender with a curated image
+                    fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+                    rerender(
+                        <DetailsPanel
+                            {...baseProps({
+                                scenes: [{
+                                    id: 'scene-1',
+                                    sceneId: 'scene-1',
+                                    title: "Harm's Way",
+                                    synthesisRationale: singleSceneCopy,
+                                    zineImages: ['https://example.com/harms-way.jpg'],
+                                }],
+                                overarchingRationale: undefined,
+                            })}
+                        />
+                    );
+                    expect(screen.queryByTestId('zine-edit-suggestion-badge')).not.toBeInTheDocument();
+                });
+
+                it('calculates un-illustrated sections count across multi-scene overarching and scene sections', () => {
+                    render(
+                        <DetailsPanel
+                            {...baseProps({
+                                overarchingRationale: 'Overarching cross-scene editorial paragraph.',
+                                overarchingZineImages: [],
+                                scenes: [
+                                    {
+                                        id: 'scene-1',
+                                        sceneId: 'scene-1',
+                                        title: "Harm's Way",
+                                        synthesisRationale: 'Scene 1 editorial paragraph.',
+                                        zineImages: [],
+                                    },
+                                    {
+                                        id: 'scene-2',
+                                        sceneId: 'scene-2',
+                                        title: "Jesus Piece",
+                                        synthesisRationale: 'Scene 2 editorial paragraph.',
+                                        zineImages: [],
+                                    },
+                                ],
+                            })}
+                        />
+                    );
+
+                    // Overarching + Scene 1 + Scene 2 = 3 un-illustrated sections
+                    const badge = screen.getByTestId('zine-edit-suggestion-badge');
+                    expect(badge).toBeInTheDocument();
+                    expect(badge).toHaveTextContent('3');
+                });
+
+                it('launches Google Images udm=2, opens URL editor, and pre-fills editable caption upon chip click', () => {
+                    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+                    const mockNodes: any[] = [
+                        { id: 'harms-way-us', label: "Harm's Way", type: 'artist' },
+                        { id: 'xibalba-us', label: 'Xibalba', type: 'artist' },
+                    ];
+
+                    const mockCache = new Map<string, any>();
+                    mockCache.set('xibalba-us', {
+                        id: 'xibalba-us',
+                        details: { artist: 'Xibalba', genre: 'Death Metal / Hardcore' },
+                    });
+
+                    render(
+                        <DetailsPanel
+                            {...baseProps({
+                                overarchingRationale: "Block 1 covers **Harm's Way**.\n\nBlock 2 covers **Xibalba**.",
+                                overarchingZineImages: [],
+                                graphData: { nodes: mockNodes, links: [] },
+                                detailsCache: mockCache,
+                            })}
+                        />
+                    );
+
+                    // Enter edit mode
+                    fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+
+                    // Block 1 should have Harm's Way search chip
+                    const harmsWayChip = screen.getByTestId('zine-chip-search-overarching-0-harms-way-us');
+                    expect(harmsWayChip).toBeInTheDocument();
+                    expect(harmsWayChip).toHaveTextContent("Harm's Way");
+
+                    // Click the chip
+                    fireEvent.click(harmsWayChip);
+
+                    // 1. window.open called with udm=2 URL
+                    expect(openSpy).toHaveBeenCalledWith(
+                        expect.stringContaining('https://www.google.com/search?udm=2&q='),
+                        '_blank',
+                        'noopener,noreferrer'
+                    );
+
+                    // 2. URL editor opens for Block 1
+                    expect(screen.getByTestId('zine-slot-form-overarching-0')).toBeInTheDocument();
+                    const captionInput = screen.getByTestId('zine-slot-caption-input-overarching-0') as HTMLInputElement;
+
+                    // 3. Caption pre-filled with clicked artist name
+                    expect(captionInput.value).toBe("Harm's Way");
+
+                    // 4. Caption remains 100% editable
+                    fireEvent.change(captionInput, { target: { value: "Harm's Way — Live at Sound and Fury" } });
+                    expect(captionInput.value).toBe("Harm's Way — Live at Sound and Fury");
+
+                    openSpy.mockRestore();
+                });
+            });
         });
     });
 });

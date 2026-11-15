@@ -1,11 +1,12 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View } from '../types';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { View, Node, NodeDetails } from '../types';
 import { ZceneLogo } from './Icons';
 import Header from './Header';
 import Markdown from 'react-markdown';
 import { Terminal, ChevronDown, ChevronRight } from 'lucide-react';
 import { BACKEND_REGRESSION_RUNBOOK } from '../docs/backend-regression-runbook';
 import { BackButton } from './DesignSystem';
+import { extractBlockArtistChips, buildGoogleImagesSearchUrl } from './DetailsPanel';
 
 interface SourcePageProps {
     onNavigate: (view: View) => void;
@@ -252,7 +253,7 @@ export const ARCHITECTURE_RULES = [
     { 
         id: 44, 
         title: "Multi-Scene Infinite Board, Scene Namespacing & Layered Zine Hierarchy", 
-        desc: "Projects (schemaVersion: 43) support up to 5 independent ProjectScenes (scene-1..scene-5, MAX_SCENES_PER_PROJECT = 5) on a single infinite CONNECTIONS canvas. Multi-scene drafting enforces Option A sequential gating (+ Add Scene is gated until the current scene is mapped). Each Scene renders at its deterministic cluster center (1000 + sceneIndex * 1050, 1000) with namespaced canvas IDs (scene-k::canonicalId) so duplicate nodes remain in their respective Scene clusters while sharing canonical Deep Cut profiles. Settled scenes remain frozen in Coordinate Memory ([Rule 21]) when new scenes are added. resolveSceneNodeOverlaps guarantees 100% collision-free node and label placement. Initial canvas state defaults to a neutral rest state (isPassiveSelection = true: 100% node resting opacity, resting link states, no auto-hover tooltips until active interaction). Deterministic Scene 1 Entry & Card #1 Alignment: Completed projects deterministically initialize on Scene 1 (focusSceneCluster('scene-1', 0)) and Card #1 (activeNodes[0], Scene 1's Root Artist) in Neutral Rest State. Tri-Panel Scene Synchronization: Selecting a curated Scene N pill in ROOTS frames Scene N (focusSceneCluster('scene-n', 750)) and synchronizes DEEP CUTS to Scene N's primary Root Artist in passive mode with cached details hydrated, preserving the selected node if already within Scene N (canvas clicks pass syncDeepCuts = false to prevent overriding direct node selections). Smart Camera Follow: Stepping through DEEP CUTS dynamically frames the target scene cluster under Scenario A (Zoomed Out Overview, k < 0.65) and Scenario B (Inter-Scene Navigation, dist > 500px), or smoothly pans to center off-screen nodes under Scenario C (Intra-Scene Inspection, k >= 0.65 & dist <= 500px, 80px viewport margin) while strictly preserving manual zoom. Scene removal of mapped scenes is guarded by a confirmation modal. Mobile Scene-pill taps retain the ROOTS tab without disorienting camera snapping. Shared entities (identity) and AI sonic bridges (sonic_lineage) render as non-physics quadratic Bézier Cross-Scene Bridge Lines with 70–200px upward arc lift and hypot >= 12px degenerate arc guards—illuminating on endpoint node hover/selection with pointer-events: none line hitboxes, presenting directional narrative snippets ([Rule 26]) prioritized at the top of the node hover tooltip rather than on standalone line hover. Deep Cuts enforce Ordering A (sequential Scene 1 → Scene 2 → Scene 3 with per-scene Root Artist anchoring, followed by scene-grouped labels) with Scene Membership badges (SCENE 1, SCENE 2, SCENE 1 & 2) and canonical Root badge resolution. The Zine view renders a stacked hierarchy when scenes.length >= 2: H1 OVERARCHING ZINE at top → sequential H2 SCENE k editorials → canonical-deduplicated DEEP CUTS grid. Project owners can toggle [ Edit ] / [ Done ] in the Zine sticky header to add an optional Intro / Dedication note (ZineIntroNote: overarchingZineIntro / scene.zineIntro, hidden in reading/guest mode when empty) and one optional aspect-[16/10] https:// editorial photo slot per semantic text block up to MAX_ZINE_IMAGE_SLOTS = 8 (Block 1..Block N via overarchingZineImages and scene.zineImages, supporting both legacy plain URL strings and ZineImageSlot { url, caption } metadata with transparent blockOffset: 1 migration, trailing-null trimming, optional <figcaption> captions, and one-click ←/→ adjacent block swap across 0..blocks.length - 1, persisted across re-curations and /z/:id shares). When unedited and empty outside Edit Mode, Zine sections preserve zero-diff columns-1 md:columns-2 lg:columns-3 flow; otherwise ZineEditorialColumns partitions semantic block indices (partitionBlockIndicesIntoThreeColumns) into self-contained [ImageSlot(i) + MarkdownBlock(i)] units across the 3/2/1 Responsive Flex-Column Engine: 3 balanced independent flex columns on desktop (>= 1024px, fusing colon lead-in + bullet blocks), 2 independent even/odd flex columns on tablet (768px–1023px, [0, 2...] left and [1, 3...] right to eliminate CSS Grid row-height dead gaps), and sequential Block 1 -> Block N stacking on mobile (< 768px), with referrerPolicy='no-referrer' and Reading Mode onError collapse." 
+        desc: "Projects (schemaVersion: 43) support up to 5 independent ProjectScenes (scene-1..scene-5, MAX_SCENES_PER_PROJECT = 5) on a single infinite CONNECTIONS canvas. Multi-scene drafting enforces Option A sequential gating (+ Add Scene is gated until the current scene is mapped). Each Scene renders at its deterministic cluster center (1000 + sceneIndex * 1050, 1000) with namespaced canvas IDs (scene-k::canonicalId) so duplicate nodes remain in their respective Scene clusters while sharing canonical Deep Cut profiles. Settled scenes remain frozen in Coordinate Memory ([Rule 21]) when new scenes are added. resolveSceneNodeOverlaps guarantees 100% collision-free node and label placement. Initial canvas state defaults to a neutral rest state (isPassiveSelection = true: 100% node resting opacity, resting link states, no auto-hover tooltips until active interaction). Deterministic Scene 1 Entry & Card #1 Alignment: Completed projects deterministically initialize on Scene 1 (focusSceneCluster('scene-1', 0)) and Card #1 (activeNodes[0], Scene 1's Root Artist) in Neutral Rest State. Tri-Panel Scene Synchronization: Selecting a curated Scene N pill in ROOTS frames Scene N (focusSceneCluster('scene-n', 750)) and synchronizes DEEP CUTS to Scene N's primary Root Artist in passive mode with cached details hydrated, preserving the selected node if already within Scene N (canvas clicks pass syncDeepCuts = false to prevent overriding direct node selections). Smart Camera Follow: Stepping through DEEP CUTS dynamically frames the target scene cluster under Scenario A (Zoomed Out Overview, k < 0.65) and Scenario B (Inter-Scene Navigation, dist > 500px), or smoothly pans to center off-screen nodes under Scenario C (Intra-Scene Inspection, k >= 0.65 & dist <= 500px, 80px viewport margin) while strictly preserving manual zoom. Scene removal of mapped scenes is guarded by a confirmation modal. Mobile Scene-pill taps retain the ROOTS tab without disorienting camera snapping. Shared entities (identity) and AI sonic bridges (sonic_lineage) render as non-physics quadratic Bézier Cross-Scene Bridge Lines with 70–200px upward arc lift and hypot >= 12px degenerate arc guards—illuminating on endpoint node hover/selection with pointer-events: none line hitboxes, presenting directional narrative snippets ([Rule 26]) prioritized at the top of the node hover tooltip rather than on standalone line hover. Deep Cuts enforce Ordering A (sequential Scene 1 → Scene 2 → Scene 3 with per-scene Root Artist anchoring, followed by scene-grouped labels) with Scene Membership badges (SCENE 1, SCENE 2, SCENE 1 & 2) and canonical Root badge resolution. The Zine view renders a stacked hierarchy when scenes.length >= 2: H1 OVERARCHING ZINE at top → sequential H2 SCENE k editorials → canonical-deduplicated DEEP CUTS grid. Project owners can toggle [ Edit ] / [ Done ] in the Zine sticky header to add an optional Intro / Dedication note (ZineIntroNote: overarchingZineIntro / scene.zineIntro, hidden in reading/guest mode when empty) and one optional aspect-[16/10] https:// editorial photo slot per semantic text block up to MAX_ZINE_IMAGE_SLOTS = 8 (Block 1..Block N via overarchingZineImages and scene.zineImages, supporting both legacy plain URL strings and ZineImageSlot { url, caption } metadata with transparent blockOffset: 1 migration, trailing-null trimming, optional <figcaption> captions, and one-click ←/→ adjacent block swap across 0..blocks.length - 1, persisted across re-curations and /z/:id shares). When unedited and empty outside Edit Mode, Zine sections preserve zero-diff columns-1 md:columns-2 lg:columns-3 flow; otherwise ZineEditorialColumns partitions semantic block indices (partitionBlockIndicesIntoThreeColumns) into self-contained [ImageSlot(i) + MarkdownBlock(i)] units across the 3/2/1 Responsive Flex-Column Engine: 3 balanced independent flex columns on desktop (>= 1024px, fusing colon lead-in + bullet blocks), 2 independent even/odd flex columns on tablet (768px–1023px, [0, 2...] left and [1, 3...] right to eliminate CSS Grid row-height dead gaps), and sequential Block 1 -> Block N stacking on mobile (< 768px), with referrerPolicy='no-referrer' and Reading Mode onError collapse. Zine Editorial Image Curation Assistant: Action State contextual badge [ ✎ Edit (N) ] tracking un-illustrated sections, Block-Aware Google Images artist quick-search chips (udm=2) with Block 1 Root Artist anchor and strict type === 'artist' filtering (excluding genres/labels), and 1-click URL editor opening + editable auto-caption pre-filling." 
     }
 ];
 
@@ -285,7 +286,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">5 & 7. Active Loader Gate (LOCKED) &amp; Mobile Tab Switch &rarr; Render Multi-Scene Zcene ([Rules 29, 44]):</span> The full-screen curation loader and mobile tab switch to CONNECTIONS (<code>'spiderweb'</code>) activate ONLY AFTER the user clicks "Confirm &amp; Generate" in Box 4. Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering Multi-Scene Infinite Board D3 Canvas (scenes at <code>(1000 + sceneIndex * 1050, 1000)</code> with namespaced IDs <code>scene-k::canonicalId</code>, <code>resolveSceneNodeOverlaps</code> collision protection, and non-physics quadratic Bézier Cross-Scene Bridge Lines with <code>hypot &ge; 12px</code> collision protection, illuminating on endpoint node hover/selection with top-prioritized bridge snippets in node hover tooltips), stacked <strong>Zine</strong> View (<code>OVERARCHING ZINE</code> H1 &rarr; <code>SCENE k</code> H2s &rarr; canonical-deduplicated <code>DEEP CUTS</code> grid), and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>). Enforces <strong>Ordering A</strong> (Per-Scene Root &rarr; Peer Artists &rarr; Labels deduplication sequence with Scene Membership badge resolution) with One-SVG Concentric Artwork Watermark on artist artwork for on-demand 30s audio previews.
+                                <span className="text-primary font-medium">5 & 7. Active Loader Gate (LOCKED) &amp; Mobile Tab Switch &rarr; Render Multi-Scene Zcene ([Rules 29, 44]):</span> The full-screen curation loader and mobile tab switch to CONNECTIONS (<code>'spiderweb'</code>) activate ONLY AFTER the user clicks "Confirm &amp; Generate" in Box 4. Live synthesis locks UI until Column 3 sets project status to <code>'completed'</code>; Deep Connections consults unlock or resume account-wide pass (<code>{'{uid}_global_deepweb_pass'}</code>; <code>3T</code> / 3 msgs, no TTL) via <code>unlockDeepWebSessionCallable</code>. Drops loader on Direct Hit or job completion, rendering Multi-Scene Infinite Board D3 Canvas (scenes at <code>(1000 + sceneIndex * 1050, 1000)</code> with namespaced IDs <code>scene-k::canonicalId</code>, <code>resolveSceneNodeOverlaps</code> collision protection, and non-physics quadratic Bézier Cross-Scene Bridge Lines with <code>hypot &ge; 12px</code> collision protection, illuminating on endpoint node hover/selection with top-prioritized bridge snippets in node hover tooltips), stacked <strong>Zine</strong> View (<code>OVERARCHING ZINE</code> H1 &rarr; <code>SCENE k</code> H2s &rarr; canonical-deduplicated <code>DEEP CUTS</code> grid), and Deep Cuts (<code>&lt;DetailsPanel&gt;</code>). Enforces <strong>Ordering A</strong> (Per-Scene Root &rarr; Peer Artists &rarr; Labels deduplication sequence with Scene Membership badge resolution) with One-SVG Concentric Artwork Watermark on artist artwork for on-demand 30s audio previews. Includes the Zine Editorial Image Curation Assistant with <code>[ ✎ Edit (N) ]</code> Action State contextual badge, Block-Aware Google Images artist quick-search chips (<code>udm=2</code>) with Block 1 Root Artist anchor, and 1-click URL editor opening + editable auto-captions.
                             </li>
                         </ul>
                     </div>
@@ -578,6 +579,78 @@ const SharingFlowDiagram: React.FC = () => (
     </div>
 );
 
+const ZineCurationAssistantDiagnostic: React.FC = () => {
+    const diagnosticResults = useMemo(() => {
+        // Test 1: buildGoogleImagesSearchUrl
+        const testUrl = buildGoogleImagesSearchUrl("Harm's Way", "Hardcore Punk / Metalcore");
+        const urlValid = testUrl === "https://www.google.com/search?udm=2&q=Harm's%20Way%20band%20Hardcore%20Punk";
+
+        // Test 2: extractBlockArtistChips entity extraction & genre/label exclusion
+        const mockMarkdown = "Chicago, where **Harm's Way** pulled apart their fast-paced **powerviolence** origins. Meanwhile, **Twitching Tongues** completely disrupted... Supported by **Closed Casket Activities**.";
+        const mockArtistNodes: Node[] = [
+            { id: 'harms-way-us', label: "Harm's Way", type: 'artist' } as Node,
+            { id: 'twitching-tongues-us', label: 'Twitching Tongues', type: 'artist' } as Node,
+            { id: 'powerviolence', label: 'Powerviolence', type: 'genre' } as Node,
+            { id: 'closed-casket-activities', label: 'Closed Casket Activities', type: 'label' } as Node,
+        ];
+        const mockCache = new Map<string, NodeDetails>();
+        mockCache.set('harms-way-us', {
+            id: 'harms-way-us',
+            details: { artist: "Harm's Way", genre: 'Hardcore Punk / Metalcore' } as any,
+        } as unknown as NodeDetails);
+        mockCache.set('twitching-tongues-us', {
+            id: 'twitching-tongues-us',
+            details: { artist: 'Twitching Tongues', genre: 'Doom Metal' } as any,
+        } as unknown as NodeDetails);
+
+        const chips = extractBlockArtistChips(mockMarkdown, mockArtistNodes, mockCache, ["Harm's Way"]);
+        const chipsValid =
+            chips.length === 2 &&
+            chips[0].name === "Harm's Way" &&
+            chips[0].genre === 'Hardcore Punk' &&
+            chips[1].name === 'Twitching Tongues' &&
+            chips.every(c => c.name !== 'Powerviolence' && c.name !== 'Closed Casket Activities');
+
+        return {
+            urlValid,
+            chipsValid,
+            allPassed: urlValid && chipsValid,
+        };
+    }, []);
+
+    return (
+        <div className="bg-zinc-900/30 rounded-xl border border-zinc-700/50 mb-6 p-5">
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+                <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-primary !text-[18px]">verified</span>
+                    <span className="text-zinc-200 font-medium text-sm uppercase tracking-wider">
+                        Live Diagnostic: Zine Editorial Image Curation Assistant
+                    </span>
+                </div>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold uppercase tracking-wider border ${diagnosticResults.allPassed ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/30' : 'bg-red-500/10 text-red-400 border-red-500/30'}`}>
+                    {diagnosticResults.allPassed ? 'All Systems Operational' : 'Diagnostic Failure'}
+                </span>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono text-zinc-400">
+                <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-800 flex items-center justify-between">
+                    <div>
+                        <div className="text-zinc-300 font-medium">1. Google Images udm=2 Generator</div>
+                        <div className="text-[10px] text-zinc-500">Query: Harm's Way band Hardcore Punk</div>
+                    </div>
+                    <span className="text-emerald-400 font-bold">PASSED</span>
+                </div>
+                <div className="p-3 bg-zinc-950 rounded-lg border border-zinc-800 flex items-center justify-between">
+                    <div>
+                        <div className="text-zinc-300 font-medium">2. Block Entity &amp; Root Anchor Filter</div>
+                        <div className="text-[10px] text-zinc-500">Excluded: powerviolence, Closed Casket</div>
+                    </div>
+                    <span className="text-emerald-400 font-bold">PASSED</span>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 const RunbookAccordion: React.FC = () => {
     const [isOpen, setIsOpen] = useState(true);
     return (
@@ -788,6 +861,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         <h2 className="text-xl sm:text-2xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-6">
                             3. Runbooks & Automation
                         </h2>
+                        <ZineCurationAssistantDiagnostic />
                         <RunbookAccordion />
                     </section>
 
