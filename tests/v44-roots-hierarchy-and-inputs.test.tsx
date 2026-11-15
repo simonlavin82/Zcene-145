@@ -474,4 +474,114 @@ describe('V44 Blended Library + Global /artists Autocomplete & Deduplication', (
       expect(screen.queryByText('ARCHIVE')).not.toBeInTheDocument();
     });
   });
+
+  describe('ROOTS Left Panel Collapse Initialization & Multi-Scene Hydration', () => {
+    beforeEach(() => {
+      Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        value: vi.fn().mockImplementation((query) => ({
+          matches: true, // Desktop viewport: matches min-width: 768px
+          media: query,
+          onchange: null,
+          addListener: vi.fn(),
+          removeListener: vi.fn(),
+          addEventListener: vi.fn(),
+          removeEventListener: vi.fn(),
+          dispatchEvent: vi.fn(),
+        })),
+      });
+    });
+    it('initializes with the ROOTS panel collapsed when opening a completed multi-scene project', () => {
+      const completedScenes: any = [
+        {
+          id: 'scene-1',
+          sceneId: 'scene-1',
+          customName: 'Dashboard 1',
+          seedArtists: 'Dashboard Confessional',
+          graphData: {
+            nodes: [
+              { id: 'scene-1::dashboard-confessional-us', name: 'Dashboard Confessional', type: 'artist' },
+              { id: 'scene-1::further-seems-forever-us', name: 'Further Seems Forever', type: 'artist' },
+            ],
+            links: [],
+          },
+        },
+        {
+          id: 'scene-2',
+          sceneId: 'scene-2',
+          customName: 'Rocking Horse 1',
+          seedArtists: 'Rocking Horse Winner',
+          graphData: {
+            nodes: [
+              { id: 'scene-2::rocking-horse-winner-us', name: 'Rocking Horse Winner', type: 'artist' },
+              { id: 'scene-2::dashboard-confessional-us', name: 'Dashboard Confessional', type: 'artist' },
+            ],
+            links: [],
+          },
+        },
+      ];
+
+      render(
+        <GraphPage
+          {...baseProps}
+          projectId="CNJLqzLsXvNv53xEC5xT"
+          projectStatus="completed"
+          scenes={completedScenes}
+          seedArtists="Dashboard Confessional"
+          data={{
+            nodes: [
+              { id: 'scene-1::dashboard-confessional-us', name: 'Dashboard Confessional', type: 'artist', x: 100, y: 100 },
+              { id: 'scene-1::further-seems-forever-us', name: 'Further Seems Forever', type: 'artist', x: 200, y: 200 },
+            ],
+            links: [],
+          }}
+        />
+      );
+
+      // Panel starts collapsed into the left rail
+      expect(screen.getByTitle('Expand Panel')).toBeInTheDocument();
+      expect(screen.queryByTitle('Collapse Panel')).not.toBeInTheDocument();
+      expect(screen.queryByRole('heading', { name: /^roots$/i })).not.toBeInTheDocument();
+    });
+
+    it('initializes with the ROOTS panel expanded for a blank new Zcene', () => {
+      render(
+        <GraphPage
+          {...baseProps}
+          projectId={undefined}
+          projectStatus="idle"
+          scenes={[]}
+          seedArtists=""
+          data={{ nodes: [], links: [] }}
+        />
+      );
+
+      // Panel starts open for entering seed artists
+      expect(screen.getByTitle('Collapse Panel')).toBeInTheDocument();
+      expect(screen.queryByTitle('Expand Panel')).not.toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /^roots$/i })).toBeInTheDocument();
+    });
+
+    it('preserves single-seed step-zero expanded state when nodes count matches seeds count', () => {
+      render(
+        <GraphPage
+          {...baseProps}
+          projectId="new-step-zero"
+          projectStatus="idle"
+          scenes={[]}
+          seedArtists="Dashboard Confessional"
+          data={{
+            nodes: [
+              { id: 'dashboard-confessional-us', name: 'Dashboard Confessional', type: 'artist', x: 100, y: 100 },
+            ],
+            links: [],
+          }}
+        />
+      );
+
+      // Step-zero graph with single seed stays open
+      expect(screen.getByTitle('Collapse Panel')).toBeInTheDocument();
+      expect(screen.getByRole('heading', { name: /^roots$/i })).toBeInTheDocument();
+    });
+  });
 });

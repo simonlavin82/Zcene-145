@@ -151,6 +151,7 @@ interface GraphPageProps {
   onUpdateZineIntro?: (target: 'overarching' | string, intro: string | null) => void;
   crossSceneLinks?: CrossSceneLink[];
   isPassiveSelection?: boolean;
+  projectStatus?: string | null;
 }
 
 const DEFAULT_LEFT_PANEL_WIDTH = 320;
@@ -1215,10 +1216,17 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onUpdateZineIntro,
   crossSceneLinks,
   isPassiveSelection = false,
+  projectStatus,
 }) => {
-  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(false);
+  const [isLeftPanelCollapsed, setIsLeftPanelCollapsed] = useState(() => {
+    const seedCount = seedArtists.split('::').filter(Boolean).length;
+    if (data.nodes.length > 0 && data.nodes.length !== seedCount) return true;
+    if (scenes && scenes.some(s => (s.graphData?.nodes?.length ?? 0) > 1)) return true;
+    if (projectStatus === 'completed') return true;
+    return false;
+  });
   const [focusedSceneCluster, setFocusedSceneCluster] = useState<{ sceneId: string; timestamp: number } | undefined>(undefined);
-  const hasInitializedPanelRef = useRef(false);
+  const hasInitializedPanelRef = useRef(isLeftPanelCollapsed);
 
   useEffect(() => {
       if (hasInitializedPanelRef.current || data.nodes.length === 0) return;

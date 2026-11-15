@@ -7913,24 +7913,7 @@ const App: React.FC = () => {
 
         // Shared Zcenes are handled entirely in processDeepLink now.
 
-        // 2. Try Projects (top-level flat)
-        const flatProjectRef = doc(db, 'projects', currentProjectId);
-        try {
-          const flatSnap = await getDoc(flatProjectRef);
-          if (!isMounted) return;
-          if (await handleSnap(flatSnap)) {
-            console.log(`[ProjectLoader] Found in top-level projects, setting up real-time sync`);
-            const unsub = onSnapshot(flatProjectRef, (snap) => { handleSnap(snap); }, (err) => {
-              if (isMounted && err.code !== 'permission-denied') handleFirestoreError(err, OperationType.GET, `projects/${currentProjectId}`);
-            });
-            unsubscribeList.push(unsub);
-            return;
-          }
-        } catch (e) {
-          console.log(`[ProjectLoader] Flat probe failed or denied`);
-        }
-
-        // 3. Try User-owned projects (if logged in)
+        // 2. Try User-owned projects first (if logged in)
         if (user) {
           const userProjectRef = doc(db, 'users', user.uid, 'projects', currentProjectId);
           try {
@@ -7948,6 +7931,23 @@ const App: React.FC = () => {
           } catch (e) {
             console.log(`[ProjectLoader] My projects probe failed or denied`);
           }
+        }
+
+        // 3. Fallback: Try Projects (top-level flat) for legacy projects or unauthenticated
+        const flatProjectRef = doc(db, 'projects', currentProjectId);
+        try {
+          const flatSnap = await getDoc(flatProjectRef);
+          if (!isMounted) return;
+          if (await handleSnap(flatSnap)) {
+            console.log(`[ProjectLoader] Found in top-level projects, setting up real-time sync`);
+            const unsub = onSnapshot(flatProjectRef, (snap) => { handleSnap(snap); }, (err) => {
+              if (isMounted && err.code !== 'permission-denied') handleFirestoreError(err, OperationType.GET, `projects/${currentProjectId}`);
+            });
+            unsubscribeList.push(unsub);
+            return;
+          }
+        } catch (e) {
+          console.log(`[ProjectLoader] Flat probe failed or denied`);
         }
 
         console.log(`[ProjectLoader] Project not found in any accessible location. Redirecting.`);
@@ -8381,9 +8381,122 @@ const App: React.FC = () => {
                 const localProj = projects.find(p => p.id === projectId);
                 if (localProj) {
                   console.log(`[Router] Pre-populating context for project ${projectId} from dashboard data:`, localProj.seedArtists);
-                  const initialSeeds = localProj.seedArtists || '';
-                  seedArtistsRef.current = initialSeeds;
-                  setSeedArtists(initialSeeds);
+                  
+                  // 1. Multi-Scene Parsing & Pre-population
+                  let parsedScenes: ProjectScene[] = [];
+                  if (localProj.scenes !== undefined && localProj.scenes !== null) {
+                    try {
+                      parsedScenes = parseProjectScenes(localProj.scenes);
+                    } catch (e) {
+                      console.warn('[Router] Failed to parse localProj scenes:', e);
+                    }
+                  }
+
+                  if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
+                    scenesRef.current = parsedScenes;
+                    setScenes(parsedScenes);
+
+                    const resolvedActiveSceneId = localProj.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === localProj.activeSceneId)
+                      ? localProj.activeSceneId
+                      : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
+                    activeSceneIdRef.current = resolvedActiveSceneId;
+                    setActiveSceneId(resolvedActiveSceneId);
+
+                    const targetScene = parsedScenes.find(s => (s.sceneId || s.id) === resolvedActiveSceneId) || parsedScenes[0];
+                    const targetSeedsStr = targetScene?.seedArtists ? toSeedArtistsString(targetScene.seedArtists) : '';
+                    seedArtistsRef.current = targetSeedsStr;
+                    setSeedArtists(targetSeedsStr);
+
+                    if (targetScene?.discoveryFilters) {
+                      setDiscoveryFilters(targetScene.discoveryFilters);
+                    }
+                  } else {
+                    const initialSeeds = localProj.seedArtists || '';
+                    seedArtistsRef.current = initialSeeds;
+                    setSeedArtists(initialSeeds);
+                  }
+
+                  // 2. Pre-populate crossSceneLinks
+                  let parsedCrossLinks: CrossSceneLink[] = [];
+                  if (localProj.crossSceneLinks !== undefined && localProj.crossSceneLinks !== null) {
+                    try {
+                      parsedCrossLinks = parseCrossSceneLinks(localProj.crossSceneLinks);
+                      crossSceneLinksRef.current = parsedCrossLinks;
+                      setCrossSceneLinks(parsedCrossLinks);
+                    } catch (e) {}
+                  }
+
+                  // 3. Pre-populate graphData
+                  const populatedScenesFromDoc = parsedScenes.filter(
+                    s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+                  );
+
+                  let savedPositions: CanvasNodeRef[] = [];
+                  if (localProj.canvasLayout) {
+                    try {
+                      const rawLayout = typeof localProj.canvasLayout === 'string' ? JSON.parse(localProj.canvasLayout) : localProj.canvasLayout;
+                      if (Array.isArray(rawLayout)) {
+                        savedPositions = migrateLegacyCanvasLayout(rawLayout, parsedScenes);
+                      }
+                    } catch (e) {
+                      console.warn('[Router] canvasLayout parse failed:', e);
+                    }
+                  }
+
+                  let parsedGraphData: any = null;
+                  if (typeof localProj.graphData === 'string' && localProj.graphData.trim().length > 0) {
+                    try {
+                      parsedGraphData = JSON.parse(localProj.graphData);
+                    } catch (e) {}
+                  } else if (typeof localProj.graphData === 'object' && localProj.graphData !== null) {
+                    parsedGraphData = localProj.graphData;
+                  }
+
+                  if (populatedScenesFromDoc.length >= 1) {
+                    const composite = buildCompositeCanvasGraph(populatedScenesFromDoc, parsedCrossLinks, savedPositions);
+                    graphDataRef.current = composite;
+                    setGraphData(composite);
+                  } else if (parsedGraphData && Array.isArray(parsedGraphData.nodes) && parsedGraphData.nodes.length > 0) {
+                    graphDataRef.current = parsedGraphData;
+                    setGraphData(parsedGraphData);
+                  }
+
+                  // 4. Pre-populate activeNodes & detailsCache
+                  if (Array.isArray(localProj.activeNodes) && localProj.activeNodes.length > 0) {
+                    setActiveNodeIds(localProj.activeNodes);
+                  }
+                  if (localProj.detailsCache) {
+                    try {
+                      const entries = typeof localProj.detailsCache === 'string' ? JSON.parse(localProj.detailsCache) : localProj.detailsCache;
+                      if (Array.isArray(entries)) {
+                        const parsedCache = new Map<string, NodeDetails>(entries);
+                        detailsCacheRef.current = parsedCache;
+                        setDetailsCache(parsedCache);
+                      }
+                    } catch (e) {}
+                  }
+
+                  // 5. Pre-populate Overarching Zine metadata
+                  if (localProj.overarchingRationale !== undefined) {
+                    overarchingRationaleRef.current = localProj.overarchingRationale || '';
+                    setOverarchingRationale(localProj.overarchingRationale || '');
+                  }
+                  if (localProj.overarchingZineTitle !== undefined) {
+                    const nextOverarchingTitle = normalizeZineTitle(localProj.overarchingZineTitle) || '';
+                    overarchingZineTitleRef.current = nextOverarchingTitle;
+                    setOverarchingZineTitle(nextOverarchingTitle);
+                  }
+                  if (localProj.overarchingZineIntro !== undefined) {
+                    const nextOverarchingIntro = normalizeZineIntro(localProj.overarchingZineIntro) || '';
+                    overarchingZineIntroRef.current = nextOverarchingIntro;
+                    setOverarchingZineIntro(nextOverarchingIntro);
+                  }
+                  if (localProj.overarchingZineImages !== undefined) {
+                    const nextOverarchingImages = normalizeZineImages(localProj.overarchingZineImages) || [];
+                    overarchingZineImagesRef.current = nextOverarchingImages;
+                    setOverarchingZineImages(nextOverarchingImages);
+                  }
+
                   setProjectName(localProj.name || '');
                   setProjectStatus(localProj.status || null);
                   setActiveJobId(localProj.activeJobId || null);
@@ -9761,6 +9874,7 @@ const App: React.FC = () => {
             <GraphPage
               key={currentProjectId || (isViewingShare ? 'share' : 'new-project')}
               projectId={currentProjectId || undefined}
+              projectStatus={projectStatus}
               activeDeepWebSession={activeDeepWebSession}
               areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
