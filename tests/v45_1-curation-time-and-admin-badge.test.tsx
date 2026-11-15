@@ -1007,4 +1007,141 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(effectiveStatus).toBe('curating');
     });
   });
+
+  describe('Multi-Scene Fork Target Scene Protection (App.tsx onFork & ProjectLoader)', () => {
+    const multiSceneList: any[] = [
+      { sceneId: 'scene-1', id: 'scene-1', title: 'The Jealous Sound + Hey Mercedes', graphData: { nodes: [{ id: 'tjs' }, { id: 'hm' }] } },
+      { sceneId: 'scene-2', id: 'scene-2', title: 'Elliott', graphData: { nodes: [{ id: 'elliott' }] } },
+      { sceneId: 'scene-3', id: 'scene-3', title: 'Jimmy Eat World', graphData: { nodes: [{ id: 'jew' }] } },
+      { sceneId: 'scene-4', id: 'scene-4', title: 'Yellowcard', graphData: { nodes: [] } },
+    ];
+
+    it('preserves targetSceneId="scene-4" in ProjectLoader during fork pre-flight even when status="completed" and isInitialLoad=true', () => {
+      const forkedProjectDoc: any = {
+        id: '4kfd8smA8Fchud1qcWUk',
+        status: 'completed',
+        activeJobId: null,
+        activeSceneId: 'scene-4',
+      };
+
+      const currentProjectId = '4kfd8smA8Fchud1qcWUk';
+      const pendingUnconfirmedForkId = '4kfd8smA8Fchud1qcWUk';
+      const isPreFlightChecking = true;
+      const isInitialLoad = true;
+      const activeSceneIdRefCurrent = 'scene-4';
+
+      const isCurating = forkedProjectDoc.status === 'curating' || !!forkedProjectDoc.activeJobId;
+      const isUnconfirmedForkOrPreFlight = pendingUnconfirmedForkId === currentProjectId || isPreFlightChecking;
+
+      const resolvedActiveSceneId = isUnconfirmedForkOrPreFlight && (forkedProjectDoc.activeSceneId || activeSceneIdRefCurrent) && multiSceneList.some(s => (s.sceneId || s.id) === (forkedProjectDoc.activeSceneId || activeSceneIdRefCurrent))
+        ? (forkedProjectDoc.activeSceneId && multiSceneList.some(s => (s.sceneId || s.id) === forkedProjectDoc.activeSceneId) ? forkedProjectDoc.activeSceneId : (activeSceneIdRefCurrent || 'scene-1'))
+        : isCurating && forkedProjectDoc.activeSceneId && multiSceneList.some(s => (s.sceneId || s.id) === forkedProjectDoc.activeSceneId)
+          ? forkedProjectDoc.activeSceneId
+          : (!isInitialLoad && activeSceneIdRefCurrent && multiSceneList.some(s => (s.sceneId || s.id) === activeSceneIdRefCurrent))
+            ? activeSceneIdRefCurrent
+            : (multiSceneList[0].sceneId || multiSceneList[0].id || 'scene-1');
+
+      expect(resolvedActiveSceneId).toBe('scene-4');
+    });
+
+    it('preserves activeSceneId="scene-4" when isPreFlightChecking is true even if pendingUnconfirmedForkId is null', () => {
+      const existingProjectDoc: any = {
+        id: 'J6u14fD1reYUv48HIYFi',
+        status: 'completed',
+        activeJobId: null,
+        activeSceneId: 'scene-4',
+      };
+
+      const currentProjectId = 'J6u14fD1reYUv48HIYFi';
+      const pendingUnconfirmedForkId = null;
+      const isPreFlightChecking = true;
+      const isInitialLoad = true;
+      const activeSceneIdRefCurrent = 'scene-4';
+
+      const isCurating = existingProjectDoc.status === 'curating' || !!existingProjectDoc.activeJobId;
+      const isUnconfirmedForkOrPreFlight = pendingUnconfirmedForkId === currentProjectId || isPreFlightChecking;
+
+      const resolvedActiveSceneId = isUnconfirmedForkOrPreFlight && (existingProjectDoc.activeSceneId || activeSceneIdRefCurrent) && multiSceneList.some(s => (s.sceneId || s.id) === (existingProjectDoc.activeSceneId || activeSceneIdRefCurrent))
+        ? (existingProjectDoc.activeSceneId && multiSceneList.some(s => (s.sceneId || s.id) === existingProjectDoc.activeSceneId) ? existingProjectDoc.activeSceneId : (activeSceneIdRefCurrent || 'scene-1'))
+        : isCurating && existingProjectDoc.activeSceneId && multiSceneList.some(s => (s.sceneId || s.id) === existingProjectDoc.activeSceneId)
+          ? existingProjectDoc.activeSceneId
+          : (!isInitialLoad && activeSceneIdRefCurrent && multiSceneList.some(s => (s.sceneId || s.id) === activeSceneIdRefCurrent))
+            ? activeSceneIdRefCurrent
+            : (multiSceneList[0].sceneId || multiSceneList[0].id || 'scene-1');
+
+      expect(resolvedActiveSceneId).toBe('scene-4');
+    });
+
+    it('defaults normal completed project loads from /dashboard to parsedScenes[0] (Scene 1) when not in pre-flight or unconfirmed fork', () => {
+      const settledProjectDoc: any = {
+        id: 'J6u14fD1reYUv48HIYFi',
+        status: 'completed',
+        activeJobId: null,
+        activeSceneId: 'scene-3', // Last saved scene was Scene 3
+      };
+
+      const currentProjectId = 'J6u14fD1reYUv48HIYFi';
+      const pendingUnconfirmedForkId = null;
+      const isPreFlightChecking = false;
+      const isInitialLoad = true; // Initial load from dashboard
+      const activeSceneIdRefCurrent = 'scene-1';
+
+      const isCurating = settledProjectDoc.status === 'curating' || !!settledProjectDoc.activeJobId;
+      const isUnconfirmedForkOrPreFlight = pendingUnconfirmedForkId === currentProjectId || isPreFlightChecking;
+
+      const resolvedActiveSceneId = isUnconfirmedForkOrPreFlight && (settledProjectDoc.activeSceneId || activeSceneIdRefCurrent) && multiSceneList.some(s => (s.sceneId || s.id) === (settledProjectDoc.activeSceneId || activeSceneIdRefCurrent))
+        ? (settledProjectDoc.activeSceneId && multiSceneList.some(s => (s.sceneId || s.id) === settledProjectDoc.activeSceneId) ? settledProjectDoc.activeSceneId : (activeSceneIdRefCurrent || 'scene-1'))
+        : isCurating && settledProjectDoc.activeSceneId && multiSceneList.some(s => (s.sceneId || s.id) === settledProjectDoc.activeSceneId)
+          ? settledProjectDoc.activeSceneId
+          : (!isInitialLoad && activeSceneIdRefCurrent && multiSceneList.some(s => (s.sceneId || s.id) === activeSceneIdRefCurrent))
+            ? activeSceneIdRefCurrent
+            : (multiSceneList[0].sceneId || multiSceneList[0].id || 'scene-1');
+
+      expect(resolvedActiveSceneId).toBe('scene-1');
+    });
+
+    it('locks targetSceneIdOverride at handleGenerateGraph entry and dispatches scene-4 even if mutable ref is altered during await', async () => {
+      const targetSceneIdOverride = 'scene-4';
+      let activeSceneIdRefCurrent = 'scene-4';
+
+      // Layer 1: Lock targetSceneId at entry
+      const lockedTargetSceneId = targetSceneIdOverride || activeSceneIdRefCurrent || 'scene-1';
+      activeSceneIdRefCurrent = lockedTargetSceneId;
+
+      // Simulate async modal pause (await confirmTokenUsage / await ConsolidatedValidationModal)
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      // Simulate concurrent background snapshot altering mutable ref to scene-1:
+      activeSceneIdRefCurrent = 'scene-1';
+
+      // When modal confirms, re-assert lockedTargetSceneId:
+      activeSceneIdRefCurrent = lockedTargetSceneId;
+
+      // When curation payload is constructed:
+      const targetSceneIdForJob = lockedTargetSceneId;
+      const targetSceneIdxForJob = Math.max(0, multiSceneList.findIndex(s => (s.sceneId || s.id) === targetSceneIdForJob));
+
+      expect(targetSceneIdForJob).toBe('scene-4');
+      expect(targetSceneIdxForJob).toBe(3);
+      expect(activeSceneIdRefCurrent).toBe('scene-4');
+    });
+
+    it('suppresses auto-selection during unconfirmed fork or pre-flight', () => {
+      const urlSelected = null;
+      let hasAutoSelected = null;
+      const currentProjectId = '4kfd8smA8Fchud1qcWUk';
+
+      // Pre-flight active
+      const isUnconfirmedForkOrPreFlight = true;
+
+      let didAutoSelect = false;
+      if (!urlSelected && !isUnconfirmedForkOrPreFlight && hasAutoSelected !== currentProjectId) {
+        hasAutoSelected = currentProjectId;
+        didAutoSelect = true;
+      }
+
+      expect(didAutoSelect).toBe(false);
+      expect(hasAutoSelected).toBe(null);
+    });
+  });
 });

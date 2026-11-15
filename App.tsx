@@ -1342,7 +1342,12 @@ const App: React.FC = () => {
     onConfirm: (updatedSeeds?: PreFlightSeed[]) => void;
     onCancel: () => void;
   } | null>(null);
-  const [isPreFlightChecking, setIsPreFlightChecking] = useState<boolean>(false);
+  const [isPreFlightChecking, _setIsPreFlightChecking] = useState<boolean>(false);
+  const isPreFlightCheckingRef = useRef<boolean>(false);
+  const setIsPreFlightChecking = useCallback((val: boolean) => {
+    isPreFlightCheckingRef.current = val;
+    _setIsPreFlightChecking(val);
+  }, []);
   const validationRunIdRef = useRef<number>(0);
   const attemptedMissIdsRef = useRef<Set<string>>(new Set());
     const [filterGuidanceState, setFilterGuidanceState] = useState<{
@@ -3816,7 +3821,8 @@ const App: React.FC = () => {
     data: any, 
     artistList: string[], 
     artistsString: string,
-    explicitProjectId?: string
+    explicitProjectId?: string,
+    explicitTargetSceneId?: string
   ) => {
     const searchIdLower = searchId.toLowerCase();
     const canonicalId = data?.cacheKey || data?.artistId || searchId;
@@ -3915,7 +3921,9 @@ const App: React.FC = () => {
     artistList.forEach(name => { approvedSeedsRef.current.add(normalizeArtistId(name)); });
 
     // V43 Multi-Scene Direct Hit Assembly: update activeScene inside scenes and rebuild composite graph
-    const targetSceneId = activeSceneIdRef.current || 'scene-1';
+    const targetSceneId = explicitTargetSceneId || activeSceneIdRef.current || 'scene-1';
+    activeSceneIdRef.current = targetSceneId;
+    setActiveSceneId(targetSceneId);
     const currentScenesList = scenesRef.current.length > 0 ? [...scenesRef.current] : [createEmptyScene(0)];
     let targetSceneIdx = currentScenesList.findIndex(s => (s.sceneId || s.id) === targetSceneId);
     if (targetSceneIdx === -1) {
@@ -4272,8 +4280,13 @@ const App: React.FC = () => {
     disambiguationGenres?: Record<string, string>,
     originalQueries?: Record<string, string>,
     seedNames?: Record<string, string>,
-    explicitProjectId?: string
+    explicitProjectId?: string,
+    targetSceneIdOverride?: string
   ) => {
+    const lockedTargetSceneId = targetSceneIdOverride || activeSceneIdRef.current || 'scene-1';
+    activeSceneIdRef.current = lockedTargetSceneId;
+    setActiveSceneId(lockedTargetSceneId);
+
     if (!bypassTokenConfirmation) {
       sessionTokenApprovedRef.current = false;
     }
@@ -4689,7 +4702,7 @@ const App: React.FC = () => {
         }
 
         const isMultiSceneOverarching = (scenesRef.current || []).filter(
-          s => (s.sceneId || s.id) !== activeSceneIdRef.current && (s.graphData?.nodes?.length ?? 0) > 0
+          s => (s.sceneId || s.id) !== lockedTargetSceneId && (s.graphData?.nodes?.length ?? 0) > 0
         ).length >= 1;
         const allSeedsTopologyCached = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isTopologyHit);
 
@@ -4733,6 +4746,8 @@ const App: React.FC = () => {
         }
 
         // Safeguard 1: Step 4 confirmed: curation execution begins. Clear pending fork guards.
+        activeSceneIdRef.current = lockedTargetSceneId;
+        setActiveSceneId(lockedTargetSceneId);
         pendingUnconfirmedForkIdRef.current = null;
         pendingForkOriginIdRef.current = null;
 
@@ -4842,7 +4857,7 @@ const App: React.FC = () => {
           cacheCandidatesPerSeed.every(s => s.isTopologyHit || (s.isAmbiguous && !!s.selectedCandidateId));
         const nextSkipCacheLookup = !canCheckCacheOnPass2;
         
-        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, true, overrideFilters, activeDisambiguationHints, true, activeDisambiguationGenres, activeOriginalQueries, activeSeedNames, explicitProjectId);
+        handleGenerateGraph(newArtistsStr, isRegeneration, graphToEnhance, nextSkipCacheLookup, true, overrideFilters, activeDisambiguationHints, true, activeDisambiguationGenres, activeOriginalQueries, activeSeedNames, explicitProjectId, lockedTargetSceneId);
         return;
       }
 
@@ -4868,7 +4883,7 @@ const App: React.FC = () => {
             resetAbortedPreFlightState();
             return;
           }
-          await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists, explicitProjectId);
+          await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists, explicitProjectId, lockedTargetSceneId);
           isHydratingSessionRef.current = false;
           isProjectLoadingRef.current = false;
           setIsLoading(false);
@@ -5058,7 +5073,7 @@ const App: React.FC = () => {
 
     // Instantly commit the clean-slate pruned graph to React state to purge stale lineage data
     // (When other settled scenes exist on the multi-scene board, preserve them during curation)
-    const activeSceneKey = activeSceneIdRef.current || 'scene-1';
+    const activeSceneKey = lockedTargetSceneId;
     const otherSettledScenes = scenesRef.current.filter(
       s => (s.sceneId || s.id) !== activeSceneKey && s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
     );
@@ -6068,7 +6083,7 @@ const App: React.FC = () => {
           // If this is a transition/fork (isLiveSynthesisTemp) we must ignore the stale projectName 
           // and forcefully derive the name from the fresh artists string.
           const isNewOrUntitled = !projectName || projectName === "Untitled Zcene";
-          const targetSceneId = activeSceneIdRef.current || 'scene-1';
+          const targetSceneId = lockedTargetSceneId;
           const targetSceneIdx = Math.max(0, scenesRef.current.findIndex(s => (s.sceneId || s.id) === targetSceneId));
           const allSceneSeedStrs = scenesRef.current.length > 1
             ? Array.from(new Set([
@@ -6126,7 +6141,7 @@ const App: React.FC = () => {
         }
         
         const seedImageUrl = undefined;
-        const targetSceneIdForJob = activeSceneIdRef.current || 'scene-1';
+        const targetSceneIdForJob = lockedTargetSceneId;
         const targetSceneIdxForJob = Math.max(0, scenesRef.current.findIndex(s => (s.sceneId || s.id) === targetSceneIdForJob));
         // V43.1: sanitizeScenesForTransport strips D3-mutated link object refs (source/target → string IDs)
         // and undefined fields so the HTTPS Callable payload always serializes cleanly.
@@ -7328,11 +7343,14 @@ const App: React.FC = () => {
           if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
             const isCurating = incomingStatus === 'curating' || !!data.activeJobId;
             const isInitialLoad = isProjectLoadingRef.current;
-            const resolvedActiveSceneId = isCurating && data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId)
-              ? data.activeSceneId
-              : (!isInitialLoad && activeSceneIdRef.current && parsedScenes.some(s => (s.sceneId || s.id) === activeSceneIdRef.current))
-                ? activeSceneIdRef.current
-                : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
+            const isUnconfirmedForkOrPreFlight = pendingUnconfirmedForkIdRef.current === currentProjectId || isPreFlightCheckingRef.current || isPreFlightChecking;
+            const resolvedActiveSceneId = isUnconfirmedForkOrPreFlight && (data.activeSceneId || activeSceneIdRef.current) && parsedScenes.some(s => (s.sceneId || s.id) === (data.activeSceneId || activeSceneIdRef.current))
+              ? (data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId) ? data.activeSceneId : (activeSceneIdRef.current || 'scene-1'))
+              : isCurating && data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId)
+                ? data.activeSceneId
+                : (!isInitialLoad && activeSceneIdRef.current && parsedScenes.some(s => (s.sceneId || s.id) === activeSceneIdRef.current))
+                  ? activeSceneIdRef.current
+                  : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
             activeSceneIdRef.current = resolvedActiveSceneId;
             setActiveSceneId(resolvedActiveSceneId);
             const activeIdxInParsed = parsedScenes.findIndex(s => (s.sceneId || s.id) === resolvedActiveSceneId);
@@ -7894,7 +7912,8 @@ const App: React.FC = () => {
         if (hydratedNodes.length > 0 && incomingStatus === 'completed') {
           const searchParams = new URLSearchParams(window.location.search);
           const urlSelected = searchParams.get('selected');
-          if (!urlSelected && hasAutoSelectedRef.current !== currentProjectId) {
+          const isUnconfirmedForkOrPreFlight = pendingUnconfirmedForkIdRef.current === currentProjectId || isPreFlightCheckingRef.current || isPreFlightChecking;
+          if (!urlSelected && !isUnconfirmedForkOrPreFlight && hasAutoSelectedRef.current !== currentProjectId) {
             const seedIds = (data.seedArtists ? data.seedArtists.split('::') : [...(data.artistIds || []), ...(data.labelIds || [])])
               .map((s: string) => normalizeArtistId(s.trim()))
               .filter(Boolean);
@@ -8193,7 +8212,8 @@ const App: React.FC = () => {
         // Auto-hydrate the Deep Cut panel on load if nothing is selected
         const searchParams = new URLSearchParams(window.location.search);
         const urlSelected = searchParams.get('selected');
-        if (!urlSelected && hasAutoSelectedRef.current !== currentProjectId) {
+        const isUnconfirmedForkOrPreFlight = pendingUnconfirmedForkIdRef.current === currentProjectId || isPreFlightCheckingRef.current || isPreFlightChecking;
+        if (!urlSelected && !isUnconfirmedForkOrPreFlight && hasAutoSelectedRef.current !== currentProjectId) {
           hasAutoSelectedRef.current = currentProjectId;
           const currentScenes = scenesRef.current || [];
           const scene1 = currentScenes[0];
@@ -10123,7 +10143,7 @@ const App: React.FC = () => {
                     setPeekedNode(null);
 
                     navigate(`/p/${newId}`);
-                    handleGenerateGraph(n, false, null, false, false, undefined, undefined, false, undefined, undefined, undefined, newId);
+                    handleGenerateGraph(n, false, null, false, false, undefined, undefined, false, undefined, undefined, undefined, newId, forkTargetSceneId);
                     return;
                   }
 
@@ -10190,6 +10210,8 @@ const App: React.FC = () => {
                   setExpectedCurationSpeed(undefined);
 
                   navigate(`/p/${newId}`);
+                  handleGenerateGraph(n, false, null, false, false, undefined, undefined, false, undefined, undefined, undefined, newId, forkedScene.id);
+                  return;
                 } else {
                   setCurrentProjectId(null);
                   currentProjectIdRef.current = null;
