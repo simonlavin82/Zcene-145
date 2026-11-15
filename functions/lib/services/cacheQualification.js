@@ -269,11 +269,11 @@ const deriveRoutingDecision = (verdicts, isLiveSynthesis) => {
 };
 exports.deriveRoutingDecision = deriveRoutingDecision;
 function classifyCurationSpeed({ seedCount, hasActiveFilters, routingDecision, allSeedsTopologyCached, isMultiSceneOverarching, }) {
-    if (isMultiSceneOverarching || seedCount >= 2 || hasActiveFilters) {
+    if (seedCount >= 2 || hasActiveFilters) {
         return 'deep';
     }
     if (routingDecision === 'TOPOLOGY_HIT' && allSeedsTopologyCached) {
-        return 'instant';
+        return isMultiSceneOverarching ? 'partial' : 'instant';
     }
     if (routingDecision === 'PARTIAL') {
         return 'partial';

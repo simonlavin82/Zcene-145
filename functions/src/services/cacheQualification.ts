@@ -310,11 +310,11 @@ export function classifyCurationSpeed({
   allSeedsTopologyCached,
   isMultiSceneOverarching,
 }: ClassifyCurationSpeedParams): ExpectedCurationSpeed {
-  if (isMultiSceneOverarching || seedCount >= 2 || hasActiveFilters) {
+  if (seedCount >= 2 || hasActiveFilters) {
     return 'deep';
   }
   if (routingDecision === 'TOPOLOGY_HIT' && allSeedsTopologyCached) {
-    return 'instant';
+    return isMultiSceneOverarching ? 'partial' : 'instant';
   }
   if (routingDecision === 'PARTIAL') {
     return 'partial';

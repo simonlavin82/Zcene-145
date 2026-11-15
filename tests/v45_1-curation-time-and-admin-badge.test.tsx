@@ -189,11 +189,33 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(speed).toBe('deep');
     });
 
-    it('classifies multi-scene overarching zine regeneration as "deep" (~3–5 minutes)', () => {
+    it('classifies multi-scene single-seed direct hit with overarching synthesis as "partial" (~1–2 minutes)', () => {
       const speed = classifyCurationSpeed({
         seedCount: 1,
         hasActiveFilters: false,
         routingDecision: 'TOPOLOGY_HIT',
+        allSeedsTopologyCached: true,
+        isMultiSceneOverarching: true,
+      });
+      expect(speed).toBe('partial');
+    });
+
+    it('classifies multi-scene multi-seed query as "deep" (~3–5 minutes)', () => {
+      const speed = classifyCurationSpeed({
+        seedCount: 2,
+        hasActiveFilters: false,
+        routingDecision: 'LIVE_SYNTHESIS',
+        allSeedsTopologyCached: false,
+        isMultiSceneOverarching: true,
+      });
+      expect(speed).toBe('deep');
+    });
+
+    it('classifies multi-scene single-seed with active filters as "deep" (~3–5 minutes)', () => {
+      const speed = classifyCurationSpeed({
+        seedCount: 1,
+        hasActiveFilters: true,
+        routingDecision: 'LIVE_SYNTHESIS',
         allSeedsTopologyCached: true,
         isMultiSceneOverarching: true,
       });
@@ -339,6 +361,52 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
 
       await waitFor(() => {
         // Once escape hatch resolves with replacement candidate, dynamic speed becomes 'deep'
+        expect(screen.getByTestId('curation-time-estimate')).toHaveTextContent('~3–5 minutes');
+      });
+    });
+
+    it('dynamically upgrades estimate from ~1–2 minutes to ~3–5 minutes when escape hatch replaces a multi-scene partial seed with an uncached origin', async () => {
+      const mockCallable = vi.fn().mockResolvedValue({
+        data: {
+          isValid: true,
+          id: 'Jimmy Eat World',
+          origin: 'Germany',
+          genre: 'Alternative Rock',
+          hasCollision: false,
+          candidates: [
+            {
+              id: 'jimmy-eat-world-de',
+              name: 'Jimmy Eat World',
+              origin: 'Germany',
+              genre: 'Alternative Rock',
+            },
+          ],
+        },
+      });
+      (httpsCallable as any).mockReturnValue(mockCallable);
+
+      render(
+        <ConsolidatedValidationModal
+          isOpen={true}
+          seeds={[verifiedSeed]}
+          expectedSpeed="partial"
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+
+      // Initially partial (~1–2 minutes)
+      expect(screen.getByTestId('curation-time-estimate')).toHaveTextContent('~1–2 minutes');
+
+      // Click "Not this artist?" escape hatch
+      fireEvent.click(screen.getByText('Not this artist?'));
+
+      const originInput = screen.getByPlaceholderText('Country or region (required, e.g. Thailand)');
+      fireEvent.change(originInput, { target: { value: 'Germany' } });
+      fireEvent.click(screen.getByText('Apply'));
+
+      await waitFor(() => {
+        // Once escape hatch resolves with replacement uncached candidate, dynamic speed steps up to 'deep' (~3–5 minutes)
         expect(screen.getByTestId('curation-time-estimate')).toHaveTextContent('~3–5 minutes');
       });
     });

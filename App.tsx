@@ -4688,7 +4688,9 @@ const App: React.FC = () => {
           })();
         }
 
-        const isMultiSceneOverarching = (scenesRef.current || []).filter(s => s.graphData?.nodes?.length > 0).length >= 2;
+        const isMultiSceneOverarching = (scenesRef.current || []).filter(
+          s => (s.sceneId || s.id) !== activeSceneIdRef.current && (s.graphData?.nodes?.length ?? 0) > 0
+        ).length >= 1;
         const allSeedsTopologyCached = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isTopologyHit);
 
         const calculatedExpectedSpeed = classifyCurationSpeed({
@@ -7316,7 +7318,7 @@ const App: React.FC = () => {
       setSupportsLabelDeepCuts(data.supportsLabelDeepCuts === true || data.schemaVersion >= 2);
       if (incomingStatus === 'curating') {
         setIsLoading(true);
-        setExpectedCurationSpeed('deep');
+        setExpectedCurationSpeed((prev) => prev || 'deep');
       }
 
       // Always restore non-graph metadata (available in both new and legacy formats)
@@ -8585,7 +8587,7 @@ const App: React.FC = () => {
                   setActiveJobId(localProj.activeJobId || null);
                   if (localProj.status === 'curating') {
                     setIsLoading(true);
-                    setExpectedCurationSpeed('deep');
+                    setExpectedCurationSpeed((prev) => prev || 'deep');
                   } else {
                     setExpectedCurationSpeed(undefined);
                   }
