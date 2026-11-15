@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUrl, extractBlockArtistChips, buildGoogleImagesSearchUrl } from './DetailsPanel';
+import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUrl, extractBlockArtistChips, buildGoogleImagesSearchUrl, estimateEditorialBlockHeight, partitionBlockIndicesIntoThreeColumns, partitionBlocksIntoThreeColumns } from './DetailsPanel';
 import { streamNodeChat } from '../services/geminiService';
 
 vi.mock('react-markdown', () => ({
@@ -2088,6 +2088,162 @@ describe('DetailsPanel', () => {
                     expect(captionInput.value).toBe("Harm's Way — Live at Sound and Fury");
 
                     openSpy.mockRestore();
+                });
+            });
+
+            describe('Image-Weighted & End-Tapered 3-Column Balancing (partitionBlockIndicesIntoThreeColumns)', () => {
+                it('estimates editorial block visual line height accurately for prose, bullets, and 16:10 image slots', () => {
+                    const prose = "This is a single short sentence.";
+                    expect(estimateEditorialBlockHeight(prose, false)).toBe(1);
+                    expect(estimateEditorialBlockHeight(prose, true)).toBe(13.5);
+
+                    const longProse = "Hardcore punk used to be measured strictly in velocity, but somewhere along the line it shifted.";
+                    expect(estimateEditorialBlockHeight(longProse, false)).toBe(3);
+
+                    const bulletList = "- First item\n- Second item\n- Third item";
+                    expect(estimateEditorialBlockHeight(bulletList, false)).toBeCloseTo(5.4, 1);
+                });
+
+                it('deterministically selects [[0, 1, 2], [3, 4], [5, 6]] for Harm\'s Way (7 blocks, photos 0..5) enforcing H1 >= H2 >= H3 end-taper', () => {
+                    const harmsWayBlocks = [
+                        "Hardcore punk used to be measured strictly in velocity, but somewhere along the evolutionary timeline, it became an arms race of sheer, suffocating weight. Trace this mutation back to its uncompromising roots, and Chicago's Harm's Way stands as a monumental monolith of sonic brutality. Emerging from the underground with a vicious blend of powerviolence and beatdown, they systematically carved away excess speed to focus on crushing, mid-tempo hostility, laying a heavy foundation for the metallic renaissance to come.",
+                        "To understand this industrialization of heavy music, you have to map the surrounding architects of sonic violence. Nails provided the modern blueprint for outright hostility by utilizing HM-2 guitar distortion and blistering speed. Full of Hell took that extreme aggression and pushed it completely off the cliff, collapsing grindcore and death metal into terrifying walls of harsh noise.",
+                        "As the speed fractured, the scene began dragging itself through the mud. Xibalba and Jesus Piece weaponized low-end frequencies to pull cavernous death metal weight into mid-tempo beatdown grooves down to its rawest, most muscular essence. Meanwhile, Twitching Tongues completely disrupted the ecosystem by injecting theatrical doom metal crooning into the center of oppressive, slow-burn breakdowns.",
+                        "Simultaneously, a sect of bands began rewiring the genre with digital dread. Code Orange and Vein.fm ripped up the late-90s mathcore playbook, rebuilding it with synthetic noise, drum-and-bass breaks, and industrial glitching. Sanction mirrored this claustrophobia in the underground by offering a raw, unfiltered take on early 2000s panic-chord violence.",
+                        "Eventually, this subterranean pressure breached the mainstream. Knocked Loose dragged dissonant beatdowns to global festival stages without diluting a single drop of ferocity. Incendiary brought razor-sharp socio-political lyricism over classic 90s groove, while Gatecreeper supplied arena-ready death metal stomp. Preserving the foundational hardcore ethos through it all stood Terror, acting as the uncompromising heartbeat of the entire movement.",
+                        `None of this cross-pollination happened in a vacuum, as visionary record labels built the scaffolding for this extreme renaissance:
+
+- Closed Casket Activities curated the definitive aesthetic and sonic standard of the modern heavy underground.
+- Southern Lord bridged the gap between sludge, crust punk, and pure amplifier worship.
+- Pure Noise provided a massive launchpad for modern hardcore and alternative counterculture.
+- Metal Blade, Century Media, and Roadrunner laid the historical groundwork for extreme metal's eventual collision with hardcore.`,
+                        "Pull these threads together and you no longer just see a collection of bands playing heavy music. You uncover a living, breathing ecosystem where punk velocity, death metal weight, and electronic decay merge into an unstoppable, mechanized force."
+                    ];
+
+                    const harmsWayImages = [
+                        { url: "https://example.com/harms-way.jpg" },
+                        { url: "https://example.com/nails.jpg" },
+                        { url: "https://example.com/jesus-piece.jpg" },
+                        { url: "https://example.com/code-orange.jpg" },
+                        { url: "https://example.com/knocked-loose.jpg" },
+                        { url: "https://example.com/closed-casket.jpg" },
+                        null
+                    ];
+
+                    const partition = partitionBlockIndicesIntoThreeColumns(harmsWayBlocks, harmsWayImages);
+                    expect(partition).toEqual([[0, 1, 2], [3, 4], [5, 6]]);
+
+                    // Verify H1 >= H2 >= H3
+                    const heights = harmsWayBlocks.map((b, i) => estimateEditorialBlockHeight(b, Boolean(harmsWayImages[i]?.url)));
+                    const h1 = partition[0].reduce((sum, idx) => sum + heights[idx], 0);
+                    const h2 = partition[1].reduce((sum, idx) => sum + heights[idx], 0);
+                    const h3 = partition[2].reduce((sum, idx) => sum + heights[idx], 0);
+                    expect(h1).toBeGreaterThanOrEqual(h2);
+                    expect(h2).toBeGreaterThanOrEqual(h3);
+                });
+
+                it('deterministically selects [[0, 1], [2, 3], [4, 5]] for To Kill (6 blocks, photos 0, 1, 4) avoiding single-closing-paragraph underflow in Column 3', () => {
+                    const toKillBlocks = [
+                        "To Kill emerged from Rome's blistering straight edge hardcore lineage in the early 2000s, weaponizing heavy metallic breakdowns, fast European thrash tempo, and uncompromising ethical vegan straight edge lyricism. Their relentless tour ethic placed them at the crossroads of European and American hardcore.",
+                        "To map their sonic coordinates, look directly to Converge and Integrity. The chaotic dissonance of Salem, Massachusetts and the dark apocalyptic metallic terror of Cleveland provided the bedrock for modern metallic hardcore velocity and explosive live ferocity across continental Europe.",
+                        "Meanwhile, melodic hardcore counterweights like Shai Hulud expanded the vocabulary of emotive, intricate guitar counterpoints that influenced Rome's songwriting dynamics.",
+                        `European counterparts created a vibrant transatlantic touring network that amplified To Kill's international reach:
+
+- Arkangel defined the Belgian H8000 edge-metal fury that swept across mainland Europe.
+- Maroon brought punishing German metalcore grooves to shared festival stages.
+- Purified in Blood synthesized Norwegian metal velocity with unrelenting hardcore ethics.
+- Sunrise and Born From Pain solidified the Eastern European and Dutch connections.
+- Gather established deep DIY solidarity across underground activist communities.`,
+                        "Century Media and GSR Music recognized the explosive power of this European movement, signing flagship heavy artists and cementing the distribution pipeline between underground European venues and global festival stages.",
+                        "Decades later, the legacy of Rome straight edge endures as proof that urgent hardcore conviction and metallic weight can transcend regional scenes to inspire a global movement."
+                    ];
+
+                    const toKillImages = [
+                        { url: "https://example.com/to-kill.jpg" },
+                        { url: "https://example.com/converge.jpg" },
+                        null,
+                        null,
+                        { url: "https://example.com/century-media.jpg" },
+                        null
+                    ];
+
+                    const partition = partitionBlockIndicesIntoThreeColumns(toKillBlocks, toKillImages);
+                    expect(partition).toEqual([[0, 1], [2, 3], [4, 5]]);
+
+                    // Verify H1 >= H2 >= H3
+                    const heights = toKillBlocks.map((b, i) => estimateEditorialBlockHeight(b, Boolean(toKillImages[i]?.url)));
+                    const h1 = partition[0].reduce((sum, idx) => sum + heights[idx], 0);
+                    const h2 = partition[1].reduce((sum, idx) => sum + heights[idx], 0);
+                    const h3 = partition[2].reduce((sum, idx) => sum + heights[idx], 0);
+                    expect(h1).toBeGreaterThanOrEqual(h2);
+                    expect(h2).toBeGreaterThanOrEqual(h3);
+                });
+
+                it('preserves the V44 4-block standard structure [[0], [1], [2, 3]]', () => {
+                    const fourBlocks = ['Block 0', 'Block 1', 'Block 2', 'Block 3'];
+                    expect(partitionBlockIndicesIntoThreeColumns(fourBlocks)).toEqual([[0], [1], [2, 3]]);
+                });
+
+                it('balances equal un-illustrated text-only blocks cleanly across 3 columns', () => {
+                    const sixBlocks = Array(6).fill('A moderately sized editorial paragraph describing the evolution of the genre.');
+                    expect(partitionBlockIndicesIntoThreeColumns(sixBlocks)).toEqual([[0, 1], [2, 3], [4, 5]]);
+
+                    const fiveBlocks = Array(5).fill('A moderately sized editorial paragraph describing the evolution of the genre.');
+                    expect(partitionBlockIndicesIntoThreeColumns(fiveBlocks)).toEqual([[0, 1], [2, 3], [4]]);
+                });
+
+                it('maintains zero layout jump when toggling [ ✎ Edit ] / [ ✓ Done ] with curated images', () => {
+                    const harmsWayBlocks = [
+                        "Hardcore punk used to be measured strictly in velocity...",
+                        "To understand this industrialization of heavy music...",
+                        "As the speed fractured, the scene began dragging itself...",
+                        "Simultaneously, a sect of bands began rewiring the genre...",
+                        "Eventually, this subterranean pressure breached the mainstream...",
+                        "None of this cross-pollination happened in a vacuum...",
+                        "Pull these threads together and you uncover a living ecosystem."
+                    ];
+
+                    const curatedImages = [
+                        'https://example.com/harms-way.jpg',
+                        'https://example.com/nails.jpg',
+                        'https://example.com/jesus-piece.jpg',
+                        'https://example.com/code-orange.jpg',
+                        'https://example.com/knocked-loose.jpg',
+                        'https://example.com/closed-casket.jpg'
+                    ];
+
+                    render(
+                        <DetailsPanel
+                            {...baseProps({
+                                scenes: [{
+                                    id: 'scene-1',
+                                    sceneId: 'scene-1',
+                                    title: "Harm's Way",
+                                    synthesisRationale: harmsWayBlocks.join('\n\n'),
+                                    zineImages: curatedImages,
+                                }],
+                                overarchingRationale: undefined,
+                            })}
+                        />
+                    );
+
+                    // In reading mode with curated images:
+                    // Block 2 (Jesus Piece) must be in Column 1 along with Blocks 0 and 1
+                    const block2Reading = screen.getByTestId('zine-editorial-block-scene-1-2');
+                    const col0Reading = block2Reading.parentElement;
+                    expect(col0Reading).toHaveClass('flex-col');
+                    expect(screen.getByTestId('zine-editorial-block-scene-1-0').parentElement).toBe(col0Reading);
+                    expect(screen.getByTestId('zine-editorial-block-scene-1-1').parentElement).toBe(col0Reading);
+
+                    // Enter edit mode
+                    fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+                    expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveTextContent('Done');
+
+                    // In edit mode: Block 2 remains in Column 1 (zero layout jump)
+                    const block2Editing = screen.getByTestId('zine-editorial-block-scene-1-2');
+                    const col0Editing = block2Editing.parentElement;
+                    expect(screen.getByTestId('zine-editorial-block-scene-1-0').parentElement).toBe(col0Editing);
+                    expect(screen.getByTestId('zine-editorial-block-scene-1-1').parentElement).toBe(col0Editing);
                 });
             });
         });

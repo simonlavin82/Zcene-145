@@ -2186,12 +2186,30 @@ export const splitMarkdownIntoEditorialBlocks = (markdown: string): string[] => 
     return fused;
 };
 
-const isListHeavyEditorialBlock = (block: string): boolean => {
-    const lines = block.trim().split('\n');
-    return lines.some((line) => /^([-*•]|\d+\.)\s/.test(line.trim()));
+export const estimateEditorialBlockHeight = (block: string, hasImage?: boolean): number => {
+    if (!block && !hasImage) return 0;
+    const lines = (block || '').trim().split('\n');
+    let textLines = 0;
+    for (const rawLine of lines) {
+        const line = rawLine.trim();
+        if (!line) {
+            textLines += 1.0;
+            continue;
+        }
+        if (/^([-*•]|\d+\.)\s/.test(line)) {
+            const content = line.replace(/^([-*•]|\d+\.)\s+/, '');
+            textLines += Math.max(1, Math.ceil(content.length / 42)) + 0.8;
+        } else {
+            textLines += Math.max(1, Math.ceil(line.length / 45));
+        }
+    }
+    return textLines + (hasImage ? 12.5 : 0);
 };
 
-export const partitionBlockIndicesIntoThreeColumns = (blocks: string[]): [number[], number[], number[]] => {
+export const partitionBlockIndicesIntoThreeColumns = (
+    blocks: string[],
+    images?: (ZineEditorialImageEntry | null | undefined)[]
+): [number[], number[], number[]] => {
     if (blocks.length === 0) return [[], [], []];
     if (blocks.length === 1) return [[0], [], []];
     if (blocks.length === 2) return [[0], [1], []];
@@ -2204,30 +2222,64 @@ export const partitionBlockIndicesIntoThreeColumns = (blocks: string[]): [number
         return [[0], [1], [2, 3]];
     }
 
-    const indices = blocks.map((_, idx) => idx);
-    const lengths = blocks.map((b) => b.length);
+    const n = blocks.length;
+    const normalizedImages = normalizeZineImages(images);
+    const heights = blocks.map((b, idx) => {
+        const hasImage = Boolean(resolveZineImageSlot(normalizedImages?.[idx])?.url);
+        return estimateEditorialBlockHeight(b, hasImage);
+    });
+
     const prefix: number[] = [0];
-    for (let idx = 0; idx < lengths.length; idx++) {
-        prefix.push(prefix[idx] + lengths[idx]);
+    for (let k = 0; k < n; k++) {
+        prefix.push(prefix[k] + heights[k]);
     }
-    const total = prefix[lengths.length];
+    const total = prefix[n];
 
     let bestI = 1;
     let bestJ = 2;
     let bestScore = Infinity;
 
-    for (let i = 1; i < blocks.length - 1; i++) {
-        const col0 = prefix[i];
-        for (let j = i + 1; j < blocks.length; j++) {
-            const col1 = prefix[j] - prefix[i];
-            const col2 = total - prefix[j];
-            const spread = Math.max(col0, col1, col2) - Math.min(col0, col1, col2);
-            // Avoid merging Para 2 + Para 3 into Col 2 when Col 3 would start directly with a bullet list
-            const listAnchorPenalty =
-                j > 2 && !isListHeavyEditorialBlock(blocks[2]) && isListHeavyEditorialBlock(blocks[j])
-                    ? 2000
-                    : 0;
-            const score = spread + listAnchorPenalty;
+    for (let i = 1; i < n - 1; i++) {
+        const h1 = prefix[i];
+        for (let j = i + 1; j < n; j++) {
+            const h2 = prefix[j] - prefix[i];
+            const h3 = total - prefix[j];
+
+            // 1. Primary balance spread between Col 1 and Col 2
+            const spread12 = Math.abs(h1 - h2);
+
+            // 2. Precedence penalty: Col 1 should ideally lead Col 2 (mild penalty if h2 > h1)
+            const precedencePenalty = Math.max(0, h2 - h1) * 0.75;
+
+            // 3. Taper penalty: Col 3 should never dominate the spread (Col 3 <= min(h1, h2))
+            const min12 = Math.min(h1, h2);
+            const max12 = Math.max(h1, h2);
+            let taperPenalty = 0;
+            if (h3 > max12) {
+                taperPenalty = (h3 - max12) * 30.0 + (max12 - min12) * 8.0;
+            } else if (h3 > min12) {
+                taperPenalty = (h3 - min12) * 8.0;
+            }
+
+            // 4. Column 3 Underflow Penalty:
+            // Strongly penalizes leaving a single un-illustrated closing paragraph in Col 3 (j === n - 1 and h3 < 0.45 * min(h1, h2))
+            let underflowPenalty = 0;
+            if (j === n - 1) {
+                const underflowThreshold = 0.45 * min12;
+                underflowPenalty = Math.max(0, underflowThreshold - h3) * 15.0;
+            }
+
+            // 5. Mild overall balance and block-count regularization
+            const balanceReg = 0.05 * Math.abs((h1 + h2) / 2 - h3);
+            const count1 = i;
+            const count2 = j - i;
+            const count3 = n - j;
+            const targetCount = n / 3;
+            const blockCountDev = Math.abs(count1 - targetCount) + Math.abs(count2 - targetCount) + Math.abs(count3 - targetCount);
+            const blockCountPenalty = blockCountDev * 1.5;
+
+            const score = spread12 + precedencePenalty + taperPenalty + underflowPenalty + balanceReg + blockCountPenalty;
+
             if (score < bestScore) {
                 bestScore = score;
                 bestI = i;
@@ -2236,6 +2288,7 @@ export const partitionBlockIndicesIntoThreeColumns = (blocks: string[]): [number
         }
     }
 
+    const indices = blocks.map((_, idx) => idx);
     return [
         indices.slice(0, bestI),
         indices.slice(bestI, bestJ),
@@ -2243,8 +2296,11 @@ export const partitionBlockIndicesIntoThreeColumns = (blocks: string[]): [number
     ];
 };
 
-export const partitionBlocksIntoThreeColumns = (blocks: string[]): [string[], string[], string[]] => {
-    const [c0, c1, c2] = partitionBlockIndicesIntoThreeColumns(blocks);
+export const partitionBlocksIntoThreeColumns = (
+    blocks: string[],
+    images?: (ZineEditorialImageEntry | null | undefined)[]
+): [string[], string[], string[]] => {
+    const [c0, c1, c2] = partitionBlockIndicesIntoThreeColumns(blocks, images);
     return [
         c0.map((idx) => blocks[idx]),
         c1.map((idx) => blocks[idx]),
@@ -2973,7 +3029,7 @@ const ZineEditorialColumns: React.FC<ZineEditorialColumnsProps> = ({
         );
     }
 
-    const colIndexBuckets = partitionBlockIndicesIntoThreeColumns(blocks);
+    const colIndexBuckets = partitionBlockIndicesIntoThreeColumns(blocks, images);
 
     return (
         <div
