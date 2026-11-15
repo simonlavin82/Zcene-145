@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUrl, extractBlockArtistChips, buildGoogleImagesSearchUrl, estimateEditorialBlockHeight, partitionBlockIndicesIntoThreeColumns, partitionBlocksIntoThreeColumns } from './DetailsPanel';
+import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUrl, extractBlockArtistChips, buildGoogleImagesSearchUrl, estimateEditorialBlockHeight, partitionBlockIndicesIntoThreeColumns, partitionBlocksIntoThreeColumns, ZineEditorialHeading } from './DetailsPanel';
 import { streamNodeChat } from '../services/geminiService';
 
 vi.mock('react-markdown', () => ({
@@ -1879,6 +1879,110 @@ describe('DetailsPanel', () => {
             fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
             fireEvent.click(screen.getByTestId('zine-intro-remove-overarching'));
             expect(onUpdateZineIntro).toHaveBeenCalledWith('overarching', null);
+        });
+
+        it('renders default headlines in Reading/Guest Mode and allows owners to edit and reset them via ZineEditorialHeading', () => {
+            const onUpdateZineTitle = vi.fn();
+            const { rerender } = render(
+                <DetailsPanel
+                    {...baseProps({
+                        projectName: 'Dashboard Confessional + Rocking Horse Winner + American Football',
+                        onUpdateZineTitle,
+                    })}
+                />
+            );
+
+            // In Reading Mode, default headline renders without edit controls
+            const heading = screen.getByTestId('zine-heading-overarching');
+            expect(heading).toHaveTextContent('Dashboard Confessional + Rocking Horse Winner + American Football');
+            expect(screen.queryByTestId('zine-heading-edit-btn-overarching')).not.toBeInTheDocument();
+
+            // Owner enters Edit Mode
+            fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+            const editBtn = screen.getByTestId('zine-heading-edit-btn-overarching');
+            expect(editBtn).toBeInTheDocument();
+
+            // Click Edit Title: input should be pre-filled with default title (Guardrail 1)
+            fireEvent.click(editBtn);
+            const input = screen.getByTestId('zine-heading-input-overarching') as HTMLInputElement;
+            expect(input.value).toBe('Dashboard Confessional + Rocking Horse Winner + American Football');
+
+            // Change to custom editorial headline
+            fireEvent.change(input, {
+                target: { value: '90s Emo Crossover: From Midwest Math Rock to Bedroom Acoustics' },
+            });
+            fireEvent.click(screen.getByTestId('zine-heading-save-btn-overarching'));
+
+            expect(onUpdateZineTitle).toHaveBeenCalledWith(
+                'overarching',
+                '90s Emo Crossover: From Midwest Math Rock to Bedroom Acoustics'
+            );
+
+            // Re-render in Guest Mode with custom title set: renders custom title without edit chrome
+            rerender(
+                <DetailsPanel
+                    {...baseProps({
+                        isGuest: true,
+                        overarchingZineTitle: '90s Emo Crossover: From Midwest Math Rock to Bedroom Acoustics',
+                        onUpdateZineTitle,
+                    })}
+                />
+            );
+            expect(screen.getByTestId('zine-heading-overarching')).toHaveTextContent(
+                '90s Emo Crossover: From Midwest Math Rock to Bedroom Acoustics'
+            );
+            expect(screen.queryByTestId('zine-heading-edit-btn-overarching')).not.toBeInTheDocument();
+
+            // Re-enter Edit Mode as owner and click Reset
+            rerender(
+                <DetailsPanel
+                    {...baseProps({
+                        isGuest: false,
+                        overarchingZineTitle: '90s Emo Crossover: From Midwest Math Rock to Bedroom Acoustics',
+                        onUpdateZineTitle,
+                    })}
+                />
+            );
+            fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+            fireEvent.click(screen.getByTestId('zine-heading-quick-reset-overarching'));
+            expect(onUpdateZineTitle).toHaveBeenCalledWith('overarching', null);
+        });
+
+        it('supports customizable Scene H2 chapter headings and single-scene H1 fallback', () => {
+            const onUpdateZineTitle = vi.fn();
+            const mockScene = {
+                id: 'scene-1',
+                sceneId: 'scene-1',
+                sceneIndex: 0,
+                title: 'American Football',
+                name: 'American Football',
+                seedArtists: 'American Football',
+                seedIds: ['american-football'],
+                discoveryFilters: {},
+                graphData: {
+                    nodes: [{ id: 'scene-1::american-football', label: 'American Football', type: 'artist' as const, isSeed: true }],
+                    links: [],
+                    synthesisRationale: 'American Football defined midwest emo.'
+                },
+                synthesisRationale: 'American Football defined midwest emo.',
+                zineTitle: 'Midwest Emo Foundational Blueprint',
+                centerOffset: { x: 1000, y: 1000 },
+                status: 'completed' as const,
+                updatedAt: Date.now(),
+            };
+
+            // Single-scene mode (scenes.length === 1)
+            render(
+                <DetailsPanel
+                    {...baseProps({
+                        scenes: [mockScene],
+                        onUpdateZineTitle,
+                    })}
+                />
+            );
+
+            // Single-scene H1 reads from scenes[0]?.zineTitle
+            expect(screen.getByTestId('zine-heading-scene-1')).toHaveTextContent('Midwest Emo Foundational Blueprint');
         });
 
         describe('Zine Editorial Image Curation Assistant (Block-Aware Search Chips & Contextual Indicator Badge)', () => {

@@ -142,10 +142,12 @@ interface GraphPageProps {
   onRemoveScene?: (sceneId: string) => void;
   onRenameScene?: (sceneId: string, customName: string) => void;
   overarchingRationale?: string;
+  overarchingZineTitle?: string;
   overarchingZineIntro?: string;
   overarchingZineImages?: ZineEditorialImageEntry[];
   onUpdateZineImages?: (target: 'overarching' | string, slotIndex: number, entry: ZineEditorialImageEntry) => void;
   onSwapZineImages?: (target: 'overarching' | string, indexA: number, indexB: number) => void;
+  onUpdateZineTitle?: (target: 'overarching' | string, title: string | null) => void;
   onUpdateZineIntro?: (target: 'overarching' | string, intro: string | null) => void;
   crossSceneLinks?: CrossSceneLink[];
   isPassiveSelection?: boolean;
@@ -1204,10 +1206,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onRemoveScene,
   onRenameScene,
   overarchingRationale,
+  overarchingZineTitle,
   overarchingZineIntro,
   overarchingZineImages,
   onUpdateZineImages,
   onSwapZineImages,
+  onUpdateZineTitle,
   onUpdateZineIntro,
   crossSceneLinks,
   isPassiveSelection = false,
@@ -2797,10 +2801,12 @@ const GraphPage: React.FC<GraphPageProps> = ({
           scenes={scenes}
           activeSceneId={activeSceneId}
           overarchingRationale={overarchingRationale}
+          overarchingZineTitle={overarchingZineTitle}
           overarchingZineIntro={overarchingZineIntro}
           overarchingZineImages={overarchingZineImages}
           onUpdateZineImages={onUpdateZineImages}
           onSwapZineImages={onSwapZineImages}
+          onUpdateZineTitle={onUpdateZineTitle}
           onUpdateZineIntro={onUpdateZineIntro}
           activeDeepWebSession={effectiveDeepWebSession}
           onUpdateDeepWebSession={setDeepWebSession}

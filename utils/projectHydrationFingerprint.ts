@@ -105,16 +105,20 @@ export const computeProjectHydrationFingerprint = (
       ].join(';');
   const rawOverarchingImages = normalizeZineImagesForSnapshot(data.overarchingZineImages);
   const hasOverarchingImages = rawOverarchingImages.length > 0;
+  const normalizedOverarchingTitle =
+    typeof data.overarchingZineTitle === 'string' ? data.overarchingZineTitle.trim() : '';
   const normalizedOverarchingIntro =
     typeof data.overarchingZineIntro === 'string' ? data.overarchingZineIntro.trim() : '';
   const multiSceneSig =
-    data.overarchingRationale || data.scenes || data.crossSceneLinks || hasOverarchingImages || normalizedOverarchingIntro
+    data.overarchingRationale || data.scenes || data.crossSceneLinks || hasOverarchingImages || normalizedOverarchingTitle || normalizedOverarchingIntro
       ? fnv1aHash(
           `${String(data.overarchingRationale ?? '')}|${
             typeof data.scenes === 'string' ? data.scenes : JSON.stringify(data.scenes ?? '')
           }|${
             typeof data.crossSceneLinks === 'string' ? data.crossSceneLinks : JSON.stringify(data.crossSceneLinks ?? '')
           }${hasOverarchingImages ? `|${JSON.stringify(rawOverarchingImages)}` : ''}${
+            normalizedOverarchingTitle ? `|${normalizedOverarchingTitle}` : ''
+          }${
             normalizedOverarchingIntro ? `|${normalizedOverarchingIntro}` : ''
           }`
         )
@@ -156,6 +160,8 @@ export const computeAutosaveDocSnapshot = (data: any): string => {
     : [];
   const seedImageUrls = rawSeedImageUrls.some(Boolean) ? rawSeedImageUrls : [];
   const overarchingZineImages = normalizeZineImagesForSnapshot(data.overarchingZineImages);
+  const overarchingZineTitle =
+    typeof data.overarchingZineTitle === 'string' ? data.overarchingZineTitle.trim() : '';
   const overarchingZineIntro =
     typeof data.overarchingZineIntro === 'string' ? data.overarchingZineIntro.trim() : '';
 
@@ -166,6 +172,7 @@ export const computeAutosaveDocSnapshot = (data: any): string => {
     seedImageUrls,
     scenes: normalizeJson(data.scenes, '[]'),
     overarchingRationale: data.overarchingRationale || '',
+    overarchingZineTitle,
     overarchingZineIntro,
     overarchingZineImages,
     crossSceneLinks: normalizeJson(data.crossSceneLinks, '[]'),

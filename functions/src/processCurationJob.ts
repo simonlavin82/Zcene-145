@@ -2349,6 +2349,7 @@ export const processCurationJob = onDocumentCreated({
           curatedDiscoveryFilters: inputPayload.filters || {},
           graphData: finalGraph,
           synthesisRationale: finalGraph.synthesisRationale || rootBreakdownStr || "",
+          ...(prevTargetScene?.zineTitle ? { zineTitle: prevTargetScene.zineTitle } : {}),
           ...(prevTargetScene?.zineIntro ? { zineIntro: prevTargetScene.zineIntro } : {}),
           ...(prevTargetScene?.zineImages ? { zineImages: prevTargetScene.zineImages } : {}),
           artistSnippets: sceneArtistSnippetsMap,

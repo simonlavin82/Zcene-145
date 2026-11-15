@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { createPortal } from 'react-dom';
 import Markdown from 'react-markdown';
 import { Node, NodeDetails, GraphData, View, ChatMessage, StackItem, UserTaste, TasteProfile, ProjectScene, ZineEditorialImageEntry, ZineImageSlot, COST_PER_AI_CALL } from '../types';
-import { stripSceneNamespace, toSeedArtistsArray, normalizeCanonicalEntityId, resolveZineImageSlot, serializeZineImageEntry, validateZineImageUrl, normalizeZineImages, normalizeZineIntro, formatZineSceneBadgeLabel, MAX_ZINE_IMAGE_SLOTS } from '../shared/multiSceneUtils';
+import { stripSceneNamespace, toSeedArtistsArray, normalizeCanonicalEntityId, resolveZineImageSlot, serializeZineImageEntry, validateZineImageUrl, normalizeZineImages, normalizeZineIntro, normalizeZineTitle, formatZineSceneBadgeLabel, MAX_ZINE_IMAGE_SLOTS } from '../shared/multiSceneUtils';
 import { streamNodeChat, streamLocalHeuristicChat, fetchNodeDetails } from '../services/geminiService';
 import { normalizeArtistId, normalizeLabelId, titleCaseArtistId, cleanArtistDisplayName, cleanLabelDisplayName, isNodeInSeedList, getArtistDocWithRedirect, enforceArtistCacheSchema, isArtistIdMatch, stripCountrySlug } from '../services/artistCacheService';
 import { analyticsService } from '../services/analyticsService';
@@ -2340,6 +2340,207 @@ const useZineViewportTier = (isSmallScreen: boolean): ZineViewportTier => {
     return tier;
 };
 
+interface ZineEditorialHeadingProps {
+    level: 'h1' | 'h2';
+    sectionKey: 'overarching' | string;
+    customTitle?: string;
+    defaultTitle: string;
+    isEditingZine: boolean;
+    onSaveTitle?: (title: string | null) => void;
+}
+
+export const ZineEditorialHeading: React.FC<ZineEditorialHeadingProps> = ({
+    level,
+    sectionKey,
+    customTitle,
+    defaultTitle,
+    isEditingZine,
+    onSaveTitle,
+}) => {
+    const cleanCustom = normalizeZineTitle(customTitle) || '';
+    const displayTitle = cleanCustom || defaultTitle;
+    const [isEditorOpen, setIsEditorOpen] = useState(false);
+    const [draftTitle, setDraftTitle] = useState(cleanCustom || defaultTitle);
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        if (!isEditingZine) {
+            setIsEditorOpen(false);
+        }
+    }, [isEditingZine]);
+
+    useEffect(() => {
+        setDraftTitle(cleanCustom || defaultTitle);
+    }, [cleanCustom, defaultTitle]);
+
+    const handleOpenEdit = () => {
+        setDraftTitle(cleanCustom || defaultTitle);
+        setIsEditorOpen(true);
+        setTimeout(() => {
+            if (inputRef.current) {
+                inputRef.current.focus();
+                inputRef.current.select();
+            }
+        }, 10);
+    };
+
+    const handleReset = () => {
+        setIsEditorOpen(false);
+        setDraftTitle(defaultTitle);
+        onSaveTitle?.(null);
+    };
+
+    const handleSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        const normalized = normalizeZineTitle(draftTitle);
+        setIsEditorOpen(false);
+        if (!normalized || normalized === defaultTitle) {
+            onSaveTitle?.(null);
+        } else {
+            onSaveTitle?.(normalized);
+        }
+    };
+
+    const headingClasses = level === 'h1'
+        ? "text-4xl lg:text-7xl font-bold tracking-tighter text-white mb-6 lg:mb-8 leading-tight"
+        : "text-3xl lg:text-5xl font-bold tracking-tight text-white mb-5 lg:mb-6 leading-tight";
+
+    // Reading Mode or Guest Mode
+    if (!isEditingZine || !onSaveTitle) {
+        if (level === 'h1') {
+            return (
+                <h1
+                    data-testid={`zine-heading-${sectionKey}`}
+                    className={headingClasses}
+                    style={{ wordBreak: 'break-word' }}
+                >
+                    {displayTitle}
+                </h1>
+            );
+        }
+        return (
+            <h2
+                data-testid={`zine-heading-${sectionKey}`}
+                className={headingClasses}
+                style={{ wordBreak: 'break-word' }}
+            >
+                {displayTitle}
+            </h2>
+        );
+    }
+
+    if (isEditorOpen) {
+        return (
+            <form
+                onSubmit={handleSubmit}
+                data-testid={`zine-heading-form-${sectionKey}`}
+                className="mb-8 rounded-xl border border-zinc-700/80 bg-zinc-900/90 p-4 max-w-3xl space-y-3"
+            >
+                <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
+                        {level === 'h1' ? "Editorial Headline (H1)" : "Scene Chapter Title (H2)"}
+                    </span>
+                    <span className="text-[10px] font-mono text-zinc-500">
+                        {draftTitle.length}/120
+                    </span>
+                </div>
+                <input
+                    ref={inputRef}
+                    autoFocus
+                    type="text"
+                    maxLength={120}
+                    data-testid={`zine-heading-input-${sectionKey}`}
+                    placeholder={`Default: ${defaultTitle}`}
+                    value={draftTitle}
+                    onChange={(e) => setDraftTitle(e.target.value)}
+                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 text-white font-bold text-lg lg:text-2xl p-3 placeholder:text-zinc-600 focus:ring-1 focus:ring-primary focus:outline-none"
+                />
+                <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
+                    <span className="text-[11px] text-zinc-500">
+                        Default: <strong className="text-zinc-400">{defaultTitle}</strong>
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <button
+                            type="button"
+                            onClick={() => {
+                                setIsEditorOpen(false);
+                                setDraftTitle(cleanCustom || defaultTitle);
+                            }}
+                            className="px-3 py-1.5 rounded-lg text-xs font-medium text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                        >
+                            Cancel
+                        </button>
+                        {cleanCustom && (
+                            <button
+                                type="button"
+                                data-testid={`zine-heading-reset-btn-${sectionKey}`}
+                                onClick={handleReset}
+                                className="px-3 py-1.5 rounded-lg text-xs font-medium text-amber-300 hover:text-amber-200 border border-amber-500/30 hover:border-amber-500/60 bg-amber-500/10 transition-colors cursor-pointer"
+                            >
+                                Reset to Default
+                            </button>
+                        )}
+                        <button
+                            type="submit"
+                            data-testid={`zine-heading-save-btn-${sectionKey}`}
+                            className="px-4 py-1.5 rounded-lg text-xs font-medium bg-white text-zinc-950 hover:bg-zinc-200 transition-colors cursor-pointer font-semibold"
+                        >
+                            Save Headline
+                        </button>
+                    </div>
+                </div>
+            </form>
+        );
+    }
+
+    // Edit Mode, Resting State: Heading + Edit/Reset buttons
+    return (
+        <div className="group mb-6 lg:mb-8" data-testid={`zine-heading-container-${sectionKey}`}>
+            <div className="flex items-baseline flex-wrap gap-3">
+                {level === 'h1' ? (
+                    <h1
+                        data-testid={`zine-heading-${sectionKey}`}
+                        className={`${headingClasses} !mb-0`}
+                        style={{ wordBreak: 'break-word' }}
+                    >
+                        {displayTitle}
+                    </h1>
+                ) : (
+                    <h2
+                        data-testid={`zine-heading-${sectionKey}`}
+                        className={`${headingClasses} !mb-0`}
+                        style={{ wordBreak: 'break-word' }}
+                    >
+                        {displayTitle}
+                    </h2>
+                )}
+                <div className="inline-flex items-center gap-2 mb-2">
+                    <button
+                        type="button"
+                        data-testid={`zine-heading-edit-btn-${sectionKey}`}
+                        onClick={handleOpenEdit}
+                        className="rounded-xl border border-zinc-700/80 bg-zinc-900/80 hover:bg-zinc-800 hover:border-primary/60 transition-colors px-2.5 py-1 text-xs font-medium text-zinc-300 hover:text-white inline-flex items-center gap-1 cursor-pointer"
+                    >
+                        <span className="material-symbols-outlined !text-[14px]">edit</span>
+                        <span>Edit Title</span>
+                    </button>
+                    {cleanCustom && (
+                        <button
+                            type="button"
+                            data-testid={`zine-heading-quick-reset-${sectionKey}`}
+                            onClick={handleReset}
+                            title="Reset to default title"
+                            className="text-xs text-zinc-500 hover:text-amber-400 transition-colors cursor-pointer px-1 py-1"
+                        >
+                            Reset
+                        </button>
+                    )}
+                </div>
+            </div>
+        </div>
+    );
+};
+
 interface ZineIntroNoteProps {
     sectionKey: string;
     intro?: string;
@@ -3104,10 +3305,12 @@ interface DetailsPanelProps {
     scenes?: ProjectScene[];
     activeSceneId?: string;
     overarchingRationale?: string;
+    overarchingZineTitle?: string;
     overarchingZineIntro?: string;
     overarchingZineImages?: ZineEditorialImageEntry[];
     onUpdateZineImages?: (target: 'overarching' | string, slotIndex: number, entry: ZineEditorialImageEntry) => void;
     onSwapZineImages?: (target: 'overarching' | string, indexA: number, indexB: number) => void;
+    onUpdateZineTitle?: (target: 'overarching' | string, title: string | null) => void;
     onUpdateZineIntro?: (target: 'overarching' | string, intro: string | null) => void;
 }
 
@@ -3120,7 +3323,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     onUpdateTasteProfile, onShowToast, onOpenTasteModal, projectName, onStashArtist, onOpenStackDrawer,
     activeDeepWebSession, onUpdateDeepWebSession, isStaticMockup = false,
     scenes = [], activeSceneId, overarchingRationale,
-    overarchingZineIntro, overarchingZineImages, onUpdateZineImages, onSwapZineImages, onUpdateZineIntro
+    overarchingZineTitle, overarchingZineIntro, overarchingZineImages, onUpdateZineImages, onSwapZineImages, onUpdateZineTitle, onUpdateZineIntro
 }) => {
     const [viewedIndex, setViewedIndex] = useState(0);
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
@@ -4138,9 +4341,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             DEEP CUTS: {deepCutsCount}
                                         </span>
                                     </div>
-                                    <h1 className="text-4xl lg:text-7xl font-bold tracking-tighter text-white mb-6 lg:mb-8 leading-tight" style={{ wordBreak: 'break-word' }}>
-                                        {projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(' / ') : 'Zine')}
-                                    </h1>
+                                    <ZineEditorialHeading
+                                        level="h1"
+                                        sectionKey="overarching"
+                                        customTitle={overarchingZineTitle}
+                                        defaultTitle={projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(' / ') : 'Zine')}
+                                        isEditingZine={isEditingZine}
+                                        onSaveTitle={onUpdateZineTitle ? (nextTitle) => onUpdateZineTitle('overarching', nextTitle) : undefined}
+                                    />
                                     <ZineIntroNote
                                         sectionKey="overarching"
                                         intro={overarchingZineIntro}
@@ -4203,9 +4411,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                         </span>
                                                     )}
                                                 </div>
-                                                <h2 className="text-3xl lg:text-5xl font-bold tracking-tight text-white mb-5 lg:mb-6 leading-tight" style={{ wordBreak: 'break-word' }}>
-                                                    {sceneSeeds.length > 0 ? sceneSeeds.join(' + ') : (cleanArtistDisplayName(scene.title || scene.name, scene.graphData?.nodes) || `Scene ${idx + 1}`)}
-                                                </h2>
+                                                <ZineEditorialHeading
+                                                    level="h2"
+                                                    sectionKey={sceneKey}
+                                                    customTitle={scene.zineTitle}
+                                                    defaultTitle={sceneSeeds.length > 0 ? sceneSeeds.join(' + ') : (cleanArtistDisplayName(scene.title || scene.name, scene.graphData?.nodes) || `Scene ${idx + 1}`)}
+                                                    isEditingZine={isEditingZine}
+                                                    onSaveTitle={onUpdateZineTitle ? (nextTitle) => onUpdateZineTitle(sceneKey, nextTitle) : undefined}
+                                                />
                                                 <ZineIntroNote
                                                     sectionKey={sceneKey}
                                                     intro={scene.zineIntro}
@@ -4253,9 +4466,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         DEEP CUTS: {deepCutsCount}
                                     </span>
                                 </div>
-                                <h1 className="text-4xl lg:text-7xl font-bold tracking-tighter text-white mb-6 lg:mb-8 leading-tight" style={{ wordBreak: 'break-word' }}>
-                                    {projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(' / ') : 'Zine')}
-                                </h1>
+                                <ZineEditorialHeading
+                                    level="h1"
+                                    sectionKey={scenes[0]?.sceneId || scenes[0]?.id || 'scene-1'}
+                                    customTitle={scenes[0]?.zineTitle || overarchingZineTitle}
+                                    defaultTitle={projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(' / ') : 'Zine')}
+                                    isEditingZine={isEditingZine}
+                                    onSaveTitle={onUpdateZineTitle ? (nextTitle) => onUpdateZineTitle(scenes[0]?.sceneId || scenes[0]?.id || 'overarching', nextTitle) : undefined}
+                                />
                                 <ZineIntroNote
                                     sectionKey={scenes[0]?.sceneId || scenes[0]?.id || 'scene-1'}
                                     intro={scenes[0]?.zineIntro}

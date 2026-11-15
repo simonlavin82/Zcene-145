@@ -161,6 +161,7 @@ export interface ProjectScene {
   curatedDiscoveryFilters?: DiscoveryFilters; // Frozen baseline filters used to curate this scene
   graphData: GraphData;               // Un-namespaced canonical scene topology
   synthesisRationale: string;         // Scene-specific Zine editorial markdown
+  zineTitle?: string;                 // Optional owner-curated custom editorial headline for this Scene in Zine view (defaults to scene seeds)
   zineIntro?: string;                 // Optional owner-curated intro / dedication note for this Scene's Zine editorial
   zineImages?: ZineEditorialImages;   // Optional up to MAX_ZINE_IMAGE_SLOTS (8) per-block Zine editorial image slots (url | { url, caption })
   artistSnippets?: Record<string, string>; // Scene-specific 1-sentence epicenter hooks keyed by canonical ID
@@ -258,6 +259,7 @@ export interface Project {
   scenes?: string | ProjectScene[] | null;         // V43 Authoritative Multi-Scene array (JSON or parsed)
   activeSceneId?: string;                          // Currently focused Scene in ROOTS panel (e.g. 'scene-1')
   overarchingRationale?: string | null;            // Master Overarching Zine Editorial (when scenes.length >= 2)
+  overarchingZineTitle?: string | null;            // Optional owner-curated custom H1 editorial headline for Overarching Zine (defaults to project.name)
   overarchingZineIntro?: string | null;            // Optional owner-curated intro / dedication note below H1 Zine title
   overarchingZineImages?: ZineEditorialImages;     // Optional up to MAX_ZINE_IMAGE_SLOTS (8) per-block image slots for Overarching Zine editorial
   crossSceneLinks?: string | CrossSceneLink[] | null; // Deterministic identity + AI sonic_lineage cross-scene bridges

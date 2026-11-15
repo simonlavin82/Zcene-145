@@ -4754,7 +4754,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">State & Layout</p>
-                                        <p className="text-sm text-zinc-300">Fixed overlay at z-[1000]; Per-Block 3/2/1 Flex-Column Engine (3 balanced desktop cols, 2 even/odd tablet cols, 1 sequential mobile col), `ZineIntroNote`, optional image captions, Block-Aware Google Images search chips (`udm=2`) with Block 1 Root Artist anchor, and per-scene metadata pill pairing (`SCENE N` un-renamed / `SCENE: &lt;CUSTOM_NAME&gt;` renamed alongside `ROOTS: &lt;SEEDS&gt;`).</p>
+                                        <p className="text-sm text-zinc-300">Fixed overlay at z-[1000]; Per-Block 3/2/1 Flex-Column Engine (3 balanced desktop cols, 2 even/odd tablet cols, 1 sequential mobile col), customizable editorial headlines (`overarchingZineTitle` H1 &amp; `scene.zineTitle` H1/H2 with 1-click `[ ✎ Edit Title ]` &amp; reset to default), `ZineIntroNote`, optional image captions, Block-Aware Google Images search chips (`udm=2`) with Block 1 Root Artist anchor, and per-scene metadata pill pairing (`SCENE N` un-renamed / `SCENE: &lt;CUSTOM_NAME&gt;` renamed alongside `ROOTS: &lt;SEEDS&gt;`).</p>
                                     </div>
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Logic & Resilience</p>

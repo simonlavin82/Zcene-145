@@ -389,6 +389,17 @@ export function normalizeZineImages(
 }
 
 /**
+ * Normalizes an optional custom Zine editorial headline.
+ * Collapses whitespace/newlines, trims, limits to 120 characters,
+ * and returns undefined when empty so unedited Zines incur zero storage overhead.
+ */
+export function normalizeZineTitle(raw: unknown): string | undefined {
+  if (typeof raw !== 'string') return undefined;
+  const cleaned = raw.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 120);
+  return cleaned.length > 0 ? cleaned : undefined;
+}
+
+/**
  * Normalizes an optional Zine Curator's Note / Intro dedication paragraph.
  * Returns undefined when empty so unedited Zines incur zero overhead.
  */
@@ -571,6 +582,7 @@ export function normalizeProjectScene(
     }
   }
 
+  const normalizedZineTitle = normalizeZineTitle((s as any).zineTitle);
   const normalizedZineIntro = normalizeZineIntro((s as any).zineIntro);
   const normalizedZineImages = normalizeZineImages((s as any).zineImages);
 
@@ -592,6 +604,7 @@ export function normalizeProjectScene(
     curatedDiscoveryFilters,
     graphData,
     synthesisRationale: s.synthesisRationale || graphData.synthesisRationale || '',
+    ...(normalizedZineTitle ? { zineTitle: normalizedZineTitle } : {}),
     ...(normalizedZineIntro ? { zineIntro: normalizedZineIntro } : {}),
     ...(normalizedZineImages ? { zineImages: normalizedZineImages } : {}),
     artistSnippets: s.artistSnippets && typeof s.artistSnippets === 'object' ? s.artistSnippets : {},

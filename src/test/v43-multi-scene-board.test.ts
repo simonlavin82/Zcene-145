@@ -35,6 +35,7 @@ import {
   serializeZineImageEntry,
   normalizeZineImages,
   normalizeZineIntro,
+  normalizeZineTitle,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId, normalizeGraphData, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
 import { TOKEN_PRICING } from '../../shared/tokenEconomy';
@@ -3385,11 +3386,17 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(normalizeZineIntro('  Line 1\r\n\r\n\r\nLine 2  ')).toBe('Line 1\n\nLine 2');
       expect(normalizeZineIntro('x'.repeat(700))?.length).toBe(600);
 
+      expect(normalizeZineTitle(undefined)).toBeUndefined();
+      expect(normalizeZineTitle('   \n\t   ')).toBeUndefined();
+      expect(normalizeZineTitle('  90s Emo \r\n Crossover: \t From Midwest  ')).toBe('90s Emo Crossover: From Midwest');
+      expect(normalizeZineTitle('x'.repeat(150))?.length).toBe(120);
+
       const baseScene = normalizeProjectScene(
         {
           id: 'scene-1',
           sceneId: 'scene-1',
           seedArtists: 'American Football',
+          zineTitle: '   \n\t ',
           zineIntro: '   \n ',
           zineImages: ['https://i.scdn.co/image/col1.jpg', null, null],
           graphData: {
@@ -3400,8 +3407,15 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         },
         0
       );
+      expect(baseScene.zineTitle).toBeUndefined();
       expect(baseScene.zineIntro).toBeUndefined();
       expect(baseScene.zineImages).toEqual(['https://i.scdn.co/image/col1.jpg']);
+
+      const sceneWithTitle = normalizeProjectScene({
+        ...baseScene,
+        zineTitle: 'Midwest Emo Pioneer Blueprint',
+      }, 0);
+      expect(sceneWithTitle.zineTitle).toBe('Midwest Emo Pioneer Blueprint');
 
       const snapPlain = computeAutosaveDocSnapshot({
         name: 'American Football',
