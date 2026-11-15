@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ConsolidatedValidationModal, PreFlightSeed, TokenConfirmationDialog } from '../components/SharedModals';
 import { LoadingSpinner } from '../components/Icons';
+import GraphPage from '../components/GraphPage';
 import { classifyCurationSpeed } from '../services/cacheQualification';
 import { httpsCallable } from 'firebase/functions';
 
@@ -11,9 +12,53 @@ vi.mock('firebase/functions', () => ({
   getFunctions: vi.fn(),
 }));
 
+vi.mock('firebase/firestore', async (importOriginal) => {
+  const actual: any = await importOriginal();
+  return {
+    ...actual,
+    collection: vi.fn((_db, ...segments) => ({ path: segments.join('/') })),
+    doc: vi.fn((_db, ...segments) => ({ path: segments.join('/') })),
+    getDocs: vi.fn(async () => ({ empty: true, docs: [] })),
+    getDoc: vi.fn(async () => ({ exists: () => false, data: () => null })),
+    setDoc: vi.fn(),
+    updateDoc: vi.fn(),
+    serverTimestamp: vi.fn(),
+    increment: vi.fn(),
+    query: vi.fn((ref) => ref),
+    where: vi.fn(),
+    limit: vi.fn(),
+    documentId: vi.fn(() => '__name__'),
+  };
+});
+
+vi.mock('../services/firebaseConfig', () => ({
+  functions: {},
+  db: {},
+  auth: {},
+}));
+
 describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and Mobile Loader Padding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    Object.defineProperty(window, 'matchMedia', {
+      writable: true,
+      value: vi.fn().mockImplementation((query) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+        dispatchEvent: vi.fn(),
+      })),
+    });
+
+    global.ResizeObserver = class {
+      observe() {}
+      unobserve() {}
+      disconnect() {}
+    } as any;
   });
 
   describe('1. [Rule 34] CACHE HIT Badge Visibility Guard (<ConsolidatedValidationModal>)', () => {
@@ -374,6 +419,157 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
     it('defaults to realistic 3–5 minute copy in LoadingSpinner', () => {
       render(<LoadingSpinner />);
       expect(screen.getByText('Mapping your Zcene connections... This usually takes 3–5 minutes to find the best musical paths.')).toBeInTheDocument();
+    });
+  });
+
+  describe('5. Active Loader Subtext Priority & Plain-English Copy (<GraphPage>)', () => {
+    const baseGraphPageProps: any = {
+      data: { nodes: [], links: [] },
+      baseGraph: null,
+      libraryArtists: [],
+      seedArtists: 'Sense Field',
+      onRegenerate: vi.fn(),
+      isLoading: false,
+      isHydrating: true,
+      onCancelGeneration: vi.fn(),
+      onFileUpload: vi.fn(),
+      onNodeClick: vi.fn(),
+      selectedNode: null,
+      peekedNode: null,
+      activeNodes: [],
+      detailsCache: new Map(),
+      onUpdateDetailsCache: vi.fn(),
+      loadingNodeIds: new Set(),
+      onTogglePinNode: vi.fn(),
+      pinnedNodes: new Set(),
+      onRefreshNode: vi.fn(),
+      detailsError: null,
+      systemError: null,
+      onLogoClick: vi.fn(),
+      onNavigate: vi.fn(),
+      onClearLibrary: vi.fn(),
+      onClearZcene: vi.fn(),
+      isActive: true,
+      chatHistories: new Map(),
+      onUpdateChatHistories: vi.fn(),
+      onShowToast: vi.fn(),
+      onRefreshUI: vi.fn(),
+      onAddToStack: vi.fn(),
+      stackCount: 0,
+      lastViewedStackCount: 0,
+      onUpdateLastViewedStackCount: vi.fn(),
+      discoveryFilters: {
+        minYear: 1965,
+        maxYear: 2026,
+        originCountries: [],
+        originMode: 'include',
+        genres: [],
+        labels: [],
+      },
+      onUpdateDiscoveryFilters: vi.fn(),
+      isMagazineViewOpen: false,
+      onUpdateIsMagazineViewOpen: vi.fn(),
+      user: null,
+      profile: null,
+      onUpdateProfile: vi.fn(),
+      isAuthInitialized: true,
+      onLogin: vi.fn(),
+      onLogout: vi.fn(),
+      isProfileOpen: false,
+      setIsProfileOpen: vi.fn(),
+      isDeleteAccountModalOpen: false,
+      setIsDeleteAccountModalOpen: vi.fn(),
+      isStackDialogOpen: false,
+      setIsStackDialogOpen: vi.fn(),
+      isMenuOpen: false,
+      setIsMenuOpen: vi.fn(),
+      scenes: [
+        {
+          sceneId: 'scene-1',
+          title: 'Scene 1',
+          customName: 'Scene 1',
+          seedArtists: ['Sense Field'],
+          graphData: { nodes: [], links: [] },
+        }
+      ],
+      activeSceneId: 'scene-1',
+      onSelectScene: vi.fn(),
+      onAddScene: vi.fn(),
+    };
+
+    it('displays 3–5 minutes copy and never 1–2 minutes or "curatorial dataset" when isHydrating={true} + expectedCurationSpeed="deep" + projectStatus="curating"', () => {
+      render(
+        <GraphPage
+          {...baseGraphPageProps}
+          isHydrating={true}
+          expectedCurationSpeed="deep"
+          projectStatus="curating"
+        />
+      );
+
+      expect(screen.getByText('Mapping your Zcene connections... This usually takes 3–5 minutes to find the best musical paths.')).toBeInTheDocument();
+      expect(screen.queryByText(/1–2 minutes/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/curatorial dataset/i)).not.toBeInTheDocument();
+    });
+
+    it('displays "Loading connections... Ready in a few seconds." and never "cached" or "3–5 minutes" when isHydrating={true} + expectedCurationSpeed="instant" + projectStatus="curating"', () => {
+      render(
+        <GraphPage
+          {...baseGraphPageProps}
+          isHydrating={true}
+          expectedCurationSpeed="instant"
+          projectStatus="curating"
+        />
+      );
+
+      expect(screen.getByText('Loading connections... Ready in a few seconds.')).toBeInTheDocument();
+      expect(screen.queryByText(/cached/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/3–5 minutes/i)).not.toBeInTheDocument();
+    });
+
+    it('displays "Loading connections... Ready in 1–2 minutes." and never "curatorial dataset" when isHydrating={true} + expectedCurationSpeed="partial" + projectStatus="curating"', () => {
+      render(
+        <GraphPage
+          {...baseGraphPageProps}
+          isHydrating={true}
+          expectedCurationSpeed="partial"
+          projectStatus="curating"
+        />
+      );
+
+      expect(screen.getByText('Loading connections... Ready in 1–2 minutes.')).toBeInTheDocument();
+      expect(screen.queryByText(/curatorial dataset/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/3–5 minutes/i)).not.toBeInTheDocument();
+    });
+
+    it('displays 3–5 minutes copy when isHydrating={true} + expectedCurationSpeed={undefined} + projectStatus="curating"', () => {
+      render(
+        <GraphPage
+          {...baseGraphPageProps}
+          isHydrating={true}
+          expectedCurationSpeed={undefined}
+          projectStatus="curating"
+        />
+      );
+
+      expect(screen.getByText('Mapping your Zcene connections... This usually takes 3–5 minutes to find the best musical paths.')).toBeInTheDocument();
+      expect(screen.queryByText(/1–2 minutes/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/curatorial dataset/i)).not.toBeInTheDocument();
+    });
+
+    it('displays "Loading connections... Ready in a few seconds." when isHydrating={true} + expectedCurationSpeed={undefined} + projectStatus="completed"', () => {
+      render(
+        <GraphPage
+          {...baseGraphPageProps}
+          isHydrating={true}
+          expectedCurationSpeed={undefined}
+          projectStatus="completed"
+        />
+      );
+
+      expect(screen.getByText('Loading connections... Ready in a few seconds.')).toBeInTheDocument();
+      expect(screen.queryByText(/curatorial dataset/i)).not.toBeInTheDocument();
+      expect(screen.queryByText(/3–5 minutes/i)).not.toBeInTheDocument();
     });
   });
 });

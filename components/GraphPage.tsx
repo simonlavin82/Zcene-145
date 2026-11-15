@@ -2279,13 +2279,16 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const enabledArtistsCount = selectedSeedArtists.filter(a => a.enabled).length;
 
-  const loadingSubtext = isHydrating 
-    ? "Hydrating curatorial dataset... This usually takes 1–2 minutes." 
-    : expectedCurationSpeed === 'partial'
-    ? "Mapping your Zcene connections... This usually takes 1–2 minutes to find the best musical paths."
-    : expectedCurationSpeed === 'instant'
-    ? "Loading cached Zcene connections... Ready in a few seconds."
-    : "Mapping your Zcene connections... This usually takes 3–5 minutes to find the best musical paths.";
+  const loadingSubtext =
+    expectedCurationSpeed === 'instant'
+      ? "Loading connections... Ready in a few seconds."
+      : expectedCurationSpeed === 'partial'
+      ? "Loading connections... Ready in 1–2 minutes."
+      : expectedCurationSpeed === 'deep' || projectStatus === 'curating'
+      ? "Mapping your Zcene connections... This usually takes 3–5 minutes to find the best musical paths."
+      : isHydrating
+      ? "Loading connections... Ready in a few seconds."
+      : "Mapping your Zcene connections... This usually takes 3–5 minutes to find the best musical paths.";
 
   const totalPendingCount = useMemo(() => {
     if (!searchTerm.trim()) return enabledArtistsCount;

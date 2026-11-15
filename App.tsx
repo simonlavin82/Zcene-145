@@ -7259,6 +7259,7 @@ const App: React.FC = () => {
       setSupportsLabelDeepCuts(data.supportsLabelDeepCuts === true || data.schemaVersion >= 2);
       if (incomingStatus === 'curating') {
         setIsLoading(true);
+        setExpectedCurationSpeed('deep');
       }
 
       // Always restore non-graph metadata (available in both new and legacy formats)
@@ -8370,6 +8371,7 @@ const App: React.FC = () => {
             setCurrentView(View.Dashboard);
             setCurrentProjectId(null);
             setCurrentProjectOwnerId(null);
+            setExpectedCurationSpeed(undefined);
             setSelectedNode(null);
             setPeekedNode(null);
             setIsPassiveSelection(true);
@@ -8389,6 +8391,7 @@ const App: React.FC = () => {
             if (currentViewRef.current !== View.Graph || currentProjectIdRef.current !== projectId) {
               if (currentProjectIdRef.current !== projectId) {
                 isProjectLoadingRef.current = true;
+                setExpectedCurationSpeed(undefined);
                 setIsViewingShare(false);
                 setGraphData({ nodes: [], links: [] });
                 setActiveNodeIds([]);
@@ -8524,6 +8527,9 @@ const App: React.FC = () => {
                   setActiveJobId(localProj.activeJobId || null);
                   if (localProj.status === 'curating') {
                     setIsLoading(true);
+                    setExpectedCurationSpeed('deep');
+                  } else {
+                    setExpectedCurationSpeed(undefined);
                   }
                 } else {
                   seedArtistsRef.current = '';
@@ -8536,6 +8542,7 @@ const App: React.FC = () => {
                   setProjectName('');
                   setProjectStatus(null);
                   setActiveJobId(null);
+                  setExpectedCurationSpeed(undefined);
                 }
               }
               setCurrentProjectId(projectId);
@@ -8558,6 +8565,7 @@ const App: React.FC = () => {
               setCurrentView(View.Graph);
             }
             setCurrentProjectId(null);
+            setExpectedCurationSpeed(undefined);
             setCurrentProjectOwnerId(null);
             setIsViewingShare(true);
             setGraphData({ nodes: [], links: [] });
@@ -10110,11 +10118,13 @@ const App: React.FC = () => {
                   setDetailsCache(new Map());
                   setChatHistories(new Map());
                   setDiscoveryFilters({});
+                  setExpectedCurationSpeed(undefined);
 
                   navigate(`/p/${newId}`);
                 } else {
                   setCurrentProjectId(null);
                   currentProjectIdRef.current = null;
+                  setExpectedCurationSpeed(undefined);
                   
                   const forkedScene = createEmptyScene(0);
                   forkedScene.seedArtists = n;
