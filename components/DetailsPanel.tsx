@@ -2262,11 +2262,18 @@ export const partitionBlockIndicesIntoThreeColumns = (
             }
 
             // 4. Column 3 Underflow Penalty:
-            // Strongly penalizes leaving a single un-illustrated closing paragraph in Col 3 (j === n - 1 and h3 < 0.45 * min(h1, h2))
+            // Strongly penalizes leaving a single closing paragraph in Col 3 (j === n - 1)
+            // UNLESS pulling block n - 2 into Col 3 would exceed the average column budget (total / 3),
+            // which indicates block n - 2 is a large bullet list that cannot fit in Col 3 without violating end-taper.
             let underflowPenalty = 0;
             if (j === n - 1) {
-                const underflowThreshold = 0.45 * min12;
-                underflowPenalty = Math.max(0, underflowThreshold - h3) * 15.0;
+                const col2WithPrev = total - prefix[n - 2];
+                const colTargetBudget = total / 3;
+                if (col2WithPrev <= colTargetBudget) {
+                    const avg12 = (h1 + h2) / 2;
+                    const underflowThreshold = 0.45 * avg12;
+                    underflowPenalty = Math.max(0, underflowThreshold - h3) * 15.0;
+                }
             }
 
             // 5. Mild overall balance and block-count regularization

@@ -2179,6 +2179,52 @@ describe('DetailsPanel', () => {
                     expect(h2).toBeGreaterThanOrEqual(h3);
                 });
 
+                it('balances Column 1 and Column 2 without starving Column 1 for American Football (7 blocks, 1 photo on Block 0) while keeping Column 3 shortest', () => {
+                    const americanFootballBlocks = [
+                        "Emo was not born in a vacuum; it was a beautiful accident of hardcore kids discovering open tunings and slowing down their heart rates.",
+                        "Map the early shift away from aggressive youth crew punk. Revelation Records laid the foundation for heavy music, but bands like Sunny Day Real Estate and Texas Is the Reason pulled apart that aggression to uncover soaring, vulnerable post-hardcore.",
+                        "Trace this evolution to Chicago, where Cap'n Jazz created the frantic big bang of Midwest Emo. Their eventual collapse birthed a sprawling family tree of experimental indie rock. Tim Kinsella dismantled song structures entirely with the avant-garde Joan of Arc and deconstructed rhythm alongside his old bandmates in Owls.",
+                        "Meanwhile, his brother Mike Kinsella pivoted toward meticulous restraint. He formed American Football, blending Math Rock time signatures with quiet, melancholic lyricism. Their defining masterpiece was perfectly preserved by Polyvinyl Record Co., establishing a new sonic blueprint for intricate guitar music.",
+                        "The surrounding Midwest ecosystem was boiling over with kindred spirits challenging punk velocity. Braid engineered sharp, jagged math-rock guitar angles across Champaign, while The Promise Ring brought bright power-pop hooks and melodic heart to Milwaukee.",
+                        `Regional labels acted as vital cultural anchors for this sensitive revolution:
+
+- Jade Tree documented the emotional dissonance of Promise Ring and Cap'n Jazz.
+- Polyvinyl Record Co. captured the subtle technical intimacy of American Football.
+- Deep Elm Records packaged the movement for suburban youth through their seminal The Emo Diaries compilations.
+- Crank! A Record Company bridged West Coast indie sensibility with Midwestern vulnerability.`,
+                        "Pull the scene apart, and you realize that Midwest emo is not just a localized genre. It is a sprawling, interconnected network of punk veterans, avant-garde experimenters, and poetic kids who collectively decided that emotional vulnerability was heavier than distortion."
+                    ];
+
+                    const americanFootballImages = [
+                        { url: "https://example.com/american-football.jpg" },
+                        null,
+                        null,
+                        null,
+                        null,
+                        null,
+                        null
+                    ];
+
+                    const partitionWithPhoto = partitionBlockIndicesIntoThreeColumns(americanFootballBlocks, americanFootballImages);
+                    // Col 1 must NOT be starved to [0]; Column 1 and Column 2 are balanced, Col 3 is shortest
+                    expect(partitionWithPhoto[0].length).toBeGreaterThanOrEqual(2);
+                    expect(partitionWithPhoto).toEqual([[0, 1, 2], [3, 4, 5], [6]]);
+
+                    const heights = americanFootballBlocks.map((b, i) => estimateEditorialBlockHeight(b, Boolean(americanFootballImages[i]?.url)));
+                    const h1 = partitionWithPhoto[0].reduce((sum, idx) => sum + heights[idx], 0);
+                    const h2 = partitionWithPhoto[1].reduce((sum, idx) => sum + heights[idx], 0);
+                    const h3 = partitionWithPhoto[2].reduce((sum, idx) => sum + heights[idx], 0);
+
+                    // Col 3 is strictly shorter than both Col 1 and Col 2
+                    expect(h3).toBeLessThan(h1);
+                    expect(h3).toBeLessThan(h2);
+
+                    // Also verify when unillustrated (0 photos), partition remains balanced without starving Col 1
+                    const partitionNoPhoto = partitionBlockIndicesIntoThreeColumns(americanFootballBlocks, []);
+                    expect(partitionNoPhoto[0].length).toBeGreaterThanOrEqual(2);
+                    expect(partitionNoPhoto).toEqual([[0, 1, 2, 3], [4, 5], [6]]);
+                });
+
                 it('preserves the V44 4-block standard structure [[0], [1], [2, 3]]', () => {
                     const fourBlocks = ['Block 0', 'Block 1', 'Block 2', 'Block 3'];
                     expect(partitionBlockIndicesIntoThreeColumns(fourBlocks)).toEqual([[0], [1], [2, 3]]);
