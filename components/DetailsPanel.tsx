@@ -4248,7 +4248,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 </div>
             ) : (
                 <div className={`flex-grow flex flex-col min-h-0 ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-hidden'}`}>
-                    {!isMagazineViewOpen && filteredAndSortedNodes.length > 0 && (
+                    {!isMagazineViewOpen && filteredAndSortedNodes.length > 0 && !isGlobalLoading && (
                         <div className="flex justify-between items-center w-full px-4 py-2 border-b border-zinc-700/50 bg-zinc-900 flex-shrink-0 gap-3">
                             {filteredAndSortedNodes.length > 1 && (
                                 <>
@@ -4506,25 +4506,27 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 : `flex ${isStaticMockup ? 'h-auto' : 'h-full'} w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`
                                 } relative z-10`}
                             style={renderMode === 'panel' ? {
-                                transform: `translateX(-${(filteredAndSortedNodes.length === 0 ? 0 : Math.min(viewedIndex, filteredAndSortedNodes.length - 1)) * 100}%)`,
+                                transform: `translateX(-${(isGlobalLoading || filteredAndSortedNodes.length === 0 ? 0 : Math.min(viewedIndex, filteredAndSortedNodes.length - 1)) * 100}%)`,
                                 overscrollBehaviorX: 'none'
                             } : {}}
                         >
-                            {filteredAndSortedNodes.length === 0 || systemError ? (
+                            {isGlobalLoading && !systemError ? (
                                 <div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none">
-                                    {(isGlobalLoading || isReconciliationPending || (Boolean(graphData?.nodes && graphData.nodes.length > 0) && !magazineSearchQuery.trim() && seedArtists && seedArtists.length > 0)) && !systemError ? (
+                                    <div className="flex flex-col items-center justify-center gap-6">
+                                        <LoadingSpinner
+                                            steps={["Waiting for Connections to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
+                                            subtext="Graph mapping takes priority. Details will follow."
+                                        />
+                                    </div>
+                                </div>
+                            ) : filteredAndSortedNodes.length === 0 || systemError ? (
+                                <div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none">
+                                    {(isReconciliationPending || (Boolean(graphData?.nodes && graphData.nodes.length > 0) && !magazineSearchQuery.trim() && seedArtists && seedArtists.length > 0)) && !systemError ? (
                                         <div className="flex flex-col items-center justify-center gap-6">
-                                            {isGlobalLoading ? (
-                                                <LoadingSpinner
-                                                    steps={["Waiting for Connections to settle...", "Mapping relationships first...", "Synchronising nodes..."]}
-                                                    subtext="Graph mapping takes priority. Details will follow."
-                                                />
-                                            ) : (
-                                                <LoadingSpinner
-                                                    steps={DETAIL_THINKING_STEPS}
-                                                    subtext="Typically takes 20–30 seconds to dig for details."
-                                                />
-                                            )}
+                                            <LoadingSpinner
+                                                steps={DETAIL_THINKING_STEPS}
+                                                subtext="Typically takes 20–30 seconds to dig for details."
+                                            />
                                         </div>
                                     ) : (
                                         <div className="flex flex-col items-center gap-4">

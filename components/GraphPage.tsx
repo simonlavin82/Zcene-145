@@ -1840,20 +1840,18 @@ const GraphPage: React.FC<GraphPageProps> = ({
     return "Add a new Scene cluster to this Zcene board";
   }, [scenes.length, hasUncuratedScene]);
 
-  // Guardrail 2: The overwrite intercept gate applies ONLY when the active scene itself
-  // is already curated (overwriting existing connections). Uncurated scenes (Scene 2..5)
-  // curate directly via onRegenerate / preflight without popping up the overwrite intercept modal.
-  const hasExistingProjectGraph = useMemo(
-    () => isSceneCurated,
-    [isSceneCurated]
-  );
-
-  // Step 1: Button wording gate. Once ANY scene across the project is mapped on canvas,
+  // Step 1: Button wording and Overwrite Intercept gate. Once ANY scene across the project is mapped on canvas,
   // the button wording becomes "Update Zcene" (or "Add & Update Zcene" / "Verifying...").
-  // "Create Zcene" appears only on a brand new project with 0 mapped scenes across all scenes.
+  // Curating any scene (whether updating an existing scene or adding a new scene to the project)
+  // prompts the user with the Update Zcene modal to either fork ("Save as New Zcene") or modify the current project ("Overwrite Existing").
   const hasAnyMappedScene = useMemo(() => {
     return data.nodes.length > 0 || scenes.some(s => (s.graphData?.nodes?.length ?? 0) > 0);
   }, [data.nodes.length, scenes]);
+
+  const hasExistingProjectGraph = useMemo(
+    () => hasAnyMappedScene,
+    [hasAnyMappedScene]
+  );
 
   const handleApplyChanges = () => {
     if (!user) {

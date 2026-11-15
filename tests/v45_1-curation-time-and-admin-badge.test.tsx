@@ -652,5 +652,206 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(screen.getByText('Waiting for Connections to settle...')).toBeInTheDocument();
       expect(screen.getByText('Graph mapping takes priority. Details will follow.')).toBeInTheDocument();
     });
+
+    it('renders "Waiting for Connections to settle..." and hides pagination dots and stale cards when isGlobalLoading={true} even with 19 active nodes', () => {
+      const mock19Nodes: any[] = Array.from({ length: 19 }, (_, i) => ({
+        id: `node-${i}`,
+        type: 'artist',
+        label: i === 0 ? 'The Jealous Sound' : `Artist ${i}`,
+      }));
+
+      const mockCache = new Map<string, any>();
+      mockCache.set('node-0', {
+        summary: 'Long bio for The Jealous Sound that would normally render in Deep Cuts',
+        imageUrl: 'https://example.com/tjs.jpg',
+        details: { artist: 'The Jealous Sound', genre: 'Emo' },
+      });
+
+      render(
+        <DetailsPanel
+          {...baseDetailsProps}
+          isGlobalLoading={true}
+          graphData={{ nodes: mock19Nodes, links: [] }}
+          activeNodes={mock19Nodes}
+          detailsCache={mockCache}
+        />
+      );
+
+      // Centered spinner must be present
+      expect(screen.getByText('Waiting for Connections to settle...')).toBeInTheDocument();
+      expect(screen.getByText('Graph mapping takes priority. Details will follow.')).toBeInTheDocument();
+
+      // Stale card bio and label must NOT be rendered
+      expect(screen.queryByText('The Jealous Sound')).not.toBeInTheDocument();
+      expect(screen.queryByText(/Long bio for The Jealous Sound/i)).not.toBeInTheDocument();
+
+      // Pagination chevron buttons must NOT be rendered while loading
+      expect(screen.queryByText('chevron_left')).not.toBeInTheDocument();
+
+      // Transform must be clamped to 0%
+      const container = screen.getByTestId('deep-cut-cards-container');
+      expect(container.style.transform).toBe('translateX(-0%)');
+    });
+  });
+
+  describe('7. Multi-Scene Overwrite vs. Fork Intercept Modal (<GraphPage>)', () => {
+    const multiSceneGraphPageProps: any = {
+      data: {
+        nodes: [{ id: 'the-jealous-sound', type: 'artist', label: 'The Jealous Sound' }],
+        links: [],
+      },
+      baseGraph: null,
+      libraryArtists: [],
+      seedArtists: 'Elliott',
+      onRegenerate: vi.fn(),
+      onFork: vi.fn(),
+      isLoading: false,
+      isHydrating: false,
+      onCancelGeneration: vi.fn(),
+      onFileUpload: vi.fn(),
+      onNodeClick: vi.fn(),
+      selectedNode: null,
+      peekedNode: null,
+      activeNodes: [],
+      detailsCache: new Map(),
+      onUpdateDetailsCache: vi.fn(),
+      loadingNodeIds: new Set(),
+      onTogglePinNode: vi.fn(),
+      pinnedNodes: new Set(),
+      onRefreshNode: vi.fn(),
+      detailsError: null,
+      systemError: null,
+      onLogoClick: vi.fn(),
+      onNavigate: vi.fn(),
+      onClearLibrary: vi.fn(),
+      onClearZcene: vi.fn(),
+      isActive: true,
+      chatHistories: new Map(),
+      onUpdateChatHistories: vi.fn(),
+      onShowToast: vi.fn(),
+      onRefreshUI: vi.fn(),
+      onAddToStack: vi.fn(),
+      stackCount: 0,
+      lastViewedStackCount: 0,
+      onUpdateLastViewedStackCount: vi.fn(),
+      discoveryFilters: {
+        minYear: 1965,
+        maxYear: 2026,
+        originCountries: [],
+        originMode: 'include',
+        genres: [],
+        labels: [],
+      },
+      onUpdateDiscoveryFilters: vi.fn(),
+      isMagazineViewOpen: false,
+      onUpdateIsMagazineViewOpen: vi.fn(),
+      user: { uid: 'test-user-simon', email: 'simon@test.com' },
+      profile: null,
+      onUpdateProfile: vi.fn(),
+      isAuthInitialized: true,
+      onLogin: vi.fn(),
+      onLogout: vi.fn(),
+      isProfileOpen: false,
+      setIsProfileOpen: vi.fn(),
+      isDeleteAccountModalOpen: false,
+      setIsDeleteAccountModalOpen: vi.fn(),
+      isStackDialogOpen: false,
+      setIsStackDialogOpen: vi.fn(),
+      isMenuOpen: false,
+      setIsMenuOpen: vi.fn(),
+      scenes: [
+        {
+          sceneId: 'scene-1',
+          title: 'Scene 1',
+          customName: 'Scene 1',
+          seedArtists: 'The Jealous Sound',
+          graphData: {
+            nodes: [{ id: 'the-jealous-sound', type: 'artist', label: 'The Jealous Sound' }],
+            links: [],
+          },
+        },
+        {
+          sceneId: 'scene-2',
+          title: 'Scene 2',
+          customName: 'Scene 2',
+          seedArtists: 'Elliott',
+          graphData: { nodes: [], links: [] },
+        },
+      ],
+      activeSceneId: 'scene-2',
+      onSelectScene: vi.fn(),
+      onAddScene: vi.fn(),
+    };
+
+    it('opens UpdateInterceptModal when adding/updating Scene 2 on a project with existing mapped Scene 1', () => {
+      const onRegenerateMock = vi.fn();
+      const onForkMock = vi.fn();
+
+      render(
+        <GraphPage
+          {...multiSceneGraphPageProps}
+          onRegenerate={onRegenerateMock}
+          onFork={onForkMock}
+        />
+      );
+
+      const updateButton = screen.getByRole('button', { name: /Update Zcene/i });
+      expect(updateButton).toBeInTheDocument();
+
+      fireEvent.click(updateButton);
+
+      expect(screen.getByText('You are about to generate new connections. Would you like to fork a new Zcene, or overwrite the existing one?')).toBeInTheDocument();
+      expect(screen.getByText('Save as New Zcene')).toBeInTheDocument();
+      expect(screen.getByText('Overwrite Existing')).toBeInTheDocument();
+      expect(onRegenerateMock).not.toHaveBeenCalled();
+    });
+
+    it('invokes onFork when user selects "Save as New Zcene" in the modal', () => {
+      const onRegenerateMock = vi.fn();
+      const onForkMock = vi.fn();
+
+      render(
+        <GraphPage
+          {...multiSceneGraphPageProps}
+          onRegenerate={onRegenerateMock}
+          onFork={onForkMock}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Update Zcene/i }));
+
+      const forkButton = screen.getByText('Save as New Zcene');
+      fireEvent.click(forkButton);
+
+      expect(onForkMock).toHaveBeenCalledWith('Elliott');
+      expect(onRegenerateMock).not.toHaveBeenCalled();
+    });
+
+    it('invokes onRegenerate when user selects "Overwrite Existing" with confirmation checkbox checked', () => {
+      const onRegenerateMock = vi.fn();
+      const onForkMock = vi.fn();
+
+      render(
+        <GraphPage
+          {...multiSceneGraphPageProps}
+          onRegenerate={onRegenerateMock}
+          onFork={onForkMock}
+        />
+      );
+
+      fireEvent.click(screen.getByRole('button', { name: /Update Zcene/i }));
+
+      const overwriteButton = screen.getByText('Overwrite Existing');
+      expect(overwriteButton).toBeDisabled();
+
+      const checkbox = screen.getByRole('checkbox');
+      fireEvent.click(checkbox);
+
+      expect(overwriteButton).not.toBeDisabled();
+      fireEvent.click(overwriteButton);
+
+      expect(onRegenerateMock).toHaveBeenCalledWith('Elliott');
+      expect(onForkMock).not.toHaveBeenCalled();
+    });
   });
 });
