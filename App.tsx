@@ -8,7 +8,7 @@ import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, c
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing, stripCountrySlug, canonicalizeEntitySlugWithCountry } from './services/artistCacheService';
 export { canonicalizeEntitySlugWithCountry };
-import { qualifyCacheEntry, deriveRoutingDecision, isLocallyRenderable, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters } from './services/cacheQualification';
+import { qualifyCacheEntry, deriveRoutingDecision, isLocallyRenderable, CacheVerdict, RoutingDecision, hasActiveDiscoveryFilters, hasActiveTier2Filters, sanitizeDiscoveryFilters, classifyCurationSpeed, ExpectedCurationSpeed } from './services/cacheQualification';
 import { normalizeCountry } from './utils/normalization';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from './utils/projectHydrationFingerprint';
 export { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature };
@@ -1313,6 +1313,14 @@ const App: React.FC = () => {
     const email = user.email.toLowerCase();
     return email === 'zcene.online@gmail.com' && user.uid === '9FBuWDALnNfUAjxV0pRe3RnKwJy1';
   }, [user]);
+  const [isAdminPreview, setIsAdminPreview] = useState<boolean>(() => {
+    try {
+      return typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('adminPreview') === 'true' || localStorage.getItem('zcene_admin_preview') === 'true');
+    } catch {
+      return false;
+    }
+  });
+  const [expectedCurationSpeed, setExpectedCurationSpeed] = useState<ExpectedCurationSpeed | undefined>(undefined);
   const [pendingAuthAction, setPendingAuthAction] = useState<{ type: string; payload: any } | null>(null);
   const [tokenConfirmation, setTokenConfirmation] = useState<{
     isOpen: boolean;
@@ -1330,6 +1338,7 @@ const App: React.FC = () => {
   const [consolidatedValidationDialog, setConsolidatedValidationDialog] = useState<{
     isOpen: boolean;
     seeds: PreFlightSeed[];
+    expectedSpeed?: ExpectedCurationSpeed;
     onConfirm: (updatedSeeds?: PreFlightSeed[]) => void;
     onCancel: () => void;
   } | null>(null);
@@ -4657,10 +4666,23 @@ const App: React.FC = () => {
           })();
         }
 
+        const isMultiSceneOverarching = (scenesRef.current || []).filter(s => s.graphData?.nodes?.length > 0).length >= 2;
+        const allSeedsTopologyCached = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isTopologyHit);
+
+        const calculatedExpectedSpeed = classifyCurationSpeed({
+          seedCount: artistList.length,
+          hasActiveFilters,
+          routingDecision,
+          allSeedsTopologyCached,
+          isMultiSceneOverarching,
+        });
+        setExpectedCurationSpeed(calculatedExpectedSpeed);
+
         const confirmed = await new Promise<boolean>((resolve) => {
           setConsolidatedValidationDialog({
             isOpen: true,
             seeds: initialModalSeeds,
+            expectedSpeed: calculatedExpectedSpeed,
             onConfirm: (updatedSeeds) => {
               if (updatedSeeds) {
                 for (let idx = 0; idx < updatedSeeds.length; idx++) {
@@ -9875,6 +9897,7 @@ const App: React.FC = () => {
               key={currentProjectId || (isViewingShare ? 'share' : 'new-project')}
               projectId={currentProjectId || undefined}
               projectStatus={projectStatus}
+              expectedCurationSpeed={expectedCurationSpeed}
               activeDeepWebSession={activeDeepWebSession}
               areFiltersChanged={areFiltersChanged}
               data={formattedGraphData || { nodes: [], links: [] }} baseGraph={baseGraph} libraryArtists={libraryArtists} seedArtists={seedArtists}
@@ -10469,6 +10492,8 @@ const App: React.FC = () => {
         seeds={consolidatedValidationDialog?.seeds || []}
         curationSessionId={curationSessionIdRef.current}
         isAdmin={isAdmin}
+        isAdminPreview={isAdminPreview}
+        expectedSpeed={consolidatedValidationDialog?.expectedSpeed}
         onOpenTopUp={(tierId) => setSimulatedStripeModal({ isOpen: true, initialTierId: tierId || 'gbp_5' })}
         onConfirm={(updatedSeeds) => consolidatedValidationDialog?.onConfirm(updatedSeeds)}
         onCancel={() => consolidatedValidationDialog?.onCancel()}

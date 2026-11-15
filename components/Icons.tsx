@@ -91,7 +91,7 @@ interface LoadingSpinnerProps {
 
 export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
     steps = GRAPH_THINKING_STEPS, 
-    subtext = "Mapping your Zcene connections... This usually takes a minute or two to find the best musical paths."
+    subtext = "Mapping your Zcene connections... This usually takes 3–5 minutes to find the best musical paths."
 }) => {
     const [currentStep, setCurrentStep] = useState(0);
     const [isVisible, setIsVisible] = useState(true);
@@ -108,16 +108,16 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     }, [steps]);
 
     return (
-        <div data-testid="active-loader" className="flex flex-col items-center justify-center gap-4 text-center">
+        <div data-testid="active-loader" className="flex flex-col items-center justify-center gap-4 text-center w-full max-w-sm px-6 mx-auto">
             <div className="w-12 h-12 border-4 border-zinc-500 border-t-primary animate-spin rounded-full"></div>
-            <div className="flex flex-col items-center gap-1.5">
-                <div className="h-6 flex items-center justify-center">
-                    <p className={`text-sm text-zinc-300 font-medium transition-opacity duration-500 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
+            <div className="flex flex-col items-center gap-1.5 w-full">
+                <div className="h-6 flex items-center justify-center w-full">
+                    <p className={`text-sm text-zinc-300 font-medium transition-opacity duration-500 px-2 ${isVisible ? 'opacity-100' : 'opacity-0'}`}>
                         {steps[currentStep]}
                     </p>
                 </div>
                 {subtext && (
-                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-medium opacity-80">
+                    <p className="text-[10px] text-zinc-500 uppercase tracking-widest font-medium opacity-80 max-w-[260px] sm:max-w-xs mx-auto leading-relaxed text-center">
                         {subtext}
                     </p>
                 )}

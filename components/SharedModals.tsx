@@ -10,7 +10,8 @@ import {
 import { StackIcon, VisibilityIcon, VisibilityOffIcon } from './Icons';
 import Markdown from 'react-markdown';
 import { isNodeInSeedList, cleanArtistDisplayName, cleanLabelDisplayName, normalizeLabelId } from '../services/artistCacheService';
-import { sanitizeAnchorLabelInput } from '../services/cacheQualification';
+import { sanitizeAnchorLabelInput, ExpectedCurationSpeed } from '../services/cacheQualification';
+export type { ExpectedCurationSpeed };
 import { Flame, Waypoints } from 'lucide-react';
 import { formatSystemTimestamp } from '../utils/formatters';
 import { db, functions } from '../services/firebase';
@@ -2095,6 +2096,8 @@ export interface ConsolidatedValidationModalProps {
   onCancel: () => void;
   curationSessionId?: string | null;
   isAdmin?: boolean;
+  isAdminPreview?: boolean;
+  expectedSpeed?: ExpectedCurationSpeed;
   onOpenTopUp?: (tierId?: TokenTopUpTierId) => void;
 }
 
@@ -2105,6 +2108,8 @@ export function ConsolidatedValidationModal({
   onCancel,
   curationSessionId,
   isAdmin = false,
+  isAdminPreview = false,
+  expectedSpeed,
   onOpenTopUp,
 }: ConsolidatedValidationModalProps) {
   const [localSeeds, setLocalSeeds] = React.useState<PreFlightSeed[]>(seeds);
@@ -2191,11 +2196,12 @@ export function ConsolidatedValidationModal({
               predictedOrigin: data.origin || customOrigin.trim(),
               genre: data.genre || customGenre.trim() || '',
               isKnownCacheHit: false, // force fresh pipeline routing
+              isTopologyHit: false,
               isAmbiguous: hasCollision,
               candidates: hasCollision ? data.candidates : undefined,
               selectedCandidateId: hasCollision ? data.candidates[0].id : undefined,
               candidateId: data.candidates && data.candidates.length === 1 ? data.candidates[0].id : undefined,
-              isCorrected: data.correctedInput || s.isCorrected,
+              isCorrected: true,
               correctedQuery: (data.id && data.id !== seedQuery) ? data.id : s.correctedQuery
             };
           }
@@ -2297,6 +2303,15 @@ export function ConsolidatedValidationModal({
   );
 
   const hasVerifyingSeeds = localSeeds.some(seed => seed.isVerifyingOrigin);
+
+  const effectiveSpeed: ExpectedCurationSpeed = useMemo(() => {
+    const baseSpeed = expectedSpeed || (localSeeds.length >= 2 ? 'deep' : localSeeds.every(s => s.isTopologyHit) ? 'instant' : 'deep');
+    const hasUncachedReplacement = localSeeds.some(s => s.isCorrected && !s.isTopologyHit);
+    if (hasUncachedReplacement) {
+      return 'deep';
+    }
+    return baseSpeed;
+  }, [expectedSpeed, localSeeds]);
 
   const hasInvalidSeeds = localSeeds.some(seed => {
     if (seed.isVerifyingOrigin) {
@@ -2401,7 +2416,7 @@ export function ConsolidatedValidationModal({
                         <span className="text-white font-medium text-base truncate">
                           {seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
                         </span>
-                        {isAdmin && seed.isKnownCacheHit && (
+                        {isAdmin && !isAdminPreview && seed.isKnownCacheHit && (
                           <span className="text-[9px] uppercase tracking-wider text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full font-semibold">CACHE HIT</span>
                         )}
                       </div>
@@ -2452,6 +2467,25 @@ export function ConsolidatedValidationModal({
                 );
               })}
             </div>
+
+            {!hasVerifyingSeeds && (
+              <div 
+                data-testid="curation-time-estimate" 
+                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-400 mt-1"
+              >
+                <span className="material-symbols-outlined text-primary !text-[16px] flex-shrink-0">
+                  {effectiveSpeed === 'instant' ? 'bolt' : effectiveSpeed === 'partial' ? 'schedule' : 'hourglass_top'}
+                </span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span>Estimated time:</span>
+                  <span className="text-zinc-200 font-medium">
+                    {effectiveSpeed === 'instant' && 'Ready in a few seconds'}
+                    {effectiveSpeed === 'partial' && '~1–2 minutes'}
+                    {effectiveSpeed === 'deep' && '~3–5 minutes'}
+                  </span>
+                </div>
+              </div>
+            )}
           </ModalBody>
           <ModalFooter>
             <button

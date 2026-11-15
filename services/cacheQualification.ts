@@ -287,6 +287,41 @@ export const deriveRoutingDecision = (verdicts: CacheVerdict[], isLiveSynthesis:
   return 'MISS';
 };
 
+/**
+ * Expected curation duration tier presented to users.
+ *   instant → Ready in a few seconds (Single-seed Direct Hit, topology cached, no active filters).
+ *   partial → ~1–2 minutes (Single-seed topology cached, but needs node details hydration).
+ *   deep    → ~3–5 minutes (Multi-seed, uncached seeds, 3-tier filters, or overarching zine regeneration).
+ */
+export type ExpectedCurationSpeed = 'instant' | 'partial' | 'deep';
+
+export interface ClassifyCurationSpeedParams {
+  seedCount: number;
+  hasActiveFilters: boolean;
+  routingDecision?: RoutingDecision | string;
+  allSeedsTopologyCached?: boolean;
+  isMultiSceneOverarching?: boolean;
+}
+
+export function classifyCurationSpeed({
+  seedCount,
+  hasActiveFilters,
+  routingDecision,
+  allSeedsTopologyCached,
+  isMultiSceneOverarching,
+}: ClassifyCurationSpeedParams): ExpectedCurationSpeed {
+  if (isMultiSceneOverarching || seedCount >= 2 || hasActiveFilters) {
+    return 'deep';
+  }
+  if (routingDecision === 'TOPOLOGY_HIT' && allSeedsTopologyCached) {
+    return 'instant';
+  }
+  if (routingDecision === 'PARTIAL') {
+    return 'partial';
+  }
+  return 'deep';
+}
+
 /** Recursively strips secrets from a payload before it is written to logs. */
 const SENSITIVE_KEYS = new Set(['password', 'apiKey', 'api_key', 'token', 'secret', 'authorization']);
 export const redactSensitive = (value: any, depth: number = 0): any => {
