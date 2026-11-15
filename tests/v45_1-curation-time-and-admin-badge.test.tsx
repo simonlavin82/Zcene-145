@@ -1,7 +1,7 @@
 import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { ConsolidatedValidationModal, PreFlightSeed } from '../components/SharedModals';
+import { ConsolidatedValidationModal, PreFlightSeed, TokenConfirmationDialog } from '../components/SharedModals';
 import { LoadingSpinner } from '../components/Icons';
 import { classifyCurationSpeed } from '../services/cacheQualification';
 import { httpsCallable } from 'firebase/functions';
@@ -295,6 +295,62 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
         // Once escape hatch resolves with replacement candidate, dynamic speed becomes 'deep'
         expect(screen.getByTestId('curation-time-estimate')).toHaveTextContent('~3–5 minutes');
       });
+    });
+
+    it('successfully transitions from isOpen={false} to isOpen={true} without violating Rules of Hooks (React Error #310)', () => {
+      const { rerender } = render(
+        <ConsolidatedValidationModal
+          isOpen={false}
+          seeds={[verifiedSeed]}
+          expectedSpeed="instant"
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+
+      expect(screen.queryByText('Confirm Your Artists')).not.toBeInTheDocument();
+
+      // Transition isOpen: false -> true (crashed with Minified React error #310 prior to fix)
+      rerender(
+        <ConsolidatedValidationModal
+          isOpen={true}
+          seeds={[verifiedSeed]}
+          expectedSpeed="instant"
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Confirm Your Artists')).toBeInTheDocument();
+      expect(screen.getByTestId('curation-time-estimate')).toHaveTextContent('Ready in a few seconds');
+    });
+
+    it('successfully transitions TokenConfirmationDialog from isOpen={false} to isOpen={true} without violating Rules of Hooks', () => {
+      const { rerender } = render(
+        <TokenConfirmationDialog
+          isOpen={false}
+          type="generation"
+          cachedArtists={['Sense Field']}
+          missingArtists={[]}
+          tokenBalance={50}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+
+      rerender(
+        <TokenConfirmationDialog
+          isOpen={true}
+          type="generation"
+          cachedArtists={['Sense Field']}
+          missingArtists={[]}
+          tokenBalance={50}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+
+      expect(screen.getByText('Confirm Zcene Curation')).toBeInTheDocument();
     });
   });
 

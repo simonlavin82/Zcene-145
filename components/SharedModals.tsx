@@ -954,9 +954,10 @@ export const TokenConfirmationDialog: React.FC<{
   error,
   isLoading = false,
 }) => {
+  const [internalSubmitting, setInternalSubmitting] = useState(false);
+
   if (!isOpen) return null;
 
-  const [internalSubmitting, setInternalSubmitting] = useState(false);
   const isBusy = !!isLoading || internalSubmitting;
 
   const handleConfirmClick = async () => {
@@ -2304,14 +2305,11 @@ export function ConsolidatedValidationModal({
 
   const hasVerifyingSeeds = localSeeds.some(seed => seed.isVerifyingOrigin);
 
-  const effectiveSpeed: ExpectedCurationSpeed = useMemo(() => {
-    const baseSpeed = expectedSpeed || (localSeeds.length >= 2 ? 'deep' : localSeeds.every(s => s.isTopologyHit) ? 'instant' : 'deep');
-    const hasUncachedReplacement = localSeeds.some(s => s.isCorrected && !s.isTopologyHit);
-    if (hasUncachedReplacement) {
-      return 'deep';
-    }
-    return baseSpeed;
-  }, [expectedSpeed, localSeeds]);
+  const baseSpeed: ExpectedCurationSpeed =
+    expectedSpeed ||
+    (localSeeds.length >= 2 ? 'deep' : localSeeds.every(s => s.isTopologyHit) ? 'instant' : 'deep');
+  const hasUncachedReplacement = localSeeds.some(s => s.isCorrected && !s.isTopologyHit);
+  const effectiveSpeed: ExpectedCurationSpeed = hasUncachedReplacement ? 'deep' : baseSpeed;
 
   const hasInvalidSeeds = localSeeds.some(seed => {
     if (seed.isVerifyingOrigin) {
