@@ -1747,6 +1747,8 @@ const App: React.FC = () => {
   const crossSceneLinksRef = useRef<CrossSceneLink[]>([]);
   const lastAppliedFiltersRef = useRef<DiscoveryFilters>({});
   const selectedNodeRef = useRef<Node | null>(null);
+  const pendingUnconfirmedForkIdRef = useRef<string | null>(null);
+  const pendingForkOriginIdRef = useRef<string | null>(null);
 
   useEffect(() => { currentProjectOwnerIdRef.current = currentProjectOwnerId; }, [currentProjectOwnerId]);
   useEffect(() => { projectNameRef.current = projectName; }, [projectName]);
@@ -4323,6 +4325,26 @@ const App: React.FC = () => {
       validationRunIdRef.current++;
       sessionTokenApprovedRef.current = false;
       curationSessionIdRef.current = null;
+
+      // Safeguard 1: Clean up unconfirmed fork if user cancelled before curation confirmed
+      const unconfirmedForkId = pendingUnconfirmedForkIdRef.current;
+      const originProjectId = pendingForkOriginIdRef.current;
+      if (unconfirmedForkId && user && !isGuest) {
+        pendingUnconfirmedForkIdRef.current = null;
+        pendingForkOriginIdRef.current = null;
+        deleteDoc(doc(db, 'users', user.uid, 'projects', unconfirmedForkId)).catch(() => {});
+        setIsLoading(false);
+        isHydratingSessionRef.current = false;
+        isProjectLoadingRef.current = false;
+        if (originProjectId) {
+          navigate(`/p/${originProjectId}`);
+        } else {
+          navigate('/dashboard');
+        }
+        showToast('Cancelled Zcene fork.');
+        return;
+      }
+
       setActiveNodeIds(prevActiveNodeIds);
       setSeedArtists(prevSeedArtists);
       setLoadingNodeIds(prev => (prev.size === 0 ? prev : new Set()));
@@ -4708,6 +4730,10 @@ const App: React.FC = () => {
           return;
         }
 
+        // Safeguard 1: Step 4 confirmed: curation execution begins. Clear pending fork guards.
+        pendingUnconfirmedForkIdRef.current = null;
+        pendingForkOriginIdRef.current = null;
+
         // Only after user clicks Confirm & Generate: flip to CONNECTIONS on mobile & start full loader
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('switch-to-connections-tab'));
@@ -4727,6 +4753,8 @@ const App: React.FC = () => {
             return;
           }
           sessionTokenApprovedRef.current = true;
+          pendingUnconfirmedForkIdRef.current = null;
+          pendingForkOriginIdRef.current = null;
       }
 
 
@@ -6799,7 +6827,17 @@ const App: React.FC = () => {
           canvasLayout: data.canvasLayout,
           activeNodes: data.activeNodes,
           isMagazineViewOpen: data.isMagazineViewOpen,
-          status: data.status,
+          status: (() => {
+            // Safeguard 2: Only auto-heal stranded projects when not actively in Stage 1 curation in current session
+            const isActivelyCuratingThisProj = docSnap.id === currentProjectIdRef.current && (isCurrentlyCurating || isProjectLoadingRef.current || isPreFlightChecking);
+            if (data.status === 'curating' && !data.activeJobId && !isActivelyCuratingThisProj) {
+              const hasNodes = (typeof data.graphData === 'string' && data.graphData.length > 20) || (Array.isArray(data.scenes) && data.scenes.some((s: any) => (s.graphData?.nodes?.length ?? 0) > 0));
+              const healed = hasNodes ? 'completed' : 'idle';
+              updateDoc(docSnap.ref, { status: healed, updatedAt: serverTimestamp() }).catch(() => {});
+              return healed;
+            }
+            return data.status;
+          })(),
           coverImage: data.coverImage,
           seedImageUrl: data.seedImageUrl,
           seedImageUrls: data.seedImageUrls,
@@ -7203,12 +7241,31 @@ const App: React.FC = () => {
       }
 
       const data = snap.data();
-      const incomingStatus = data.status || null;
+      let incomingStatus = data.status || null;
       const incomingJobId = data.activeJobId || null;
+      const localHasGraph = Boolean(graphDataRef.current?.nodes && graphDataRef.current.nodes.length > 0);
+
+      // Safeguard 2: Auto-heal stranded curation without an active job (when not actively curating in session)
+      const isActivelyCuratingThisProj = isCurrentlyCurating || isPreFlightChecking;
+      if (incomingStatus === 'curating' && !incomingJobId && !isActivelyCuratingThisProj) {
+        let hasNodes = localHasGraph || (typeof data.graphData === 'string' && data.graphData.length > 20);
+        if (!hasNodes && data.scenes) {
+          try {
+            const scenesList = parseProjectScenes(data.scenes);
+            hasNodes = scenesList.some(s => (s.graphData?.nodes?.length ?? 0) > 0);
+          } catch {}
+        }
+        const healed = hasNodes ? 'completed' : 'idle';
+        incomingStatus = healed;
+        console.log(`[ProjectLoader] Auto-healing stranded project ${currentProjectId}: converting status from curating to ${healed}`);
+        if (user && currentProjectId && !isGuest) {
+          updateDoc(doc(db, 'users', user.uid, 'projects', currentProjectId), { status: healed, updatedAt: serverTimestamp() }).catch(() => {});
+        }
+      }
+
       const statusChanged = incomingStatus !== projectStatusRef.current;
       const jobChanged = incomingJobId !== activeJobIdRef.current;
       const incomingHasGraph = data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20;
-      const localHasGraph = graphDataRef.current && graphDataRef.current.nodes && graphDataRef.current.nodes.length > 0;
       
       const isCriticalUpdate = statusChanged || jobChanged || (incomingHasGraph && !localHasGraph);
 
@@ -7268,10 +7325,10 @@ const App: React.FC = () => {
           const parsedScenes: ProjectScene[] = parseProjectScenes(data.scenes);
           if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
             const isCurating = incomingStatus === 'curating' || !!data.activeJobId;
-            const isAlreadyHydrated = Boolean(graphDataRef.current?.nodes && graphDataRef.current.nodes.length > 0);
+            const isInitialLoad = isProjectLoadingRef.current;
             const resolvedActiveSceneId = isCurating && data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId)
               ? data.activeSceneId
-              : (isAlreadyHydrated && activeSceneIdRef.current && parsedScenes.some(s => (s.sceneId || s.id) === activeSceneIdRef.current))
+              : (!isInitialLoad && activeSceneIdRef.current && parsedScenes.some(s => (s.sceneId || s.id) === activeSceneIdRef.current))
                 ? activeSceneIdRef.current
                 : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
             activeSceneIdRef.current = resolvedActiveSceneId;
@@ -8421,7 +8478,8 @@ const App: React.FC = () => {
                     scenesRef.current = parsedScenes;
                     setScenes(parsedScenes);
 
-                    const resolvedActiveSceneId = localProj.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === localProj.activeSceneId)
+                    const isCurating = localProj.status === 'curating' || !!localProj.activeJobId;
+                    const resolvedActiveSceneId = isCurating && localProj.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === localProj.activeSceneId)
                       ? localProj.activeSceneId
                       : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
                     activeSceneIdRef.current = resolvedActiveSceneId;
@@ -9929,6 +9987,8 @@ const App: React.FC = () => {
               onRegenerate={(n) => handleGenerateGraph(n, true, graphData)} 
               onFork={async (n) => {
                 if (user && !isGuest) {
+                  // Safeguard 1: Capture origin project ID before switching currentProjectIdRef to newId
+                  const originProjectId = currentProjectIdRef.current;
                   const newDocRef = doc(collection(db, 'users', user.uid, 'projects'));
                   const newId = newDocRef.id;
                   
@@ -9969,7 +10029,7 @@ const App: React.FC = () => {
                             zineImages: undefined,
                             artistSnippets: {},
                             activeNodes: [],
-                            status: 'curating'
+                            status: 'idle'
                           }, idx)
                         : normalizeProjectScene(s, idx)
                     );
@@ -10028,8 +10088,12 @@ const App: React.FC = () => {
                       sceneCount: forkedScenes.length,
                       createdAt: serverTimestamp(),
                       updatedAt: serverTimestamp(),
-                      status: 'curating'
+                      status: 'completed'
                     });
+
+                    // Safeguard 1: Track pending unconfirmed fork lifecycle
+                    pendingUnconfirmedForkIdRef.current = newId;
+                    pendingForkOriginIdRef.current = originProjectId;
 
                     setCurrentProjectId(newId);
                     currentProjectIdRef.current = newId;
@@ -10052,7 +10116,7 @@ const App: React.FC = () => {
                     setCrossSceneLinks(forkBridges);
                     projectSeedImageSnapshotRef.current = { names: forkAllSeeds, urls: forkSeedImageUrls };
                     setProjectName(forkName);
-                    setProjectStatus('curating');
+                    setProjectStatus('completed');
                     setSelectedNode(null);
                     setPeekedNode(null);
 
@@ -10063,7 +10127,7 @@ const App: React.FC = () => {
 
                   const forkedScene = createEmptyScene(0);
                   forkedScene.seedArtists = n;
-                  forkedScene.status = 'curating';
+                  forkedScene.status = 'idle';
 
                   await setDoc(newDocRef, {
                     name: defaultName,
@@ -10088,8 +10152,11 @@ const App: React.FC = () => {
                     sceneCount: 1,
                     createdAt: serverTimestamp(),
                     updatedAt: serverTimestamp(),
-                    status: 'curating'
+                    status: 'idle'
                   });
+
+                  pendingUnconfirmedForkIdRef.current = newId;
+                  pendingForkOriginIdRef.current = originProjectId;
                   
                   setCurrentProjectId(newId);
                   currentProjectIdRef.current = newId;
@@ -10112,7 +10179,7 @@ const App: React.FC = () => {
                   crossSceneLinksRef.current = [];
                   setCrossSceneLinks([]);
                   setProjectName(defaultName);
-                  setProjectStatus('curating');
+                  setProjectStatus('idle');
                   setSelectedNode(null);
                   setPeekedNode(null);
                   setDetailsCache(new Map());
@@ -10128,7 +10195,7 @@ const App: React.FC = () => {
                   
                   const forkedScene = createEmptyScene(0);
                   forkedScene.seedArtists = n;
-                  forkedScene.status = 'curating';
+                  forkedScene.status = 'idle';
 
                   setGraphData({ nodes: [], links: [] });
                   setActiveNodeIds([]);
@@ -10148,7 +10215,7 @@ const App: React.FC = () => {
                   crossSceneLinksRef.current = [];
                   setCrossSceneLinks([]);
                   setProjectName("Untitled Zcene");
-                  setProjectStatus('curating');
+                  setProjectStatus('idle');
                   setSelectedNode(null);
                   setPeekedNode(null);
                   setDetailsCache(new Map());

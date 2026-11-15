@@ -854,4 +854,89 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(onForkMock).not.toHaveBeenCalled();
     });
   });
+
+  describe('8. Multi-Scene Initial Selection & Stranded Curation Self-Healing', () => {
+    it('defaults activeSceneId to Scene 1 (parsedScenes[0]) when entering a completed project with activeSceneId="scene-2"', () => {
+      const parsedScenes: any[] = [
+        { sceneId: 'scene-1', id: 'scene-1', title: 'Scene 1' },
+        { sceneId: 'scene-2', id: 'scene-2', title: 'Scene 2' },
+      ];
+
+      // Simulated Router Pre-population logic for completed project
+      const localProjCompleted: any = {
+        status: 'completed',
+        activeJobId: null,
+        activeSceneId: 'scene-2',
+      };
+
+      const isCurating = localProjCompleted.status === 'curating' || !!localProjCompleted.activeJobId;
+      const resolvedActiveSceneId = isCurating && localProjCompleted.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === localProjCompleted.activeSceneId)
+        ? localProjCompleted.activeSceneId
+        : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
+
+      expect(resolvedActiveSceneId).toBe('scene-1');
+    });
+
+    it('preserves target activeSceneId when entering an actively curating project', () => {
+      const parsedScenes: any[] = [
+        { sceneId: 'scene-1', id: 'scene-1', title: 'Scene 1' },
+        { sceneId: 'scene-2', id: 'scene-2', title: 'Scene 2' },
+      ];
+
+      const localProjCurating: any = {
+        status: 'curating',
+        activeJobId: 'job-123',
+        activeSceneId: 'scene-2',
+      };
+
+      const isCurating = localProjCurating.status === 'curating' || !!localProjCurating.activeJobId;
+      const resolvedActiveSceneId = isCurating && localProjCurating.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === localProjCurating.activeSceneId)
+        ? localProjCurating.activeSceneId
+        : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
+
+      expect(resolvedActiveSceneId).toBe('scene-2');
+    });
+
+    it('auto-heals a stranded project with status="curating" and activeJobId=null to "completed" when mapped nodes exist', () => {
+      const strandedDoc: any = {
+        id: 'wMAF46dvYZCCi30wV4oj',
+        status: 'curating',
+        activeJobId: null,
+        graphData: JSON.stringify({ nodes: [{ id: 'artist-1' }], links: [] }),
+        scenes: [{ sceneId: 'scene-1', graphData: { nodes: [{ id: 'artist-1' }], links: [] } }],
+      };
+
+      // Safeguard 2: Not actively curating in the current session
+      const isActivelyCuratingThisProj = false;
+
+      let effectiveStatus = strandedDoc.status;
+      if (strandedDoc.status === 'curating' && !strandedDoc.activeJobId && !isActivelyCuratingThisProj) {
+        const hasNodes = (typeof strandedDoc.graphData === 'string' && strandedDoc.graphData.length > 20) ||
+          (Array.isArray(strandedDoc.scenes) && strandedDoc.scenes.some((s: any) => (s.graphData?.nodes?.length ?? 0) > 0));
+        effectiveStatus = hasNodes ? 'completed' : 'idle';
+      }
+
+      expect(effectiveStatus).toBe('completed');
+    });
+
+    it('protects active Stage-1 curations from auto-healing when active in the current session', () => {
+      const stage1Doc: any = {
+        id: 'active-session-proj-1',
+        status: 'curating',
+        activeJobId: null, // Stage 1 Cloud Function has not returned jobId yet
+        graphData: JSON.stringify({ nodes: [{ id: 'artist-1' }], links: [] }),
+      };
+
+      // In current active tab session
+      const isActivelyCuratingThisProj = true;
+
+      let effectiveStatus = stage1Doc.status;
+      if (stage1Doc.status === 'curating' && !stage1Doc.activeJobId && !isActivelyCuratingThisProj) {
+        effectiveStatus = 'completed';
+      }
+
+      // Must remain 'curating' to allow Stage 1 pipeline to proceed
+      expect(effectiveStatus).toBe('curating');
+    });
+  });
 });
