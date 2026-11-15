@@ -2215,13 +2215,6 @@ export const partitionBlockIndicesIntoThreeColumns = (
     if (blocks.length === 2) return [[0], [1], []];
     if (blocks.length === 3) return [[0], [1], [2]];
 
-    // V44 Standard 4-block structure (3 narrative paragraphs + 1 crossover/bullet block):
-    // Anchor Block 0 (Para 1) -> Col 1, Block 1 (Para 2) -> Col 2,
-    // Block 2 (Para 3) + Block 3 (Lead-in/Bullets) -> Col 3.
-    if (blocks.length === 4) {
-        return [[0], [1], [2, 3]];
-    }
-
     const n = blocks.length;
     const normalizedImages = normalizeZineImages(images);
     const heights = blocks.map((b, idx) => {

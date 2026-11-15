@@ -1589,20 +1589,19 @@ describe('DetailsPanel', () => {
                 const desktopGrid = screen.getByTestId('zine-editorial-grid-overarching');
                 expect(desktopGrid).toHaveClass('grid-cols-3');
                 expect(desktopGrid.children).toHaveLength(3);
+                // Under dynamic balancing [[0, 1], [2], [3]], Col 1 has Block 0 + Block 1, Col 2 has Block 2, Col 3 has Block 3
                 expect(desktopGrid.children[0].innerHTML).toContain('https://i.guim.co.uk/af.jpg');
                 expect(desktopGrid.children[0].textContent).toContain('American Football');
-                expect(desktopGrid.children[1].innerHTML).toContain('https://i.scdn.co/rhw.jpg');
-                expect(desktopGrid.children[1].textContent).toContain('Rocking Horse Winner');
-                expect(desktopGrid.children[1].textContent).not.toContain('Dashboard Confessional');
+                expect(desktopGrid.children[0].innerHTML).toContain('https://i.scdn.co/rhw.jpg');
+                expect(desktopGrid.children[0].textContent).toContain('Rocking Horse Winner');
+
+                expect(desktopGrid.children[1].innerHTML).toContain('https://encrypted-tbn0.gstatic.com/dc.jpg');
+                expect(desktopGrid.children[1].textContent).toContain('Dashboard Confessional');
 
                 const col3Html = desktopGrid.children[2].innerHTML;
-                expect(col3Html).toContain('https://encrypted-tbn0.gstatic.com/dc.jpg');
-                expect(col3Html).toContain('Dashboard Confessional');
                 expect(col3Html).toContain('https://i.scdn.co/getupkids.jpg');
                 expect(col3Html).toContain('The secret architecture of this evolution relies on a few critical crossover points:');
                 expect(col3Html).toContain('The Get Up Kids');
-                expect(col3Html.indexOf('https://encrypted-tbn0.gstatic.com/dc.jpg')).toBeLessThan(col3Html.indexOf('Dashboard Confessional'));
-                expect(col3Html.indexOf('Dashboard Confessional')).toBeLessThan(col3Html.indexOf('https://i.scdn.co/getupkids.jpg'));
                 expect(col3Html.indexOf('https://i.scdn.co/getupkids.jpg')).toBeLessThan(col3Html.indexOf('The Get Up Kids'));
 
                 // 2. Tablet (820px): 2 independent vertical flex columns ([Block 0, Block 2] left & [Block 1, Block 3] right)
@@ -2329,9 +2328,44 @@ describe('DetailsPanel', () => {
                     expect(partitionNoPhoto).toEqual([[0, 1, 2, 3], [4, 5], [6]]);
                 });
 
-                it('preserves the V44 4-block standard structure [[0], [1], [2, 3]]', () => {
-                    const fourBlocks = ['Block 0', 'Block 1', 'Block 2', 'Block 3'];
-                    expect(partitionBlockIndicesIntoThreeColumns(fourBlocks)).toEqual([[0], [1], [2, 3]]);
+                it('balances 4-block editorials dynamically (1990s Emo with curated photos and bullet crossover block)', () => {
+                    const emoBlocks = [
+                        "The story of modern alternative music is a tale of hardcore kids learning how to whisper. In the late 1990s, the aggressive youth crew punk of the previous decade began to splinter. In Chicago, the volatile energy of Cap'n Jazz birthed the intricate, polyrhythmic framework of Midwest Emo. Out of this midwestern big bang came American Football, a band that slowed the frantic pulse of punk into a melancholic twilight. Labels like Polyvinyl Record Co. and Doghouse captured this tectonic shift, proving that the intensity of post-hardcore could be channeled into quiet, meticulous restraint rather than pure volume.",
+                        "Meanwhile, a parallel mutation was gestating in the humid basements of South Florida. Down south, bands like Rocking Horse Winner and Discount were actively rewriting the regional playbook. They traded the punishing breakdowns of their local scenes for bright, expansive indie rock hooks. This was an era defined by transitional friction, nurtured by grassroots imprints like Kat Records. Heavy music veterans realized they wanted to sing, stitching the raw energy of underground emo to a soaring, melodic accessibility.",
+                        "This regional incubator ultimately produced the massive commercial explosion of the early 2000s. The dense, math-leaning dual guitars of Further Seems Forever directly birthed the stadium-sized acoustic vulnerability of Dashboard Confessional. At the exact same time, New Found Glory weaponized the local bounce into anthemic pop-punk. This was no longer a localized secret. It was a cultural takeover.",
+                        "The secret architecture of this evolution relies on a few critical crossover points:\n\n* The Get Up Kids took the fragile Midwest blueprint and injected it with relentless pop-punk velocity, effectively building the bridge to the mainstream.\n\n* Rainer Maria anchored both the Midwestern and Florida-adjacent scenes by elevating dual-vocal indie rock above simple teenage angst.\n\n* Cultural epicenters like Vagrant and Drive-Thru capitalized on this exact lineage, packaging the emotional resonance of the basement for global arena consumption."
+                    ];
+                    const emoImages = [
+                        { url: "https://example.com/american-football.jpg" },
+                        { url: "https://example.com/rocking-horse-winner.jpg" },
+                        { url: "https://example.com/dashboard-confessional.jpg" },
+                        null
+                    ];
+
+                    const partition = partitionBlockIndicesIntoThreeColumns(emoBlocks, emoImages);
+                    // Evaluates to [[0, 1], [2], [3]] so Col 3 does not tower over Col 1 and Col 2
+                    expect(partition).toEqual([[0, 1], [2], [3]]);
+
+                    const heights = emoBlocks.map((b, i) => estimateEditorialBlockHeight(b, Boolean(emoImages[i]?.url)));
+                    const h1 = partition[0].reduce((sum, idx) => sum + heights[idx], 0);
+                    const h2 = partition[1].reduce((sum, idx) => sum + heights[idx], 0);
+                    const h3 = partition[2].reduce((sum, idx) => sum + heights[idx], 0);
+
+                    // End-taper: Col 1 leads, Col 2 follows, Col 3 is shortest
+                    expect(h1).toBeGreaterThanOrEqual(h2);
+                    expect(h3).toBeLessThan(h1);
+                    expect(h3).toBeLessThanOrEqual(h2);
+                });
+
+                it('naturally preserves [[0], [1], [2, 3]] on 4 blocks when blocks 2 and 3 fit within column budget', () => {
+                    const taperedBlocks = [
+                        "A long introductory paragraph discussing the origin of the scene and early precursors in detail.\nSecond line of historical context.",
+                        "Another substantial paragraph exploring the regional expansion and second wave evolution.\nSecond line of expansion context.",
+                        "A brief transition paragraph.",
+                        "A short closing note."
+                    ];
+                    const partition = partitionBlockIndicesIntoThreeColumns(taperedBlocks);
+                    expect(partition).toEqual([[0], [1], [2, 3]]);
                 });
 
                 it('balances equal un-illustrated text-only blocks cleanly across 3 columns', () => {
