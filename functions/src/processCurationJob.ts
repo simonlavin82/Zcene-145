@@ -245,7 +245,7 @@ export const processCurationJob = onDocumentCreated({
   document: "curationJobs/{jobId}",
   secrets: ["GEMINI_API_KEY"],
   timeoutSeconds: 540, // Firebase Functions v2 SDK enforces a hard 540s cap for Firestore event triggers
-  memory: "1GiB",
+  memory: "2GiB",
 }, async (event) => {
   const snapshot = event.data;
   if (!snapshot) {

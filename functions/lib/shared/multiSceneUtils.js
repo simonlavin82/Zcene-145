@@ -18,6 +18,7 @@ exports.validateZineImageUrl = validateZineImageUrl;
 exports.resolveZineImageSlot = resolveZineImageSlot;
 exports.serializeZineImageEntry = serializeZineImageEntry;
 exports.normalizeZineImages = normalizeZineImages;
+exports.normalizeZineTitle = normalizeZineTitle;
 exports.normalizeZineIntro = normalizeZineIntro;
 exports.normalizeProjectScene = normalizeProjectScene;
 exports.createEmptyProjectScene = createEmptyProjectScene;
@@ -410,6 +411,17 @@ function normalizeZineImages(raw) {
     return serialized.length > 0 ? serialized : undefined;
 }
 /**
+ * Normalizes an optional custom Zine editorial headline.
+ * Collapses whitespace/newlines, trims, limits to 120 characters,
+ * and returns undefined when empty so unedited Zines incur zero storage overhead.
+ */
+function normalizeZineTitle(raw) {
+    if (typeof raw !== 'string')
+        return undefined;
+    const cleaned = raw.replace(/[\r\n\t]+/g, ' ').replace(/\s{2,}/g, ' ').trim().slice(0, 120);
+    return cleaned.length > 0 ? cleaned : undefined;
+}
+/**
  * Normalizes an optional Zine Curator's Note / Intro dedication paragraph.
  * Returns undefined when empty so unedited Zines incur zero overhead.
  */
@@ -570,6 +582,7 @@ function normalizeProjectScene(raw, fallbackIndex = 0) {
             graphData = { ...graphData, nodes: graphData.nodes.map((n) => shiftNodeX(n, nodeShift)) };
         }
     }
+    const normalizedZineTitle = normalizeZineTitle(s.zineTitle);
     const normalizedZineIntro = normalizeZineIntro(s.zineIntro);
     const normalizedZineImages = normalizeZineImages(s.zineImages);
     return {
@@ -590,6 +603,7 @@ function normalizeProjectScene(raw, fallbackIndex = 0) {
         curatedDiscoveryFilters,
         graphData,
         synthesisRationale: s.synthesisRationale || graphData.synthesisRationale || '',
+        ...(normalizedZineTitle ? { zineTitle: normalizedZineTitle } : {}),
         ...(normalizedZineIntro ? { zineIntro: normalizedZineIntro } : {}),
         ...(normalizedZineImages ? { zineImages: normalizedZineImages } : {}),
         artistSnippets: s.artistSnippets && typeof s.artistSnippets === 'object' ? s.artistSnippets : {},

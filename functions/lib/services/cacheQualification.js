@@ -29,6 +29,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.sanitizeDiscoveryFilters = exports.hasActiveDiscoveryFilters = exports.hasActiveTier3Filters = exports.hasActiveTier2Filters = exports.sanitizeAnchorLabelInput = exports.V30_ERA_MAX = exports.getDynamicEraMax = exports.SCENE_MATURITY_BUFFER_YEARS = exports.V30_ERA_MIN = exports.redactSensitive = exports.deriveRoutingDecision = exports.isLocallyRenderable = exports.qualifyCacheEntry = exports.isFullyQualifiedEntityProfile = exports.parseGraphField = exports.extractSeedProfile = exports.MIN_RATIONALE_LENGTH = exports.MIN_BIO_LENGTH = exports.extractTrailingCountryIso = exports.doesOriginMatchExpectedIso = void 0;
+exports.classifyCurationSpeed = classifyCurationSpeed;
 const isoCountries_1 = require("../shared/isoCountries");
 Object.defineProperty(exports, "doesOriginMatchExpectedIso", { enumerable: true, get: function () { return isoCountries_1.doesOriginMatchExpectedIso; } });
 Object.defineProperty(exports, "extractTrailingCountryIso", { enumerable: true, get: function () { return isoCountries_1.extractTrailingCountryIso; } });
@@ -267,6 +268,18 @@ const deriveRoutingDecision = (verdicts, isLiveSynthesis) => {
     return 'MISS';
 };
 exports.deriveRoutingDecision = deriveRoutingDecision;
+function classifyCurationSpeed({ seedCount, hasActiveFilters, routingDecision, allSeedsTopologyCached, isMultiSceneOverarching, }) {
+    if (isMultiSceneOverarching || seedCount >= 2 || hasActiveFilters) {
+        return 'deep';
+    }
+    if (routingDecision === 'TOPOLOGY_HIT' && allSeedsTopologyCached) {
+        return 'instant';
+    }
+    if (routingDecision === 'PARTIAL') {
+        return 'partial';
+    }
+    return 'deep';
+}
 /** Recursively strips secrets from a payload before it is written to logs. */
 const SENSITIVE_KEYS = new Set(['password', 'apiKey', 'api_key', 'token', 'secret', 'authorization']);
 const redactSensitive = (value, depth = 0) => {

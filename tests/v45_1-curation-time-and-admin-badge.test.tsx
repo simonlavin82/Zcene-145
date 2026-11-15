@@ -4,6 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ConsolidatedValidationModal, PreFlightSeed, TokenConfirmationDialog } from '../components/SharedModals';
 import { LoadingSpinner } from '../components/Icons';
 import GraphPage from '../components/GraphPage';
+import { DetailsPanel } from '../components/DetailsPanel';
 import { classifyCurationSpeed } from '../services/cacheQualification';
 import { httpsCallable } from 'firebase/functions';
 
@@ -570,6 +571,86 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(screen.getByText('Loading connections... Ready in a few seconds.')).toBeInTheDocument();
       expect(screen.queryByText(/curatorial dataset/i)).not.toBeInTheDocument();
       expect(screen.queryByText(/3–5 minutes/i)).not.toBeInTheDocument();
+    });
+  });
+
+  describe('6. DEEP CUTS Loader Primacy & viewedIndex Clamping (<DetailsPanel>)', () => {
+    const baseDetailsProps = {
+      selectedNode: null,
+      activeNodes: [],
+      detailsCache: new Map(),
+      loadingNodeIds: new Set<string>(),
+      onTogglePinNode: vi.fn(),
+      pinnedNodes: new Set<string>(),
+      onRefreshNode: vi.fn(),
+      error: null,
+      systemError: null,
+      graphData: { nodes: [], links: [] },
+      libraryArtists: [],
+      seedArtists: ['The Jealous Sound', 'Hey Mercedes'],
+      onAddArtist: vi.fn(),
+      isCollapsed: false,
+      onToggleCollapse: vi.fn(),
+      isSmallScreen: false,
+      onNodeClick: vi.fn(),
+      onNavigate: vi.fn(),
+      isGlobalLoading: false,
+      onCancelGlobalLoading: vi.fn(),
+      unreadCount: 0,
+      isActive: true,
+      isMagazineViewOpen: false,
+      onMagazineViewToggle: vi.fn(),
+      chatHistories: new Map(),
+      onUpdateChatHistories: vi.fn(),
+      onAddToStack: vi.fn(),
+    };
+
+    it('renders "Waiting for Connections to settle..." and "Graph mapping takes priority." when isGlobalLoading={true} even if graphData.nodes is empty', () => {
+      render(
+        <DetailsPanel
+          {...baseDetailsProps}
+          isGlobalLoading={true}
+          graphData={{ nodes: [], links: [] }}
+          activeNodes={[]}
+        />
+      );
+
+      expect(screen.getByText('Waiting for Connections to settle...')).toBeInTheDocument();
+      expect(screen.getByText('Graph mapping takes priority. Details will follow.')).toBeInTheDocument();
+      expect(screen.queryByText('Create Your Zcene')).not.toBeInTheDocument();
+    });
+
+    it('clamps translateX offset to 0% when activeNodes becomes empty after viewing at viewedIndex > 0', () => {
+      const mockNodes: any[] = [
+        { id: 'the-jealous-sound', type: 'artist', label: 'The Jealous Sound' },
+        { id: 'hey-mercedes', type: 'artist', label: 'Hey Mercedes' },
+        { id: 'sense-field', type: 'artist', label: 'Sense Field' },
+      ];
+
+      const { rerender } = render(
+        <DetailsPanel
+          {...baseDetailsProps}
+          activeNodes={mockNodes}
+          graphData={{ nodes: mockNodes, links: [] }}
+          selectedNode={mockNodes[1]}
+        />
+      );
+
+      // Verify that after transitioning to an empty slate on overwrite with isGlobalLoading={true}
+      rerender(
+        <DetailsPanel
+          {...baseDetailsProps}
+          activeNodes={[]}
+          graphData={{ nodes: [], links: [] }}
+          selectedNode={null}
+          isGlobalLoading={true}
+        />
+      );
+
+      const container = screen.getByTestId('deep-cut-cards-container');
+      expect(container.style.transform).toBe('translateX(-0%)');
+      expect(screen.getByText('Waiting for Connections to settle...')).toBeInTheDocument();
+      expect(screen.getByText('Graph mapping takes priority. Details will follow.')).toBeInTheDocument();
     });
   });
 });

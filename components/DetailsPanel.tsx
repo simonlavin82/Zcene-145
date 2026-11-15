@@ -3886,6 +3886,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [selectedNode, filteredAndSortedNodes]);
 
+    useEffect(() => {
+        if (filteredAndSortedNodes.length === 0) {
+            if (viewedIndex !== 0) setViewedIndex(0);
+        } else if (viewedIndex >= filteredAndSortedNodes.length) {
+            setViewedIndex(filteredAndSortedNodes.length - 1);
+        }
+    }, [filteredAndSortedNodes.length, viewedIndex]);
+
     // Stop active audio preview when switching viewed node in panel mode
     useEffect(() => {
         if (!isMagazineViewOpen && viewedNode?.id) {
@@ -4492,18 +4500,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         )}
                         {/* 4) DEEP CUT CARDS GRID (Z-INDEX 10) */}
                         <div
+                            data-testid="deep-cut-cards-container"
                             className={`${renderMode === 'magazine'
                                 ? `grid grid-cols-[repeat(auto-fit,minmax(min(100%,400px),1fr))] gap-12 items-start max-w-[1400px] mx-auto pt-4 md:pt-6 lg:pt-8 pb-[calc(env(safe-area-inset-bottom)_+_3rem)] transition-opacity duration-300 ease-in-out ${!isMagazineViewOpen || isTransitioning ? 'opacity-0 min-w-[100vw]' : 'opacity-100 w-full'}`
                                 : `flex ${isStaticMockup ? 'h-auto' : 'h-full'} w-full transition-all duration-300 ease-in-out will-change-transform touch-pan-y ${isTransitioning ? 'opacity-0' : 'opacity-100'}`
                                 } relative z-10`}
                             style={renderMode === 'panel' ? {
-                                transform: `translateX(-${viewedIndex * 100}%)`,
+                                transform: `translateX(-${(filteredAndSortedNodes.length === 0 ? 0 : Math.min(viewedIndex, filteredAndSortedNodes.length - 1)) * 100}%)`,
                                 overscrollBehaviorX: 'none'
                             } : {}}
                         >
                             {filteredAndSortedNodes.length === 0 || systemError ? (
                                 <div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none">
-                                    {(isReconciliationPending || (Boolean(graphData?.nodes && graphData.nodes.length > 0) && !magazineSearchQuery.trim() && seedArtists && seedArtists.length > 0)) && !systemError ? (
+                                    {(isGlobalLoading || isReconciliationPending || (Boolean(graphData?.nodes && graphData.nodes.length > 0) && !magazineSearchQuery.trim() && seedArtists && seedArtists.length > 0)) && !systemError ? (
                                         <div className="flex flex-col items-center justify-center gap-6">
                                             {isGlobalLoading ? (
                                                 <LoadingSpinner

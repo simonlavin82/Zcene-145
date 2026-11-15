@@ -193,7 +193,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
     document: "curationJobs/{jobId}",
     secrets: ["GEMINI_API_KEY"],
     timeoutSeconds: 540, // Firebase Functions v2 SDK enforces a hard 540s cap for Firestore event triggers
-    memory: "1GiB",
+    memory: "2GiB",
 }, async (event) => {
     const snapshot = event.data;
     if (!snapshot) {
@@ -2115,6 +2115,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     curatedDiscoveryFilters: inputPayload.filters || {},
                     graphData: finalGraph,
                     synthesisRationale: finalGraph.synthesisRationale || rootBreakdownStr || "",
+                    ...(prevTargetScene?.zineTitle ? { zineTitle: prevTargetScene.zineTitle } : {}),
                     ...(prevTargetScene?.zineIntro ? { zineIntro: prevTargetScene.zineIntro } : {}),
                     ...(prevTargetScene?.zineImages ? { zineImages: prevTargetScene.zineImages } : {}),
                     artistSnippets: sceneArtistSnippetsMap,
