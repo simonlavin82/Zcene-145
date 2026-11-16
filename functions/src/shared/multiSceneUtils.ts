@@ -9,6 +9,7 @@ import {
   DiscoveryFilters,
   ZineImageSlot,
   ZineEditorialImageEntry,
+  OverarchingHistoryEntry,
 } from '../types';
 import { stripCountrySlug } from './isoCountries';
 
@@ -2093,4 +2094,232 @@ export function compactDetailsCacheToCanonical(
   }
 
   return result;
+}
+
+// ── Overarching History & Canonical Signature System ([Rule 29], [Rule 44]) ──
+
+export const MAX_OVERARCHING_HISTORY_ENTRIES = 10;
+
+/**
+ * Computes a deterministic canonical signature for a set of curated scenes.
+ * - Only includes curated scenes with mapped topology (graphData.nodes.length > 0).
+ * - For each scene: extracts sorted canonical seed IDs and normalized discovery filters.
+ * - Sorts all scene tokens alphabetically so scene ordering (scene-1, scene-2, etc.) does NOT alter the signature.
+ */
+export function computeSceneSetSignature(scenes: (ProjectScene | any)[]): string {
+  if (!Array.isArray(scenes) || scenes.length === 0) return '';
+  const curated = scenes.filter((s: any) => {
+    if (!s) return false;
+    let nodesCount = 0;
+    if (s.graphData) {
+      if (Array.isArray(s.graphData.nodes)) {
+        nodesCount = s.graphData.nodes.length;
+      } else if (typeof s.graphData === 'string') {
+        try {
+          const parsed = JSON.parse(s.graphData);
+          nodesCount = parsed?.nodes?.length || 0;
+        } catch {}
+      }
+    }
+    return nodesCount > 0 || s.status === 'completed' || s.status === 'ready';
+  });
+
+  if (curated.length < 2) return '';
+
+  const sceneTokens = curated.map((s: any) => {
+    const rawSeeds = s.curatedSeedArtists || s.seedArtists || '';
+    const seedArray = toSeedArtistsArray(rawSeeds);
+    const sortedSeeds = seedArray
+      .map(seed => normalizeCanonicalEntityId(seed))
+      .filter(Boolean)
+      .sort()
+      .join(',');
+
+    let filters = s.curatedDiscoveryFilters || s.discoveryFilters;
+    if (typeof filters === 'string') {
+      try { filters = JSON.parse(filters); } catch { filters = {}; }
+    }
+    const cleanFilters = filters && typeof filters === 'object' ? filters : {};
+    const filterKeys = Object.keys(cleanFilters).filter(k => {
+      const val = cleanFilters[k];
+      return Array.isArray(val) ? val.length > 0 : Boolean(val);
+    }).sort();
+
+    let filterToken = '';
+    if (filterKeys.length > 0) {
+      const parts = filterKeys.map(k => {
+        const val = cleanFilters[k];
+        if (Array.isArray(val)) {
+          return `${k}:${[...val].map(v => String(v).trim().toLowerCase()).sort().join(';')}`;
+        }
+        return `${k}:${String(val).trim().toLowerCase()}`;
+      });
+      filterToken = parts.join('&');
+    }
+
+    return filterToken ? `${sortedSeeds}#${filterToken}` : sortedSeeds;
+  });
+
+  return sceneTokens.sort().join('+');
+}
+
+/**
+ * Parses overarchingHistory safely from JSON string or object representation.
+ */
+export function parseOverarchingHistory(raw: any): Record<string, OverarchingHistoryEntry> {
+  if (!raw) return {};
+  let parsed = raw;
+  if (typeof raw === 'string') {
+    try {
+      parsed = JSON.parse(raw);
+    } catch {
+      return {};
+    }
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  return parsed as Record<string, OverarchingHistoryEntry>;
+}
+
+/**
+ * Prunes overarchingHistory to the most recent entries per [Rule 29] to prevent Firestore document bloat.
+ */
+export function pruneOverarchingHistory(
+  history: Record<string, OverarchingHistoryEntry>,
+  maxEntries: number = MAX_OVERARCHING_HISTORY_ENTRIES
+): Record<string, OverarchingHistoryEntry> {
+  if (!history || typeof history !== 'object') return {};
+  const entries = Object.entries(history);
+  if (entries.length <= maxEntries) return history;
+
+  entries.sort((a, b) => {
+    const timeA = a[1].archivedAt ? new Date(a[1].archivedAt).getTime() : 0;
+    const timeB = b[1].archivedAt ? new Date(b[1].archivedAt).getTime() : 0;
+    return timeB - timeA;
+  });
+
+  const pruned: Record<string, OverarchingHistoryEntry> = {};
+  for (let i = 0; i < maxEntries && i < entries.length; i++) {
+    pruned[entries[i][0]] = entries[i][1];
+  }
+  return pruned;
+}
+
+export interface ShiftSceneCoordinatesParams {
+  scenes: (ProjectScene | any)[];
+  removedSceneId: string;
+  canvasLayout?: CanvasNodeRef[] | string | null;
+}
+
+export interface ShiftSceneCoordinatesResult {
+  remainingScenes: ProjectScene[];
+  shiftedCanvasLayout: CanvasNodeRef[];
+}
+
+/**
+ * Shifts both canvasLayout (savedPositions) AND scene.graphData.nodes x/fx Coordinates
+ * when removing a scene per Guardrail 3 ([Rule 29], [Rule 44]).
+ * For every remaining scene with oldIdx > removedIdx, computes dx = (newIdx - oldIdx) * 1050
+ * and shifts both matching scene-k::* entries in canvasLayout AND any x/fx on s.graphData.nodes.
+ */
+export function shiftSceneClusterCoordinates({
+  scenes,
+  removedSceneId,
+  canvasLayout,
+}: ShiftSceneCoordinatesParams): ShiftSceneCoordinatesResult {
+  if (!Array.isArray(scenes) || scenes.length === 0) {
+    return { remainingScenes: [], shiftedCanvasLayout: [] };
+  }
+
+  const removedIdx = scenes.findIndex(
+    (s) => (s?.sceneId || s?.id) === removedSceneId
+  );
+  if (removedIdx === -1) {
+    let parsedLayout: CanvasNodeRef[] = [];
+    if (canvasLayout) {
+      if (typeof canvasLayout === 'string') {
+        try { parsedLayout = JSON.parse(canvasLayout); } catch {}
+      } else if (Array.isArray(canvasLayout)) {
+        parsedLayout = [...canvasLayout];
+      }
+    }
+    return {
+      remainingScenes: [...scenes],
+      shiftedCanvasLayout: parsedLayout,
+    };
+  }
+
+  let parsedLayout: CanvasNodeRef[] = [];
+  if (canvasLayout) {
+    if (typeof canvasLayout === 'string') {
+      try { parsedLayout = JSON.parse(canvasLayout); } catch {}
+    } else if (Array.isArray(canvasLayout)) {
+      parsedLayout = [...canvasLayout];
+    }
+  }
+
+  // Filter out the removed scene's nodes from canvasLayout
+  parsedLayout = parsedLayout.filter(
+    (item) => !item.nodeId.startsWith(`${removedSceneId}::`)
+  );
+
+  const remainingScenes: ProjectScene[] = [];
+
+  for (let oldIdx = 0; oldIdx < scenes.length; oldIdx++) {
+    if (oldIdx === removedIdx) continue;
+    const scene = scenes[oldIdx];
+    const newIdx = remainingScenes.length;
+    const dx = (newIdx - oldIdx) * 1050;
+
+    let updatedGraphData: GraphData = { nodes: [], links: [] };
+    if (scene.graphData) {
+      const g = typeof scene.graphData === 'string'
+        ? (() => { try { return JSON.parse(scene.graphData); } catch { return { nodes: [], links: [] }; } })()
+        : scene.graphData;
+      updatedGraphData = {
+        nodes: Array.isArray(g.nodes) ? g.nodes.map((node: any) => ({ ...node })) : [],
+        links: Array.isArray(g.links) ? g.links.map((link: any) => ({ ...link })) : [],
+        ...(g.synthesisRationale ? { synthesisRationale: g.synthesisRationale } : {})
+      };
+    }
+
+    if (dx !== 0 && Array.isArray(updatedGraphData.nodes)) {
+      updatedGraphData.nodes = updatedGraphData.nodes.map((node: any) => ({
+        ...node,
+        ...(typeof node.x === 'number' ? { x: node.x + dx } : {}),
+        ...(typeof node.fx === 'number' ? { fx: node.fx + dx } : {}),
+      }));
+
+      // Also shift matching entries in canvasLayout
+      const sceneNodeIds = new Set(updatedGraphData.nodes.map((n: any) => n.id));
+      const sid = scene.sceneId || scene.id;
+      parsedLayout = parsedLayout.map((item) => {
+        const isMatch = sceneNodeIds.has(item.nodeId) ||
+          (sid && item.nodeId.startsWith(`${sid}::`));
+        if (isMatch) {
+          return {
+            ...item,
+            x: typeof item.x === 'number' ? item.x + dx : item.x,
+            ...(typeof item.fx === 'number' ? { fx: item.fx + dx } : {}),
+          };
+        }
+        return item;
+      });
+    }
+
+    const normalized = normalizeProjectScene({
+      ...scene,
+      sceneIndex: newIdx,
+      title: scene.customName || `Scene ${newIdx + 1}`,
+      name: scene.customName || `Scene ${newIdx + 1}`,
+      centerOffset: getSceneCenterOffset(newIdx),
+      graphData: updatedGraphData,
+    }, newIdx);
+
+    remainingScenes.push(normalized);
+  }
+
+  return {
+    remainingScenes,
+    shiftedCanvasLayout: parsedLayout,
+  };
 }

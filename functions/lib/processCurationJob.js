@@ -305,6 +305,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             }
         };
         ingestDetailsCacheIntoMap(inputPayload?.detailsCache || inputPayload?.existingDetailsCache);
+        let initialProjectDocData = null;
         if (inputPayload?.projectId && jobData.userId) {
             try {
                 const projSnap = await db
@@ -315,6 +316,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     .get();
                 if (projSnap && projSnap.exists) {
                     const projData = projSnap.data();
+                    initialProjectDocData = projData;
                     if (existingProjectScenes.length === 0 && projData?.scenes) {
                         existingProjectScenes = (0, multiSceneUtils_1.parseProjectScenes)(projData.scenes);
                     }
@@ -2267,10 +2269,11 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             // Accumulate apiUsage and tokensSpent across scenes on the parent project document
             let accumulatedProjectApiUsage = { ...mergedApiUsage };
             let accumulatedTokensSpent = typeof inputPayload?.tokensSpent === "number" ? inputPayload.tokensSpent : 0;
+            let pData = {};
             try {
                 const projectSnap = await db.collection("users").doc(jobData.userId).collection("projects").doc(inputPayload.projectId).get();
                 if (projectSnap.exists) {
-                    const pData = projectSnap.data() || {};
+                    pData = projectSnap.data() || {};
                     if (pData.apiUsage && typeof pData.apiUsage === "object") {
                         accumulatedProjectApiUsage = { ...pData.apiUsage };
                         for (const [model, usage] of Object.entries(mergedApiUsage)) {
@@ -2291,6 +2294,66 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             catch (pErr) {
                 console.warn(`[Curation Backend] Non-fatal project telemetry fetch warning:`, pErr?.message || pErr);
             }
+            // Overarching History Persistence ([Rule 29], Guardrail 1)
+            const existingHistoryMap = (0, multiSceneUtils_1.parseOverarchingHistory)(pData?.overarchingHistory || initialProjectDocData?.overarchingHistory);
+            // 1. Pre-archive previous overarching state if it existed and was settled across >= 2 scenes
+            const prevDocRationale = pData?.overarchingRationale || initialProjectDocData?.overarchingRationale;
+            const prevDocScenesRaw = pData?.scenes || initialProjectDocData?.scenes;
+            if (prevDocRationale && prevDocScenesRaw) {
+                const prevDocScenes = (0, multiSceneUtils_1.parseProjectScenes)(prevDocScenesRaw);
+                if (prevDocScenes.length >= 2) {
+                    const prevSig = (0, multiSceneUtils_1.computeSceneSetSignature)(prevDocScenes);
+                    if (prevSig) {
+                        const rawCrossLinks = pData?.crossSceneLinks ?? initialProjectDocData?.crossSceneLinks;
+                        let parsedCrossLinks = [];
+                        if (typeof rawCrossLinks === "string") {
+                            try {
+                                parsedCrossLinks = JSON.parse(rawCrossLinks);
+                            }
+                            catch { }
+                        }
+                        else if (Array.isArray(rawCrossLinks)) {
+                            parsedCrossLinks = rawCrossLinks;
+                        }
+                        existingHistoryMap[prevSig] = {
+                            sceneSignature: prevSig,
+                            overarchingRationale: prevDocRationale,
+                            ...(pData?.overarchingZineTitle || initialProjectDocData?.overarchingZineTitle
+                                ? { overarchingZineTitle: pData?.overarchingZineTitle || initialProjectDocData?.overarchingZineTitle }
+                                : {}),
+                            ...(pData?.overarchingZineIntro || initialProjectDocData?.overarchingZineIntro
+                                ? { overarchingZineIntro: pData?.overarchingZineIntro || initialProjectDocData?.overarchingZineIntro }
+                                : {}),
+                            ...(pData?.overarchingZineImages || initialProjectDocData?.overarchingZineImages
+                                ? { overarchingZineImages: pData?.overarchingZineImages || initialProjectDocData?.overarchingZineImages }
+                                : {}),
+                            crossSceneLinks: parsedCrossLinks,
+                            archivedAt: new Date().toISOString(),
+                            sceneCount: prevDocScenes.length,
+                            sceneSeeds: prevDocScenes.map((s) => s.curatedSeedArtists || s.seedArtists || "").filter(Boolean),
+                        };
+                    }
+                }
+            }
+            // 2. Archive the newly synthesized overarching state if multi-scene
+            if (result.overarchingRationale && finalProjectScenes.length >= 2) {
+                const newSig = (0, multiSceneUtils_1.computeSceneSetSignature)(finalProjectScenes);
+                if (newSig) {
+                    const priorEntryForSig = existingHistoryMap[newSig];
+                    existingHistoryMap[newSig] = {
+                        sceneSignature: newSig,
+                        overarchingRationale: result.overarchingRationale,
+                        ...(priorEntryForSig?.overarchingZineTitle ? { overarchingZineTitle: priorEntryForSig.overarchingZineTitle } : {}),
+                        ...(priorEntryForSig?.overarchingZineIntro ? { overarchingZineIntro: priorEntryForSig.overarchingZineIntro } : {}),
+                        ...(priorEntryForSig?.overarchingZineImages ? { overarchingZineImages: priorEntryForSig.overarchingZineImages } : {}),
+                        crossSceneLinks: result.crossSceneLinks || [],
+                        archivedAt: new Date().toISOString(),
+                        sceneCount: finalProjectScenes.length,
+                        sceneSeeds: finalProjectScenes.map((s) => s.curatedSeedArtists || s.seedArtists || "").filter(Boolean),
+                    };
+                }
+            }
+            const prunedOverarchingHistory = (0, multiSceneUtils_1.pruneOverarchingHistory)(existingHistoryMap);
             await updateProjectStatus(jobData.userId, inputPayload.projectId, {
                 status: "completed",
                 schemaVersion: 43,
@@ -2306,6 +2369,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         overarchingRationale: result.overarchingRationale || "",
                         crossSceneLinks: JSON.stringify(result.crossSceneLinks || []),
                     }
+                    : {}),
+                ...(Object.keys(prunedOverarchingHistory).length > 0
+                    ? { overarchingHistory: JSON.stringify(prunedOverarchingHistory) }
                     : {}),
                 artistIds: artistEntityIds,
                 labelIds: labelEntityIds,

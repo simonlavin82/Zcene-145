@@ -683,7 +683,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                         updatedAt: firestore_1.FieldValue.serverTimestamp(),
                         inputPayload: {
                             ...payload,
-                            mode: determinedGenerationType === "Direct Hit" && updatedScenes.length >= 2 ? "overarching_only" : "standard",
+                            mode: payload.mode === "overarching_only" ? "overarching_only" : (determinedGenerationType === "Direct Hit" && updatedScenes.length >= 2 ? "overarching_only" : "standard"),
                             targetSceneId,
                             sceneIndex: targetSceneIndex,
                             scenes: updatedScenes,

@@ -15,7 +15,8 @@ import {
   getPrimaryGenreLabel,
 } from '../services/artistCacheService';
 import { hasActiveDiscoveryFilters, sanitizeAnchorLabelInput } from '../services/cacheQualification';
-import { toSeedArtistsArray, stripSceneNamespace, MAX_SCENES_PER_PROJECT, computeClampedDropdownLeft } from '../shared/multiSceneUtils';
+import { toSeedArtistsArray, stripSceneNamespace, MAX_SCENES_PER_PROJECT, computeClampedDropdownLeft, computeSceneSetSignature, parseOverarchingHistory } from '../shared/multiSceneUtils';
+import { OverarchingHistoryEntry } from '../types';
 import HelpPage from './HelpPage';
 import Header from './Header';
 import MusicGraph from './MusicGraph';
@@ -139,12 +140,13 @@ interface GraphPageProps {
   activeSceneId?: string;
   onSelectScene?: (sceneId: string) => void;
   onAddScene?: () => void;
-  onRemoveScene?: (sceneId: string) => void;
+  onRemoveScene?: (sceneId: string, action?: 'overwrite' | 'fork') => void;
   onRenameScene?: (sceneId: string, customName: string) => void;
   overarchingRationale?: string;
   overarchingZineTitle?: string;
   overarchingZineIntro?: string;
   overarchingZineImages?: ZineEditorialImageEntry[];
+  overarchingHistory?: Record<string, OverarchingHistoryEntry> | string | null;
   onUpdateZineImages?: (target: 'overarching' | string, slotIndex: number, entry: ZineEditorialImageEntry) => void;
   onSwapZineImages?: (target: 'overarching' | string, indexA: number, indexB: number) => void;
   onUpdateZineTitle?: (target: 'overarching' | string, title: string | null) => void;
@@ -896,7 +898,9 @@ const UpdateInterceptModal: React.FC<{
     onSaveAsNew: () => void;
     confirmOverwrite: boolean;
     setConfirmOverwrite: (val: boolean) => void;
-}> = ({ isOpen, onClose, onOverwrite, onSaveAsNew, confirmOverwrite, setConfirmOverwrite }) => {
+    title?: string;
+    description?: React.ReactNode;
+}> = ({ isOpen, onClose, onOverwrite, onSaveAsNew, confirmOverwrite, setConfirmOverwrite, title, description }) => {
     if (!isOpen) return null;
     return (
         <ModalBackdrop className="z-[110]" onClick={onClose}>
@@ -904,7 +908,7 @@ const UpdateInterceptModal: React.FC<{
                 <ModalHeader>
                     <div className="flex items-center gap-2">
                         <span className="material-symbols-outlined text-primary !text-[18px]">account_tree</span>
-                        <h3 className="font-medium text-white text-base">Update Zcene</h3>
+                        <h3 className="font-medium text-white text-base">{title || "Update Zcene"}</h3>
                     </div>
                     <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors">
                         <span className="material-symbols-outlined !text-[18px]">close</span>
@@ -912,7 +916,7 @@ const UpdateInterceptModal: React.FC<{
                 </ModalHeader>
                 <ModalBody>
                     <p className="text-zinc-300 text-sm mb-4">
-                        You are about to generate new connections. Would you like to fork a new Zcene, or overwrite the existing one?
+                        {description || "You are about to generate new connections. Would you like to fork a new Zcene, or overwrite the existing one?"}
                     </p>
                     <div className="p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl hover:bg-zinc-800/50 transition-colors">
                         <Checkbox 
@@ -1211,6 +1215,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   overarchingZineTitle,
   overarchingZineIntro,
   overarchingZineImages,
+  overarchingHistory,
   onUpdateZineImages,
   onSwapZineImages,
   onUpdateZineTitle,
@@ -1353,7 +1358,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   const [isLibraryDialogOpen, setIsLibraryDialogOpen] = useState(false);
   const [isUpdateModalOpen, setIsUpdateModalOpen] = useState(false);
-  const [scenePendingRemoval, setScenePendingRemoval] = useState<{ sceneId: string; title: string; index: number } | null>(null);
+  const [sceneRemovalIntercept, setSceneRemovalIntercept] = useState<{
+    sceneId: string;
+    title: string;
+    index: number;
+    mode: 'case_a' | 'case_b' | 'case_c';
+  } | null>(null);
+  const [confirmRemoveOverwrite, setConfirmRemoveOverwrite] = useState(false);
   const [sceneToRename, setSceneToRename] = useState<{ sceneId: string; currentName: string; index: number } | null>(null);
   const [sceneRenameInput, setSceneRenameInput] = useState('');
   const [activeSceneMenuId, setActiveSceneMenuId] = useState<string | null>(null);
@@ -2440,15 +2451,36 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                         setActiveSceneMenuId(null);
                                         const targetScene = scenes.find(s => (s.sceneId || s.id) === sceneKey);
                                         const isMapped = (targetScene?.graphData?.nodes?.length || 0) > 0;
-                                        if (isMapped) {
-                                          setScenePendingRemoval({
-                                            sceneId: sceneKey,
-                                            title: targetScene?.customName || targetScene?.title || targetScene?.name || `Scene ${idx + 1}`,
-                                            index: idx + 1
-                                          });
-                                        } else {
+                                        if (!isMapped) {
+                                          // Guardrail 4: Uncurated draft scene stubs (nodes.length === 0) stay instant and free with no modal
                                           onRemoveScene(sceneKey);
+                                          return;
                                         }
+
+                                        const remainingCurated = scenes.filter(
+                                          s => (s.sceneId || s.id) !== sceneKey && (s.graphData?.nodes?.length || 0) > 0
+                                        );
+
+                                        let mode: 'case_a' | 'case_b' | 'case_c' = 'case_a';
+                                        if (remainingCurated.length <= 1) {
+                                          mode = 'case_a';
+                                        } else {
+                                          const sig = computeSceneSetSignature(remainingCurated);
+                                          const historyMap = parseOverarchingHistory(overarchingHistory);
+                                          if (sig && historyMap[sig]) {
+                                            mode = 'case_b';
+                                          } else {
+                                            mode = 'case_c';
+                                          }
+                                        }
+
+                                        setConfirmRemoveOverwrite(false);
+                                        setSceneRemovalIntercept({
+                                          sceneId: sceneKey,
+                                          title: targetScene?.customName || targetScene?.title || targetScene?.name || `Scene ${idx + 1}`,
+                                          index: idx + 1,
+                                          mode
+                                        });
                                       }}
                                       className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
                                     >
@@ -2923,50 +2955,30 @@ const GraphPage: React.FC<GraphPageProps> = ({
             }}
         />
         {showConfirmDelete && <ConfirmDeleteModal />}
-        {scenePendingRemoval && (
-          <ModalBackdrop className="z-[110]" onClick={() => setScenePendingRemoval(null)}>
-            <ModalContainer className="text-left sm:max-w-md">
-              <ModalHeader>
-                <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-red-400 !text-[18px]">delete</span>
-                  <h3 className="text-base font-medium text-white">Remove Scene?</h3>
-                </div>
-                <button 
-                  onClick={() => setScenePendingRemoval(null)} 
-                  className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"
-                  aria-label="Close"
-                >
-                  <span className="material-symbols-outlined !text-[18px]">close</span>
-                </button>
-              </ModalHeader>
-
-              <div className="p-5 space-y-4 text-sm text-zinc-400">
-                <p className="leading-relaxed">
-                  Are you sure you want to remove Scene {scenePendingRemoval.index} ({scenePendingRemoval.title}) from this Zcene? Its mapped connections and editorial narrative will be permanently removed.
-                </p>
-              </div>
-
-              <ModalFooter>
-                <button 
-                  onClick={() => setScenePendingRemoval(null)} 
-                  className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button 
-                  onClick={() => {
-                    const sid = scenePendingRemoval.sceneId;
-                    setScenePendingRemoval(null);
-                    onRemoveScene?.(sid);
-                  }} 
-                  className="px-4 py-1.5 bg-red-500 text-white rounded-xl font-medium text-sm transition-opacity hover:opacity-90"
-                >
-                  Remove Scene
-                </button>
-              </ModalFooter>
-            </ModalContainer>
-          </ModalBackdrop>
-        )}
+        <UpdateInterceptModal 
+            isOpen={Boolean(sceneRemovalIntercept)}
+            onClose={() => setSceneRemovalIntercept(null)}
+            title="Update Zcene"
+            description={
+              sceneRemovalIntercept?.mode === 'case_a'
+                ? "Removing this scene will return this project to a single scene. Would you like to overwrite this Zcene or save as a new Zcene?"
+                : sceneRemovalIntercept?.mode === 'case_b'
+                  ? "Removing this scene will restore the previous Overarching Editorial for the remaining scenes. Would you like to overwrite this Zcene or save as a new Zcene?"
+                  : "Removing this scene requires synthesizing a new Overarching Editorial for the remaining scenes (5 Tokens, ~1–2 min). Would you like to overwrite this Zcene or save as a new Zcene?"
+            }
+            confirmOverwrite={confirmRemoveOverwrite}
+            setConfirmOverwrite={setConfirmRemoveOverwrite}
+            onOverwrite={() => {
+              const sid = sceneRemovalIntercept?.sceneId;
+              setSceneRemovalIntercept(null);
+              if (sid) onRemoveScene?.(sid, 'overwrite');
+            }}
+            onSaveAsNew={() => {
+              const sid = sceneRemovalIntercept?.sceneId;
+              setSceneRemovalIntercept(null);
+              if (sid) onRemoveScene?.(sid, 'fork');
+            }}
+        />
 
         {sceneToRename && (
           <ModalBackdrop className="z-[110]" onClick={() => setSceneToRename(null)}>

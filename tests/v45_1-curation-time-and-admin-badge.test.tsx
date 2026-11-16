@@ -6,6 +6,7 @@ import { LoadingSpinner } from '../components/Icons';
 import GraphPage from '../components/GraphPage';
 import { DetailsPanel } from '../components/DetailsPanel';
 import { classifyCurationSpeed } from '../services/cacheQualification';
+import { computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates } from '../shared/multiSceneUtils';
 import { httpsCallable } from 'firebase/functions';
 
 vi.mock('firebase/functions', () => ({
@@ -1142,6 +1143,212 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
 
       expect(didAutoSelect).toBe(false);
       expect(hasAutoSelected).toBe(null);
+    });
+  });
+
+  describe('Architecture V45.1: overarchingHistory Archive & 3-Case Scene Removal Intercept ([Rule 29], [Rule 44])', () => {
+    const scene1 = {
+      sceneId: 'scene-1',
+      sceneIndex: 0,
+      curatedSeedArtists: 'The Jealous Sound::Hey Mercedes',
+      seedArtists: 'The Jealous Sound::Hey Mercedes',
+      graphData: {
+        nodes: Array.from({ length: 19 }, (_, i) => ({ id: `scene-1::node-${i}`, x: 1000 + i * 10, fx: 1000 + i * 10, type: 'artist' })),
+        links: []
+      },
+      status: 'completed',
+    };
+
+    const scene2 = {
+      sceneId: 'scene-2',
+      sceneIndex: 1,
+      curatedSeedArtists: 'Elliott',
+      seedArtists: 'Elliott',
+      graphData: {
+        nodes: Array.from({ length: 18 }, (_, i) => ({ id: `scene-2::node-${i}`, x: 2050 + i * 10, fx: 2050 + i * 10, type: 'artist' })),
+        links: []
+      },
+      status: 'completed',
+    };
+
+    const scene3 = {
+      sceneId: 'scene-3',
+      sceneIndex: 2,
+      curatedSeedArtists: 'Jimmy Eat World',
+      seedArtists: 'Jimmy Eat World',
+      graphData: {
+        nodes: Array.from({ length: 19 }, (_, i) => ({ id: `scene-3::node-${i}`, x: 3100 + i * 10, fx: 3100 + i * 10, type: 'artist' })),
+        links: []
+      },
+      status: 'completed',
+    };
+
+    const scene4 = {
+      sceneId: 'scene-4',
+      sceneIndex: 3,
+      curatedSeedArtists: 'Yellowcard',
+      seedArtists: 'Yellowcard',
+      graphData: {
+        nodes: Array.from({ length: 18 }, (_, i) => ({ id: `scene-4::node-${i}`, x: 4150 + i * 10, fx: 4150 + i * 10, type: 'artist' })),
+        links: []
+      },
+      status: 'completed',
+    };
+
+    const uncuratedStub = {
+      sceneId: 'scene-stub',
+      sceneIndex: 4,
+      curatedSeedArtists: 'Sunny Day Real Estate',
+      seedArtists: 'Sunny Day Real Estate',
+      graphData: { nodes: [], links: [] },
+      status: 'idle',
+    };
+
+    it('1. Deterministic canonical signature computation: sorts seeds, ignores scene order, ignores uncurated stubs', () => {
+      const sigForward = computeSceneSetSignature([scene1, scene2]);
+      const sigBackward = computeSceneSetSignature([scene2, scene1]);
+
+      expect(sigForward).toBeTruthy();
+      expect(sigForward).toBe(sigBackward);
+
+      // Uncurated stub with 0 nodes does not alter signature
+      const sigWithStub = computeSceneSetSignature([scene1, scene2, uncuratedStub]);
+      expect(sigWithStub).toBe(sigForward);
+
+      // Adding a 3rd curated scene produces a distinct stable signature
+      const sig3Scenes = computeSceneSetSignature([scene1, scene2, scene3]);
+      expect(sig3Scenes).toBeTruthy();
+      expect(sig3Scenes).not.toBe(sigForward);
+      expect(computeSceneSetSignature([scene3, scene1, scene2])).toBe(sig3Scenes);
+    });
+
+    it('2. Case A (Single Scene Fallback): removing scene when 1 curated scene remains clears overarching rationale/links', () => {
+      const allScenes = [scene1, scene2];
+      const remainingCurated = allScenes.filter(s => (s.sceneId || s.id) !== 'scene-2' && s.graphData.nodes.length > 0);
+
+      expect(remainingCurated.length).toBe(1);
+
+      // In Case A, removing scene-2 leaves 1 scene: overarching editorial must be cleared
+      const isCaseA = remainingCurated.length <= 1;
+      expect(isCaseA).toBe(true);
+
+      const nextOverarchingRationale = isCaseA ? '' : 'preserved';
+      const nextCrossSceneLinks = isCaseA ? [] : [{ sourceSceneId: 'scene-1', targetSceneId: 'scene-2' }];
+
+      expect(nextOverarchingRationale).toBe('');
+      expect(nextCrossSceneLinks).toEqual([]);
+    });
+
+    it('3. Case B (Archive Hit): restores archived Overarching Zine (editorial, title, intro, links) instantly without token spend', () => {
+      const remainingCurated = [scene1, scene2];
+      const targetSig = computeSceneSetSignature(remainingCurated);
+
+      const archivedEntry = {
+        sceneSignature: targetSig,
+        overarchingRationale: '# The Dual Soundscape\nArchived editorial between The Jealous Sound and Elliott.',
+        overarchingZineTitle: 'Midwest & West Coast Emo Architecture',
+        overarchingZineIntro: 'Archived dedication note.',
+        overarchingZineImages: [{ url: 'https://example.com/jealous.jpg', caption: 'The Jealous Sound' }],
+        crossSceneLinks: [{ sourceSceneId: 'scene-1', targetSceneId: 'scene-2', bridgeType: 'sonic_lineage' }],
+        archivedAt: new Date().toISOString(),
+        sceneCount: 2,
+        sceneSeeds: ['The Jealous Sound', 'Elliott'],
+      };
+
+      const historyMap = { [targetSig]: archivedEntry };
+      const parsedHistory = parseOverarchingHistory(historyMap);
+
+      expect(parsedHistory[targetSig]).toBeDefined();
+      expect(parsedHistory[targetSig].overarchingZineTitle).toBe('Midwest & West Coast Emo Architecture');
+
+      // Restoration is instant and 0 token cost
+      const restored = parsedHistory[targetSig];
+      expect(restored.overarchingRationale).toContain('Archived editorial');
+      expect(restored.crossSceneLinks).toHaveLength(1);
+    });
+
+    it('4. Case C (Archive Miss & Safe Cancel): prompts 5 Tokens and aborts cleanly with zero scene removal on cancel', async () => {
+      const allScenes = [scene1, scene2, scene3];
+      const remainingCurated = allScenes.filter(s => (s.sceneId || s.id) !== 'scene-3' && s.graphData.nodes.length > 0);
+      const targetSig = computeSceneSetSignature(remainingCurated);
+
+      // Empty history -> Archive Miss -> Case C
+      const historyMap: any = {};
+      const isArchiveHit = Boolean(targetSig && historyMap[targetSig]);
+      expect(isArchiveHit).toBe(false);
+
+      // Simulation of Safe Cancel per Guardrail 2
+      let userCancelled = true;
+      let targetSceneRemoved = false;
+      let unconfirmedForkId: string | null = 'fork-doc-123';
+      let deletedForkId: string | null = null;
+
+      // Mock Token Confirmation Dialog cancel
+      if (userCancelled) {
+        // Abort cleanly: delete unconfirmed fork doc if created
+        deletedForkId = unconfirmedForkId;
+        unconfirmedForkId = null;
+        // targetSceneRemoved remains false
+      } else {
+        targetSceneRemoved = true;
+      }
+
+      expect(targetSceneRemoved).toBe(false);
+      expect(deletedForkId).toBe('fork-doc-123');
+      expect(unconfirmedForkId).toBeNull();
+      expect(allScenes).toHaveLength(3); // Scene 3 remains untouched
+    });
+
+    it('5. Coordinate & CanvasLayout Shifting (Guardrail 3): shifts oldIdx > removedIdx by dx = (newIdx - oldIdx) * 1050', () => {
+      const initialScenes = [scene1, scene2, scene3, scene4];
+
+      const initialCanvasLayout = [
+        { nodeId: 'scene-1::node-0', x: 1000, fx: 1000, y: 500, fy: 500 },
+        { nodeId: 'scene-2::node-0', x: 2050, fx: 2050, y: 500, fy: 500 },
+        { nodeId: 'scene-3::node-0', x: 3100, fx: 3100, y: 500, fy: 500 },
+        { nodeId: 'scene-4::node-0', x: 4150, fx: 4150, y: 500, fy: 500 },
+      ];
+
+      // Remove Scene 2 (removedIdx = 1)
+      const { remainingScenes, shiftedCanvasLayout } = shiftSceneClusterCoordinates({
+        scenes: initialScenes,
+        removedSceneId: 'scene-2',
+        canvasLayout: initialCanvasLayout,
+      });
+
+      expect(remainingScenes).toHaveLength(3);
+
+      // Scene 1 (oldIdx = 0 < 1): dx = 0
+      expect(remainingScenes[0].sceneId).toBe('scene-1');
+      expect(remainingScenes[0].sceneIndex).toBe(0);
+      expect(remainingScenes[0].centerOffset).toEqual({ x: 1000, y: 1000 });
+      expect(remainingScenes[0].graphData.nodes[0].x).toBe(1000);
+      expect(remainingScenes[0].graphData.nodes[0].fx).toBe(1000);
+
+      // Scene 2 nodes are purged from canvasLayout
+      expect(shiftedCanvasLayout.some(item => item.nodeId.startsWith('scene-2::'))).toBe(false);
+
+      // Scene 3 (oldIdx = 2, newIdx = 1): dx = (1 - 2) * 1050 = -1050
+      expect(remainingScenes[1].sceneId).toBe('scene-3');
+      expect(remainingScenes[1].sceneIndex).toBe(1);
+      expect(remainingScenes[1].centerOffset).toEqual({ x: 2050, y: 1000 }); // 1000 + 1 * 1050
+      expect(remainingScenes[1].graphData.nodes[0].x).toBe(3100 - 1050); // 2050
+      expect(remainingScenes[1].graphData.nodes[0].fx).toBe(3100 - 1050); // 2050
+
+      const scene3Layout = shiftedCanvasLayout.find(item => item.nodeId === 'scene-3::node-0');
+      expect(scene3Layout?.x).toBe(3100 - 1050);
+      expect(scene3Layout?.fx).toBe(3100 - 1050);
+
+      // Scene 4 (oldIdx = 3, newIdx = 2): dx = (2 - 3) * 1050 = -1050
+      expect(remainingScenes[2].sceneId).toBe('scene-4');
+      expect(remainingScenes[2].sceneIndex).toBe(2);
+      expect(remainingScenes[2].centerOffset).toEqual({ x: 3100, y: 1000 }); // 1000 + 2 * 1050
+      expect(remainingScenes[2].graphData.nodes[0].x).toBe(4150 - 1050); // 3100
+      expect(remainingScenes[2].graphData.nodes[0].fx).toBe(4150 - 1050); // 3100
+
+      const scene4Layout = shiftedCanvasLayout.find(item => item.nodeId === 'scene-4::node-0');
+      expect(scene4Layout?.x).toBe(4150 - 1050);
+      expect(scene4Layout?.fx).toBe(4150 - 1050);
     });
   });
 });

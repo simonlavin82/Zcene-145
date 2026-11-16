@@ -252,6 +252,18 @@ export interface DisambiguationCandidateStub {
   isVerifiedEntity?: boolean;
 }
 
+export interface OverarchingHistoryEntry {
+  sceneSignature: string;          // Deterministic canonical signature of the curated scene combination
+  overarchingRationale: string;    // Master Overarching Zine Editorial markdown
+  overarchingZineTitle?: string;   // Optional custom H1 editorial headline
+  overarchingZineIntro?: string;   // Optional custom intro / dedication note
+  overarchingZineImages?: ZineEditorialImages; // Up to 8 image slots (MAX_ZINE_IMAGE_SLOTS)
+  crossSceneLinks?: CrossSceneLink[]; // Sonic lineage + identity bridges (sanitized per [Rule 29])
+  archivedAt: string;              // ISO timestamp
+  sceneCount: number;              // e.g. 2, 3
+  sceneSeeds: string[];            // Human display seed titles for audit/debugging
+}
+
 export interface Project {
   id: string;
   name: string;
@@ -262,6 +274,7 @@ export interface Project {
   overarchingZineTitle?: string | null;            // Optional owner-curated custom H1 editorial headline for Overarching Zine (defaults to project.name)
   overarchingZineIntro?: string | null;            // Optional owner-curated intro / dedication note below H1 Zine title
   overarchingZineImages?: ZineEditorialImages;     // Optional up to MAX_ZINE_IMAGE_SLOTS (8) per-block image slots for Overarching Zine editorial
+  overarchingHistory?: Record<string, OverarchingHistoryEntry> | string | null; // Archived Overarching Zines keyed by sceneSignature
   crossSceneLinks?: string | CrossSceneLink[] | null; // Deterministic identity + AI sonic_lineage cross-scene bridges
   seedArtistIds?: string[];                        // Union of all scene.seedIds across all scenes
   sceneCount?: number;
