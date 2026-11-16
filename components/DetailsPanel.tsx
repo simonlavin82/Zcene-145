@@ -2154,9 +2154,23 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 // --- EDIT ZINE MODE: ADAPTIVE 3-COLUMN EDITORIAL IMAGES ---
 
+/**
+ * Normalizes all HTML line breaks (<br>, <br/>, <br />, </br>) and consecutive
+ * HTML break sequences into clean markdown paragraph breaks (\n\n).
+ * Prevents LLM-generated <br> tags from leaking as raw text strings into the
+ * Zine editorial and prevents multi-column layouts from collapsing into a single column.
+ */
+export function normalizeMarkdownLineBreaks(text?: string): string {
+    if (!text || typeof text !== 'string') return '';
+    return text
+        .replace(/(?:[ \t]*<\/?br\s*\/?>[ \t]*[\r\n]*)+/gi, '\n\n')
+        .replace(/\n{3,}/g, '\n\n');
+}
+
 export const splitMarkdownIntoEditorialBlocks = (markdown: string): string[] => {
     if (!markdown || typeof markdown !== 'string') return [];
-    const rawBlocks = markdown
+    const normalized = normalizeMarkdownLineBreaks(markdown);
+    const rawBlocks = normalized
         .replace(/\r\n/g, '\n')
         .trim()
         .split(/\n{2,}/)
@@ -3968,7 +3982,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
     const sanitizeRationaleMarkdown = useCallback((rawText?: string, nodeCount?: number) => {
         if (!rawText) return '';
-        let sanitized = rawText;
+        let sanitized = normalizeMarkdownLineBreaks(rawText);
         sanitized = sanitized.replace(/^[ \t]*([•\-\*])[ \t]+/gm, '- ');
         sanitized = sanitized.replace(/(^|\n)([ \t]*-[ \t]*)[\n]+[ \t]*/g, '$1$2');
         sanitized = sanitized.replace(/([^\n])\n([ \t]*- )/g, '$1\n\n$2');

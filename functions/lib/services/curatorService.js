@@ -1144,7 +1144,9 @@ ${JSON.stringify(deterministicBridges.map((b) => ({
         }
     }
     let cleanRationale = (rawResult?.overarchingRationale || "")
+        .replace(/(?:[ \t]*<\/?br\s*\/?>[ \t]*[\r\n]*)+/gi, "\n\n")
         .replace(/\\n/g, "\n")
+        .replace(/\n{3,}/g, "\n\n")
         .replace(/\s*—\s*/g, ", ")
         .trim();
     if (!cleanRationale) {
@@ -1787,7 +1789,14 @@ const generateGraphDataBackend = async (artists, filters, cachedSubgraphsContext
         links: mergedLinks
     });
     if (data) {
-        finalGraph.synthesisRationale = data.synthesisRationale || data.synthesis_rationale;
+        const rawSynthesis = data.synthesisRationale || data.synthesis_rationale;
+        finalGraph.synthesisRationale = typeof rawSynthesis === "string"
+            ? rawSynthesis
+                .replace(/(?:[ \t]*<\/?br\s*\/?>[ \t]*[\r\n]*)+/gi, "\n\n")
+                .replace(/\\n/g, "\n")
+                .replace(/\n{3,}/g, "\n\n")
+                .trim()
+            : rawSynthesis;
     }
     return { graphData: finalGraph, apiUsage: finalApiUsage };
 };

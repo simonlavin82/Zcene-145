@@ -1278,7 +1278,9 @@ ${JSON.stringify(
   }
 
   let cleanRationale = (rawResult?.overarchingRationale || "")
+    .replace(/(?:[ \t]*<\/?br\s*\/?>[ \t]*[\r\n]*)+/gi, "\n\n")
     .replace(/\\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
     .replace(/\s*—\s*/g, ", ")
     .trim();
 
@@ -1999,7 +2001,14 @@ export const generateGraphDataBackend = async (
   });
 
   if (data) {
-      finalGraph.synthesisRationale = (data as any).synthesisRationale || (data as any).synthesis_rationale;
+      const rawSynthesis = (data as any).synthesisRationale || (data as any).synthesis_rationale;
+      finalGraph.synthesisRationale = typeof rawSynthesis === "string"
+        ? rawSynthesis
+            .replace(/(?:[ \t]*<\/?br\s*\/?>[ \t]*[\r\n]*)+/gi, "\n\n")
+            .replace(/\\n/g, "\n")
+            .replace(/\n{3,}/g, "\n\n")
+            .trim()
+        : rawSynthesis;
   }
 
   return { graphData: finalGraph, apiUsage: finalApiUsage };

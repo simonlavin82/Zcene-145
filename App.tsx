@@ -2189,6 +2189,12 @@ const App: React.FC = () => {
       pendingUnconfirmedForkIdRef.current = null;
       pendingForkOriginIdRef.current = null;
 
+      // Synchronously engage full loading state immediately upon user confirmation (zero stale graph flash)
+      setIsLoading(true);
+      setProjectStatus('curating');
+      projectStatusRef.current = 'curating';
+      setExpectedCurationSpeed('partial');
+
       // Apply removal and shift coordinates per Guardrail 3
       const { remainingScenes, shiftedCanvasLayout } = shiftSceneClusterCoordinates({
         scenes: currentScenes,
@@ -2211,10 +2217,6 @@ const App: React.FC = () => {
       discoveryFiltersRef.current = nextFilters;
       setLastAppliedFilters(nextFilters);
       lastSettledLayoutRef.current = JSON.stringify(shiftedCanvasLayout);
-
-      setExpectedCurationSpeed('partial');
-      projectStatusRef.current = 'curating';
-      setProjectStatus('curating');
 
       if (action === 'fork' && newForkId) {
         currentProjectIdRef.current = newForkId;
@@ -2276,6 +2278,9 @@ const App: React.FC = () => {
         }
       } catch (err) {
         console.error('[handleRemoveScene] Failed to dispatch overarching_only curation job:', err);
+        setIsLoading(false);
+        setProjectStatus('idle');
+        projectStatusRef.current = 'idle';
       }
       return;
     }
@@ -5192,6 +5197,9 @@ const App: React.FC = () => {
           sessionTokenApprovedRef.current = true;
           pendingUnconfirmedForkIdRef.current = null;
           pendingForkOriginIdRef.current = null;
+          setIsLoading(true);
+          projectStatusRef.current = 'curating';
+          setProjectStatus('curating');
       }
 
 

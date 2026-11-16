@@ -4,7 +4,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ConsolidatedValidationModal, PreFlightSeed, TokenConfirmationDialog } from '../components/SharedModals';
 import { LoadingSpinner } from '../components/Icons';
 import GraphPage from '../components/GraphPage';
-import { DetailsPanel } from '../components/DetailsPanel';
+import { DetailsPanel, normalizeMarkdownLineBreaks, splitMarkdownIntoEditorialBlocks, partitionBlockIndicesIntoThreeColumns } from '../components/DetailsPanel';
 import { classifyCurationSpeed } from '../services/cacheQualification';
 import { computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates, detectLegacyStrideShiftX } from '../shared/multiSceneUtils';
 import { httpsCallable } from 'firebase/functions';
@@ -1583,6 +1583,33 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(addedSceneId).toBe('scene-3');
       // Zero collision: scene-3 does not exist in the 2 remaining scenes
       expect(step2.remainingScenes.some(s => s.sceneId === addedSceneId)).toBe(false);
+    });
+
+    it('12. normalizeMarkdownLineBreaks: converts HTML <br>, <br/>, <br /> and consecutive breaks into clean markdown newlines', () => {
+      const input = 'First paragraph.<br><br>Second paragraph with <br/>inline break and trailing.<br />\n<br>Third paragraph.';
+      const output = normalizeMarkdownLineBreaks(input);
+
+      expect(output).not.toContain('<br>');
+      expect(output).not.toContain('<br/>');
+      expect(output).not.toContain('<br />');
+      expect(output).toBe('First paragraph.\n\nSecond paragraph with\n\ninline break and trailing.\n\nThird paragraph.');
+    });
+
+    it('13. splitMarkdownIntoEditorialBlocks: prevents single-column collapse on articles containing <br> tags', () => {
+      const articleWithBrs = 'Underground tastemakers, especially **Drive-Thru Records**, served as talent incubators.<br><br>Ultimately, this pipeline fed directly into the corporate machinery. Major label heavyweights like **Capitol** and vital modern imprints like **Fueled By Ramen** provided the muscle.<br><br>Acts such as **Fall Out Boy** and **The Starting Line** dragged verbose underground sensibilities into polished pop dominance.';
+      
+      const blocks = splitMarkdownIntoEditorialBlocks(articleWithBrs);
+      expect(blocks).toHaveLength(3);
+      expect(blocks[0]).toContain('Drive-Thru Records');
+      expect(blocks[1]).toContain('Capitol');
+      expect(blocks[2]).toContain('Fall Out Boy');
+
+      // Verify 3-column distribution avoids single-column [[0], [], []] collapse
+      const columns = partitionBlockIndicesIntoThreeColumns(blocks);
+      expect(columns).toEqual([[0], [1], [2]]);
+      expect(columns[0]).toHaveLength(1);
+      expect(columns[1]).toHaveLength(1);
+      expect(columns[2]).toHaveLength(1);
     });
   });
 });
