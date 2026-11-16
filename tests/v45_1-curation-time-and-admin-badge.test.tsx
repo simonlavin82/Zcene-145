@@ -6,7 +6,7 @@ import { LoadingSpinner } from '../components/Icons';
 import GraphPage from '../components/GraphPage';
 import { DetailsPanel } from '../components/DetailsPanel';
 import { classifyCurationSpeed } from '../services/cacheQualification';
-import { computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates } from '../shared/multiSceneUtils';
+import { computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates, detectLegacyStrideShiftX } from '../shared/multiSceneUtils';
 import { httpsCallable } from 'firebase/functions';
 
 vi.mock('firebase/functions', () => ({
@@ -1322,31 +1322,36 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(remainingScenes[0].sceneId).toBe('scene-1');
       expect(remainingScenes[0].sceneIndex).toBe(0);
       expect(remainingScenes[0].centerOffset).toEqual({ x: 1000, y: 1000 });
+      expect(remainingScenes[0].graphData.nodes[0].id).toBe('scene-1::node-0');
       expect(remainingScenes[0].graphData.nodes[0].x).toBe(1000);
       expect(remainingScenes[0].graphData.nodes[0].fx).toBe(1000);
 
-      // Scene 2 nodes are purged from canvasLayout
-      expect(shiftedCanvasLayout.some(item => item.nodeId.startsWith('scene-2::'))).toBe(false);
+      // Total layout count shrinks from 4 to 3 (removed scene is purged)
+      expect(shiftedCanvasLayout).toHaveLength(3);
+      // scene-4 is canonically re-indexed to scene-3, so no scene-4:: entries remain
+      expect(shiftedCanvasLayout.some(item => item.nodeId.startsWith('scene-4::'))).toBe(false);
 
-      // Scene 3 (oldIdx = 2, newIdx = 1): dx = (1 - 2) * 1050 = -1050
-      expect(remainingScenes[1].sceneId).toBe('scene-3');
+      // Scene 3 canonically re-indexed to scene-2 (oldIdx = 2, newIdx = 1): dx = (1 - 2) * 1050 = -1050
+      expect(remainingScenes[1].sceneId).toBe('scene-2');
       expect(remainingScenes[1].sceneIndex).toBe(1);
       expect(remainingScenes[1].centerOffset).toEqual({ x: 2050, y: 1000 }); // 1000 + 1 * 1050
+      expect(remainingScenes[1].graphData.nodes[0].id).toBe('scene-2::node-0');
       expect(remainingScenes[1].graphData.nodes[0].x).toBe(3100 - 1050); // 2050
       expect(remainingScenes[1].graphData.nodes[0].fx).toBe(3100 - 1050); // 2050
 
-      const scene3Layout = shiftedCanvasLayout.find(item => item.nodeId === 'scene-3::node-0');
+      const scene3Layout = shiftedCanvasLayout.find(item => item.nodeId === 'scene-2::node-0');
       expect(scene3Layout?.x).toBe(3100 - 1050);
       expect(scene3Layout?.fx).toBe(3100 - 1050);
 
-      // Scene 4 (oldIdx = 3, newIdx = 2): dx = (2 - 3) * 1050 = -1050
-      expect(remainingScenes[2].sceneId).toBe('scene-4');
+      // Scene 4 canonically re-indexed to scene-3 (oldIdx = 3, newIdx = 2): dx = (2 - 3) * 1050 = -1050
+      expect(remainingScenes[2].sceneId).toBe('scene-3');
       expect(remainingScenes[2].sceneIndex).toBe(2);
       expect(remainingScenes[2].centerOffset).toEqual({ x: 3100, y: 1000 }); // 1000 + 2 * 1050
+      expect(remainingScenes[2].graphData.nodes[0].id).toBe('scene-3::node-0');
       expect(remainingScenes[2].graphData.nodes[0].x).toBe(4150 - 1050); // 3100
       expect(remainingScenes[2].graphData.nodes[0].fx).toBe(4150 - 1050); // 3100
 
-      const scene4Layout = shiftedCanvasLayout.find(item => item.nodeId === 'scene-4::node-0');
+      const scene4Layout = shiftedCanvasLayout.find(item => item.nodeId === 'scene-3::node-0');
       expect(scene4Layout?.x).toBe(4150 - 1050);
       expect(scene4Layout?.fx).toBe(4150 - 1050);
     });
@@ -1465,6 +1470,119 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(bypassed).toBe(true);
       expect(overarchingHistoryRef.current['sig-auto-sync']).toBeDefined();
       expect(setOverarchingHistoryVal['sig-auto-sync'].overarchingRationale).toBe('# Bypassed Snapshot Sync Rationale');
+    });
+
+    it('9. Custom Scene Name Preservation: preserves customName and non-default title while canonically re-indexing generic titles', () => {
+      const scenesWithNames = [
+        {
+          sceneId: 'scene-1',
+          sceneIndex: 0,
+          curatedSeedArtists: 'The Jealous Sound',
+          seedArtists: 'The Jealous Sound',
+          title: 'The Jealous Sound',
+          graphData: { nodes: [{ id: 'scene-1::jealous', x: 1000, fx: 1000, type: 'artist' }], links: [] },
+          status: 'completed',
+        },
+        {
+          sceneId: 'scene-2',
+          sceneIndex: 1,
+          customName: 'Midwest Emo Pioneers',
+          title: 'Midwest Emo Pioneers',
+          curatedSeedArtists: 'Elliott',
+          seedArtists: 'Elliott',
+          graphData: { nodes: [{ id: 'scene-2::elliott', x: 2050, fx: 2050, type: 'artist' }], links: [] },
+          status: 'completed',
+        },
+        {
+          sceneId: 'scene-3',
+          sceneIndex: 2,
+          title: 'Arena Anthem Emo', // Non-default custom title without explicit customName field
+          curatedSeedArtists: 'Jimmy Eat World',
+          seedArtists: 'Jimmy Eat World',
+          graphData: { nodes: [{ id: 'scene-3::jimmy', x: 3100, fx: 3100, type: 'artist' }], links: [] },
+          status: 'completed',
+        },
+        {
+          sceneId: 'scene-4',
+          sceneIndex: 3,
+          curatedSeedArtists: 'Yellowcard',
+          seedArtists: 'Yellowcard',
+          title: 'Yellowcard', // Seed-derived title, un-renamed
+          graphData: { nodes: [{ id: 'scene-4::yellowcard', x: 4150, fx: 4150, type: 'artist' }], links: [] },
+          status: 'completed',
+        },
+      ];
+
+      // Remove Scene 1
+      const { remainingScenes } = shiftSceneClusterCoordinates({
+        scenes: scenesWithNames as any,
+        removedSceneId: 'scene-1',
+        canvasLayout: [],
+      });
+
+      expect(remainingScenes).toHaveLength(3);
+
+      // Former Scene 2 becomes scene-1; customName 'Midwest Emo Pioneers' is strictly preserved
+      expect(remainingScenes[0].sceneId).toBe('scene-1');
+      expect(remainingScenes[0].customName).toBe('Midwest Emo Pioneers');
+      expect(remainingScenes[0].title).toBe('Midwest Emo Pioneers');
+
+      // Former Scene 3 becomes scene-2; non-default title 'Arena Anthem Emo' is preserved on customName and title
+      expect(remainingScenes[1].sceneId).toBe('scene-2');
+      expect(remainingScenes[1].customName).toBe('Arena Anthem Emo');
+      expect(remainingScenes[1].title).toBe('Arena Anthem Emo');
+
+      // Former Scene 4 becomes scene-3; un-renamed seed title preserves customName = undefined so ROOTS pill shows Scene 3
+      expect(remainingScenes[2].sceneId).toBe('scene-3');
+      expect(remainingScenes[2].customName).toBeUndefined();
+      expect(remainingScenes[2].title).toBe('Yellowcard');
+    });
+
+    it('10. detectLegacyStrideShiftX: shifts unshifted base-center topology (X ≈ 1000) by k * 1050px', () => {
+      // Direct Hit topology cached at base center (X ≈ 1000)
+      const baseTopologyXs = [990, 1000, 1010, 1005, 995];
+
+      // Added as Scene 2 (k = 1): must shift +1050px to reach 2050px (not +100px)
+      const shiftForScene2 = detectLegacyStrideShiftX(1, baseTopologyXs);
+      expect(shiftForScene2).toBe(1050);
+
+      // Added as Scene 4 (k = 3): must shift +3150px to reach 4150px (not +300px)
+      const shiftForScene4 = detectLegacyStrideShiftX(3, baseTopologyXs);
+      expect(shiftForScene4).toBe(3150);
+
+      // Idempotency: topology already centered at Scene 2 (2050px) returns 0
+      const settledScene2Xs = [2040, 2050, 2060];
+      expect(detectLegacyStrideShiftX(1, settledScene2Xs)).toBe(0);
+    });
+
+    it('11. Zero-Collision + Add Scene Guarantee: removing scenes followed by + Add Scene generates sequential scene IDs', () => {
+      const fourScenes = [scene1, scene2, scene3, scene4];
+
+      // Step 1: Remove Scene 1
+      const step1 = shiftSceneClusterCoordinates({
+        scenes: fourScenes,
+        removedSceneId: 'scene-1',
+        canvasLayout: [],
+      });
+
+      // Step 2: Remove former Scene 2 (now scene-1: Elliott)
+      const step2 = shiftSceneClusterCoordinates({
+        scenes: step1.remainingScenes,
+        removedSceneId: 'scene-1',
+        canvasLayout: [],
+      });
+
+      expect(step2.remainingScenes).toHaveLength(2);
+      expect(step2.remainingScenes[0].sceneId).toBe('scene-1'); // Jimmy Eat World
+      expect(step2.remainingScenes[1].sceneId).toBe('scene-2'); // Yellowcard
+
+      // Step 3: Clicking + Add Scene creates sceneId based on scenes.length + 1
+      const nextIndex = step2.remainingScenes.length;
+      const addedSceneId = `scene-${nextIndex + 1}`;
+
+      expect(addedSceneId).toBe('scene-3');
+      // Zero collision: scene-3 does not exist in the 2 remaining scenes
+      expect(step2.remainingScenes.some(s => s.sceneId === addedSceneId)).toBe(false);
     });
   });
 });

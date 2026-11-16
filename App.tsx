@@ -2203,6 +2203,13 @@ const App: React.FC = () => {
       setScenes(remainingScenes);
       activeSceneIdRef.current = nextActiveId;
       setActiveSceneId(nextActiveId);
+      const nextSeeds = toSeedArtistsString(nextActive.seedArtists);
+      setSeedArtists(nextSeeds);
+      seedArtistsRef.current = nextSeeds;
+      const nextFilters = nextActive.discoveryFilters || {};
+      setDiscoveryFilters(nextFilters);
+      discoveryFiltersRef.current = nextFilters;
+      setLastAppliedFilters(nextFilters);
       lastSettledLayoutRef.current = JSON.stringify(shiftedCanvasLayout);
 
       setExpectedCurationSpeed('partial');
@@ -2309,6 +2316,13 @@ const App: React.FC = () => {
         setScenes(remainingScenes);
         activeSceneIdRef.current = nextActiveId;
         setActiveSceneId(nextActiveId);
+        const nextSeeds = toSeedArtistsString(nextActive.seedArtists);
+        setSeedArtists(nextSeeds);
+        seedArtistsRef.current = nextSeeds;
+        const nextFilters = nextActive.discoveryFilters || {};
+        setDiscoveryFilters(nextFilters);
+        discoveryFiltersRef.current = nextFilters;
+        setLastAppliedFilters(nextFilters);
         lastSettledLayoutRef.current = JSON.stringify(shiftedCanvasLayout);
 
         const composite = buildCompositeCanvasGraph(remainingScenes, nextBridges, shiftedCanvasLayout);
@@ -2406,6 +2420,13 @@ const App: React.FC = () => {
     setScenes(remainingScenes);
     activeSceneIdRef.current = nextActiveId;
     setActiveSceneId(nextActiveId);
+    const nextSeeds = toSeedArtistsString(nextActive.seedArtists);
+    setSeedArtists(nextSeeds);
+    seedArtistsRef.current = nextSeeds;
+    const nextFilters = nextActive.discoveryFilters || {};
+    setDiscoveryFilters(nextFilters);
+    discoveryFiltersRef.current = nextFilters;
+    setLastAppliedFilters(nextFilters);
     lastSettledLayoutRef.current = JSON.stringify(shiftedCanvasLayout);
 
     const composite = buildCompositeCanvasGraph(remainingScenes, [], shiftedCanvasLayout);

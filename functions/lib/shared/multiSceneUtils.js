@@ -81,9 +81,15 @@ function detectLegacyStrideShiftX(sceneIndex, sampleXs) {
     if (xs.length === 0)
         return 0;
     const meanX = xs.reduce((sum, x) => sum + x, 0) / xs.length;
+    const currentCenterX = exports.SCENE_BASE_CENTER_X + k * exports.SCENE_HORIZONTAL_STRIDE;
+    // Base-Center Detection: If topology sits unshifted around the base center (X ≈ 1000),
+    // e.g. from single-artist cache in Firestore, it must be shifted to Scene k center (k * 1050px).
+    const distToBase = Math.abs(meanX - exports.SCENE_BASE_CENTER_X);
+    if (distToBase < 350) {
+        return currentCenterX - exports.SCENE_BASE_CENTER_X;
+    }
     const legacy1600CenterX = exports.SCENE_BASE_CENTER_X + k * exports.LEGACY_SCENE_HORIZONTAL_STRIDE;
     const prev950CenterX = exports.SCENE_BASE_CENTER_X + k * exports.PREV_SCENE_HORIZONTAL_STRIDE;
-    const currentCenterX = exports.SCENE_BASE_CENTER_X + k * exports.SCENE_HORIZONTAL_STRIDE;
     const distTo1600 = Math.abs(meanX - legacy1600CenterX);
     const distTo950 = Math.abs(meanX - prev950CenterX);
     const distToCurrent = Math.abs(meanX - currentCenterX);
@@ -2092,12 +2098,17 @@ function shiftSceneClusterCoordinates({ scenes, removedSceneId, canvasLayout, })
     // Filter out the removed scene's nodes from canvasLayout
     parsedLayout = parsedLayout.filter((item) => !item.nodeId.startsWith(`${removedSceneId}::`));
     const remainingScenes = [];
+    const sceneShiftMap = new Map();
     for (let oldIdx = 0; oldIdx < scenes.length; oldIdx++) {
         if (oldIdx === removedIdx)
             continue;
         const scene = scenes[oldIdx];
         const newIdx = remainingScenes.length;
-        const dx = (newIdx - oldIdx) * 1050;
+        const oldSceneId = (scene.sceneId || scene.id || `scene-${oldIdx + 1}`).trim();
+        const newSceneId = `scene-${newIdx + 1}`;
+        const dx = (newIdx - oldIdx) * exports.SCENE_HORIZONTAL_STRIDE; // 1050px stride
+        sceneShiftMap.set(oldSceneId, { newSceneId, dx });
+        // 1. Re-namespace and shift graphData nodes & links
         let updatedGraphData = { nodes: [], links: [] };
         if (scene.graphData) {
             const g = typeof scene.graphData === 'string'
@@ -2108,47 +2119,90 @@ function shiftSceneClusterCoordinates({ scenes, removedSceneId, canvasLayout, })
                     return { nodes: [], links: [] };
                 } })()
                 : scene.graphData;
+            const rawNodes = Array.isArray(g.nodes) ? g.nodes : [];
+            const rawLinks = Array.isArray(g.links) ? g.links : [];
+            const newNodes = rawNodes.map((node) => {
+                const canonical = stripSceneNamespace(node.canonicalId || node.id);
+                const reNamespacedId = namespaceSceneNodeId(newSceneId, canonical);
+                const newX = typeof node.x === 'number' ? node.x + dx : node.x;
+                const newFx = typeof node.fx === 'number' ? node.fx + dx : node.fx;
+                return {
+                    ...node,
+                    id: reNamespacedId,
+                    canonicalId: canonical,
+                    sceneId: newSceneId,
+                    sceneIndex: newIdx,
+                    ...(typeof newX === 'number' ? { x: newX } : {}),
+                    ...(typeof newFx === 'number' ? { fx: newFx } : {}),
+                };
+            });
+            const newLinks = rawLinks.map((link) => {
+                const srcId = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                const tgtId = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                const cleanSrcCanonical = stripSceneNamespace(srcId);
+                const cleanTgtCanonical = stripSceneNamespace(tgtId);
+                const newSrcId = namespaceSceneNodeId(newSceneId, cleanSrcCanonical);
+                const newTgtId = namespaceSceneNodeId(newSceneId, cleanTgtCanonical);
+                return {
+                    ...link,
+                    source: newSrcId,
+                    target: newTgtId,
+                };
+            });
             updatedGraphData = {
-                nodes: Array.isArray(g.nodes) ? g.nodes.map((node) => ({ ...node })) : [],
-                links: Array.isArray(g.links) ? g.links.map((link) => ({ ...link })) : [],
+                nodes: newNodes,
+                links: newLinks,
                 ...(g.synthesisRationale ? { synthesisRationale: g.synthesisRationale } : {})
             };
         }
-        if (dx !== 0 && Array.isArray(updatedGraphData.nodes)) {
-            updatedGraphData.nodes = updatedGraphData.nodes.map((node) => ({
-                ...node,
-                ...(typeof node.x === 'number' ? { x: node.x + dx } : {}),
-                ...(typeof node.fx === 'number' ? { fx: node.fx + dx } : {}),
-            }));
-            // Also shift matching entries in canvasLayout
-            const sceneNodeIds = new Set(updatedGraphData.nodes.map((n) => n.id));
-            const sid = scene.sceneId || scene.id;
-            parsedLayout = parsedLayout.map((item) => {
-                const isMatch = sceneNodeIds.has(item.nodeId) ||
-                    (sid && item.nodeId.startsWith(`${sid}::`));
-                if (isMatch) {
-                    return {
-                        ...item,
-                        x: typeof item.x === 'number' ? item.x + dx : item.x,
-                        ...(typeof item.fx === 'number' ? { fx: item.fx + dx } : {}),
-                    };
-                }
-                return item;
-            });
-        }
+        // 2. Custom Name vs Default Re-indexing Resolution
+        const seedsArray = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+        const seedsJoined = seedsArray.join(' + ');
+        const hasExplicitCustomName = typeof scene.customName === 'string' && scene.customName.trim().length > 0;
+        const hasCustomTitle = typeof scene.title === 'string' &&
+            scene.title.trim().length > 0 &&
+            !/^scene(?:\s+\d+)?$/i.test(scene.title.trim()) &&
+            scene.title.trim() !== seedsJoined;
+        const preservedCustomName = hasExplicitCustomName
+            ? scene.customName.trim()
+            : (hasCustomTitle ? scene.title.trim() : undefined);
+        const resolvedTitle = preservedCustomName || (seedsArray.length > 0 ? seedsJoined : `Scene ${newIdx + 1}`);
         const normalized = normalizeProjectScene({
             ...scene,
+            id: newSceneId,
+            sceneId: newSceneId,
             sceneIndex: newIdx,
-            title: scene.customName || `Scene ${newIdx + 1}`,
-            name: scene.customName || `Scene ${newIdx + 1}`,
+            title: resolvedTitle,
+            name: resolvedTitle,
+            ...(preservedCustomName ? { customName: preservedCustomName } : { customName: undefined }),
             centerOffset: getSceneCenterOffset(newIdx),
             graphData: updatedGraphData,
         }, newIdx);
         remainingScenes.push(normalized);
     }
+    // 3. Shift and re-namespace matching entries in canvasLayout
+    const shiftedLayout = [];
+    for (const item of parsedLayout) {
+        if (item.nodeId.startsWith(`${removedSceneId}::`))
+            continue;
+        const oldSid = extractSceneIdFromNodeId(item.nodeId);
+        if (oldSid && sceneShiftMap.has(oldSid)) {
+            const { newSceneId, dx } = sceneShiftMap.get(oldSid);
+            const canonical = stripSceneNamespace(item.nodeId);
+            shiftedLayout.push({
+                ...item,
+                nodeId: namespaceSceneNodeId(newSceneId, canonical),
+                x: typeof item.x === 'number' ? item.x + dx : item.x,
+                ...(typeof item.fx === 'number' ? { fx: item.fx + dx } : {}),
+            });
+        }
+        else {
+            shiftedLayout.push(item);
+        }
+    }
     return {
         remainingScenes,
-        shiftedCanvasLayout: parsedLayout,
+        shiftedCanvasLayout: shiftedLayout,
     };
 }
 //# sourceMappingURL=multiSceneUtils.js.map
