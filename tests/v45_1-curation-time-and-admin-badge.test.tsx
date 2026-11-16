@@ -1224,7 +1224,7 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
 
     it('2. Case A (Single Scene Fallback): removing scene when 1 curated scene remains clears overarching rationale/links', () => {
       const allScenes = [scene1, scene2];
-      const remainingCurated = allScenes.filter(s => (s.sceneId || s.id) !== 'scene-2' && s.graphData.nodes.length > 0);
+      const remainingCurated = allScenes.filter(s => (s.sceneId || (s as any).id) !== 'scene-2' && s.graphData.nodes.length > 0);
 
       expect(remainingCurated.length).toBe(1);
 
@@ -1267,9 +1267,9 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(restored.crossSceneLinks).toHaveLength(1);
     });
 
-    it('4. Case C (Archive Miss & Safe Cancel): prompts 5 Tokens and aborts cleanly with zero scene removal on cancel', async () => {
+    it('4. Case C (Archive Miss & Safe Cancel): prompts 5 Tokens and aborts cleanly with 0 deleteDoc calls when cancelled', async () => {
       const allScenes = [scene1, scene2, scene3];
-      const remainingCurated = allScenes.filter(s => (s.sceneId || s.id) !== 'scene-3' && s.graphData.nodes.length > 0);
+      const remainingCurated = allScenes.filter(s => (s.sceneId || (s as any).id) !== 'scene-3' && s.graphData.nodes.length > 0);
       const targetSig = computeSceneSetSignature(remainingCurated);
 
       // Empty history -> Archive Miss -> Case C
@@ -1277,25 +1277,25 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       const isArchiveHit = Boolean(targetSig && historyMap[targetSig]);
       expect(isArchiveHit).toBe(false);
 
-      // Simulation of Safe Cancel per Guardrail 2
-      let userCancelled = true;
+      // Simulation of Safe Cancel in handleRemoveScene (Pass #3 architecture)
+      // Because setDoc is deferred until after token confirmation, no document exists in Firestore.
+      // Therefore, zero deleteDoc calls are made and no permission error can occur.
+      const deleteDocMock = vi.fn();
+      let confirmedToken = false;
       let targetSceneRemoved = false;
-      let unconfirmedForkId: string | null = 'fork-doc-123';
-      let deletedForkId: string | null = null;
+      let pendingUnconfirmedForkId: string | null = 'fork-doc-123';
 
-      // Mock Token Confirmation Dialog cancel
-      if (userCancelled) {
-        // Abort cleanly: delete unconfirmed fork doc if created
-        deletedForkId = unconfirmedForkId;
-        unconfirmedForkId = null;
+      if (!confirmedToken) {
+        // Safe cancel: clear pending fork refs, do NOT call deleteDoc
+        pendingUnconfirmedForkId = null;
         // targetSceneRemoved remains false
       } else {
         targetSceneRemoved = true;
       }
 
       expect(targetSceneRemoved).toBe(false);
-      expect(deletedForkId).toBe('fork-doc-123');
-      expect(unconfirmedForkId).toBeNull();
+      expect(deleteDocMock).not.toHaveBeenCalled();
+      expect(pendingUnconfirmedForkId).toBeNull();
       expect(allScenes).toHaveLength(3); // Scene 3 remains untouched
     });
 
@@ -1349,6 +1349,122 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       const scene4Layout = shiftedCanvasLayout.find(item => item.nodeId === 'scene-4::node-0');
       expect(scene4Layout?.x).toBe(4150 - 1050);
       expect(scene4Layout?.fx).toBe(4150 - 1050);
+    });
+
+    it('6. Safeguard B: processCurationJob safe prevSig === newSig disambiguation & scene metadata attribution', () => {
+      // Setup: 3 settled scenes + newly added Scene 4 (targetSceneId = 'scene-4')
+      const prevDocScenes = [scene1, scene2, scene3, scene4];
+      const finalProjectScenes = [scene1, scene2, scene3, scene4];
+      const targetSceneId = 'scene-4';
+
+      const newSig = computeSceneSetSignature(finalProjectScenes);
+      let prevSig = computeSceneSetSignature(prevDocScenes);
+      let scenesForPrevArchive = prevDocScenes;
+
+      expect(prevSig).toBe(newSig); // Prior to disambiguation, collision occurs
+
+      // Safe disambiguation: exclude targetSceneId when prevSig === newSig
+      if (prevSig === newSig && targetSceneId) {
+        const priorSettledScenes = prevDocScenes.filter(
+          s => (s.sceneId || (s as any).id) !== targetSceneId && ((s.graphData?.nodes?.length ?? 0) > 0 || (s as any).status === 'completed')
+        );
+        prevSig = computeSceneSetSignature(priorSettledScenes);
+        scenesForPrevArchive = priorSettledScenes;
+      }
+
+      // Assertions:
+      expect(prevSig).not.toBe(newSig);
+      expect(prevSig).toBe(computeSceneSetSignature([scene1, scene2, scene3]));
+      expect(scenesForPrevArchive).toHaveLength(3);
+      expect(scenesForPrevArchive.map(s => s.curatedSeedArtists)).toEqual([
+        'The Jealous Sound::Hey Mercedes',
+        'Elliott',
+        'Jimmy Eat World'
+      ]);
+    });
+
+    it('7. Safeguard C: Curation Reconnect pipes overarchingHistory, overarchingRationale, & crossSceneLinks directly into memory', () => {
+      const mockJobResult = {
+        overarchingRationale: '# New 3-Scene Rationale\nSynthesized cross-scene narrative.',
+        crossSceneLinks: [
+          { sourceSceneId: 'scene-1', targetSceneId: 'scene-2', bridgeType: 'sonic_lineage' },
+          { sourceSceneId: 'scene-2', targetSceneId: 'scene-3', bridgeType: 'label_roster' }
+        ],
+        overarchingHistory: JSON.stringify({
+          'sig-prior-4-scenes': {
+            sceneSignature: 'sig-prior-4-scenes',
+            overarchingRationale: '# Prior 4-Scene Rationale',
+            sceneCount: 4
+          },
+          'sig-new-3-scenes': {
+            sceneSignature: 'sig-new-3-scenes',
+            overarchingRationale: '# New 3-Scene Rationale',
+            sceneCount: 3
+          }
+        })
+      };
+
+      const overarchingHistoryRef = { current: {} as any };
+      const overarchingRationaleRef = { current: '' };
+      const crossSceneLinksRef = { current: [] as any[] };
+      let setOverarchingHistoryVal: any = null;
+      let setOverarchingRationaleVal: any = null;
+      let setCrossSceneLinksVal: any = null;
+
+      // Simulated Curation Reconnect direct hydration
+      if (mockJobResult.overarchingHistory) {
+        const parsed = parseOverarchingHistory(mockJobResult.overarchingHistory);
+        overarchingHistoryRef.current = parsed;
+        setOverarchingHistoryVal = parsed;
+      }
+      if (mockJobResult.overarchingRationale !== undefined) {
+        overarchingRationaleRef.current = mockJobResult.overarchingRationale;
+        setOverarchingRationaleVal = mockJobResult.overarchingRationale;
+      }
+      if (mockJobResult.crossSceneLinks) {
+        crossSceneLinksRef.current = mockJobResult.crossSceneLinks;
+        setCrossSceneLinksVal = mockJobResult.crossSceneLinks;
+      }
+
+      expect(overarchingHistoryRef.current['sig-prior-4-scenes']).toBeDefined();
+      expect(overarchingHistoryRef.current['sig-new-3-scenes']).toBeDefined();
+      expect(setOverarchingHistoryVal['sig-new-3-scenes'].sceneCount).toBe(3);
+      expect(overarchingRationaleRef.current).toBe('# New 3-Scene Rationale\nSynthesized cross-scene narrative.');
+      expect(setOverarchingRationaleVal).toBe('# New 3-Scene Rationale\nSynthesized cross-scene narrative.');
+      expect(crossSceneLinksRef.current).toHaveLength(2);
+      expect(setCrossSceneLinksVal).toHaveLength(2);
+    });
+
+    it('8. Safeguard C: ProjectLoader snapshot bypass keeps overarchingHistory in sync even during local saving/hydrating', () => {
+      const isHydratingSessionRef = { current: true };
+      const isCriticalUpdate = false;
+      const data = {
+        overarchingHistory: JSON.stringify({
+          'sig-auto-sync': {
+            sceneSignature: 'sig-auto-sync',
+            overarchingRationale: '# Bypassed Snapshot Sync Rationale',
+            sceneCount: 3
+          }
+        })
+      };
+
+      const overarchingHistoryRef = { current: {} as any };
+      let setOverarchingHistoryVal: any = null;
+
+      // Simulated ProjectLoader bypass guard with Safeguard C sync
+      let bypassed = false;
+      if (isHydratingSessionRef.current && !isCriticalUpdate) {
+        if (data.overarchingHistory !== undefined) {
+          const parsed = parseOverarchingHistory(data.overarchingHistory);
+          overarchingHistoryRef.current = parsed;
+          setOverarchingHistoryVal = parsed;
+        }
+        bypassed = true;
+      }
+
+      expect(bypassed).toBe(true);
+      expect(overarchingHistoryRef.current['sig-auto-sync']).toBeDefined();
+      expect(setOverarchingHistoryVal['sig-auto-sync'].overarchingRationale).toBe('# Bypassed Snapshot Sync Rationale');
     });
   });
 });

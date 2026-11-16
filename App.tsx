@@ -2054,6 +2054,33 @@ const App: React.FC = () => {
     setScenes(nextScenes);
   }, []);
 
+  // Universal Pre-Archive Helper: Snapshots settled multi-scene editorial before any scene mutation
+  const preArchiveCurrentSettledOverarching = useCallback(() => {
+    const settledScenes = (scenesRef.current || []).filter(
+      s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+    );
+    if (overarchingRationaleRef.current && settledScenes.length >= 2) {
+      const curSig = computeSceneSetSignature(settledScenes);
+      if (curSig) {
+        overarchingHistoryRef.current = pruneOverarchingHistory({
+          ...overarchingHistoryRef.current,
+          [curSig]: {
+            sceneSignature: curSig,
+            overarchingRationale: overarchingRationaleRef.current,
+            overarchingZineTitle: overarchingZineTitleRef.current || undefined,
+            overarchingZineIntro: overarchingZineIntroRef.current || undefined,
+            overarchingZineImages: overarchingZineImagesRef.current || undefined,
+            crossSceneLinks: crossSceneLinksRef.current || [],
+            archivedAt: new Date().toISOString(),
+            sceneCount: settledScenes.length,
+            sceneSeeds: settledScenes.map((s: any) => s.curatedSeedArtists || s.seedArtists || '').filter(Boolean),
+          }
+        });
+        setOverarchingHistory({ ...overarchingHistoryRef.current });
+      }
+    }
+  }, []);
+
   const handleRemoveScene = useCallback(async (sceneIdToRemove: string, action: 'overwrite' | 'fork' = 'overwrite') => {
     const currentScenes = scenesRef.current;
     if (currentScenes.length <= 1) return;
@@ -2121,30 +2148,6 @@ const App: React.FC = () => {
       s => (s.sceneId || s.id) !== sceneIdToRemove && (s.graphData?.nodes?.length || 0) > 0
     );
 
-    // Helper: Pre-archive current overarching state before mutating ([Rule 29], Guardrail 1)
-    const preArchiveCurrentOverarching = () => {
-      if (overarchingRationaleRef.current && currentScenes.length >= 2) {
-        const curSig = computeSceneSetSignature(currentScenes);
-        if (curSig) {
-          overarchingHistoryRef.current = pruneOverarchingHistory({
-            ...overarchingHistoryRef.current,
-            [curSig]: {
-              sceneSignature: curSig,
-              overarchingRationale: overarchingRationaleRef.current,
-              overarchingZineTitle: overarchingZineTitleRef.current || undefined,
-              overarchingZineIntro: overarchingZineIntroRef.current || undefined,
-              overarchingZineImages: overarchingZineImagesRef.current || undefined,
-              crossSceneLinks: crossSceneLinksRef.current || [],
-              archivedAt: new Date().toISOString(),
-              sceneCount: currentScenes.length,
-              sceneSeeds: currentScenes.map((s: any) => s.curatedSeedArtists || s.seedArtists || '').filter(Boolean),
-            }
-          });
-          setOverarchingHistory({ ...overarchingHistoryRef.current });
-        }
-      }
-    };
-
     const originProjectId = currentProjectIdRef.current;
 
     // ── Case C: Remaining curated scenes >= 2 AND Archive Miss ──
@@ -2162,7 +2165,7 @@ const App: React.FC = () => {
         pendingForkOriginIdRef.current = originProjectId;
       }
 
-      preArchiveCurrentOverarching();
+      preArchiveCurrentSettledOverarching();
 
       const remainingSeedNames = remainingCurated.map(s => s.curatedSeedArtists || s.seedArtists || s.title || s.name || 'Scene');
       const confirmedToken = await confirmTokenUsage(
@@ -2175,23 +2178,11 @@ const App: React.FC = () => {
         TOKEN_PRICING.SINGLE_SEED // 5 tokens
       );
 
-      // Guardrail 2: Safe cancel on Case C. If cancelled, zero scene removal!
+      // Guardrail 2: Safe cancel on Case C. If cancelled, zero scene removal & zero uncreated doc deletion!
       if (!confirmedToken) {
-        if (newForkId && user) {
-          try {
-            await deleteDoc(doc(db, 'users', user.uid, 'projects', newForkId));
-          } catch (delErr) {
-            console.warn('[handleRemoveScene] Failed to delete cancelled fork project:', delErr);
-          }
-          if (originProjectId) {
-            currentProjectIdRef.current = originProjectId;
-            setCurrentProjectId(originProjectId);
-            navigate(`/p/${originProjectId}`, { replace: true });
-          }
-          pendingUnconfirmedForkIdRef.current = null;
-          pendingForkOriginIdRef.current = null;
-        }
-        return; // ABORT! Zero scene removal!
+        pendingUnconfirmedForkIdRef.current = null;
+        pendingForkOriginIdRef.current = null;
+        return; // ABORT! Zero scene removal, zero network writes, zero deleteDoc calls!
       }
 
       // Confirmed! Clear unconfirmed fork lifecycle
@@ -2287,7 +2278,7 @@ const App: React.FC = () => {
       const targetSig = computeSceneSetSignature(remainingCurated);
       const archived = overarchingHistoryRef.current[targetSig];
       if (archived) {
-        preArchiveCurrentOverarching();
+        preArchiveCurrentSettledOverarching();
 
         const { remainingScenes, shiftedCanvasLayout } = shiftSceneClusterCoordinates({
           scenes: currentScenes,
@@ -2390,7 +2381,7 @@ const App: React.FC = () => {
     }
 
     // ── Case A: Remaining curated scenes <= 1 ──
-    preArchiveCurrentOverarching();
+    preArchiveCurrentSettledOverarching();
 
     const { remainingScenes, shiftedCanvasLayout } = shiftSceneClusterCoordinates({
       scenes: currentScenes,
@@ -4319,6 +4310,9 @@ const App: React.FC = () => {
     try { await batchHydrateDetailsCache(normalizedGraph.nodes, normalizedGraph.links); } catch (e) {}
     artistList.forEach(name => { approvedSeedsRef.current.add(normalizeArtistId(name)); });
 
+    // Pre-archive current settled overarching state before mutating scenes with the new Direct Hit scene
+    preArchiveCurrentSettledOverarching();
+
     // V43 Multi-Scene Direct Hit Assembly: update activeScene inside scenes and rebuild composite graph
     const targetSceneId = explicitTargetSceneId || activeSceneIdRef.current || 'scene-1';
     activeSceneIdRef.current = targetSceneId;
@@ -4462,6 +4456,9 @@ const App: React.FC = () => {
           overarchingZineIntro: normalizeZineIntro(overarchingZineIntroRef.current) || '',
           overarchingZineImages: normalizeZineImages(overarchingZineImagesRef.current) || [],
           crossSceneLinks: JSON.stringify(nextBridges),
+          ...(overarchingHistoryRef.current && Object.keys(overarchingHistoryRef.current).length > 0
+            ? { overarchingHistory: JSON.stringify(overarchingHistoryRef.current) }
+            : {}),
           sceneCount: currentScenesList.length,
           seedArtistIds: allSeedIds,
           graphData: JSON.stringify(compositeGraph),
@@ -5149,6 +5146,9 @@ const App: React.FC = () => {
         setActiveSceneId(lockedTargetSceneId);
         pendingUnconfirmedForkIdRef.current = null;
         pendingForkOriginIdRef.current = null;
+
+        // Pre-archive settled multi-scene editorial before mutating scene state for cloud curation
+        preArchiveCurrentSettledOverarching();
 
         // Only after user clicks Confirm & Generate: flip to CONNECTIONS on mobile & start full loader
         if (typeof window !== 'undefined') {
@@ -6505,6 +6505,9 @@ const App: React.FC = () => {
               scenes: JSON.stringify(scenesRef.current),
               name: defaultName,
               discoveryFilters: JSON.stringify(activeDiscoveryFilters),
+              ...(overarchingHistoryRef.current && Object.keys(overarchingHistoryRef.current).length > 0
+                ? { overarchingHistory: JSON.stringify(overarchingHistoryRef.current) }
+                : {}),
               updatedAt: serverTimestamp()
             });
           } catch (e) {
@@ -6520,6 +6523,9 @@ const App: React.FC = () => {
               scenes: JSON.stringify(scenesRef.current),
               name: defaultName,
               discoveryFilters: JSON.stringify(activeDiscoveryFilters),
+              ...(overarchingHistoryRef.current && Object.keys(overarchingHistoryRef.current).length > 0
+                ? { overarchingHistory: JSON.stringify(overarchingHistoryRef.current) }
+                : {}),
               updatedAt: serverTimestamp()
             }, { merge: true });
           }
@@ -7686,6 +7692,16 @@ const App: React.FC = () => {
       const isCriticalUpdate = statusChanged || jobChanged || (incomingHasGraph && !localHasGraph);
 
       if (isHydratingSessionRef.current && !isCriticalUpdate) {
+        // Keep lightweight overarchingHistory in sync even on bypassed snapshots
+        if (data.overarchingHistory !== undefined) {
+          try {
+            const parsedHistory = parseOverarchingHistory(data.overarchingHistory);
+            overarchingHistoryRef.current = parsedHistory;
+            setOverarchingHistory(parsedHistory);
+          } catch (e) {
+            console.warn('[ProjectLoader] Failed to parse overarchingHistory on bypassed snapshot:', e);
+          }
+        }
         console.log('[ProjectLoader] Bypassing snapshot handle because local session is saving/hydrating and update is non-critical');
         return false;
       }
@@ -8510,6 +8526,30 @@ const App: React.FC = () => {
         setProjectStatus('completed');
         projectStatusRef.current = 'completed';
         isHydratingSessionRef.current = false;
+
+        // Direct In-Memory Overarching Hydration: Pipe overarching editorial, archive, & bridges directly into React memory
+        if (job.result?.overarchingHistory) {
+          try {
+            const parsedHistory = parseOverarchingHistory(job.result.overarchingHistory);
+            overarchingHistoryRef.current = parsedHistory;
+            setOverarchingHistory(parsedHistory);
+          } catch (e) {
+            console.warn('[Curation Reconnect] Failed to parse overarchingHistory from job result:', e);
+          }
+        }
+        if (job.result?.overarchingRationale !== undefined) {
+          overarchingRationaleRef.current = job.result.overarchingRationale;
+          setOverarchingRationale(job.result.overarchingRationale);
+        }
+        if (job.result?.crossSceneLinks) {
+          try {
+            const parsedBridges = parseCrossSceneLinks(job.result.crossSceneLinks);
+            crossSceneLinksRef.current = parsedBridges;
+            setCrossSceneLinks(parsedBridges);
+          } catch (e) {
+            console.warn('[Curation Reconnect] Failed to parse crossSceneLinks from job result:', e);
+          }
+        }
 
         // Synchronize graphData directly if present in job result and local graph is lagging
         if (job.result?.graphData) {
@@ -10446,6 +10486,9 @@ const App: React.FC = () => {
                   } else if (seeds.length === 1) {
                     defaultName = formatSeed(seeds[0]);
                   }
+
+                  // Pre-archive parent project's settled overarching state before cloning for fork
+                  preArchiveCurrentSettledOverarching();
 
                   const forkTargetSceneId = activeSceneIdRef.current || 'scene-1';
                   const forkOtherSettledScenes = scenesRef.current.filter(

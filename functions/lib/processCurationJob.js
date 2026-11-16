@@ -2157,15 +2157,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
         else {
             throw new Error(`Unsupported jobType: ${jobType}`);
         }
-        // Complete job with 24-hour TTL expiration policy
-        await jobDocRef.update({
-            status: "completed",
-            result,
-            updatedAt: firestore_2.FieldValue.serverTimestamp(),
-            completedAt: firestore_2.FieldValue.serverTimestamp(),
-            expireAt: firestore_2.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
-        });
-        console.log(`[Curation Backend] Successfully completed job ${jobId} (set TTL expireAt +24h)`);
         if (inputPayload?.projectId && jobData.userId && result?.graphData) {
             const graphObj = typeof result.graphData === 'string' ? JSON.parse(result.graphData) : result.graphData;
             const finalProjectScenes = Array.isArray(result.scenes)
@@ -2294,16 +2285,28 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             catch (pErr) {
                 console.warn(`[Curation Backend] Non-fatal project telemetry fetch warning:`, pErr?.message || pErr);
             }
-            // Overarching History Persistence ([Rule 29], Guardrail 1)
+            // Overarching History Persistence ([Rule 29], Guardrail 1, Safeguard B)
             const existingHistoryMap = (0, multiSceneUtils_1.parseOverarchingHistory)(pData?.overarchingHistory || initialProjectDocData?.overarchingHistory);
+            const newSig = (result.overarchingRationale && finalProjectScenes.length >= 2)
+                ? (0, multiSceneUtils_1.computeSceneSetSignature)(finalProjectScenes)
+                : "";
             // 1. Pre-archive previous overarching state if it existed and was settled across >= 2 scenes
             const prevDocRationale = pData?.overarchingRationale || initialProjectDocData?.overarchingRationale;
             const prevDocScenesRaw = pData?.scenes || initialProjectDocData?.scenes;
             if (prevDocRationale && prevDocScenesRaw) {
                 const prevDocScenes = (0, multiSceneUtils_1.parseProjectScenes)(prevDocScenesRaw);
                 if (prevDocScenes.length >= 2) {
-                    const prevSig = (0, multiSceneUtils_1.computeSceneSetSignature)(prevDocScenes);
-                    if (prevSig) {
+                    let prevSig = (0, multiSceneUtils_1.computeSceneSetSignature)(prevDocScenes);
+                    let scenesForPrevArchive = prevDocScenes;
+                    // Safeguard B: Safe prevSig === newSig disambiguation.
+                    // If prevSig matches newSig and targetSceneId exists, targetSceneId was already in prevDocScenes (new scene addition).
+                    // Exclude targetSceneId to compute the signature of the scenes settled BEFORE targetSceneId.
+                    if (prevSig === newSig && targetSceneId) {
+                        const priorSettledScenes = prevDocScenes.filter(s => (s.sceneId || s.id) !== targetSceneId && ((s.graphData?.nodes?.length ?? 0) > 0 || s.status === 'completed' || s.status === 'ready'));
+                        prevSig = (0, multiSceneUtils_1.computeSceneSetSignature)(priorSettledScenes);
+                        scenesForPrevArchive = priorSettledScenes;
+                    }
+                    if (prevSig && prevSig !== newSig && !existingHistoryMap[prevSig]) {
                         const rawCrossLinks = pData?.crossSceneLinks ?? initialProjectDocData?.crossSceneLinks;
                         let parsedCrossLinks = [];
                         if (typeof rawCrossLinks === "string") {
@@ -2329,31 +2332,35 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 : {}),
                             crossSceneLinks: parsedCrossLinks,
                             archivedAt: new Date().toISOString(),
-                            sceneCount: prevDocScenes.length,
-                            sceneSeeds: prevDocScenes.map((s) => s.curatedSeedArtists || s.seedArtists || "").filter(Boolean),
+                            sceneCount: scenesForPrevArchive.length,
+                            sceneSeeds: scenesForPrevArchive.map((s) => s.curatedSeedArtists || s.seedArtists || "").filter(Boolean),
                         };
                     }
                 }
             }
             // 2. Archive the newly synthesized overarching state if multi-scene
-            if (result.overarchingRationale && finalProjectScenes.length >= 2) {
-                const newSig = (0, multiSceneUtils_1.computeSceneSetSignature)(finalProjectScenes);
-                if (newSig) {
-                    const priorEntryForSig = existingHistoryMap[newSig];
-                    existingHistoryMap[newSig] = {
-                        sceneSignature: newSig,
-                        overarchingRationale: result.overarchingRationale,
-                        ...(priorEntryForSig?.overarchingZineTitle ? { overarchingZineTitle: priorEntryForSig.overarchingZineTitle } : {}),
-                        ...(priorEntryForSig?.overarchingZineIntro ? { overarchingZineIntro: priorEntryForSig.overarchingZineIntro } : {}),
-                        ...(priorEntryForSig?.overarchingZineImages ? { overarchingZineImages: priorEntryForSig.overarchingZineImages } : {}),
-                        crossSceneLinks: result.crossSceneLinks || [],
-                        archivedAt: new Date().toISOString(),
-                        sceneCount: finalProjectScenes.length,
-                        sceneSeeds: finalProjectScenes.map((s) => s.curatedSeedArtists || s.seedArtists || "").filter(Boolean),
-                    };
-                }
+            if (newSig) {
+                const priorEntryForSig = existingHistoryMap[newSig];
+                existingHistoryMap[newSig] = {
+                    sceneSignature: newSig,
+                    overarchingRationale: result.overarchingRationale,
+                    ...(priorEntryForSig?.overarchingZineTitle ? { overarchingZineTitle: priorEntryForSig.overarchingZineTitle } : {}),
+                    ...(priorEntryForSig?.overarchingZineIntro ? { overarchingZineIntro: priorEntryForSig.overarchingZineIntro } : {}),
+                    ...(priorEntryForSig?.overarchingZineImages ? { overarchingZineImages: priorEntryForSig.overarchingZineImages } : {}),
+                    crossSceneLinks: result.crossSceneLinks || [],
+                    archivedAt: new Date().toISOString(),
+                    sceneCount: finalProjectScenes.length,
+                    sceneSeeds: finalProjectScenes.map((s) => s.curatedSeedArtists || s.seedArtists || "").filter(Boolean),
+                };
             }
             const prunedOverarchingHistory = (0, multiSceneUtils_1.pruneOverarchingHistory)(existingHistoryMap);
+            const serializedOverarchingHistory = Object.keys(prunedOverarchingHistory).length > 0
+                ? JSON.stringify(prunedOverarchingHistory)
+                : undefined;
+            // Attach overarchingHistory directly to result for immediate in-memory hydration
+            if (serializedOverarchingHistory) {
+                result.overarchingHistory = serializedOverarchingHistory;
+            }
             await updateProjectStatus(jobData.userId, inputPayload.projectId, {
                 status: "completed",
                 schemaVersion: 43,
@@ -2370,9 +2377,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         crossSceneLinks: JSON.stringify(result.crossSceneLinks || []),
                     }
                     : {}),
-                ...(Object.keys(prunedOverarchingHistory).length > 0
-                    ? { overarchingHistory: JSON.stringify(prunedOverarchingHistory) }
-                    : {}),
+                ...(serializedOverarchingHistory ? { overarchingHistory: serializedOverarchingHistory } : {}),
                 artistIds: artistEntityIds,
                 labelIds: labelEntityIds,
                 activeJobId: null,
@@ -2436,6 +2441,15 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 console.warn(`[Curation Backend] Non-fatal tokenTransactions dual-write warning:`, txErr?.message || txErr);
             }
         }
+        // Complete job with 24-hour TTL expiration policy (unconditionally for all jobs, AFTER result.overarchingHistory is attached and projectDoc is updated)
+        await jobDocRef.update({
+            status: "completed",
+            result,
+            updatedAt: firestore_2.FieldValue.serverTimestamp(),
+            completedAt: firestore_2.FieldValue.serverTimestamp(),
+            expireAt: firestore_2.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
+        });
+        console.log(`[Curation Backend] Successfully completed job ${jobId} (set TTL expireAt +24h)`);
     }
     catch (error) {
         console.error(`[Curation Backend] Failed processing job ${jobId}:`, error);

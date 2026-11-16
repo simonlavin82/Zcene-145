@@ -163,8 +163,10 @@ service cloud.firestore {
         // Users must soft-delete via status: 'trashed' or status: 'deleted'.
         allow delete: if isAdmin() || (
           isOwner(userId) && (
-            (!('tokensSpent' in resource.data) || resource.data.tokensSpent == null || resource.data.tokensSpent == 0) &&
-            (!('apiUsage' in resource.data) || resource.data.apiUsage == null)
+            resource == null || (
+              (!('tokensSpent' in resource.data) || resource.data.tokensSpent == null || resource.data.tokensSpent == 0) &&
+              (!('apiUsage' in resource.data) || resource.data.apiUsage == null)
+            )
           )
         );
       }
