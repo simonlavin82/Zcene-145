@@ -1445,7 +1445,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
   }, [isLoading, requestWakeLock]);
 
-  // V44: Retain ROOTS tab on mobile when switching Scene pills (do not flip to spiderweb).
+  // V45: Retain ROOTS tab on mobile when switching Scene pills (do not flip to spiderweb).
 
   useEffect(() => {
     if (isSmallScreen && mobileTabContainerRef.current) mobileTabContainerRef.current.scrollLeft = 0;

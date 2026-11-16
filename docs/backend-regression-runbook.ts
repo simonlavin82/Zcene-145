@@ -1,5 +1,5 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V44 Regression Suite (Full-Stack)
+# V45 Regression Suite (Full-Stack)
 
 This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator.
 
@@ -45,7 +45,7 @@ cd functions && npx vitest run tests/idempotencyAndCooldown.test.ts
 # Run V42.1 Escape Hatch Blank-Input UX & Zero "Is connected to" Tooltip tests
 npx vitest run tests/v42_1-escape-hatch-and-tooltips.test.tsx
 
-# Run V44 Multi-Scene Infinite Board, Scene Namespacing & Layered Zine tests
+# Run V45 Multi-Scene Infinite Board, Scene Namespacing & Layered Zine tests
 npx vitest run src/test/v43-multi-scene-board.test.ts
 cd functions && npx vitest run src/__tests__/v43MultiScenePipeline.test.ts
 
@@ -79,9 +79,9 @@ npx vitest --ui
     *   *Circuit Breaker & Kill Switch:* Asserts that exceeding 100 heals in 24 hours trips the auto-kill circuit breaker, throws \`resource-exhausted\`, and honors the admin toggle in \`adminLedger/system/settings\`.
     *   *Telemetry Audit:* Validates receipt creation in \`adminLedger/system/jitHeals\` with accurate token counts and list-price cost calculations.
 
-## Database Purge Runbook Protocol (V44 Multi-Scene Architecture)
+## Database Purge Runbook Protocol (V45 Multi-Scene Architecture)
 
-Note: The V44 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V44 operations.
+Note: The V45 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V45 operations.
 
 When rolling out structural schema migrations, Tier 1 Global Assets (\`/artists\` and \`/labels\`) remain canonical and 100% unchanged. Legacy purge automation (\`scripts/execute_v43_purge.cjs\`) is retained for emergency reset procedures only, while **strictly preserving Tier 1 \`/artists\` and \`/labels\`**, user wallets, and financial ledgers.
 

@@ -1701,7 +1701,7 @@ export const enforceArtistCacheSchema = (payload: any): void => {
   }
 };
 
-// ─── GLOBAL ARTIST AUTOCOMPLETE SUGGESTIONS (V44) ───────────────────────────
+// ─── GLOBAL ARTIST AUTOCOMPLETE SUGGESTIONS (V45) ───────────────────────────
 
 export interface GlobalArtistSuggestion {
   id: string; // canonical ID, e.g. "25hours-th" or "100-demons-us"

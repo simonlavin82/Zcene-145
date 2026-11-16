@@ -712,7 +712,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       contentWidth = Math.max(300, maxX - minX);
       contentHeight = Math.max(300, maxY - minY);
     } else {
-      // V44 / Rule 44: When target scene has 0 nodes (uncurated / idle) and settled nodes exist,
+      // V45 / Rule 44: When target scene has 0 nodes (uncurated / idle) and settled nodes exist,
       // fit the existing settled scenes to screen so the constellation remains visible.
       const settledNodes = visibleNodesRef.current.filter(n => n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y));
       if (settledNodes.length > 0) {
