@@ -7,6 +7,8 @@ import GraphPage from '../components/GraphPage';
 import { DetailsPanel, normalizeMarkdownLineBreaks, splitMarkdownIntoEditorialBlocks, partitionBlockIndicesIntoThreeColumns } from '../components/DetailsPanel';
 import { classifyCurationSpeed } from '../services/cacheQualification';
 import { computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates, detectLegacyStrideShiftX, canonicalizeCrossSceneLinks, canonicalizeProjectScenes, buildCompositeCanvasGraph } from '../shared/multiSceneUtils';
+import { OVERARCHING_ZINE_SCHEMA, sanitizeOverarchingRationale } from '../functions/src/services/curatorService';
+import { calculateTelemetryForUser, buildUnifiedActivityRows } from '../components/UsageAnalyticsPage';
 import { httpsCallable } from 'firebase/functions';
 
 vi.mock('firebase/functions', () => ({
@@ -1959,6 +1961,153 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(result.canonicalLayout).toHaveLength(2);
       expect(result.canonicalLayout[0].nodeId).toBe('scene-1::jew');
       expect(result.canonicalLayout[1].nodeId).toBe('scene-2::elliott');
+    });
+  });
+
+  describe('4. Phase A Regressions: Overarching Zine Scene-Label Prohibition & Multi-Scene Analytics Scope Badge', () => {
+    it('21. Polish Fix A: OVERARCHING_ZINE_SCHEMA description prohibits scene numbers and sanitizeOverarchingRationale strips literal Scene N labels', () => {
+      // 1. Schema description check
+      const rationaleDesc = OVERARCHING_ZINE_SCHEMA.properties.overarchingRationale.description;
+      expect(rationaleDesc).toMatch(/NEVER use literal technical labels like ['"]Scene 1['"] or ['"]Scene 2['"]/i);
+
+      // 2. sanitizeOverarchingRationale test with Korn + Radiohead + Green Day
+      const mockScenes = [
+        { sceneId: 'scene-1', sceneIndex: 0, curatedSeedArtists: 'Korn', customName: 'Nu Metal' },
+        { sceneId: 'scene-2', sceneIndex: 1, curatedSeedArtists: 'Radiohead', customName: 'Brit Indie' },
+        { sceneId: 'scene-3', sceneIndex: 2, curatedSeedArtists: 'Green Day', customName: 'Punk Rock' },
+      ] as any;
+
+      const rawLlmRationale =
+        "While Scene 3 brewed in the East Bay punk clubs, Scene 1 was simultaneously gestating in California's agricultural sprawl, which manifested entirely differently in Scene 2. Meanwhile Scene 9 was purely hypothetical.";
+
+      const sanitized = sanitizeOverarchingRationale(rawLlmRationale, mockScenes);
+
+      // Verify no literal 'Scene <number>' exists in the sanitized string
+      expect(sanitized).not.toMatch(/\bScene\s+[1-9]\d*\b/);
+
+      // Verify Scene 3, Scene 1, and Scene 2 were replaced with seed/context
+      expect(sanitized).toContain('Green Day');
+      expect(sanitized).toContain('Korn');
+      expect(sanitized).toContain('Radiohead');
+      // Unmatched Scene 9 falls back to organic descriptor
+      expect(sanitized).toContain('the corresponding scene');
+    });
+
+    it('22. Polish Fix B: Multi-scene projects with single-seed scenes resolve to Single-Seed Zcene scope in project telemetry and transaction rows', () => {
+      const mockMultiSceneDoc = {
+        id: 'proj-k-r-gd',
+        data: () => ({
+          name: 'Korn + Radiohead + Green Day',
+          seedArtists: 'Korn::Radiohead::Green Day',
+          tokensSpent: 15,
+          generationType: 'Root Generation',
+          createdAt: 1763406300000,
+          scenes: [
+            { sceneId: 'scene-1', seedArtists: 'Korn', customName: 'Nu Metal' },
+            { sceneId: 'scene-2', seedArtists: 'Radiohead', customName: 'Brit Indie' },
+            { sceneId: 'scene-3', seedArtists: 'Green Day', customName: 'Punk Rock' },
+          ],
+        }),
+      };
+
+      const mockTxDocs = [
+        {
+          id: 'tx-korn',
+          data: () => ({
+            uid: 'test-user',
+            type: 'spend_root_curation',
+            delta: -5,
+            balanceAfter: 45,
+            projectId: 'proj-k-r-gd',
+            seedArtist: 'Korn',
+            generationType: 'Root Generation',
+            description: 'Zcene Curation: Korn (5T)',
+            createdAt: 1763406000000,
+          }),
+        },
+        {
+          id: 'tx-radiohead',
+          data: () => ({
+            uid: 'test-user',
+            type: 'spend_live_synthesis',
+            delta: -4,
+            balanceAfter: 40,
+            projectId: 'proj-k-r-gd',
+            seedArtist: 'Radiohead',
+            generationType: 'Root Generation',
+            description: '-4T settlement after 1T pre-flight',
+            createdAt: 1763406100000,
+          }),
+        },
+        {
+          id: 'tx-greenday',
+          data: () => ({
+            uid: 'test-user',
+            type: 'spend_live_synthesis',
+            delta: -4,
+            balanceAfter: 35,
+            projectId: 'proj-k-r-gd',
+            seedArtist: 'Green Day',
+            generationType: 'Root Generation',
+            description: '-4T settlement after 1T pre-flight',
+            createdAt: 1763406200000,
+          }),
+        },
+        {
+          id: 'tx-deftones-multi',
+          data: () => ({
+            uid: 'test-user',
+            type: 'spend_live_synthesis',
+            delta: -9,
+            balanceAfter: 25,
+            projectId: 'proj-k-r-gd',
+            seedArtist: 'Deftones',
+            generationType: 'Root Generation',
+            description: '-9T settlement after 1T pre-flight',
+            createdAt: 1763406300000,
+          }),
+        },
+      ];
+
+      const telemetry = calculateTelemetryForUser(
+        'simon.lavin1@gmail.com',
+        {},
+        [mockMultiSceneDoc],
+        0,
+        { tokenBalance: 25, lifetimeTokensSpent: 22 },
+        'test-user',
+        mockTxDocs
+      );
+
+      // 1. Verify project-level resolution
+      expect(telemetry.projects).toHaveLength(1);
+      const project = telemetry.projects[0];
+      expect(project.isComplexProject).toBe(false);
+      expect(project.userFacingScope).toBe('Single-Seed Zcene');
+
+      // 2. Verify transaction row resolution
+      const activityRows = buildUnifiedActivityRows(telemetry);
+      const curationRows = activityRows.filter((r) => r.isCurationRow);
+
+      const kornRow = curationRows.find((r) => r.title === 'Korn');
+      expect(kornRow).toBeDefined();
+      expect(kornRow?.userFacingScope).toBe('Single-Seed Zcene');
+      expect(kornRow?.totalProjectTokens).toBe(5);
+
+      const radioheadRow = curationRows.find((r) => r.title === 'Radiohead');
+      expect(radioheadRow).toBeDefined();
+      expect(radioheadRow?.userFacingScope).toBe('Single-Seed Zcene');
+      expect(radioheadRow?.totalProjectTokens).toBe(5);
+
+      const greenDayRow = curationRows.find((r) => r.title === 'Green Day');
+      expect(greenDayRow).toBeDefined();
+      expect(greenDayRow?.userFacingScope).toBe('Single-Seed Zcene');
+      expect(greenDayRow?.totalProjectTokens).toBe(5);
+
+      const deftonesRow = curationRows.find((r) => r.title === 'Deftones');
+      expect(deftonesRow).toBeDefined();
+      expect(deftonesRow?.userFacingScope).toBe('Multi-Seed Zcene');
+      expect(deftonesRow?.totalProjectTokens).toBe(10);
     });
   });
 });

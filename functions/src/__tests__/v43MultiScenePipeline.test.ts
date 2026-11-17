@@ -151,7 +151,8 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
     const res = await generateOverarchingZineBackend([scene1, scene2], {}, usageCollector);
 
     expect(mockGenerateContent).toHaveBeenCalledTimes(2);
-    expect(res.overarchingRationale).toBe('Fallback Flash synthesis connecting Scene 1 and Scene 2.');
+    // V45.1: sanitizeOverarchingRationale scrubs literal 'Scene 1 and Scene 2' to seed names
+    expect(res.overarchingRationale).toBe('Fallback Flash synthesis connecting Sense Field and Jimmy Eat World.');
     expect(usageCollector.push).toHaveBeenCalledTimes(1);
   });
 

@@ -115,6 +115,7 @@ export interface ProjectTelemetry {
     createdAt: number;
     status?: 'active' | 'trashed' | 'deleted' | 'archived' | string;
     isArchived?: boolean;
+    isComplexProject?: boolean;
 }
 
 export interface TelemetryAggregateMetrics {
@@ -509,14 +510,23 @@ export const buildUnifiedActivityRows = (
             }
 
             const hasPreFlightCredit = /after\s+1t\s+pre-flight/i.test(rawDescription) || Math.abs(delta) === 4 || Math.abs(delta) === 9;
+            const txSceneTokens = (Math.abs(delta) === 4 || Math.abs(delta) === 9 || /after\s+1t\s+pre-flight/i.test(rawDescription))
+                ? Math.abs(delta) + 1
+                : Math.abs(delta);
+
             const totalProjectTokens = Math.abs(delta) > 0
-                ? (hasPreFlightCredit ? Math.abs(delta) + 1 : Math.abs(delta))
+                ? txSceneTokens
                 : (matchedProj?.tokensSpent ?? 0);
 
             const resolvedStatus = matchedProj?.status || 'archived';
+            const txDeterminedScope = Math.abs(delta) > 0
+                ? (txSceneTokens >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Seed Zcene' : 'Single-Seed Zcene')
+                : undefined;
+
             const resolvedScope =
-                matchedProj?.userFacingScope ||
-                (totalProjectTokens >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Seed Zcene' : 'Single-Seed Zcene');
+                (Math.abs(delta) > 0 && !matchedProj?.isComplexProject)
+                    ? (txSceneTokens >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Seed Zcene' : 'Single-Seed Zcene')
+                    : (txDeterminedScope || matchedProj?.userFacingScope || (totalProjectTokens >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Seed Zcene' : 'Single-Seed Zcene'));
             const resolvedGenType =
                 tx.generationType ||
                 matchedProj?.generationType ||
@@ -1633,6 +1643,20 @@ export const calculateTelemetryForUser = (
         let isEstimate = false;
         const hasFilters = !!(pData.discoveryFilters && pData.discoveryFilters !== '{}');
 
+        let parsedScenes: any[] = [];
+        if (pData.scenes) {
+            try {
+                parsedScenes = typeof pData.scenes === 'string' ? JSON.parse(pData.scenes) : pData.scenes;
+            } catch {}
+        }
+        const hasMultiSeedScene = Array.isArray(parsedScenes) && parsedScenes.length > 0
+            ? parsedScenes.some((s: any) => {
+                const sSeeds = (s.seedArtists || '').split('::').map((x: string) => x.trim()).filter(Boolean);
+                const sFilters = s.discoveryFilters && typeof s.discoveryFilters === 'object' && Object.keys(s.discoveryFilters).length > 0;
+                return sSeeds.length > 1 || sFilters;
+              })
+            : (seeds.length > 1 || hasFilters);
+
         if (generationType) {
             if (generationType === "Direct Hit" || generationType === "Clone") {
                 curationOnlyCost = 0;
@@ -1647,7 +1671,7 @@ export const calculateTelemetryForUser = (
             }
         } else {
             generationType = "Direct Hit";
-            if (seeds.length > 1 || hasFilters) {
+            if (hasMultiSeedScene) {
                 generationType = "Complex Generation";
             } else if (hasProCall || (!projectHasExactCost && activeCount > projectLiveQueries)) {
                 generationType = (activeCount > 1) ? "Root Generation" : "Direct Hit";
@@ -1675,10 +1699,12 @@ export const calculateTelemetryForUser = (
             : 0;
 
         // Rule 43: Redact backend cache status from Standard User view
+        const isComplexProject = generationType === 'Complex Generation' || hasMultiSeedScene;
+
         const userFacingScope =
             generationType === 'Clone'
                 ? 'Saved Shared Zcene'
-                : generationType === 'Complex Generation' || seeds.length > 1 || hasFilters
+                : isComplexProject
                     ? 'Multi-Seed Zcene'
                     : 'Single-Seed Zcene';
 
@@ -1697,7 +1723,8 @@ export const calculateTelemetryForUser = (
             curationOnlyCost,
             isEstimate,
             createdAt,
-            status
+            status,
+            isComplexProject
         });
     });
 

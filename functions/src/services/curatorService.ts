@@ -1077,7 +1077,7 @@ export const OVERARCHING_ZINE_SCHEMA = {
     overarchingRationale: {
       type: Type.STRING,
       description:
-        "A rich, 3-to-5 paragraph Master Overarching Zine Editorial in Markdown weaving together how Scene 1 through Scene N connect across eras, genres, geographies, and shared sonic lineage. NEVER use em-dashes (—) or long hyphens.",
+        "A rich, 3-to-5 paragraph Master Overarching Zine Editorial in Markdown weaving together these distinct musical movements across eras, genres, geographies, and shared sonic lineage. NEVER use literal technical labels like 'Scene 1' or 'Scene 2' in the narrative prose, and NEVER use em-dashes (—) or long hyphens.",
     },
     crossSceneBridges: {
       type: Type.ARRAY,
@@ -1121,6 +1121,49 @@ export const OVERARCHING_ZINE_SCHEMA = {
   },
   required: ["overarchingRationale", "crossSceneBridges"],
 };
+
+/**
+ * Sanitizes the raw Overarching Zine Editorial rationale:
+ * 1. Normalizes Gemini <br> tags, escape sequences, and excess newlines.
+ * 2. Enforces negative constraint against em-dashes (—).
+ * 3. Deterministically scrubs and replaces any stray literal "Scene N" labels with the
+ *    flagship seed artist or scene movement name so narrative prose remains organic.
+ */
+export function sanitizeOverarchingRationale(raw: string, scenes: ProjectScene[]): string {
+  let cleanRationale = (raw || "")
+    .replace(/(?:[ \t]*<\/?br\s*\/?>[ \t]*[\r\n]*)+/gi, "\n\n")
+    .replace(/\\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/\s*—\s*/g, ", ")
+    .trim();
+
+  // Deterministic guard: replace any literal "Scene N" references that slip through LLM generation
+  cleanRationale = cleanRationale.replace(/\bScene\s+([1-9]\d*)\b/gi, (match, numStr) => {
+    const idx = parseInt(numStr, 10) - 1;
+    if (idx >= 0 && idx < scenes.length) {
+      const s = scenes[idx];
+      const rawSeeds = s.seedArtists || s.curatedSeedArtists || '';
+      const firstSeed = rawSeeds ? rawSeeds.split('::')[0].trim() : '';
+      if (firstSeed) {
+        return firstSeed;
+      }
+      if (s.customName && !/^Scene\s+\d+$/i.test(s.customName)) {
+        return s.customName;
+      }
+      if (s.title && !/^Scene\s+\d+$/i.test(s.title)) {
+        return s.title;
+      }
+    }
+    return 'the corresponding scene';
+  });
+
+  if (!cleanRationale && scenes.length > 0) {
+    const sceneTitles = scenes.map((s, i) => `**${s.title || `Scene ${i + 1}`}**`).join(" and ");
+    cleanRationale = `Across ${sceneTitles}, a shared underground current links these distinct constellations into a single musical continuum.`;
+  }
+
+  return cleanRationale;
+}
 
 export const generateOverarchingZineBackend = async (
   scenes: ProjectScene[],
@@ -1185,9 +1228,10 @@ export const generateOverarchingZineBackend = async (
 Your task is to write the Overarching Zine Editorial (Master Multi-Scene Synthesis) for a multi-scene Zcene board containing ${scenes.length} distinct Scenes, AND identify 2 to 5 high-signal cross-scene bridges linking specific artists or record labels across different Scenes.
 
 FORMATTING & EDITORIAL RULES (Rule 24 & Rule 44 — non-negotiable):
-- Write 3 to 5 punchy paragraphs in Markdown for 'overarchingRationale'. **Bold** key artists, record labels, genres, and scenes on first mention.
-- Use bullet points where helpful to highlight cross-scene pivots, shared roster lineages, or sonic transformations across Scenes.
-- Treat every Scene as an integral chapter of a larger musical story: explain how Scene 1's foundation evolves into, contrasts with, or cross-pollinates Scene 2 (and any subsequent Scenes).
+- Write 3 to 5 punchy paragraphs in Markdown for 'overarchingRationale'. **Bold** key artists, record labels, genres, and movements on first mention.
+- Use bullet points where helpful to highlight cross-scene pivots, shared roster lineages, or sonic transformations across movements.
+- Treat every Scene constellation as an integral chapter of a larger musical story: explain how the musical foundation of one movement evolves into, contrasts with, or cross-pollinates the other movements across eras, geographies, and sonic lineages.
+- NEGATIVE CONSTRAINT: NEVER use literal technical or UI labels such as "Scene 1", "Scene 2", "Scene 3", "Scene N", or temporary tab names in the narrative prose. Instead, refer to each constellation organically by its flagship seed artists, genres, regional undergrounds, and eras (e.g., "the East Bay punk explosion", "the Bakersfield Nu Metal vanguard", "Oxford's cerebral alternative movement"). The narrative prose must read as timeless music journalism even if a user renames their scene tabs later.
 - NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation (commas, colons, or semicolons).
 - For 'crossSceneBridges', only reference exact 'sourceSceneId', 'targetSceneId', 'sourceCanonicalId', and 'targetCanonicalId' values from the provided scene roster. 'sourceSceneId' and 'targetSceneId' MUST be different scenes.
 - Each bridge's 'forwardContext' and 'inverseContext' MUST be a concise 3-to-8 word directional verb/prepositional predicate phrase OMITTING both endpoint names (Rule 26), e.g., "passed the melodic post-hardcore torch to" / "inherited the melodic post-hardcore blueprint from". Never output generic "is connected to".`;
@@ -1277,17 +1321,7 @@ ${JSON.stringify(
     }
   }
 
-  let cleanRationale = (rawResult?.overarchingRationale || "")
-    .replace(/(?:[ \t]*<\/?br\s*\/?>[ \t]*[\r\n]*)+/gi, "\n\n")
-    .replace(/\\n/g, "\n")
-    .replace(/\n{3,}/g, "\n\n")
-    .replace(/\s*—\s*/g, ", ")
-    .trim();
-
-  if (!cleanRationale) {
-    const sceneTitles = scenes.map((s, i) => `**${s.title || `Scene ${i + 1}`}**`).join(" and ");
-    cleanRationale = `Across ${sceneTitles}, a shared underground current links these distinct constellations into a single musical continuum.`;
-  }
+  let cleanRationale = sanitizeOverarchingRationale(rawResult?.overarchingRationale || "", scenes);
 
   const validAiBridges: CrossSceneLink[] = [];
   for (const rawBridge of rawResult?.crossSceneBridges || []) {
