@@ -788,6 +788,19 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
+
+    // Architecture V45.1 (Phase B2.2): If initial centering was blocked while width was 0,
+    // execute it immediately upon first non-zero layout measurement.
+    if (!hasInitialCentered.current && visibleNodes.length > 0) {
+      hasInitialCentered.current = true;
+      const sceneCount = detectedSceneCount;
+      if (sceneCount > 1 && focusSceneClusterRef.current) {
+        focusSceneClusterRef.current(activeSceneId || 'scene-1', 0);
+      } else if (fitGraphToScreenRef.current) {
+        fitGraphToScreenRef.current(0);
+      }
+    }
+
     const svg = d3.select(svgRef.current);
     const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
     const { width, height } = dimensions;
@@ -1388,24 +1401,33 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     onSimulationCompleteRef.current();
                 }
 
-                if (!hasInitialCentered.current) {
-                    hasInitialCentered.current = true;
-                    
-                    setTimeout(() => {
-                        const sceneCount = detectedSceneCount;
-                        if (sceneCount > 1 && focusSceneClusterRef.current) {
-                            focusSceneClusterRef.current(activeSceneId || 'scene-1', 0);
-                        } else if (fitGraphToScreenRef.current) {
-                            fitGraphToScreenRef.current(0);
-                            if (sceneCount <= 1) {
-                                setTimeout(() => {
-                                    if (svgRef.current && zoomRef.current) {
-                                        d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
-                                    }
-                                }, 50);
-                            }
+                const attemptInitialCentering = () => {
+                    if (dimensionsRef.current.width === 0 || !svgRef.current || !zoomRef.current) {
+                        return false;
+                    }
+                    const sceneCount = detectedSceneCount;
+                    if (sceneCount > 1 && focusSceneClusterRef.current) {
+                        focusSceneClusterRef.current(activeSceneId || 'scene-1', 0);
+                    } else if (fitGraphToScreenRef.current) {
+                        fitGraphToScreenRef.current(0);
+                        if (sceneCount <= 1) {
+                            setTimeout(() => {
+                                if (svgRef.current && zoomRef.current) {
+                                    d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
+                                }
+                            }, 50);
                         }
-                    }, 150);
+                    }
+                    return true;
+                };
+
+                if (!hasInitialCentered.current) {
+                    setTimeout(() => {
+                        const centered = attemptInitialCentering();
+                        if (centered) {
+                            hasInitialCentered.current = true;
+                        }
+                    }, 50);
                 }
             });
         simulationRef.current = simulation;

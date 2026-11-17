@@ -1207,8 +1207,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
 
+    const [imageErrorRetryCount, setImageErrorRetryCount] = useState(0);
+
     useEffect(() => {
         setImgLoaded(false);
+        setImageErrorRetryCount(0);
         if (details?.imageUrl) {
             setImageTier('source');
         } else {
@@ -1227,7 +1230,19 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
     const handleImageError = () => {
         setImgLoaded(false);
-        setImageTier('placeholder');
+        // Architecture V45.1 (Phase B2.2): Prevent permanent monogram latch (PH, BJ, JB)
+        // caused by transient network socket exhaustion (net::ERR_INSUFFICIENT_RESOURCES).
+        // Immediately render placeholder while backoff runs, then increment retry counter
+        // and trigger a real browser re-fetch via key prop invalidation.
+        if (imageErrorRetryCount < 2 && details?.imageUrl) {
+            setImageTier('placeholder');
+            setTimeout(() => {
+                setImageErrorRetryCount(prev => prev + 1);
+                setImageTier('source');
+            }, 1500);
+        } else {
+            setImageTier('placeholder');
+        }
     };
 
     useEffect(() => {
@@ -1582,6 +1597,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
                                                 {/* Primary / Secondary Image */}
                                                 <img
+                                                    key={`${currentImageUrl}-${imageErrorRetryCount}`}
                                                     ref={imgRef}
                                                     src={currentImageUrl}
                                                     alt={getArtistDisplayName(details, node)}

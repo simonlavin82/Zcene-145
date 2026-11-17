@@ -7564,6 +7564,17 @@ const App: React.FC = () => {
     return () => unsubscribe();
   }, [user, isAuthInitialized, isFirebaseReady]);
 
+  // Architecture V45.1 (Phase B2.2): Session-scoped hydration locks to prevent concurrent batch stampedes
+  // and eliminate infinite re-fetching loops on sparse entities (e.g. record labels without bios).
+  const attemptedHydrationIdsRef = useRef<Set<string>>(new Set());
+  const inFlightHydrationIdsRef = useRef<Set<string>>(new Set());
+
+  // Question 2: Reset hydration locks whenever project switches or resets
+  useEffect(() => {
+    attemptedHydrationIdsRef.current.clear();
+    inFlightHydrationIdsRef.current.clear();
+  }, [currentProjectId]);
+
   // ── BATCH GLOBAL HYDRATION HELPER ──────────────────────────────────────
   // Reads the global 'artists' collection for every node in a loaded graph
   // and pre-populates the local detailsCache Map before the UI declares
@@ -7573,11 +7584,48 @@ const App: React.FC = () => {
     const artistNodes = nodes.filter((n: any) => n.type === 'artist' || n.type === 'label' || !n.type);
     if (!artistNodes.length) return;
 
-    const results = new Map<string, NodeDetails>();
-
-    await Promise.allSettled(artistNodes.map(async (n: any) => {
+    // Question 2: Deduplicate by unique entity ID across all scenes before filtering
+    const seenInBatch = new Set<string>();
+    const targetNodes = artistNodes.filter((n: any) => {
       const rawEntityId = stripSceneNamespace(n.canonicalId || n.id);
       const simpleId = n.type === 'label' ? normalizeLabelId(n.label || rawEntityId) : normalizeArtistId(rawEntityId);
+      if (seenInBatch.has(simpleId)) return false;
+      seenInBatch.add(simpleId);
+
+      if (attemptedHydrationIdsRef.current.has(simpleId) || attemptedHydrationIdsRef.current.has(rawEntityId.toLowerCase())) {
+        return false;
+      }
+      if (inFlightHydrationIdsRef.current.has(simpleId) || inFlightHydrationIdsRef.current.has(rawEntityId.toLowerCase())) {
+        return false;
+      }
+      const existing = detailsCacheRef.current.get(simpleId) || detailsCacheRef.current.get(rawEntityId.toLowerCase());
+      if (existing && existing.summary && existing.summary.trim().length >= 5 && !existing._isSentinel) {
+        return false;
+      }
+      return true;
+    });
+
+    if (targetNodes.length === 0) return;
+
+    // Mark candidates as in-flight
+    targetNodes.forEach((n: any) => {
+      const rawId = stripSceneNamespace(n.canonicalId || n.id).toLowerCase();
+      const simpleId = n.type === 'label' ? normalizeLabelId(n.label || rawId) : normalizeArtistId(rawId);
+      inFlightHydrationIdsRef.current.add(simpleId);
+      inFlightHydrationIdsRef.current.add(rawId);
+    });
+
+    const results = new Map<string, NodeDetails>();
+    const BATCH_CONCURRENCY = 6; // Stay strictly within browser HTTP/1.1 socket pool limits
+
+    try {
+      for (let i = 0; i < targetNodes.length; i += BATCH_CONCURRENCY) {
+        const chunk = targetNodes.slice(i, i + BATCH_CONCURRENCY);
+        await Promise.allSettled(chunk.map(async (n: any) => {
+          const rawEntityId = stripSceneNamespace(n.canonicalId || n.id);
+          const simpleId = n.type === 'label' ? normalizeLabelId(n.label || rawEntityId) : normalizeArtistId(rawEntityId);
+          attemptedHydrationIdsRef.current.add(simpleId);
+          attemptedHydrationIdsRef.current.add(rawEntityId.toLowerCase());
 
       // Find connected countries in the graph links
       const connectedCountries = links
@@ -7741,11 +7789,13 @@ const App: React.FC = () => {
         const previewUrl = typeof parsed?.previewUrl === 'string' && parsed.previewUrl.trim().length > 0 ? parsed.previewUrl.trim() : undefined;
         const previewTrackName = typeof parsed?.previewTrackName === 'string' && parsed.previewTrackName.trim().length > 0 ? parsed.previewTrackName.trim() : undefined;
 
-        if (!bio || bio.length < 5) return;
+        const effectiveBio = bio && bio.length >= 5
+          ? bio
+          : (isLabel ? `Record label active in the music scene.` : `Artist active in the ${genre || 'alternative'} music scene.`);
 
         const payload: NodeDetails = {
-          summary: bio,
-          imageUrl: isLabel ? null : imageUrl,
+          summary: effectiveBio,
+          imageUrl: isLabel ? null : (imageUrl || null),
           details: { artist: artistName, genre, style, origin, founded, notableArtists },
           members,
           links,
@@ -7758,7 +7808,8 @@ const App: React.FC = () => {
           synthesisRationale: parsed?.synthesisRationale,
           itunesArtistId,
           previewUrl,
-          previewTrackName
+          previewTrackName,
+          _isSentinel: false,
         };
 
         // Register under all lookup key variants
@@ -7770,11 +7821,31 @@ const App: React.FC = () => {
         if (cacheId !== simpleId) {
           results.set(cacheId, payload);
         }
-        console.log('[Batch Hydration] Loaded from global artists:', rawEntityId, '→', cacheId);
+        console.log('[Batch Hydration] Loaded from global collection:', rawEntityId, '→', cacheId);
       } catch (e) {
         console.warn('[Batch Hydration] Failed for', n.id, e);
+        // Create an unblocking fallback stub to prevent infinite re-fetching loops
+        const fallbackStub: NodeDetails = {
+          summary: n.type === 'label' ? 'Record label active in the music scene.' : `Artist profile for ${titleCaseArtistId(simpleId)}.`,
+          imageUrl: null,
+          details: { artist: titleCaseArtistId(simpleId), genre: '', style: '', origin: '', founded: '', notableArtists: [] },
+          members: [],
+          links: [],
+          discography: [],
+          _isSentinel: false,
+        };
+        results.set(simpleId, fallbackStub);
       }
     }));
+      }
+    } finally {
+      targetNodes.forEach((n: any) => {
+        const rawId = stripSceneNamespace(n.canonicalId || n.id).toLowerCase();
+        const simpleId = n.type === 'label' ? normalizeLabelId(n.label || rawId) : normalizeArtistId(rawId);
+        inFlightHydrationIdsRef.current.delete(simpleId);
+        inFlightHydrationIdsRef.current.delete(rawId);
+      });
+    }
 
     if (results.size > 0) {
       // ── Synchronous ref pre-mutation ────────────────────────────────────────

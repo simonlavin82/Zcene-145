@@ -37,7 +37,7 @@ import {
   normalizeZineIntro,
   normalizeZineTitle,
 } from '../../shared/multiSceneUtils';
-import { normalizeArtistId, normalizeGraphData, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
+import { normalizeArtistId, normalizeLabelId, normalizeGraphData, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
 import { TOKEN_PRICING, computeBaseProjectTokenCost } from '../../shared/tokenEconomy';
 import { sanitizeDiscoveryFilters, hasActiveDiscoveryFilters } from '../../services/cacheQualification';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
@@ -598,6 +598,71 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     const recompacted = compactDetailsCacheToCanonical(compacted, mockNodes);
     expect(recompacted.length).toBe(2);
     expect(recompacted.map(([k]) => k)).toEqual(keys);
+  });
+
+  it('seenInBatch deduplication and attemptedHydrationIdsRef prevent duplicate/looping fetches on shared labels (scene-1::epic, scene-2::epic, scene-3::epic)', () => {
+    const attemptedHydrationIds = new Set<string>();
+    const inFlightHydrationIds = new Set<string>();
+    const detailsCache = new Map<string, any>();
+
+    const artistNodes = [
+      { id: 'scene-1::epic', label: 'Epic Records', type: 'label' },
+      { id: 'scene-2::epic', label: 'Epic Records', type: 'label' },
+      { id: 'scene-3::epic', label: 'Epic Records', type: 'label' },
+      { id: 'scene-1::deftones-us', label: 'Deftones', type: 'artist' },
+      { id: 'scene-2::pj-harvey-gb', label: 'PJ Harvey', type: 'artist' },
+    ];
+
+    const filterTargetNodes = (nodes: any[]) => {
+      const seenInBatch = new Set<string>();
+      return nodes.filter((n: any) => {
+        const rawEntityId = stripSceneNamespace(n.canonicalId || n.id);
+        const simpleId = n.type === 'label' ? normalizeLabelId(n.label || rawEntityId) : normalizeArtistId(rawEntityId);
+        if (seenInBatch.has(simpleId)) return false;
+        seenInBatch.add(simpleId);
+
+        if (attemptedHydrationIds.has(simpleId) || attemptedHydrationIds.has(rawEntityId.toLowerCase())) {
+          return false;
+        }
+        if (inFlightHydrationIds.has(simpleId) || inFlightHydrationIds.has(rawEntityId.toLowerCase())) {
+          return false;
+        }
+        const existing = detailsCache.get(simpleId) || detailsCache.get(rawEntityId.toLowerCase());
+        if (existing && existing.summary && existing.summary.trim().length >= 5 && !existing._isSentinel) {
+          return false;
+        }
+        return true;
+      });
+    };
+
+    // First hydration pass:
+    const targetNodes = filterTargetNodes(artistNodes);
+
+    // epic must appear EXACTLY ONCE despite being in 3 scenes!
+    const epicMatches = targetNodes.filter(n => stripSceneNamespace(n.id).includes('epic'));
+    expect(epicMatches.length).toBe(1);
+    expect(targetNodes.length).toBe(3); // epic, deftones, pj-harvey
+
+    // Simulate batch chunk execution:
+    targetNodes.forEach(n => {
+      const rawEntityId = stripSceneNamespace(n.canonicalId || n.id);
+      const simpleId = n.type === 'label' ? normalizeLabelId(n.label || rawEntityId) : normalizeArtistId(rawEntityId);
+      attemptedHydrationIds.add(simpleId);
+      attemptedHydrationIds.add(rawEntityId.toLowerCase());
+      // Populate fallback stub for sparse label without bio (Phase B2.2)
+      if (n.type === 'label') {
+        detailsCache.set(simpleId, {
+          summary: 'Record label active in the music scene.',
+          _isSentinel: false,
+        });
+      }
+    });
+
+    // Second hydration pass (e.g. on re-render / snapshot update):
+    const secondPassTargets = filterTargetNodes(artistNodes);
+
+    // Must be completely empty: zero duplicate fetches or infinite loops!
+    expect(secondPassTargets.length).toBe(0);
   });
 
   describe('resolveSceneNodeOverlaps ([Rule 21] Box 5 Semantic Weighting & Tether Preservation)', () => {

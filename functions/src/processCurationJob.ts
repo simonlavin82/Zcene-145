@@ -377,6 +377,50 @@ export const processCurationJob = onDocumentCreated({
       }
     };
 
+    const ingestEntityDocIntoMap = (docId: string, aData: any, isLabel: boolean, redirectTo?: string) => {
+      if (!aData) return;
+      let profile = aData.detailsCache ? (typeof aData.detailsCache === 'string' ? JSON.parse(aData.detailsCache) : aData.detailsCache) : null;
+      if (Array.isArray(profile) && profile.length > 0) {
+        profile = Array.isArray(profile[0]) ? profile[0][1] : profile[0];
+      }
+      if (!profile || !profile.summary) {
+        if (aData.summary || aData.bio || aData.details) {
+          profile = {
+            summary: aData.summary || aData.bio || aData.description || (isLabel ? 'Record label active in the music scene.' : ''),
+            imageUrl: aData.imageUrl || '',
+            details: aData.details || { artist: aData.name || aData.seedArtists || aData.label || docId },
+            members: aData.members || [],
+            discography: aData.discography || [],
+            youtubeVideoId: aData.youtubeVideoId || undefined,
+            previewUrl: aData.previewUrl || undefined,
+            itunesArtistId: aData.itunesArtistId || undefined,
+          };
+        } else if (isLabel) {
+          profile = {
+            summary: 'Record label active in the music scene.',
+            imageUrl: '',
+            details: { artist: aData.name || aData.label || docId, genre: '', style: '', origin: '', founded: '', notableArtists: [] },
+            members: [],
+            discography: []
+          };
+        }
+      }
+      if (profile && (profile.summary || profile.details)) {
+        const norm = isLabel ? normalizeLabelId(docId) : normalizeArtistId(docId);
+        const bare = stripCountrySlug(norm);
+        existingProjectDetailsMap.set(docId, profile);
+        existingProjectDetailsMap.set(norm, profile);
+        if (bare) existingProjectDetailsMap.set(bare, profile);
+        if (redirectTo) {
+          const redirNorm = isLabel ? normalizeLabelId(redirectTo) : normalizeArtistId(redirectTo);
+          const redirBare = stripCountrySlug(redirNorm);
+          existingProjectDetailsMap.set(redirectTo, profile);
+          existingProjectDetailsMap.set(redirNorm, profile);
+          if (redirBare) existingProjectDetailsMap.set(redirBare, profile);
+        }
+      }
+    };
+
     ingestDetailsCacheIntoMap(inputPayload?.detailsCache || inputPayload?.existingDetailsCache);
 
     let initialProjectDocData: any = null;
@@ -458,7 +502,64 @@ export const processCurationJob = onDocumentCreated({
                 s.seedArtistIds = [resolvedCanonicalId];
                 s.activeNodes = parsedGraph.nodes.map((n: any) => n.id);
                 ingestDetailsCacheIntoMap(sCache.detailsCache);
-                console.log(`[Curation Backend] [Step 0 Direct Hit] Immediately hydrated scene "${s.sceneId || i}" (${sSeeds[0]} -> ${resolvedCanonicalId}) from Global Cache.`);
+
+                // Architecture V45.1 (Phase B2.2): Batch-fetch peer artists and labels from global
+                // collections for this Direct Hit scene so existingProjectDetailsMap is 100% complete.
+                // Eliminates client-side net::ERR_INSUFFICIENT_RESOURCES storm on project load.
+                const missingNodeIds: { id: string; type: string; rawId: string }[] = [];
+                for (const node of (parsedGraph.nodes || [])) {
+                  const rawId = stripSceneNamespace(node.id || node.canonicalId || '');
+                  const normId = normalizeArtistId(rawId);
+                  if (rawId && !existingProjectDetailsMap.has(rawId) && !existingProjectDetailsMap.has(normId)) {
+                    missingNodeIds.push({ id: node.id, type: node.type || 'artist', rawId });
+                  }
+                }
+
+                if (missingNodeIds.length > 0) {
+                  const artistNodes = missingNodeIds.filter(n => n.type !== 'label');
+                  const labelNodes = missingNodeIds.filter(n => n.type === 'label');
+
+                  if (artistNodes.length > 0) {
+                    try {
+                      const artistRefs = artistNodes.map(n => db.collection("artists").doc(normalizeArtistId(n.rawId)));
+                      const artistDocs = await db.getAll(...artistRefs);
+                      for (const aDoc of artistDocs) {
+                        if (aDoc.exists) {
+                          let aData = aDoc.data();
+                          let originalDocId = aDoc.id;
+                          let redirectedId: string | undefined = undefined;
+                          if (aData?.redirectTo && aData.redirectTo !== aDoc.id) {
+                            redirectedId = aData.redirectTo;
+                            const redirDoc = await db.collection("artists").doc(aData.redirectTo).get();
+                            if (redirDoc.exists) {
+                              aData = redirDoc.data();
+                            }
+                          }
+                          ingestEntityDocIntoMap(originalDocId, aData, false, redirectedId);
+                        }
+                      }
+                    } catch (peerErr) {
+                      console.warn(`[Curation Backend] Non-fatal error batch-fetching peer artists for direct hit scene:`, peerErr);
+                    }
+                  }
+
+                  if (labelNodes.length > 0) {
+                    try {
+                      const labelRefs = labelNodes.map(n => db.collection("labels").doc(normalizeLabelId(n.rawId)));
+                      const labelDocs = await db.getAll(...labelRefs);
+                      for (const lDoc of labelDocs) {
+                        if (lDoc.exists) {
+                          const lData = lDoc.data();
+                          ingestEntityDocIntoMap(lDoc.id, lData, true);
+                        }
+                      }
+                    } catch (peerErr) {
+                      console.warn(`[Curation Backend] Non-fatal error batch-fetching peer labels for direct hit scene:`, peerErr);
+                    }
+                  }
+                }
+
+                console.log(`[Curation Backend] [Step 0 Direct Hit] Immediately hydrated scene "${s.sceneId || i}" (${sSeeds[0]} -> ${resolvedCanonicalId}) and ${missingNodeIds.length} peer profiles from Global Cache.`);
               }
             }
           } catch (dhErr) {
@@ -534,6 +635,57 @@ export const processCurationJob = onDocumentCreated({
         console.log(
           `[Curation Backend] [Overarching-Only Mode] Synthesizing Overarching Zine & Cross-Scene Bridges across ${existingProjectScenes.length} scenes...`
         );
+
+        // Architecture V45.1 (Phase B2.2 Catch-All): Ensure all nodes across all populated scenes
+        // are fully ingested into existingProjectDetailsMap before synthesizing Overarching Zine
+        const allPopulatedNodes = existingProjectScenes
+          .flatMap(s => (s.graphData?.nodes || []))
+          .filter(Boolean);
+        const uningestedArtists = allPopulatedNodes.filter(n => {
+          const rawId = stripSceneNamespace(n.id || n.canonicalId || '');
+          return n.type !== 'label' && rawId && !existingProjectDetailsMap.has(rawId) && !existingProjectDetailsMap.has(normalizeArtistId(rawId));
+        });
+        const uningestedLabels = allPopulatedNodes.filter(n => {
+          const rawId = stripSceneNamespace(n.id || n.canonicalId || '');
+          return n.type === 'label' && rawId && !existingProjectDetailsMap.has(rawId) && !existingProjectDetailsMap.has(normalizeLabelId(rawId));
+        });
+
+        if (uningestedArtists.length > 0) {
+          try {
+            const aRefs = Array.from(new Set(uningestedArtists.map(n => normalizeArtistId(stripSceneNamespace(n.id || n.canonicalId || ''))))).map(id => db.collection("artists").doc(id));
+            const aDocs = await db.getAll(...aRefs);
+            for (const aDoc of aDocs) {
+              if (aDoc.exists) {
+                let aData = aDoc.data();
+                let originalDocId = aDoc.id;
+                let redirectedId: string | undefined = undefined;
+                if (aData?.redirectTo && aData.redirectTo !== aDoc.id) {
+                  redirectedId = aData.redirectTo;
+                  const redirDoc = await db.collection("artists").doc(aData.redirectTo).get();
+                  if (redirDoc.exists) aData = redirDoc.data();
+                }
+                ingestEntityDocIntoMap(originalDocId, aData, false, redirectedId);
+              }
+            }
+          } catch (e) {
+            console.warn('[Curation Backend] Non-fatal batch hydrate catch-all for artists failed:', e);
+          }
+        }
+        if (uningestedLabels.length > 0) {
+          try {
+            const lRefs = Array.from(new Set(uningestedLabels.map(n => normalizeLabelId(stripSceneNamespace(n.id || n.canonicalId || ''))))).map(id => db.collection("labels").doc(id));
+            const lDocs = await db.getAll(...lRefs);
+            for (const lDoc of lDocs) {
+              if (lDoc.exists) {
+                const lData = lDoc.data();
+                ingestEntityDocIntoMap(lDoc.id, lData, true);
+              }
+            }
+          } catch (e) {
+            console.warn('[Curation Backend] Non-fatal batch hydrate catch-all for labels failed:', e);
+          }
+        }
+
         const detailsLookupObj = Object.fromEntries(existingProjectDetailsMap.entries());
         const overarchingResult = await generateOverarchingZineBackend(
           existingProjectScenes,

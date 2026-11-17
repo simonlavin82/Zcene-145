@@ -19,7 +19,10 @@ import {
   OVERARCHING_ZINE_SCHEMA,
   generateOverarchingZineBackend,
   UsageCollector,
+  normalizeArtistId,
+  normalizeLabelId,
 } from '../services/curatorService';
+import { stripCountrySlug } from '../shared/isoCountries';
 import {
   createEmptyProjectScene,
   buildCompositeCanvasGraph,
@@ -344,6 +347,95 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
       }
       // Must NOT be 15 + 15 = 30; must remain 15!
       expect(accumulatedHop2).toBe(15);
+    });
+
+    it('correctly ingests peer artist/label profiles in Step 0 handling both array and single-object detailsCache formats with redirectTo (Phase B2.2)', () => {
+      const existingProjectDetailsMap = new Map<string, any>();
+
+      const ingestEntityDocIntoMap = (docId: string, aData: any, isLabel: boolean, redirectTo?: string) => {
+        if (!aData) return;
+        let profile = aData.detailsCache ? (typeof aData.detailsCache === 'string' ? JSON.parse(aData.detailsCache) : aData.detailsCache) : null;
+        if (Array.isArray(profile) && profile.length > 0) {
+          profile = Array.isArray(profile[0]) ? profile[0][1] : profile[0];
+        }
+        if (!profile || !profile.summary) {
+          if (aData.summary || aData.bio || aData.details) {
+            profile = {
+              summary: aData.summary || aData.bio || aData.description || (isLabel ? 'Record label active in the music scene.' : ''),
+              imageUrl: aData.imageUrl || '',
+              details: aData.details || { artist: aData.name || aData.seedArtists || aData.label || docId },
+              members: aData.members || [],
+              discography: aData.discography || [],
+              youtubeVideoId: aData.youtubeVideoId || undefined,
+              previewUrl: aData.previewUrl || undefined,
+              itunesArtistId: aData.itunesArtistId || undefined,
+            };
+          } else if (isLabel) {
+            profile = {
+              summary: 'Record label active in the music scene.',
+              imageUrl: '',
+              details: { artist: aData.name || aData.label || docId, genre: '', style: '', origin: '', founded: '', notableArtists: [] },
+              members: [],
+              discography: []
+            };
+          }
+        }
+        if (profile && (profile.summary || profile.details)) {
+          const norm = isLabel ? normalizeLabelId(docId) : normalizeArtistId(docId);
+          const bare = stripCountrySlug(norm);
+          existingProjectDetailsMap.set(docId, profile);
+          existingProjectDetailsMap.set(norm, profile);
+          if (bare) existingProjectDetailsMap.set(bare, profile);
+          if (redirectTo) {
+            const redirNorm = isLabel ? normalizeLabelId(redirectTo) : normalizeArtistId(redirectTo);
+            const redirBare = stripCountrySlug(redirNorm);
+            existingProjectDetailsMap.set(redirectTo, profile);
+            existingProjectDetailsMap.set(redirNorm, profile);
+            if (redirBare) existingProjectDetailsMap.set(redirBare, profile);
+          }
+        }
+      };
+
+      // Case A: Single profile object format (e.g. from healOrphanedAsset or direct cache)
+      const deftonesData = {
+        detailsCache: {
+          summary: 'Deftones are an American alternative metal band from Sacramento, California.',
+          imageUrl: 'https://mzstatic.com/deftones.jpg',
+          details: { artist: 'Deftones', origin: 'Sacramento, USA', genre: 'Alternative Metal', founded: '1988' }
+        }
+      };
+      ingestEntityDocIntoMap('deftones-us', deftonesData, false, 'deftones');
+
+      expect(existingProjectDetailsMap.has('deftones-us')).toBe(true);
+      expect(existingProjectDetailsMap.has('deftones')).toBe(true);
+      expect(existingProjectDetailsMap.get('deftones')?.details?.artist).toBe('Deftones');
+
+      // Case B: 2D Array format (e.g. [ [ 'pj-harvey-gb', profile ] ])
+      const pjHarveyData = {
+        detailsCache: [
+          ['pj-harvey-gb', {
+            summary: 'PJ Harvey is an English musician and singer-songwriter.',
+            imageUrl: 'https://mzstatic.com/pj.jpg',
+            details: { artist: 'PJ Harvey', origin: 'Dorset, UK', genre: 'Brit Indie', founded: '1988' }
+          }]
+        ]
+      };
+      ingestEntityDocIntoMap('pj-harvey-gb', pjHarveyData, false, 'pj-harvey');
+
+      expect(existingProjectDetailsMap.has('pj-harvey-gb')).toBe(true);
+      expect(existingProjectDetailsMap.has('pj-harvey')).toBe(true);
+      expect(existingProjectDetailsMap.get('pj-harvey')?.imageUrl).toBe('https://mzstatic.com/pj.jpg');
+
+      // Case C: Label document with top-level fields
+      const epicLabelData = {
+        name: 'Epic Records',
+        summary: 'Epic Records is an American record label owned by Sony Music.',
+        details: { artist: 'Epic Records', genre: 'Alternative' }
+      };
+      ingestEntityDocIntoMap('epic', epicLabelData, true);
+
+      expect(existingProjectDetailsMap.has('epic')).toBe(true);
+      expect(existingProjectDetailsMap.get('epic')?.summary).toContain('Epic Records');
     });
   });
 });
