@@ -1247,6 +1247,7 @@ export function buildCompositeCanvasGraph(
   const compositeNodes: Node[] = [];
   const compositeLinks: Link[] = [];
   const nodeExistsSet = new Set<string>();
+  let wasCompositeLayoutHealed = false;
 
   scenes.forEach((scene, idx) => {
     const sceneIndex = typeof scene.sceneIndex === 'number' ? scene.sceneIndex : idx;
@@ -1353,18 +1354,40 @@ export function buildCompositeCanvasGraph(
       const savedRef = lookupSavedRef(canonicalId, namespacedId);
 
       const hasSavedCoords =
-        !isSceneLayoutCorrupted &&
         savedRef &&
         typeof savedRef.x === 'number' &&
         Number.isFinite(savedRef.x) &&
         typeof savedRef.y === 'number' &&
         Number.isFinite(savedRef.y);
       const hasRawCoords =
-        !isSceneLayoutCorrupted &&
         typeof rawNode.x === 'number' &&
         Number.isFinite(rawNode.x) &&
         typeof rawNode.y === 'number' &&
         Number.isFinite(rawNode.y);
+
+      const candSavedX = hasSavedCoords ? (savedRef!.x as number) + savedShiftX : undefined;
+      const candSavedY = hasSavedCoords ? (savedRef!.y as number) : undefined;
+      const candRawX = hasRawCoords ? (rawNode.x as number) + rawShiftX : undefined;
+      const candRawY = hasRawCoords ? (rawNode.y as number) : undefined;
+
+      // Safeguard B: Per-Node Territory Sanitizer
+      const isSavedInTerritory =
+        !isSceneLayoutCorrupted &&
+        candSavedX !== undefined &&
+        candSavedY !== undefined &&
+        Math.abs(candSavedX - center.x) <= SCENE_TERRITORY_MAX_DX &&
+        Math.abs(candSavedY - center.y) <= SCENE_TERRITORY_MAX_DY;
+
+      const isRawInTerritory =
+        !isSceneLayoutCorrupted &&
+        candRawX !== undefined &&
+        candRawY !== undefined &&
+        Math.abs(candRawX - center.x) <= SCENE_TERRITORY_MAX_DX &&
+        Math.abs(candRawY - center.y) <= SCENE_TERRITORY_MAX_DY;
+
+      if ((hasSavedCoords && !isSavedInTerritory) || (hasRawCoords && !isRawInTerritory)) {
+        wasCompositeLayoutHealed = true;
+      }
 
       const snippetFromScene =
         scene.artistSnippets?.[canonicalId] ||
@@ -1382,19 +1405,25 @@ export function buildCompositeCanvasGraph(
         ...(snippetFromScene ? { narrativeSnippet: snippetFromScene } : {}),
       };
 
-      if (hasSavedCoords) {
-        nodeClone.x = (savedRef!.x as number) + savedShiftX;
-        nodeClone.y = savedRef!.y;
-        nodeClone.fx = (savedRef!.x as number) + savedShiftX;
-        nodeClone.fy = savedRef!.y;
-      } else if (hasRawCoords) {
-        nodeClone.x = (rawNode.x as number) + rawShiftX;
-        nodeClone.y = rawNode.y;
-        if (typeof rawNode.fx === 'number' && typeof rawNode.fy === 'number') {
-          nodeClone.fx = rawNode.fx + rawShiftX;
-          nodeClone.fy = rawNode.fy;
+      if (isSavedInTerritory) {
+        nodeClone.x = candSavedX!;
+        nodeClone.y = candSavedY!;
+        nodeClone.fx = candSavedX!;
+        nodeClone.fy = candSavedY!;
+      } else if (isRawInTerritory) {
+        nodeClone.x = candRawX!;
+        nodeClone.y = candRawY!;
+        if (typeof rawNode.fx === 'number' && Number.isFinite(rawNode.fx) && typeof rawNode.fy === 'number' && Number.isFinite(rawNode.fy)) {
+          const shiftedFx = rawNode.fx + rawShiftX;
+          const isFxInTerritory = Math.abs(shiftedFx - center.x) <= SCENE_TERRITORY_MAX_DX;
+          const isFyInTerritory = Math.abs(rawNode.fy - center.y) <= SCENE_TERRITORY_MAX_DY;
+          if (isFxInTerritory && isFyInTerritory) {
+            nodeClone.fx = shiftedFx;
+            nodeClone.fy = rawNode.fy;
+          }
         }
-      } else if (isSceneLayoutCorrupted) {
+      } else if (isSceneLayoutCorrupted || (hasSavedCoords && !isSavedInTerritory) || (hasRawCoords && !isRawInTerritory)) {
+        wasCompositeLayoutHealed = true;
         // Self-healing reset: pin Root Artist seed(s) at scene center and place peers in deterministic polar rings
         if (isSceneSeed) {
           const seedSpreadOffset =
@@ -1493,6 +1522,7 @@ export function buildCompositeCanvasGraph(
     nodes: compositeNodes,
     links: compositeLinks,
     synthesisRationale: scenes[0]?.synthesisRationale || '',
+    wasLayoutHealed: wasCompositeLayoutHealed,
   };
 }
 
@@ -2363,25 +2393,250 @@ export function shiftSceneClusterCoordinates({
 
   // 3. Shift and re-namespace matching entries in canvasLayout
   const shiftedLayout: CanvasNodeRef[] = [];
+  const seenShiftedKeys = new Set<string>();
+
   for (const item of parsedLayout) {
     if (item.nodeId.startsWith(`${removedSceneId}::`)) continue;
     const oldSid = extractSceneIdFromNodeId(item.nodeId);
     if (oldSid && sceneShiftMap.has(oldSid)) {
       const { newSceneId, dx } = sceneShiftMap.get(oldSid)!;
       const canonical = stripSceneNamespace(item.nodeId);
-      shiftedLayout.push({
-        ...item,
-        nodeId: namespaceSceneNodeId(newSceneId, canonical),
-        x: typeof item.x === 'number' ? item.x + dx : item.x,
-        ...(typeof item.fx === 'number' ? { fx: item.fx + dx } : {}),
-      });
-    } else {
-      shiftedLayout.push(item);
+      const newKey = namespaceSceneNodeId(newSceneId, canonical);
+      if (!seenShiftedKeys.has(newKey.toLowerCase())) {
+        seenShiftedKeys.add(newKey.toLowerCase());
+        shiftedLayout.push({
+          ...item,
+          nodeId: newKey,
+          x: typeof item.x === 'number' ? item.x + dx : item.x,
+          ...(typeof item.fx === 'number' ? { fx: item.fx + dx } : {}),
+        });
+      }
     }
+    // Drop ghost entries from unmapped/dead scenes to prevent coordinate memory collision
   }
 
   return {
     remainingScenes,
     shiftedCanvasLayout: shiftedLayout,
   };
+}
+
+/**
+ * Canonicalizes project scenes to strict sequential IDs (scene-1, scene-2, ... scene-k),
+ * re-namespacing all nodes, links, and canvasLayout coordinates.
+ * Preserves custom titles and seed affiliations without offset ID drift.
+ */
+export function canonicalizeProjectScenes(
+  scenes: ProjectScene[],
+  canvasLayout?: string | CanvasNodeRef[] | null
+): { canonicalScenes: ProjectScene[]; canonicalLayout: CanvasNodeRef[] } {
+  if (!Array.isArray(scenes) || scenes.length === 0) {
+    return { canonicalScenes: [], canonicalLayout: [] };
+  }
+
+  let parsedLayout: CanvasNodeRef[] = [];
+  if (canvasLayout) {
+    if (typeof canvasLayout === 'string') {
+      try { parsedLayout = JSON.parse(canvasLayout); } catch {}
+    } else if (Array.isArray(canvasLayout)) {
+      parsedLayout = [...canvasLayout];
+    }
+  }
+
+  const isAlreadyCanonical = scenes.every((s, idx) => (s.sceneId || s.id) === `scene-${idx + 1}`);
+  if (isAlreadyCanonical) {
+    return { canonicalScenes: [...scenes], canonicalLayout: parsedLayout };
+  }
+
+  const sceneShiftMap = new Map<string, { newSceneId: string; dx: number }>();
+  const canonicalScenes: ProjectScene[] = [];
+
+  for (let idx = 0; idx < scenes.length; idx++) {
+    const scene = scenes[idx];
+    const oldSceneId = (scene.sceneId || scene.id || `scene-${idx + 1}`).trim();
+    const newSceneId = `scene-${idx + 1}`;
+    const dx = 0; // In-place canonicalization retains current cluster centers
+
+    sceneShiftMap.set(oldSceneId, { newSceneId, dx });
+
+    let updatedGraphData: GraphData = { nodes: [], links: [] };
+    if (scene.graphData) {
+      const g = typeof scene.graphData === 'string'
+        ? (() => { try { return JSON.parse(scene.graphData); } catch { return { nodes: [], links: [] }; } })()
+        : scene.graphData;
+
+      const rawNodes = Array.isArray(g.nodes) ? g.nodes : [];
+      const rawLinks = Array.isArray(g.links) ? g.links : [];
+
+      const newNodes = rawNodes.map((node: any) => {
+        const canonical = stripSceneNamespace(node.canonicalId || node.id);
+        return {
+          ...node,
+          id: namespaceSceneNodeId(newSceneId, canonical),
+          canonicalId: canonical,
+          sceneId: newSceneId,
+          sceneIndex: idx,
+        };
+      });
+
+      const newLinks = rawLinks.map((link: any) => {
+        const srcId = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+        const tgtId = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+        return {
+          ...link,
+          source: namespaceSceneNodeId(newSceneId, stripSceneNamespace(srcId)),
+          target: namespaceSceneNodeId(newSceneId, stripSceneNamespace(tgtId)),
+        };
+      });
+
+      updatedGraphData = {
+        nodes: newNodes,
+        links: newLinks,
+        ...(g.synthesisRationale ? { synthesisRationale: g.synthesisRationale } : {})
+      };
+    }
+
+    canonicalScenes.push(normalizeProjectScene({
+      ...scene,
+      id: newSceneId,
+      sceneId: newSceneId,
+      sceneIndex: idx,
+      centerOffset: getSceneCenterOffset(idx),
+      graphData: updatedGraphData,
+    }, idx));
+  }
+
+  const canonicalLayout: CanvasNodeRef[] = [];
+  const seenLayoutKeys = new Set<string>();
+
+  for (const item of parsedLayout) {
+    const oldSid = extractSceneIdFromNodeId(item.nodeId);
+    if (oldSid && sceneShiftMap.has(oldSid)) {
+      const { newSceneId } = sceneShiftMap.get(oldSid)!;
+      const canonical = stripSceneNamespace(item.nodeId);
+      const newKey = namespaceSceneNodeId(newSceneId, canonical);
+      if (!seenLayoutKeys.has(newKey.toLowerCase())) {
+        seenLayoutKeys.add(newKey.toLowerCase());
+        canonicalLayout.push({
+          ...item,
+          nodeId: newKey,
+        });
+      }
+    }
+  }
+
+  return { canonicalScenes, canonicalLayout };
+}
+
+/**
+ * Safeguard A: Canonicalizes archived cross-scene links to new canonical scene IDs.
+ * Uses ordinal scene mapping combined with per-scene node membership verification
+ * to preserve 100% of both sonic_lineage bridges and shared-entity identity bridges.
+ */
+export function canonicalizeCrossSceneLinks(
+  crossSceneLinks: CrossSceneLink[],
+  canonicalScenes: ProjectScene[]
+): CrossSceneLink[] {
+  if (!Array.isArray(crossSceneLinks) || crossSceneLinks.length === 0 || !Array.isArray(canonicalScenes) || canonicalScenes.length === 0) {
+    return [];
+  }
+
+  // 1. Ordinal scene-ID mapping from legacy scene numbers to canonical scene IDs
+  const referencedOldSceneIds = Array.from(
+    new Set(
+      crossSceneLinks.flatMap(l => [l.sourceSceneId || l.fromSceneId, l.targetSceneId || l.toSceneId]).filter(Boolean) as string[]
+    )
+  );
+
+  referencedOldSceneIds.sort((a, b) => {
+    const numA = parseInt((a.match(/\d+/) || ['0'])[0], 10);
+    const numB = parseInt((b.match(/\d+/) || ['0'])[0], 10);
+    return numA - numB;
+  });
+
+  const ordinalSceneMap = new Map<string, string>();
+  referencedOldSceneIds.forEach((oldSid, idx) => {
+    if (idx < canonicalScenes.length) {
+      ordinalSceneMap.set(oldSid, canonicalScenes[idx].sceneId || `scene-${idx + 1}`);
+    }
+  });
+
+  // 2. Build per-scene canonical node sets
+  const sceneNodeSets = new Map<string, Set<string>>();
+  canonicalScenes.forEach((s, idx) => {
+    const sid = s.sceneId || s.id || `scene-${idx + 1}`;
+    const nodeSet = new Set<string>();
+    (s.graphData?.nodes || []).forEach((n: any) => {
+      nodeSet.add(stripSceneNamespace(n.canonicalId || n.id).toLowerCase());
+    });
+    toSeedArtistsArray(s.curatedSeedArtists || s.seedArtists).forEach(seed => {
+      nodeSet.add(normalizeCanonicalEntityId(seed).toLowerCase());
+    });
+    sceneNodeSets.set(sid, nodeSet);
+  });
+
+  const remappedBridges: CrossSceneLink[] = [];
+  const seenPairKeys = new Set<string>();
+
+  for (const bridge of crossSceneLinks) {
+    const srcCanon = stripSceneNamespace(bridge.sourceCanonicalId || bridge.sourceNodeId || bridge.fromNodeId || '').toLowerCase();
+    const tgtCanon = stripSceneNamespace(bridge.targetCanonicalId || bridge.targetNodeId || bridge.toNodeId || '').toLowerCase();
+    const oldSrcSid = bridge.sourceSceneId || bridge.fromSceneId || '';
+    const oldTgtSid = bridge.targetSceneId || bridge.toSceneId || '';
+
+    let resolvedSrcSid = ordinalSceneMap.get(oldSrcSid);
+    let resolvedTgtSid = ordinalSceneMap.get(oldTgtSid);
+
+    // Verify node membership
+    if (!resolvedSrcSid || !sceneNodeSets.get(resolvedSrcSid)?.has(srcCanon)) {
+      resolvedSrcSid = canonicalScenes.find((s, idx) => sceneNodeSets.get(s.sceneId || s.id || `scene-${idx + 1}`)?.has(srcCanon))?.sceneId;
+    }
+    if (!resolvedTgtSid || !sceneNodeSets.get(resolvedTgtSid)?.has(tgtCanon)) {
+      resolvedTgtSid = canonicalScenes.find((s, idx) => (s.sceneId || s.id || `scene-${idx + 1}`) !== resolvedSrcSid && sceneNodeSets.get(s.sceneId || s.id || `scene-${idx + 1}`)?.has(tgtCanon))?.sceneId;
+    }
+
+    // Safeguard A: Identity Bridge Preservation (srcCanon === tgtCanon)
+    if (srcCanon === tgtCanon || bridge.bridgeType === 'identity') {
+      const matchingScenes = canonicalScenes
+        .filter((s, idx) => sceneNodeSets.get(s.sceneId || s.id || `scene-${idx + 1}`)?.has(srcCanon))
+        .map((s, idx) => s.sceneId || s.id || `scene-${idx + 1}`);
+      if (matchingScenes.length >= 2) {
+        if (!resolvedSrcSid || !resolvedTgtSid || resolvedSrcSid === resolvedTgtSid) {
+          resolvedSrcSid = matchingScenes[0];
+          resolvedTgtSid = matchingScenes[1];
+        }
+      } else {
+        continue; // Entity exists in < 2 scenes; cannot bridge
+      }
+    }
+
+    if (!resolvedSrcSid || !resolvedTgtSid || resolvedSrcSid === resolvedTgtSid) {
+      continue;
+    }
+
+    const newSrcNodeId = namespaceSceneNodeId(resolvedSrcSid, srcCanon);
+    const newTgtNodeId = namespaceSceneNodeId(resolvedTgtSid, tgtCanon);
+    const pairKey = [newSrcNodeId, newTgtNodeId].sort().join('--');
+    if (seenPairKeys.has(pairKey)) continue;
+    seenPairKeys.add(pairKey);
+
+    remappedBridges.push({
+      ...bridge,
+      id: `${newSrcNodeId}--${newTgtNodeId}`,
+      source: newSrcNodeId,
+      target: newTgtNodeId,
+      sourceSceneId: resolvedSrcSid,
+      targetSceneId: resolvedTgtSid,
+      sourceNodeId: newSrcNodeId,
+      targetNodeId: newTgtNodeId,
+      fromSceneId: resolvedSrcSid,
+      toSceneId: resolvedTgtSid,
+      sourceCanonicalId: srcCanon,
+      targetCanonicalId: tgtCanon,
+      fromNodeId: srcCanon,
+      toNodeId: tgtCanon,
+    });
+  }
+
+  return remappedBridges;
 }

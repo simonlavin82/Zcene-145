@@ -9,7 +9,7 @@ import { CanvasControlStyles, InputSizes, Button } from './DesignSystem';
 import { zceneCategoricalPalette, zceneFallbackColor, nodeTypeColorMap } from '../utils/formatters';
 import { normalizeArtistId, isNodeInSeedList, cleanLabelDisplayName } from '../services/artistCacheService';
 import { sanitizeDirectionalLinkContext, resolveFallbackRelationContext } from '../shared/linkContext';
-import { getSceneCenterOffset, stripSceneNamespace, resolveSceneNodeOverlaps, resolveCrossSceneTargetName } from '../shared/multiSceneUtils';
+import { getSceneCenterOffset, stripSceneNamespace, resolveSceneNodeOverlaps, resolveCrossSceneTargetName, SCENE_TERRITORY_MAX_DX, SCENE_TERRITORY_MAX_DY } from '../shared/multiSceneUtils';
 
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 
@@ -229,6 +229,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     onCoordinatesSettledRef.current = onCoordinatesSettled;
   }, [onCoordinatesSettled]);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
+  const lastSceneFingerprintRef = useRef<string>('');
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
   const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
@@ -1423,23 +1424,37 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // --- LIVE COORDINATE HANDSHAKE ---
     // Extract the live coordinates from the current simulation state before we overwrite them.
     // This prevents stale JSON coordinates from 'teleporting' active nodes back in time.
-    const currentLiveNodes = simulation.nodes();
+    // Guard against scene re-indexing collisions (e.g., scene-5 being re-indexed to scene-3):
+    // If the scene structure or order changed, discard live physics state so incoming composite
+    // coordinates are honored instead of stale simulation coordinates from a previous scene.
+    const currentSceneFingerprint = scenes.map(s => `${s.sceneId || s.id}:${s.seedArtists || ''}`).join('|');
+    const isSceneStructureChanged = lastSceneFingerprintRef.current !== currentSceneFingerprint;
+    lastSceneFingerprintRef.current = currentSceneFingerprint;
+
+    const currentLiveNodes = isSceneStructureChanged ? [] : simulation.nodes();
     const livePhysicsState = new Map<string, { x?: number, y?: number, vx?: number, vy?: number, fx?: number | null, fy?: number | null }>();
     currentLiveNodes.forEach(n => {
         livePhysicsState.set(n.id, { x: n.x, y: n.y, vx: n.vx, vy: n.vy, fx: n.fx, fy: n.fy });
     });
 
     visibleNodes.forEach(n => {
-        // If the node already exists in the live physics engine, perfectly inherit its momentum and position
+        // If the node already exists in the live physics engine, verify it is within its scene's territory before inheriting
         const liveState = livePhysicsState.get(n.id);
         if (liveState && liveState.x !== undefined && liveState.y !== undefined && !isNaN(liveState.x) && !isNaN(liveState.y)) {
-            n.x = liveState.x;
-            n.y = liveState.y;
-            n.vx = liveState.vx;
-            n.vy = liveState.vy;
-            n.fx = liveState.fx;
-            n.fy = liveState.fy;
-            return; // Skip fallback initialization
+            const nodeSceneIdx = n.sceneIndex ?? 0;
+            const sceneCenter = getSceneCenterOffset(nodeSceneIdx);
+            const dx = Math.abs(liveState.x - sceneCenter.x);
+            const dy = Math.abs(liveState.y - sceneCenter.y);
+            const isWithinTerritory = dx <= SCENE_TERRITORY_MAX_DX && dy <= SCENE_TERRITORY_MAX_DY;
+            if (isWithinTerritory) {
+                n.x = liveState.x;
+                n.y = liveState.y;
+                n.vx = liveState.vx;
+                n.vy = liveState.vy;
+                n.fx = liveState.fx;
+                n.fy = liveState.fy;
+                return; // Skip fallback initialization
+            }
         }
 
         // --- NEW NODE INITIALIZATION ---

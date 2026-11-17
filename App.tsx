@@ -4,7 +4,7 @@ import { flushSync } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertCircle, AlertTriangle, X, CheckCircle2, Key } from 'lucide-react';
 import { GraphData, Node, ParsedArtist, Link, View, NodeDetails, ChatMessage, StackItem, DiscoveryFilters, Project, ArtistCacheEntry, COST_PER_AI_CALL, CanvasNodeRef, DisambiguationCandidateStub, ProjectScene, CrossSceneLink, ZineEditorialImageEntry, OverarchingHistoryEntry } from './types';
-import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeduplicatedActiveNodes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, normalizeZineImages, normalizeZineIntro, normalizeZineTitle, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT, MAX_ZINE_IMAGE_SLOTS, computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates } from './shared/multiSceneUtils';
+import { buildCompositeCanvasGraph, buildCanonicalDeduplicatedNodesFromScenes, computeDeduplicatedActiveNodes, compactDetailsCacheToCanonical, computeDeterministicIdentityBridges, createEmptyScene, generateProjectTitleFromScenes, getAllProjectSeedArtistsString, getSceneCenterOffset, migrateLegacyCanvasLayout, normalizeCrossSceneLink, normalizeProjectScene, normalizeZineImages, normalizeZineIntro, normalizeZineTitle, parseCrossSceneLinks, parseProjectScenes, sanitizeGraphDataForTransport, sanitizeScenesForTransport, stripSceneNamespace, toSeedArtistsArray, toSeedArtistsString, MAX_SCENES_PER_PROJECT, MAX_ZINE_IMAGE_SLOTS, computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates, canonicalizeProjectScenes, canonicalizeCrossSceneLinks } from './shared/multiSceneUtils';
 import { generateGraphData, fetchNodeDetails, resolveArtistCandidatesViaAI } from './services/geminiService';
 import { normalizeArtistId, normalizeLabelId, readArtistCacheMany, readLabelCacheMany, writeArtistCacheMany, assembleGraphFromCache, incrementCacheHit, readLegacyArtistCache, normalizeGraphData, extractArtistSubGraph, isCacheExpired, getArtistDocWithRedirect, getEntityDocWithRedirect, getLabelDocWithRedirect, getAnyEntityDocWithRedirect, titleCaseArtistId, cleanArtistDisplayName, findCanonicalNodeForArtist, buildCompositeCacheKey, enforceArtistCacheSchema, stripUndefinedProperties, isNodeInSeedList, extractCountrySlug, triggerAssetHealing, stripCountrySlug, canonicalizeEntitySlugWithCountry } from './services/artistCacheService';
 export { canonicalizeEntitySlugWithCountry };
@@ -1959,7 +1959,14 @@ const App: React.FC = () => {
       return;
     }
 
-    let baseScenes: ProjectScene[] = scenesRef.current;
+    const { canonicalScenes, canonicalLayout } = canonicalizeProjectScenes(
+      scenesRef.current,
+      lastSettledLayoutRef.current
+    );
+    if (canonicalLayout.length > 0) {
+      lastSettledLayoutRef.current = JSON.stringify(canonicalLayout);
+    }
+    let baseScenes: ProjectScene[] = canonicalScenes;
     if (baseScenes.length >= MAX_SCENES_PER_PROJECT) return;
     if (baseScenes.length === 0) {
       const currentGraph = graphDataRef.current || { nodes: [], links: [] };
@@ -2300,7 +2307,8 @@ const App: React.FC = () => {
           canvasLayout: lastSettledLayoutRef.current,
         });
 
-        const nextBridges = archived.crossSceneLinks || [];
+        const rawArchivedBridges = archived.crossSceneLinks || [];
+        const nextBridges = canonicalizeCrossSceneLinks(rawArchivedBridges, remainingScenes);
         const restoredRationale = archived.overarchingRationale;
         const restoredTitle = archived.overarchingZineTitle || '';
         const restoredIntro = archived.overarchingZineIntro || '';
@@ -7727,6 +7735,11 @@ const App: React.FC = () => {
       const incomingJobId = data.activeJobId || null;
       const localHasGraph = Boolean(graphDataRef.current?.nodes && graphDataRef.current.nodes.length > 0);
 
+      let wasScenesHealed = false;
+      let wasBridgesHealed = false;
+      let wasLayoutHealed = false;
+      let canonicalizedSavedLayout: CanvasNodeRef[] | null = null;
+
       // Safeguard 2: Auto-heal stranded curation without an active job (when not actively curating in session)
       const isActivelyCuratingThisProj = isCurrentlyCurating || isPreFlightChecking;
       if (incomingStatus === 'curating' && !incomingJobId && !isActivelyCuratingThisProj) {
@@ -7824,8 +7837,16 @@ const App: React.FC = () => {
       // Always restore non-graph metadata (available in both new and legacy formats)
       if (data.scenes !== undefined) {
         try {
-          const parsedScenes: ProjectScene[] = parseProjectScenes(data.scenes);
+          let parsedScenes: ProjectScene[] = parseProjectScenes(data.scenes);
           if (Array.isArray(parsedScenes) && parsedScenes.length > 0) {
+            const hasNonCanonicalIds = parsedScenes.some((s, idx) => (s.sceneId || s.id) !== `scene-${idx + 1}`);
+            if (hasNonCanonicalIds) {
+              const canonicalResult = canonicalizeProjectScenes(parsedScenes, data.canvasLayout);
+              parsedScenes = canonicalResult.canonicalScenes;
+              canonicalizedSavedLayout = canonicalResult.canonicalLayout;
+              wasScenesHealed = true;
+              wasLayoutHealed = true;
+            }
             const isCurating = incomingStatus === 'curating' || !!data.activeJobId;
             const isInitialLoad = isProjectLoadingRef.current;
             const isUnconfirmedForkOrPreFlight = pendingUnconfirmedForkIdRef.current === currentProjectId || isPreFlightCheckingRef.current || isPreFlightChecking;
@@ -7903,7 +7924,15 @@ const App: React.FC = () => {
       }
       if (data.crossSceneLinks !== undefined) {
         try {
-          const parsedCrossLinks: CrossSceneLink[] = parseCrossSceneLinks(data.crossSceneLinks);
+          const rawParsed: CrossSceneLink[] = parseCrossSceneLinks(data.crossSceneLinks);
+          let parsedCrossLinks = rawParsed;
+          const currentParsedScenes = scenesRef.current || [];
+          if (currentParsedScenes.length > 0 && parsedCrossLinks.length > 0) {
+            parsedCrossLinks = canonicalizeCrossSceneLinks(parsedCrossLinks, currentParsedScenes);
+            if (JSON.stringify(rawParsed) !== JSON.stringify(parsedCrossLinks)) {
+              wasBridgesHealed = true;
+            }
+          }
           crossSceneLinksRef.current = parsedCrossLinks;
           setCrossSceneLinks(parsedCrossLinks);
         } catch (e) {
@@ -7994,7 +8023,6 @@ const App: React.FC = () => {
         return true;
       }
 
-      let wasLayoutHealed = false;
       try {
         let loadedFromGraphData = false;
         let hydratedNodes: Node[] = [];
@@ -8032,7 +8060,9 @@ const App: React.FC = () => {
           try {
             console.log('[ProjectLoader] Hydrating directly from project graphData / scenes');
             let savedPositions: CanvasNodeRef[] = [];
-            if (data.canvasLayout) {
+            if (canonicalizedSavedLayout && canonicalizedSavedLayout.length > 0) {
+              savedPositions = canonicalizedSavedLayout;
+            } else if (data.canvasLayout) {
               try {
                 const rawLayout = typeof data.canvasLayout === 'string' ? JSON.parse(data.canvasLayout) : data.canvasLayout;
                 if (Array.isArray(rawLayout)) {
@@ -8058,7 +8088,7 @@ const App: React.FC = () => {
                 const k = r?.id || r?.nodeId;
                 if (k) savedPosById.set(k.toLowerCase(), r);
               }
-              wasLayoutHealed = healedLayout.some((h) => {
+              wasLayoutHealed = wasLayoutHealed || Boolean(g.wasLayoutHealed) || wasBridgesHealed || wasScenesHealed || healedLayout.some((h) => {
                 const k = (h.nodeId || '').toLowerCase();
                 const prev = savedPosById.get(k) || savedPosById.get(stripSceneNamespace(k));
                 if (!prev || typeof prev.x !== 'number' || typeof prev.y !== 'number') return false;
@@ -8066,6 +8096,18 @@ const App: React.FC = () => {
               });
               if (healedLayout.length > 0 && (wasLayoutHealed || !lastSettledLayoutRef.current)) {
                 lastSettledLayoutRef.current = JSON.stringify(healedLayout);
+                if (wasLayoutHealed && user && !isGuest && currentProjectId) {
+                  const healPayload: any = {
+                    canvasLayout: JSON.stringify(healedLayout),
+                    crossSceneLinks: JSON.stringify(crossSceneLinksRef.current || []),
+                    updatedAt: serverTimestamp(),
+                  };
+                  if (wasScenesHealed && scenesRef.current.length > 0) {
+                    healPayload.scenes = JSON.stringify(sanitizeScenesForTransport(scenesRef.current));
+                  }
+                  updateDoc(doc(db, 'users', user.uid, 'projects', currentProjectId), healPayload)
+                    .catch((err) => console.warn('[ProjectLoader] Auto-healed canvasLayout persisted:', err));
+                }
               }
             } else if (hasGraphDataNodes) {
               g = normalizeGraphData(parsedGraphData);

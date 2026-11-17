@@ -6,7 +6,7 @@ import { LoadingSpinner } from '../components/Icons';
 import GraphPage from '../components/GraphPage';
 import { DetailsPanel, normalizeMarkdownLineBreaks, splitMarkdownIntoEditorialBlocks, partitionBlockIndicesIntoThreeColumns } from '../components/DetailsPanel';
 import { classifyCurationSpeed } from '../services/cacheQualification';
-import { computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates, detectLegacyStrideShiftX } from '../shared/multiSceneUtils';
+import { computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates, detectLegacyStrideShiftX, canonicalizeCrossSceneLinks, canonicalizeProjectScenes, buildCompositeCanvasGraph } from '../shared/multiSceneUtils';
 import { httpsCallable } from 'firebase/functions';
 
 vi.mock('firebase/functions', () => ({
@@ -1758,6 +1758,207 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(payload).not.toHaveProperty('anchorResolution');
       expect(payload.status).toBe('curating');
       expect(payload.activeJobId).toBe('curation-job-xyz');
+    });
+
+    it('17. canonicalizeCrossSceneLinks preserves shared-entity identity bridges across re-indexed scenes without collapse', () => {
+      const canonicalScenes = [
+        {
+          sceneId: 'scene-1',
+          id: 'scene-1',
+          sceneIndex: 0,
+          curatedSeedArtists: 'Jimmy Eat World',
+          graphData: {
+            nodes: [
+              { id: 'scene-1::braid', canonicalId: 'braid', name: 'Braid', type: 'artist' },
+              { id: 'scene-1::mineral', canonicalId: 'mineral', name: 'Mineral', type: 'artist' }
+            ],
+            links: []
+          }
+        },
+        {
+          sceneId: 'scene-2',
+          id: 'scene-2',
+          sceneIndex: 1,
+          curatedSeedArtists: 'Yellowcard',
+          graphData: {
+            nodes: [
+              { id: 'scene-2::taking-back-sunday', canonicalId: 'taking-back-sunday', name: 'Taking Back Sunday', type: 'artist' }
+            ],
+            links: []
+          }
+        },
+        {
+          sceneId: 'scene-3',
+          id: 'scene-3',
+          sceneIndex: 2,
+          curatedSeedArtists: 'Elliott',
+          graphData: {
+            nodes: [
+              { id: 'scene-3::braid', canonicalId: 'braid', name: 'Braid', type: 'artist' },
+              { id: 'scene-3::mineral', canonicalId: 'mineral', name: 'Mineral', type: 'artist' }
+            ],
+            links: []
+          }
+        }
+      ] as any;
+
+      // Archived bridge using legacy internal IDs (e.g. scene-3 for JEW, scene-5 for Elliott)
+      const rawArchivedBridges = [
+        {
+          id: 'bridge-1',
+          source: 'scene-3::braid',
+          target: 'scene-5::braid',
+          sourceSceneId: 'scene-3',
+          targetSceneId: 'scene-5',
+          sourceCanonicalId: 'braid',
+          targetCanonicalId: 'braid',
+          bridgeType: 'identity',
+          relationship: 'Shared Band Across Scenes',
+        }
+      ] as any;
+
+      const canonicalized = canonicalizeCrossSceneLinks(rawArchivedBridges, canonicalScenes);
+      expect(canonicalized).toHaveLength(1);
+      expect(canonicalized[0].bridgeType).toBe('identity');
+      expect(canonicalized[0].sourceSceneId).toBe('scene-1');
+      expect(canonicalized[0].targetSceneId).toBe('scene-3');
+      expect(canonicalized[0].source).toBe('scene-1::braid');
+      expect(canonicalized[0].target).toBe('scene-3::braid');
+      expect(canonicalized[0].sourceSceneId).not.toBe(canonicalized[0].targetSceneId);
+    });
+
+    it('18. canonicalizeCrossSceneLinks accurately remaps sonic lineage bridges across re-indexed scenes', () => {
+      const canonicalScenes = [
+        {
+          sceneId: 'scene-1',
+          id: 'scene-1',
+          curatedSeedArtists: 'Jimmy Eat World',
+          graphData: { nodes: [{ id: 'scene-1::jew', canonicalId: 'jew' }], links: [] }
+        },
+        {
+          sceneId: 'scene-2',
+          id: 'scene-2',
+          curatedSeedArtists: 'Yellowcard',
+          graphData: { nodes: [{ id: 'scene-2::taking-back-sunday', canonicalId: 'taking-back-sunday' }], links: [] }
+        },
+        {
+          sceneId: 'scene-3',
+          id: 'scene-3',
+          curatedSeedArtists: 'Elliott',
+          graphData: { nodes: [{ id: 'scene-3::mineral', canonicalId: 'mineral' }], links: [] }
+        }
+      ] as any;
+
+      const rawArchivedBridges = [
+        {
+          id: 'bridge-lineage',
+          source: 'scene-3::taking-back-sunday',
+          target: 'scene-5::mineral',
+          sourceSceneId: 'scene-3',
+          targetSceneId: 'scene-5',
+          sourceCanonicalId: 'taking-back-sunday',
+          targetCanonicalId: 'mineral',
+          bridgeType: 'lineage',
+          relationship: 'Sonic Ancestor',
+        }
+      ] as any;
+
+      const canonicalized = canonicalizeCrossSceneLinks(rawArchivedBridges, canonicalScenes);
+      expect(canonicalized).toHaveLength(1);
+      expect(canonicalized[0].bridgeType).toBe('lineage');
+      expect(canonicalized[0].sourceSceneId).toBe('scene-2');
+      expect(canonicalized[0].targetSceneId).toBe('scene-3');
+      expect(canonicalized[0].source).toBe('scene-2::taking-back-sunday');
+      expect(canonicalized[0].target).toBe('scene-3::mineral');
+    });
+
+    it('19. buildCompositeCanvasGraph sanitizes out-of-territory node coordinates and sets wasLayoutHealed', () => {
+      const scenes = [
+        {
+          sceneId: 'scene-1',
+          id: 'scene-1',
+          sceneIndex: 0,
+          curatedSeedArtists: 'Jimmy Eat World',
+          graphData: {
+            nodes: [
+              { id: 'scene-1::jew', canonicalId: 'jew', name: 'Jimmy Eat World', type: 'artist' }
+            ],
+            links: []
+          }
+        },
+        {
+          sceneId: 'scene-3',
+          id: 'scene-3',
+          sceneIndex: 2,
+          curatedSeedArtists: 'Elliott',
+          graphData: {
+            nodes: [
+              { id: 'scene-3::elliott', canonicalId: 'elliott', name: 'Elliott', type: 'artist' },
+              { id: 'scene-3::falling-forward', canonicalId: 'falling-forward', name: 'Falling Forward', type: 'artist' }
+            ],
+            links: []
+          }
+        }
+      ] as any;
+
+      // Corrupted layout where Elliott node has stale coordinates bleeding into Scene 1 territory (x ~ 1050 instead of scene 3 center ~ 3100)
+      const corruptedLayout = [
+        { nodeId: 'scene-1::jew', x: 1000, y: 800 },
+        { nodeId: 'scene-3::elliott', x: 3100, y: 800 },
+        { nodeId: 'scene-3::falling-forward', x: 1050, y: 800 } // Out of territory by > 2000px!
+      ];
+
+      const composite = buildCompositeCanvasGraph(scenes, [], corruptedLayout);
+      expect(composite.wasLayoutHealed).toBe(true);
+
+      const healedNode = composite.nodes.find(n => n.id === 'scene-3::falling-forward');
+      expect(healedNode).toBeDefined();
+      // Healed node should be placed inside Scene 3 territory (center 3100, within dx <= 480)
+      const dxFromScene3Center = Math.abs((healedNode?.x ?? 0) - 3100);
+      expect(dxFromScene3Center).toBeLessThanOrEqual(480);
+    });
+
+    it('20. canonicalizeProjectScenes re-indexes fragmented scene IDs and updates canvasLayout namespaces', () => {
+      const fragmentedScenes = [
+        {
+          sceneId: 'scene-3',
+          id: 'scene-3',
+          sceneIndex: 2,
+          customName: 'Custom JEW Title',
+          curatedSeedArtists: 'Jimmy Eat World',
+          graphData: {
+            nodes: [{ id: 'scene-3::jew', canonicalId: 'jew', name: 'Jimmy Eat World', type: 'artist' }],
+            links: []
+          }
+        },
+        {
+          sceneId: 'scene-5',
+          id: 'scene-5',
+          sceneIndex: 4,
+          curatedSeedArtists: 'Elliott',
+          graphData: {
+            nodes: [{ id: 'scene-5::elliott', canonicalId: 'elliott', name: 'Elliott', type: 'artist' }],
+            links: []
+          }
+        }
+      ] as any;
+
+      const rawLayout = [
+        { nodeId: 'scene-3::jew', x: 1000, y: 800 },
+        { nodeId: 'scene-5::elliott', x: 3100, y: 800 }
+      ];
+
+      const result = canonicalizeProjectScenes(fragmentedScenes, rawLayout);
+      expect(result.canonicalScenes).toHaveLength(2);
+      expect(result.canonicalScenes[0].sceneId).toBe('scene-1');
+      expect(result.canonicalScenes[0].sceneIndex).toBe(0);
+      expect(result.canonicalScenes[0].customName).toBe('Custom JEW Title');
+      expect(result.canonicalScenes[1].sceneId).toBe('scene-2');
+      expect(result.canonicalScenes[1].sceneIndex).toBe(1);
+
+      expect(result.canonicalLayout).toHaveLength(2);
+      expect(result.canonicalLayout[0].nodeId).toBe('scene-1::jew');
+      expect(result.canonicalLayout[1].nodeId).toBe('scene-2::elliott');
     });
   });
 });

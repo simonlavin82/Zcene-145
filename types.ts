@@ -52,6 +52,7 @@ export interface GraphData {
   nodes: Node[];
   links: Link[];
   synthesisRationale?: string;
+  wasLayoutHealed?: boolean;
 }
 
 export interface ChatMessage {
@@ -174,6 +175,8 @@ export interface ProjectScene {
 
 export interface CrossSceneLink {
   id: string;                         // `${sourceSceneId}::${sourceCanonicalId}--${targetSceneId}::${targetCanonicalId}`
+  source?: string;                    // Optional D3 link source alias
+  target?: string;                    // Optional D3 link target alias
   sourceSceneId: string;
   targetSceneId: string;
   fromSceneId?: string;               // Alias of sourceSceneId
