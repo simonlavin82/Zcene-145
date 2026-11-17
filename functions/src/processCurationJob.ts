@@ -42,8 +42,10 @@ import {
 } from "./shared/isoCountries";
 import {
   shouldAdoptCanonicalSlugCandidate,
-  canonicalizeArtistSlugWithOrigin
+  canonicalizeArtistSlugWithOrigin,
+  resolveSceneTopologyBackend
 } from "./executeCurationPipeline";
+import { computeBaseProjectTokenCost } from "./shared/tokenEconomy";
 import { upsertBareRouterStub } from "./services/routerStubService";
 import { AnchorResolutionStatus, ProjectScene, CrossSceneLink, OverarchingHistoryEntry } from "./types";
 import {
@@ -304,6 +306,21 @@ export const processCurationJob = onDocumentCreated({
     await updateProjectStatus(jobData.userId, inputPayload.projectId, { status: "curating" });
   }
 
+  let targetSceneId: string = inputPayload?.targetSceneId || inputPayload?.activeSceneId || "scene-1";
+  let parsedTargetIdx = parseInt(String(targetSceneId).replace(/^scene-/i, ""), 10);
+  let targetSceneIndex: number =
+    typeof inputPayload?.sceneIndex === "number" && inputPayload.sceneIndex >= 0
+      ? inputPayload.sceneIndex
+      : Number.isFinite(parsedTargetIdx) && parsedTargetIdx >= 1
+        ? parsedTargetIdx - 1
+        : 0;
+
+  let existingProjectScenes: ProjectScene[] = parseProjectScenes(inputPayload?.scenes);
+  let artistList: string[] = (inputPayload?.artists || '')
+    .split('::')
+    .map((a: string) => a.trim())
+    .filter(Boolean);
+
   try {
     console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
 
@@ -318,17 +335,6 @@ export const processCurationJob = onDocumentCreated({
         collectedTokens[model].total += usage.totalTokenCount;
       }
     };
-
-    const targetSceneId: string = inputPayload?.targetSceneId || inputPayload?.activeSceneId || "scene-1";
-    const parsedTargetIdx = parseInt(String(targetSceneId).replace(/^scene-/i, ""), 10);
-    const targetSceneIndex: number =
-      typeof inputPayload?.sceneIndex === "number" && inputPayload.sceneIndex >= 0
-        ? inputPayload.sceneIndex
-        : Number.isFinite(parsedTargetIdx) && parsedTargetIdx >= 1
-          ? parsedTargetIdx - 1
-          : 0;
-
-    let existingProjectScenes: ProjectScene[] = parseProjectScenes(inputPayload?.scenes);
     let existingProjectCanvasLayout: any[] | undefined;
     if (inputPayload?.canvasLayout) {
       try {
@@ -409,6 +415,84 @@ export const processCurationJob = onDocumentCreated({
     }
 
     if (jobType === "graph_generation") {
+      // ── Step 0: Immediate Global Cache Direct Hit Hydration for Queued Scenes ──
+      // Hydrate any pending scenes in existingProjectScenes that are 100% Global Cache Direct Hits.
+      // Follows redirectTo router stubs (Catch 1) and sets activeNodes & curatedSeedArtists.
+      for (let i = 0; i < existingProjectScenes.length; i++) {
+        const s = existingProjectScenes[i];
+        const sSeeds = (s.seedArtists || '').split('::').map((a: string) => a.trim()).filter(Boolean);
+        if ((s.graphData?.nodes?.length ?? 0) === 0 && sSeeds.length === 1 && !hasActiveDiscoveryFilters(s.discoveryFilters)) {
+          try {
+            const seedNorm = normalizeArtistId(sSeeds[0]);
+            let resolvedCanonicalId = s.seedIds?.[0] || seedNorm;
+            let seedDoc = await db.collection("artists").doc(resolvedCanonicalId).get();
+            if (seedDoc.exists) {
+              const seedData = seedDoc.data();
+              // Catch 1: Follow redirectTo router stub to canonical document (e.g. korn -> korn-us)
+              if (seedData?.redirectTo && seedData.redirectTo !== resolvedCanonicalId) {
+                const targetDoc = await db.collection("artists").doc(seedData.redirectTo).get();
+                if (targetDoc.exists) {
+                  resolvedCanonicalId = seedData.redirectTo;
+                  seedDoc = targetDoc;
+                }
+              }
+            }
+
+            if (seedDoc.exists && seedDoc.data()?.graphData && seedDoc.data()?.detailsCache) {
+              const sCache = seedDoc.data()!;
+              const parsedGraph = typeof sCache.graphData === 'string' ? JSON.parse(sCache.graphData) : sCache.graphData;
+              let cachedDetails = typeof sCache.detailsCache === 'string' ? JSON.parse(sCache.detailsCache) : sCache.detailsCache;
+              if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                const match = cachedDetails.find((item: any) => normalizeArtistId(item[0]) === resolvedCanonicalId);
+                cachedDetails = match ? match[1] : (Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0]);
+              }
+
+              if (parsedGraph?.nodes?.length >= 2 && isFullyQualifiedEntityProfile(cachedDetails)) {
+                s.graphData = parsedGraph;
+                s.synthesisRationale = sCache.synthesisRationale || parsedGraph.synthesisRationale || "";
+                s.status = "ready";
+                s.pathway = "direct_hit";
+                s.curatedSeedArtists = s.seedArtists;
+                s.seedIds = [resolvedCanonicalId];
+                s.seedArtistIds = [resolvedCanonicalId];
+                s.activeNodes = parsedGraph.nodes.map((n: any) => n.id);
+                ingestDetailsCacheIntoMap(sCache.detailsCache);
+                console.log(`[Curation Backend] [Step 0 Direct Hit] Immediately hydrated scene "${s.sceneId || i}" (${sSeeds[0]} -> ${resolvedCanonicalId}) from Global Cache.`);
+              }
+            }
+          } catch (dhErr) {
+            console.warn(`[Curation Backend] Non-fatal batch direct hit check failed for scene ${s.sceneId}:`, dhErr);
+          }
+        }
+      }
+
+      // Catch 2 & Guard 2: Dynamic Hop Retargeting in Outer Scope
+      // If targetSceneId was just hydrated by Step 0, retarget to the first remaining uncurated scene!
+      const targetSceneObj = existingProjectScenes.find(s => (s.sceneId || s.id) === targetSceneId);
+      const targetSceneAlreadyHydrated = (targetSceneObj?.graphData?.nodes?.length ?? 0) > 0;
+
+      let isAllScenesDirectHitBatch = false;
+      if (targetSceneAlreadyHydrated) {
+        const remainingUncurated = existingProjectScenes.find(s => (s.graphData?.nodes?.length ?? 0) === 0);
+        if (remainingUncurated) {
+          targetSceneId = remainingUncurated.sceneId || remainingUncurated.id || "scene-1";
+          targetSceneIndex = remainingUncurated.sceneIndex ?? 0;
+          artistList = (remainingUncurated.seedArtists || '').split('::').map((s: string) => s.trim()).filter(Boolean);
+          inputPayload.targetSceneId = targetSceneId;
+          inputPayload.sceneIndex = targetSceneIndex;
+          inputPayload.artists = remainingUncurated.seedArtists;
+          inputPayload.filters = remainingUncurated.discoveryFilters || {};
+          inputPayload.baseGraph = { nodes: [], links: [] };
+          // Guard 2: Clean stale seed locks so nextScene curates fresh
+          delete inputPayload.lockedSeeds;
+          inputPayload.seedStubs = {};
+          console.log(`[Curation Backend] [Catch 2 Retargeting] Target scene hydrated by Step 0. Retargeted Hop 1 to uncurated scene ${targetSceneId} (${artistList.join(', ')}).`);
+        } else {
+          console.log(`[Curation Backend] [Catch 2 All-Cached Batch] All queued scenes are hydrated Direct Hits! Fast-forwarding directly to Step 3B Overarching Zine.`);
+          isAllScenesDirectHitBatch = true;
+        }
+      }
+
       // Determine if we should run in mock mode
       const isEmulator = false; // TEMPORARILY DISABLED: process.env.FUNCTIONS_EMULATOR === "true";
       const isMissingApiKey = !process.env.GEMINI_API_KEY;
@@ -445,7 +529,7 @@ export const processCurationJob = onDocumentCreated({
           },
           detailsCache: JSON.stringify(mockDetails)
         };
-      } else if (inputPayload?.mode === "overarching_only" && existingProjectScenes.length >= 2) {
+      } else if ((inputPayload?.mode === "overarching_only" || isAllScenesDirectHitBatch) && existingProjectScenes.length >= 2) {
         console.log(
           `[Curation Backend] [Overarching-Only Mode] Synthesizing Overarching Zine & Cross-Scene Bridges across ${existingProjectScenes.length} scenes...`
         );
@@ -499,7 +583,7 @@ export const processCurationJob = onDocumentCreated({
           return { origin: cleanOrigin, countryIso, genre: cleanGenre };
         };
 
-        const artistList = inputPayload.artists
+        artistList = (inputPayload.artists || '')
           .split('::')
           .map((a: string) => a.trim())
           .filter(Boolean);
@@ -629,12 +713,32 @@ export const processCurationJob = onDocumentCreated({
 
         console.log(`[Phase 3: The Aggregator Gate] Resolved Seed Array:`, resolvedSeedArray);
 
+        // Self-Contained Phase 1: If inputPayload.baseGraph is empty (chained hop or deferred worker mode),
+        // generate Phase 1 topology right here inside the worker.
         let finalGraph = inputPayload.baseGraph;
+        if (!finalGraph || !Array.isArray(finalGraph.nodes) || finalGraph.nodes.length === 0) {
+          console.log(`[Curation Backend] [Phase 1 Self-Contained] Generating Phase 1 topology inside worker for scene ${targetSceneId}...`);
+          const topoResult = await resolveSceneTopologyBackend({
+            db,
+            artistList,
+            filters: inputPayload.filters || {},
+            seedNamesMap,
+            disambiguationHints: disambigHintsMap,
+            disambiguationGenres: disambigGenresMap,
+            usageCollector,
+          });
+          finalGraph = topoResult.finalGraph;
+          if (topoResult.detailsCacheEntries.length > 0) {
+            for (const [k, v] of topoResult.detailsCacheEntries) {
+              existingProjectDetailsMap.set(k, v);
+            }
+          }
+        }
 
-        // Structural Integrity Guard: Verify that we received a valid, rich graph from the model
-        const artistNodesCount = finalGraph.nodes?.filter((n: any) => n.type === 'artist' || !n.type).length || 0;
+        // Structural Integrity Guard: Verify that we have a valid, rich graph
+        const artistNodesCount = finalGraph?.nodes?.filter((n: any) => n.type === 'artist' || !n.type).length || 0;
         const minimumRequiredArtists = 2; // Seed artist + at least 1 recommendation
-        if (!finalGraph.nodes || finalGraph.nodes.length === 0 || artistNodesCount < minimumRequiredArtists) {
+        if (!finalGraph || !finalGraph.nodes || finalGraph.nodes.length === 0 || artistNodesCount < minimumRequiredArtists) {
           throw new Error(`Generated graph failed structural integrity check. Artist nodes count: ${artistNodesCount} (minimum required: ${minimumRequiredArtists}). Curation aborted.`);
         }
 
@@ -2372,11 +2476,22 @@ export const processCurationJob = onDocumentCreated({
         }
         updatedScenes.sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
 
+        // Chained Multi-Scene Evaluation: Are there remaining uncurated scenes queued in the project?
+        const remainingUncuratedScenes = updatedScenes.filter(
+          (s) => (s.graphData?.nodes?.length ?? 0) === 0
+        );
+        const isIntermediateChainedHop = remainingUncuratedScenes.length > 0;
+
         let overarchingRationale = "";
         let crossSceneLinks: CrossSceneLink[] = [];
-        if (updatedScenes.length >= 2) {
+
+        if (isIntermediateChainedHop) {
           console.log(
-            `[Curation Backend] [Step 3B: Overarching Zine Synthesis] Synthesizing Master Editorial & Cross-Scene Bridges across ${updatedScenes.length} scenes...`
+            `[Curation Backend] [Intermediate Hop] Scene ${targetSceneId} completed. ${remainingUncuratedScenes.length} uncurated scene(s) remaining. Skipping intermediate Step 3B Overarching Zine Synthesis.`
+          );
+        } else if (updatedScenes.length >= 2) {
+          console.log(
+            `[Curation Backend] [Final Hop / Step 3B: Overarching Zine Synthesis] All scenes populated! Synthesizing Master Editorial & Cross-Scene Bridges across ${updatedScenes.length} scenes...`
           );
           const unifiedDetailsObj = Object.fromEntries(unifiedDetailsCacheEntries);
           const overarchingPayload = await generateOverarchingZineBackend(
@@ -2401,6 +2516,8 @@ export const processCurationJob = onDocumentCreated({
           scenes: updatedScenes,
           overarchingRationale,
           crossSceneLinks,
+          isIntermediateChainedHop,
+          remainingUncuratedScenes,
           ...(resolvedAnchorResolution ? { anchorResolution: resolvedAnchorResolution } : {})
         };
       }
@@ -2546,7 +2663,9 @@ export const processCurationJob = onDocumentCreated({
             }
           }
           if (typeof pData.tokensSpent === "number") {
-            accumulatedTokensSpent = pData.tokensSpent + accumulatedTokensSpent;
+            accumulatedTokensSpent = inputPayload?.isChainedHop
+              ? pData.tokensSpent
+              : pData.tokensSpent + accumulatedTokensSpent;
           }
         }
       } catch (pErr: any) {
@@ -2646,8 +2765,46 @@ export const processCurationJob = onDocumentCreated({
         result.overarchingHistory = serializedOverarchingHistory;
       }
 
+      let nextChainedJobId: string | null = null;
+      if (result.isIntermediateChainedHop && result.remainingUncuratedScenes?.length > 0) {
+        const nextScene = result.remainingUncuratedScenes[0];
+        const nextJobRef = db.collection("curationJobs").doc();
+        nextChainedJobId = nextJobRef.id;
+
+        const {
+          foregroundApiUsage: _fa,
+          lockedSeeds: _ls,
+          seedStubs: _ss,
+          ...cleanInputPayload
+        } = inputPayload || {};
+
+        await nextJobRef.set({
+          status: "pending",
+          jobType: "graph_generation",
+          userId: jobData.userId,
+          createdAt: FieldValue.serverTimestamp(),
+          updatedAt: FieldValue.serverTimestamp(),
+          inputPayload: {
+            ...cleanInputPayload,
+            targetSceneId: nextScene.sceneId || nextScene.id,
+            sceneIndex: nextScene.sceneIndex,
+            scenes: finalProjectScenes,
+            artists: nextScene.seedArtists,
+            filters: nextScene.discoveryFilters || {},
+            isChainedHop: true,
+            tokensSpent: 0,
+            seedStubs: {},
+            baseGraph: { nodes: [], links: [] },
+            detailsCache: result.detailsCache,
+            existingDetailsCache: result.detailsCache,
+          }
+        });
+        console.log(`[Curation Backend] [Atomic Baton Handoff] Created chained job ${nextChainedJobId} targeting scene "${nextScene.sceneId}".`);
+      }
+
       await updateProjectStatus(jobData.userId, inputPayload.projectId, {
-        status: "completed",
+        status: nextChainedJobId ? "curating" : "completed",
+        activeJobId: nextChainedJobId,
         schemaVersion: 43,
         name: generateProjectTitleFromScenes(finalProjectScenes, result.detailsCache),
         seedArtists: getAllProjectSeedArtistsString(finalProjectScenes, inputPayload.seedArtists || inputPayload.artists || ''),
@@ -2655,7 +2812,7 @@ export const processCurationJob = onDocumentCreated({
         ...(finalProjectScenes.length > 0
           ? {
             scenes: JSON.stringify(finalProjectScenes),
-            activeSceneId: targetSceneId,
+            activeSceneId: nextChainedJobId ? (result.remainingUncuratedScenes[0]?.sceneId || targetSceneId) : targetSceneId,
             sceneCount: finalProjectScenes.length,
             seedArtistIds: getAllProjectSeedIds(finalProjectScenes),
             overarchingRationale: result.overarchingRationale || "",
@@ -2665,7 +2822,6 @@ export const processCurationJob = onDocumentCreated({
         ...(serializedOverarchingHistory ? { overarchingHistory: serializedOverarchingHistory } : {}),
         artistIds: artistEntityIds,
         labelIds: labelEntityIds,
-        activeJobId: null,
         detailsCache: result.detailsCache,
         activeNodes: hoistedActiveNodes,  // Phase 2B: canonical seed-first ordering
         apiUsage: accumulatedProjectApiUsage,
@@ -2746,12 +2902,25 @@ export const processCurationJob = onDocumentCreated({
     // Unified error messaging using the shared errorTranslationLayer
     const translatedError = translateError(error);
 
+    const hasCompletedScenes = existingProjectScenes.some(
+      (s: any) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+    );
+
     if (jobData?.userId && jobData?.inputPayload?.curationSessionId) {
+      const activeSceneObj = existingProjectScenes.find((s: any) => (s.sceneId || s.id) === targetSceneId);
+      const failedSceneCost = hasCompletedScenes
+        ? computeBaseProjectTokenCost(
+            (activeSceneObj?.seedArtists || artistList.join('::')).split('::').filter(Boolean).length || 1,
+            hasActiveDiscoveryFilters(activeSceneObj?.discoveryFilters || jobData?.inputPayload?.filters)
+          )
+        : undefined;
+
       await refundProjectSettlementOnError({
         uid: jobData.userId,
         projectId: jobData.inputPayload?.projectId,
         curationSessionId: jobData.inputPayload.curationSessionId,
-        reason: "Column 3 Hydration Worker Failure",
+        refundAmountOverride: failedSceneCost,
+        reason: `Column 3 Worker Failure for scene ${targetSceneId}`,
       });
     }
 
@@ -2769,11 +2938,20 @@ export const processCurationJob = onDocumentCreated({
     });
 
     if (jobData?.inputPayload?.projectId && jobData?.userId) {
-      await updateProjectStatus(jobData.userId, jobData.inputPayload.projectId, {
-        status: "failed",
-        errorMessage: translatedError.userFriendlyMessage,
-        activeJobId: null
-      });
+      if (hasCompletedScenes) {
+        console.warn(`[Curation Backend] Partial hop failure for scene ${targetSceneId}. Preserving completed scenes on project document.`);
+        await updateProjectStatus(jobData.userId, jobData.inputPayload.projectId, {
+          status: "completed",
+          activeJobId: null,
+          partialError: translatedError.userFriendlyMessage,
+        });
+      } else {
+        await updateProjectStatus(jobData.userId, jobData.inputPayload.projectId, {
+          status: "failed",
+          errorMessage: translatedError.userFriendlyMessage,
+          activeJobId: null
+        });
+      }
     }
   }
 });

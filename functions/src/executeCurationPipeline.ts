@@ -56,6 +56,406 @@ try {
 export const stripCountrySlug = stripIsoCountrySlug;
 export { canonicalizeArtistSlugWithOrigin, shouldAdoptCanonicalSlugCandidate };
 
+export interface ResolveSceneTopologyParams {
+  db: FirebaseFirestore.Firestore;
+  artistList: string[];
+  filters?: any;
+  seedNamesMap?: Record<string, string>;
+  disambiguationHints?: Record<string, string>;
+  disambiguationGenres?: Record<string, string>;
+  originalQueries?: Record<string, string>;
+  cachedSubgraphsContext?: any;
+  baseGraph?: any;
+  intent?: string;
+  usageCollector?: { push: (model: string, usage: any) => void };
+}
+
+export interface ResolveSceneTopologyResult {
+  finalGraph: any;
+  resolvedSeedArray: any[];
+  seedStubs: Record<string, any>;
+  detailsCacheEntries: [string, any][];
+  determinedGenerationType: "Direct Hit" | "Root Generation" | "Partial Generation" | "Complex Generation";
+  collectedTokens: Record<string, { prompt: number; candidates: number; total: number }>;
+}
+
+export async function resolveSceneTopologyBackend(
+  params: ResolveSceneTopologyParams
+): Promise<ResolveSceneTopologyResult> {
+  const {
+    db,
+    artistList,
+    filters = {},
+    seedNamesMap = {},
+    disambiguationHints = {},
+    disambiguationGenres = {},
+    originalQueries = {},
+    cachedSubgraphsContext,
+    baseGraph,
+    intent,
+  } = params;
+
+  const sanitizedFilters = sanitizeDiscoveryFilters(filters);
+  const hasActiveFilters = hasActiveDiscoveryFilters(sanitizedFilters);
+  const detailsCacheEntries: [string, any][] = [];
+  const collectedTokens: Record<string, { prompt: number, candidates: number, total: number }> = {};
+  const usageCollector = params.usageCollector || {
+    push: (model: string, usage: any) => {
+      if (!collectedTokens[model]) collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+      collectedTokens[model].prompt += usage.promptTokenCount;
+      collectedTokens[model].candidates += usage.candidatesTokenCount;
+      collectedTokens[model].total += usage.totalTokenCount;
+    }
+  };
+
+  const resolvedSeedArray: any[] = [];
+  const seedStubs: Record<string, any> = {};
+  let needsProGeneration = false;
+  let hasStubHit = false;
+  let hasCacheMiss = false;
+  const cachedDocsData: Record<string, any> = {};
+
+  for (const seed of artistList) {
+     const seedNorm = normalizeArtistId(seed);
+     const strippedSeed = stripIsoCountrySlug(seedNorm);
+     const hintCountry = (disambiguationHints && (disambiguationHints[seedNorm] || disambiguationHints[strippedSeed] || disambiguationHints[seed])) || null;
+     const hintGenre = (disambiguationGenres && (disambiguationGenres[seedNorm] || disambiguationGenres[strippedSeed] || disambiguationGenres[seed])) || null;
+     const expectedSeedIso = (hintCountry ? normalizeIsoCode(extractCountrySlug(hintCountry)) : null) || extractTrailingCountryIso(seedNorm);
+     let cachedDetails: any = null;
+
+     let resolvedSeedNorm = seedNorm;
+     try {
+       const dedupQuery = await db.collection("artists")
+         .where("artistId", ">=", strippedSeed)
+         .where("artistId", "<=", `${strippedSeed}\uf8ff`)
+         .limit(10)
+         .get();
+       if (!dedupQuery.empty) {
+         const hasAmbiguousSibling = inspectSlugDedupAmbiguity(
+           dedupQuery.docs.map(d => ({ id: d.id, data: d.data() })),
+           strippedSeed
+         );
+         for (const snap of dedupQuery.docs) {
+           const snapData = snap.data();
+           if (!shouldAdoptCanonicalSlugCandidate(expectedSeedIso, snap.id, snapData, strippedSeed, { hasAmbiguousSibling, isSeed: true })) {
+             continue;
+           }
+           if (snap.id !== seedNorm && snapData.artistId) {
+             if (snapData.graphData) {
+               resolvedSeedNorm = snap.id;
+               break;
+             }
+             resolvedSeedNorm = snap.id;
+           }
+         }
+       }
+      } catch (dedupErr) {
+        console.warn(`[resolveSceneTopologyBackend] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
+      }
+
+      const originalQuery = originalQueries && (originalQueries[resolvedSeedNorm] || originalQueries[seedNorm]);
+      if (originalQuery) {
+          const bareNormId = normalizeArtistId(originalQuery);
+          if (bareNormId !== resolvedSeedNorm && (!expectedSeedIso || areCountryIsosCompatible(expectedSeedIso, extractTrailingCountryIso(resolvedSeedNorm)))) {
+              await upsertBareRouterStub(db, bareNormId, resolvedSeedNorm, {
+                  name: seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || originalQuery,
+                  origin: hintCountry || undefined,
+                  genre: hintGenre || undefined,
+              });
+          }
+      }
+
+     let hasGraphData = false;
+      try {
+        let cacheDoc = await db.collection("artists").doc(resolvedSeedNorm).get();
+        if (cacheDoc.exists) {
+           let cacheData = cacheDoc.data();
+           if (cacheData && cacheData.redirectTo && cacheData.redirectTo !== resolvedSeedNorm) {
+              const redirectIso = extractTrailingCountryIso(cacheData.redirectTo);
+              const isValidRedirect = Boolean(
+                areCountryIsosCompatible(expectedSeedIso, redirectIso) &&
+                (!redirectIso || (/-[a-z]{2}$/i.test(cacheData.redirectTo) && !cacheData.redirectTo.endsWith('-uk')))
+              );
+              if (isValidRedirect) {
+                const targetDoc = await db.collection("artists").doc(cacheData.redirectTo).get();
+                if (targetDoc.exists) {
+                   resolvedSeedNorm = cacheData.redirectTo;
+                   cacheDoc = targetDoc;
+                   cacheData = targetDoc.data();
+                }
+              } else if (expectedSeedIso) {
+                const hintedCanonicalId = `${strippedSeed}-${expectedSeedIso}`;
+                const hintedDoc = await db.collection("artists").doc(hintedCanonicalId).get();
+                if (hintedDoc.exists) {
+                   resolvedSeedNorm = hintedCanonicalId;
+                   cacheDoc = hintedDoc;
+                   cacheData = hintedDoc.data();
+                } else {
+                   cacheData = undefined;
+                }
+              }
+           } else if (cacheData?._isStub && expectedSeedIso) {
+              const hintedCanonicalId = `${strippedSeed}-${expectedSeedIso}`;
+              const hintedDoc = await db.collection("artists").doc(hintedCanonicalId).get();
+              if (hintedDoc.exists) {
+                 resolvedSeedNorm = hintedCanonicalId;
+                 cacheDoc = hintedDoc;
+                 cacheData = hintedDoc.data();
+              }
+           }
+           if (cacheData) {
+             cachedDocsData[resolvedSeedNorm] = cacheData;
+             if (cacheData.graphData) {
+                 const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
+                 if (rawGraph && rawGraph.nodes && rawGraph.nodes.length > 0) {
+                     hasGraphData = true;
+                 }
+             }
+             if (cacheData.detailsCache) {
+                cachedDetails = typeof cacheData.detailsCache === 'string' ? JSON.parse(cacheData.detailsCache) : cacheData.detailsCache;
+                if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
+                   const match = cachedDetails.find((item: any) => normalizeArtistId(item[0]) === resolvedSeedNorm);
+                   if (match && match[1]) {
+                     cachedDetails = match[1];
+                   } else {
+                     cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
+                   }
+                }
+             }
+           }
+        }
+      } catch (e) {
+         console.warn(`[resolveSceneTopologyBackend] Failed cache lookup for ${resolvedSeedNorm}`, e);
+      }
+      
+      const qualificationIso = expectedSeedIso || extractTrailingCountryIso(resolvedSeedNorm);
+      if (isFullyQualifiedEntityProfile(cachedDetails, false, qualificationIso)) {
+         const cleanHitName = seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || seed;
+         if (hasGraphData) {
+            resolvedSeedArray.push({
+               id: resolvedSeedNorm,
+               name: cleanHitName,
+               origin: cachedDetails.details.origin || "",
+               genre: cachedDetails.details.genre || "",
+               isCacheHit: true
+            });
+            detailsCacheEntries.push([resolvedSeedNorm, cachedDetails]);
+         } else {
+            needsProGeneration = true;
+            hasStubHit = true;
+            resolvedSeedArray.push({
+               id: resolvedSeedNorm,
+               name: cleanHitName,
+               origin: cachedDetails.details.origin || "",
+               genre: cachedDetails.details.genre || "",
+               isCacheHit: true
+            });
+            detailsCacheEntries.push([resolvedSeedNorm, cachedDetails]);
+         }
+      } else {
+        needsProGeneration = true;
+        hasCacheMiss = true;
+        
+         let validationResult: any = null;
+         const effectiveGenreHint = hintGenre || "Unknown";
+         const rawId = (originalQueries && (originalQueries[seedNorm] || originalQueries[strippedSeed])) || strippedSeed;
+
+         const valResult = await validateSeedOriginBackend(
+            rawId || seed,
+            hintCountry ? { originHint: hintCountry, genreHint: effectiveGenreHint } : undefined
+         );
+         validationResult = valResult;
+         if (valResult.apiUsage) {
+            usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
+         }
+
+         if (validationResult.isValid) {
+            const bareNormId = normalizeArtistId(validationResult.id);
+            const normId = canonicalizeArtistSlugWithOrigin(bareNormId, validationResult.origin);
+            
+            if (normId !== bareNormId) {
+               await upsertBareRouterStub(db, bareNormId, normId, {
+                  name: validationResult.id,
+                  origin: validationResult.origin || "Unknown",
+                  genre: validationResult.genre || "Unknown",
+                  disambiguationSnippet: validationResult.candidates?.[0]?.disambiguationSnippet,
+                  candidates: validationResult.candidates,
+               });
+            }
+
+           const cleanMissName = seedNamesMap[normId] || seedNamesMap[bareNormId] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || validationResult.id;
+
+           resolvedSeedArray.push({
+              id: normId,
+              name: cleanMissName,
+              origin: validationResult.origin,
+              genre: validationResult.genre,
+              isCacheHit: false
+           });
+
+           seedStubs[normId] = {
+               _isStub: true,
+               summary: "Awaiting Deep Cut analysis...",
+               imageUrl: null,
+               details: {
+                   genre: validationResult.genre || "Unknown",
+                   origin: validationResult.origin || "Unknown",
+                   founded: "Unknown",
+                   notableArtists: []
+               },
+               discography: [],
+               links: []
+           };
+        } else {
+           throw new HttpsError("failed-precondition", `Validation failed for seed: ${seed}.`);
+        }
+     }
+  }
+  
+  const isComplexGeneration = artistList.length > 1 || hasActiveFilters;
+  if (isComplexGeneration || intent === 'cache_upgrade') {
+     needsProGeneration = true;
+  }
+
+  let finalGraph = (!isComplexGeneration && baseGraph) ? baseGraph : { nodes: [], links: [] };
+
+  if (needsProGeneration) {
+    const disambiguationHintsForPrompt: Record<string, string> = { ...(disambiguationHints || {}) };
+    for (const seedItem of resolvedSeedArray) {
+      if (seedItem.origin || seedItem.genre) {
+        const lockLine = `Artist "${seedItem.name}": Origin "${seedItem.origin || "Unknown"}", Genre "${seedItem.genre || "Unknown"}"`;
+        disambiguationHintsForPrompt[seedItem.id] = lockLine;
+        const bareKey = stripIsoCountrySlug(normalizeArtistId(seedItem.id));
+        if (bareKey) {
+          disambiguationHintsForPrompt[bareKey] = lockLine;
+        }
+      }
+    }
+
+    const displayArtistsForPrompt = resolvedSeedArray.length > 0
+      ? resolvedSeedArray.map(s => s.name || s.id).join('::')
+      : artistList.join('::');
+
+    const result = await generateGraphDataBackend(
+      displayArtistsForPrompt, 
+      sanitizedFilters, 
+      isComplexGeneration ? undefined : cachedSubgraphsContext, 
+      isComplexGeneration ? undefined : baseGraph, 
+      disambiguationHintsForPrompt
+    );
+    finalGraph = result.graphData;
+    if (result.apiUsage) {
+       usageCollector.push(result.apiUsage.model, result.apiUsage);
+    }
+  } else if (!baseGraph || baseGraph.nodes.length === 0) {
+    const seedNorm = resolvedSeedArray[0]?.id || normalizeArtistId(artistList[0]);
+    const cacheData = cachedDocsData[seedNorm] || cachedDocsData[normalizeArtistId(artistList[0])] || null;
+    if (cacheData) {
+        if (cacheData && cacheData.graphData) {
+            const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
+            finalGraph = JSON.parse(JSON.stringify(rawGraph));
+            if (cacheData.synthesisRationale || rawGraph.synthesisRationale) {
+               finalGraph.synthesisRationale = cacheData.synthesisRationale || rawGraph.synthesisRationale;
+            }
+        }
+    }
+  }
+
+  if (finalGraph.nodes) {
+    inferNodeOriginsFromCountryLinks(finalGraph.nodes, finalGraph.links);
+
+    const idRewriteMap = new Map<string, string>();
+    for (const n of finalGraph.nodes) {
+      if (n.type) {
+        n.type = n.type.toLowerCase();
+      } else {
+        n.type = 'artist';
+      }
+      
+      const originalNormId = normalizeArtistId(n.id);
+      let newId = originalNormId;
+      
+      const seedMatch = resolvedSeedArray.find(s => isEntitySeedMatch(s.id, originalNormId));
+      if (seedMatch) {
+         if (seedMatch.origin) {
+            n.origin = seedMatch.origin;
+         }
+         if (seedMatch.genre && !n.genre) {
+            n.genre = seedMatch.genre;
+         }
+         newId = seedMatch.id;
+      } else if (n.type === 'artist' && n.origin) {
+         newId = canonicalizeArtistSlugWithOrigin(originalNormId, n.origin);
+      }
+      
+      if (newId !== n.id) {
+         idRewriteMap.set(n.id, newId);
+      }
+      n.id = newId;
+    }
+    
+    if (finalGraph.links) {
+       for (const link of finalGraph.links) {
+          const sId = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+          const tId = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+          
+          if (idRewriteMap.size > 0 && idRewriteMap.has(sId)) {
+             link.source = idRewriteMap.get(sId);
+          } else {
+             link.source = sId;
+          }
+          
+          if (idRewriteMap.size > 0 && idRewriteMap.has(tId)) {
+             link.target = idRewriteMap.get(tId);
+          } else {
+             link.target = tId;
+          }
+       }
+    }
+    
+    for (const seed of artistList) {
+      const seedNorm = normalizeArtistId(seed);
+      const resolvedSeed = resolvedSeedArray.find(r => isEntitySeedMatch(r.id, seedNorm) || normalizeArtistId(r.name) === seedNorm || r.id === seedNorm);
+      const sluggedSeedNorm = resolvedSeed ? resolvedSeed.id : seedNorm;
+
+      const seedNode = finalGraph.nodes.find((n: any) => isEntitySeedMatch(sluggedSeedNorm, n.id) || isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
+      if (seedNode && seedNode.id !== sluggedSeedNorm) {
+         const oldId = seedNode.id;
+         seedNode.id = sluggedSeedNorm;
+         seedNode.label = resolvedSeed ? resolvedSeed.name : seed;
+         if (resolvedSeed?.origin) seedNode.origin = resolvedSeed.origin;
+         
+         if (finalGraph.links) {
+            for (const link of finalGraph.links) {
+               if (link.source === oldId) link.source = sluggedSeedNorm;
+               if (link.target === oldId) link.target = sluggedSeedNorm;
+            }
+         }
+      }
+    }
+  }
+
+  let determinedGenerationType: "Direct Hit" | "Root Generation" | "Partial Generation" | "Complex Generation" = "Direct Hit";
+  if (artistList.length > 1 || hasActiveFilters) {
+     determinedGenerationType = "Complex Generation";
+  } else if (needsProGeneration) {
+     if (hasStubHit && !hasCacheMiss) {
+        determinedGenerationType = "Partial Generation";
+     } else {
+        determinedGenerationType = "Root Generation";
+     }
+  }
+
+  return {
+    finalGraph,
+    resolvedSeedArray,
+    seedStubs,
+    detailsCacheEntries,
+    determinedGenerationType,
+    collectedTokens,
+  };
+}
+
 export const validateSeedOriginCallable = onCall({
   secrets: ["GEMINI_API_KEY"],
   timeoutSeconds: 60,
@@ -206,379 +606,52 @@ export const executeCurationPipeline = onCall({
   });
 
   try {
-  console.log(`[Pipeline Diamond] -> Cache Lookup: Checking seeds: ${artistList.join(', ')} (activeFilters=${hasActiveFilters})`);
-  
-  const detailsCacheEntries: [string, any][] = [];
-  
-  const collectedTokens: Record<string, { prompt: number, candidates: number, total: number }> = {};
-  const usageCollector = {
-    push: (model: string, usage: any) => {
-      if (!collectedTokens[model]) collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
-      collectedTokens[model].prompt += usage.promptTokenCount;
-      collectedTokens[model].candidates += usage.candidatesTokenCount;
-      collectedTokens[model].total += usage.totalTokenCount;
-    }
-  };
-  
-  const resolvedSeedArray: any[] = [];
-  const seedStubs: Record<string, any> = {};
-  let needsProGeneration = false;
-  
-  let hasStubHit = false;
-  let hasCacheMiss = false;
-  const cachedDocsData: Record<string, any> = {};
-  
-  for (const seed of artistList) {
-     const seedNorm = normalizeArtistId(seed);
-     const strippedSeed = stripIsoCountrySlug(seedNorm);
-     const hintCountry = (payload.disambiguationHints && (payload.disambiguationHints[seedNorm] || payload.disambiguationHints[strippedSeed] || payload.disambiguationHints[seed])) || null;
-     const hintGenre = (payload.disambiguationGenres && (payload.disambiguationGenres[seedNorm] || payload.disambiguationGenres[strippedSeed] || payload.disambiguationGenres[seed])) || null;
-     const expectedSeedIso = (hintCountry ? normalizeIsoCode(extractCountrySlug(hintCountry)) : null) || extractTrailingCountryIso(seedNorm);
-     let cachedDetails: any = null;
-     
-     // ── Slug Deduplication Guard (Cross-Homonym Protected) ─────────────────────
-     // Before reading artists/{seedNorm}, check if a canonical variation already
-     // exists in Firestore (e.g. buggin-us when searching buggin), while strictly
-     // rejecting cross-country homonyms (e.g. protecting klear [Thailand] from klear-us).
-     let resolvedSeedNorm = seedNorm;
-     try {
-       const dedupQuery = await db.collection("artists")
-         .where("artistId", ">=", strippedSeed)
-         .where("artistId", "<=", `${strippedSeed}\uf8ff`)
-         .limit(10)
-         .get();
-       if (!dedupQuery.empty) {
-         const hasAmbiguousSibling = inspectSlugDedupAmbiguity(
-           dedupQuery.docs.map(d => ({ id: d.id, data: d.data() })),
-           strippedSeed
-         );
-         // Prefer a compatible canonical doc that has graphData (most complete)
-         for (const snap of dedupQuery.docs) {
-           const snapData = snap.data();
-           if (!shouldAdoptCanonicalSlugCandidate(expectedSeedIso, snap.id, snapData, strippedSeed, { hasAmbiguousSibling, isSeed: true })) {
-             continue;
-           }
-           if (snap.id !== seedNorm && snapData.artistId) {
-             if (snapData.graphData) {
-               console.log(`[Pipeline Diamond] Slug Dedup: Adopting canonical seed "${snap.id}" over "${seedNorm}"`);
-               resolvedSeedNorm = snap.id;
-               break;
-             }
-             resolvedSeedNorm = snap.id;
-           }
-         }
-       }
-      } catch (dedupErr) {
-        console.warn(`[Pipeline Diamond] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
-      }
+  const targetSceneId: string = payload.targetSceneId || payload.activeSceneId || "scene-1";
+  const parsedSceneIdx = parseInt(String(targetSceneId).replace(/^scene-/i, ""), 10);
+  const targetSceneIndex: number =
+    typeof payload.sceneIndex === "number" && payload.sceneIndex >= 0
+      ? payload.sceneIndex
+      : Number.isFinite(parsedSceneIdx) && parsedSceneIdx >= 1
+        ? parsedSceneIdx - 1
+        : 0;
 
-      // [Pre-Flight Alias Resolution]
-      const originalQuery = payload.originalQueries && (payload.originalQueries[resolvedSeedNorm] || payload.originalQueries[seedNorm]);
-      if (originalQuery) {
-          const bareNormId = normalizeArtistId(originalQuery);
-          if (bareNormId !== resolvedSeedNorm && (!expectedSeedIso || areCountryIsosCompatible(expectedSeedIso, extractTrailingCountryIso(resolvedSeedNorm)))) {
-              await upsertBareRouterStub(db, bareNormId, resolvedSeedNorm, {
-                  name: seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || originalQuery,
-                  origin: hintCountry || undefined,
-                  genre: hintGenre || undefined,
-              });
-          }
-      }
-
-     let hasGraphData = false;
-      try {
-        let cacheDoc = await db.collection("artists").doc(resolvedSeedNorm).get();
-        if (cacheDoc.exists) {
-           let cacheData = cacheDoc.data();
-           // Root-as-Router Traversal (V25): Follow redirectTo ONLY if country-compatible and 2-letter canonical
-           if (cacheData && cacheData.redirectTo && cacheData.redirectTo !== resolvedSeedNorm) {
-              const redirectIso = extractTrailingCountryIso(cacheData.redirectTo);
-              const isValidRedirect = Boolean(
-                areCountryIsosCompatible(expectedSeedIso, redirectIso) &&
-                (!redirectIso || (/-[a-z]{2}$/i.test(cacheData.redirectTo) && !cacheData.redirectTo.endsWith('-uk')))
-              );
-              if (isValidRedirect) {
-                const targetDoc = await db.collection("artists").doc(cacheData.redirectTo).get();
-                if (targetDoc.exists) {
-                   resolvedSeedNorm = cacheData.redirectTo;
-                   cacheDoc = targetDoc;
-                   cacheData = targetDoc.data();
-                }
-              } else if (expectedSeedIso) {
-                const hintedCanonicalId = `${strippedSeed}-${expectedSeedIso}`;
-                const hintedDoc = await db.collection("artists").doc(hintedCanonicalId).get();
-                if (hintedDoc.exists) {
-                   resolvedSeedNorm = hintedCanonicalId;
-                   cacheDoc = hintedDoc;
-                   cacheData = hintedDoc.data();
-                } else {
-                   cacheData = undefined;
-                }
-              }
-           } else if (cacheData?._isStub && expectedSeedIso) {
-              const hintedCanonicalId = `${strippedSeed}-${expectedSeedIso}`;
-              const hintedDoc = await db.collection("artists").doc(hintedCanonicalId).get();
-              if (hintedDoc.exists) {
-                 resolvedSeedNorm = hintedCanonicalId;
-                 cacheDoc = hintedDoc;
-                 cacheData = hintedDoc.data();
-              }
-           }
-           if (cacheData) {
-             cachedDocsData[resolvedSeedNorm] = cacheData;
-             if (cacheData.graphData) {
-                 const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
-                 if (rawGraph && rawGraph.nodes && rawGraph.nodes.length > 0) {
-                     hasGraphData = true;
-                 }
-             }
-             if (cacheData.detailsCache) {
-                cachedDetails = typeof cacheData.detailsCache === 'string' ? JSON.parse(cacheData.detailsCache) : cacheData.detailsCache;
-                if (Array.isArray(cachedDetails) && cachedDetails.length > 0) {
-                   const match = cachedDetails.find((item: any) => normalizeArtistId(item[0]) === resolvedSeedNorm);
-                   if (match && match[1]) {
-                     cachedDetails = match[1];
-                   } else {
-                     cachedDetails = Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0];
-                   }
-                }
-             }
-           }
-        }
-      } catch (e) {
-         console.warn(`Failed cache lookup for ${resolvedSeedNorm}`, e);
-      }
-      
-      const qualificationIso = expectedSeedIso || extractTrailingCountryIso(resolvedSeedNorm);
-      if (isFullyQualifiedEntityProfile(cachedDetails, false, qualificationIso)) {
-         const cleanHitName = seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || seed;
-         if (hasGraphData) {
-            console.log(`[Pipeline Diamond] -> Is Hit? Yes -> Full Data? Yes -> Merge into Canvas: ${seed}`);
-            resolvedSeedArray.push({
-               id: resolvedSeedNorm,
-               name: cleanHitName,
-               origin: cachedDetails.details.origin || "",
-               genre: cachedDetails.details.genre || "",
-               isCacheHit: true
-            });
-            detailsCacheEntries.push([resolvedSeedNorm, cachedDetails]);
-         } else {
-            console.log(`[Pipeline Diamond] -> Is Hit? Partial (Stub) -> Missing Topology -> Triggering Pro Gen: ${seed}`);
-            needsProGeneration = true;
-            hasStubHit = true;
-            resolvedSeedArray.push({
-               id: resolvedSeedNorm,
-               name: cleanHitName,
-               origin: cachedDetails.details.origin || "",
-               genre: cachedDetails.details.genre || "",
-               isCacheHit: true
-            });
-            detailsCacheEntries.push([resolvedSeedNorm, cachedDetails]);
-         }
-      } else {
-        console.log(`[Pipeline Diamond] -> Is Hit? No -> Flash-Lite Origin Validation: ${seed}`);
-        needsProGeneration = true;
-        hasCacheMiss = true;
-        
-         let validationResult: any = null;
-         const effectiveGenreHint = hintGenre || "Unknown";
-         const rawId = (payload.originalQueries && (payload.originalQueries[seedNorm] || payload.originalQueries[strippedSeed])) || strippedSeed;
-
-         // Zero Blind Trust (V24): Column 2 MUST NOT synthesize geographic slugs (e.g., -jp) from raw user hints.
-         // Stubs are minted strictly from validated Flash candidate payloads.
-         const valResult = await validateSeedOriginBackend(
-            rawId || seed,
-            hintCountry ? { originHint: hintCountry, genreHint: effectiveGenreHint } : undefined
-         );
-         validationResult = valResult;
-         if (valResult.apiUsage) {
-            usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
-         }
-
-         if (validationResult.isValid) {
-            const bareNormId = normalizeArtistId(validationResult.id);
-            // Root-as-Router Contract (V25 / Rule 36): Bare IDs must be minted exclusively as _isStub: true forwarders.
-            // All verified entities with non-global origins resolve strictly to 2-letter ISO suffixed IDs (e.g. klear-th).
-            const normId = canonicalizeArtistSlugWithOrigin(bareNormId, validationResult.origin);
-            
-            if (normId !== bareNormId) {
-               await upsertBareRouterStub(db, bareNormId, normId, {
-                  name: validationResult.id,
-                  origin: validationResult.origin || "Unknown",
-                  genre: validationResult.genre || "Unknown",
-                  disambiguationSnippet: validationResult.candidates?.[0]?.disambiguationSnippet,
-                  candidates: validationResult.candidates,
-               });
-            }
-
-           const cleanMissName = seedNamesMap[normId] || seedNamesMap[bareNormId] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || validationResult.id;
-
-           resolvedSeedArray.push({
-              id: normId,
-              name: cleanMissName,
-              origin: validationResult.origin,
-              genre: validationResult.genre,
-              isCacheHit: false
-           });
-
-           seedStubs[normId] = {
-               _isStub: true,
-               summary: "Awaiting Deep Cut analysis...",
-               imageUrl: null,
-               details: {
-                   genre: validationResult.genre || "Unknown",
-                   origin: validationResult.origin || "Unknown",
-                   founded: "Unknown",
-                   notableArtists: []
-               },
-               discography: [],
-               links: []
-           };
-
-           console.log(`[Pipeline Diamond] -> Seed Slugging: ${validationResult.id} -> ${normId}`);
-        } else {
-           throw new HttpsError("failed-precondition", `Validation failed for seed: ${seed}.`);
-        }
-     }
-  }
-  
-  const isComplexGeneration = artistList.length > 1 || hasActiveFilters;
-  if (isComplexGeneration || payload.intent === 'cache_upgrade') {
-     needsProGeneration = true;
+  if (targetSceneIndex >= MAX_SCENES_PER_PROJECT) {
+    throw new HttpsError("invalid-argument", "Maximum of 5 scenes per project reached.");
   }
 
-  // Architecture V33 [Rule 15 / Rule 27] Tabula Rasa Gate:
-  // When isComplexGeneration is true (Multi-Seed or 3-Tier Anchored), strictly bypass
-  // cachedSubgraphsContext and baseGraph merging so Gemini 3.1 Pro creates fresh bespoke
-  // crossover connections from a blank slate without pre-conditioned bias.
-  // Seed identities remain 100% locked via concise origin & genre constraints.
-  let finalGraph = (!isComplexGeneration && payload.baseGraph) ? payload.baseGraph : { nodes: [], links: [] };
+  let updatedScenes: ProjectScene[] = parseProjectScenes(payload.scenes);
 
-  if (needsProGeneration) {
-    console.log(`[Pipeline Diamond] -> 3.1 Pro Topology Generation (Tabula Rasa: ${isComplexGeneration})`);
+  // Catch 5A: isUpfrontBatch triggers ONLY when >1 scenes in the batch are uncurated
+  const uncuratedScenesCount = updatedScenes.filter(
+    s => (s.graphData?.nodes?.length ?? 0) === 0
+  ).length;
+  const isUpfrontBatch = uncuratedScenesCount > 1;
+  const shouldDeferToWorker = payload.deferPhase1ToWorker === true || isUpfrontBatch;
 
-    const disambiguationHintsForPrompt: Record<string, string> = { ...(payload.disambiguationHints || {}) };
-    for (const seedItem of resolvedSeedArray) {
-      if (seedItem.origin || seedItem.genre) {
-        const lockLine = `Artist "${seedItem.name}": Origin "${seedItem.origin || "Unknown"}", Genre "${seedItem.genre || "Unknown"}"`;
-        disambiguationHintsForPrompt[seedItem.id] = lockLine;
-        const bareKey = stripIsoCountrySlug(normalizeArtistId(seedItem.id));
-        if (bareKey) {
-          disambiguationHintsForPrompt[bareKey] = lockLine;
-        }
-      }
-    }
+  let finalGraph = payload.baseGraph || { nodes: [], links: [] };
+  let resolvedSeedArray: any[] = [];
+  let seedStubs: Record<string, any> = {};
+  let determinedGenerationType: any = "Root Generation";
+  let collectedTokens: Record<string, any> = {};
 
-    const displayArtistsForPrompt = resolvedSeedArray.length > 0
-      ? resolvedSeedArray.map(s => s.name || s.id).join('::')
-      : payload.artists;
-
-    const result = await generateGraphDataBackend(
-      displayArtistsForPrompt, 
-      payload.filters, 
-      isComplexGeneration ? undefined : payload.cachedSubgraphsContext, 
-      isComplexGeneration ? undefined : payload.baseGraph, 
-      disambiguationHintsForPrompt
-    );
-    finalGraph = result.graphData;
-    if (result.apiUsage) {
-       usageCollector.push(result.apiUsage.model, result.apiUsage);
-    }
-  } else if (!payload.baseGraph || payload.baseGraph.nodes.length === 0) {
-    console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Extracting topology from cache`);
-    const seedNorm = resolvedSeedArray[0]?.id || normalizeArtistId(artistList[0]);
-    // The doc was already fetched in the loop above
-    const cacheData = cachedDocsData[seedNorm] || cachedDocsData[normalizeArtistId(artistList[0])] || null;
-    if (cacheData) {
-        if (cacheData && cacheData.graphData) {
-            const rawGraph = typeof cacheData.graphData === 'string' ? JSON.parse(cacheData.graphData) : cacheData.graphData;
-            // Deep clone to ensure we do not mutate any in-memory objects
-            finalGraph = JSON.parse(JSON.stringify(rawGraph));
-            
-            // Critical Fix: Explicitly map the synthesisRationale from the cache root (or inside graphData)
-            if (cacheData.synthesisRationale || rawGraph.synthesisRationale) {
-               finalGraph.synthesisRationale = cacheData.synthesisRationale || rawGraph.synthesisRationale;
-            }
-        }
-    }
-  }
-
-  if (finalGraph.nodes) {
-    // Infer missing `origin` on artist/label nodes from `artist/label <-> country` edges BEFORE canonical slugging
-    const inferredCount = inferNodeOriginsFromCountryLinks(finalGraph.nodes, finalGraph.links);
-    if (inferredCount > 0) {
-      console.log(`[Pipeline Diamond] -> Inferred origin from country links for ${inferredCount} graph node(s)`);
-    }
-
-    const idRewriteMap = new Map<string, string>();
-    for (const n of finalGraph.nodes) {
-      if (n.type) {
-        n.type = n.type.toLowerCase();
-      } else {
-        n.type = 'artist';
-      }
-      
-      const originalNormId = normalizeArtistId(n.id);
-      let newId = originalNormId;
-      
-      const seedMatch = resolvedSeedArray.find(s => isEntitySeedMatch(s.id, originalNormId));
-      if (seedMatch) {
-         if (seedMatch.origin) {
-            n.origin = seedMatch.origin;
-         }
-         if (seedMatch.genre && !n.genre) {
-            n.genre = seedMatch.genre;
-         }
-         newId = seedMatch.id;
-      } else if (n.type === 'artist' && n.origin) {
-         newId = canonicalizeArtistSlugWithOrigin(originalNormId, n.origin);
-      }
-      
-      if (newId !== n.id) {
-         idRewriteMap.set(n.id, newId);
-      }
-      n.id = newId;
-    }
-    
-    if (finalGraph.links) {
-       for (const link of finalGraph.links) {
-          const sId = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
-          const tId = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
-          
-          if (idRewriteMap.size > 0 && idRewriteMap.has(sId)) {
-             link.source = idRewriteMap.get(sId);
-          } else {
-             link.source = sId; // Ensure string format
-          }
-          
-          if (idRewriteMap.size > 0 && idRewriteMap.has(tId)) {
-             link.target = idRewriteMap.get(tId);
-          } else {
-             link.target = tId; // Ensure string format
-          }
-       }
-    }
-    
-    for (const seed of artistList) {
-      const seedNorm = normalizeArtistId(seed);
-      const resolvedSeed = resolvedSeedArray.find(r => isEntitySeedMatch(r.id, seedNorm) || normalizeArtistId(r.name) === seedNorm || r.id === seedNorm);
-      const sluggedSeedNorm = resolvedSeed ? resolvedSeed.id : seedNorm;
-
-      const seedNode = finalGraph.nodes.find((n: any) => isEntitySeedMatch(sluggedSeedNorm, n.id) || isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
-      if (seedNode && seedNode.id !== sluggedSeedNorm) {
-         const oldId = seedNode.id;
-         seedNode.id = sluggedSeedNorm;
-         seedNode.label = resolvedSeed ? resolvedSeed.name : seed;
-         if (resolvedSeed?.origin) seedNode.origin = resolvedSeed.origin;
-         
-         if (finalGraph.links) {
-            for (const link of finalGraph.links) {
-               if (link.source === oldId) link.source = sluggedSeedNorm;
-               if (link.target === oldId) link.target = sluggedSeedNorm;
-            }
-         }
-      }
-    }
+  if (!shouldDeferToWorker) {
+    const topoResult = await resolveSceneTopologyBackend({
+      db,
+      artistList,
+      filters: payload.filters,
+      seedNamesMap,
+      disambiguationHints: payload.disambiguationHints,
+      disambiguationGenres: payload.disambiguationGenres,
+      originalQueries: payload.originalQueries,
+      cachedSubgraphsContext: payload.cachedSubgraphsContext,
+      baseGraph: payload.baseGraph,
+      intent: payload.intent,
+    });
+    finalGraph = topoResult.finalGraph;
+    resolvedSeedArray = topoResult.resolvedSeedArray;
+    seedStubs = topoResult.seedStubs;
+    determinedGenerationType = topoResult.determinedGenerationType;
+    collectedTokens = topoResult.collectedTokens;
   }
 
   const recommendedEntities = (finalGraph.nodes || [])
@@ -608,32 +681,6 @@ export const executeCurationPipeline = onCall({
   console.log(`[Pipeline Diamond] -> Skipping synchronous hydration (Delegated to processCurationJob)`);
 
   let curationJobId = null;
-
-  let determinedGenerationType = "Direct Hit";
-  if (artistList.length > 1 || hasActiveFilters) {
-     determinedGenerationType = "Complex Generation";
-  } else if (needsProGeneration) {
-     if (hasStubHit && !hasCacheMiss) {
-        determinedGenerationType = "Partial Generation";
-     } else {
-        determinedGenerationType = "Root Generation";
-     }
-  }
-
-  const targetSceneId: string = payload.targetSceneId || payload.activeSceneId || "scene-1";
-  const parsedSceneIdx = parseInt(String(targetSceneId).replace(/^scene-/i, ""), 10);
-  const targetSceneIndex: number =
-    typeof payload.sceneIndex === "number" && payload.sceneIndex >= 0
-      ? payload.sceneIndex
-      : Number.isFinite(parsedSceneIdx) && parsedSceneIdx >= 1
-        ? parsedSceneIdx - 1
-        : 0;
-
-  if (targetSceneIndex >= MAX_SCENES_PER_PROJECT) {
-    throw new HttpsError("invalid-argument", "Maximum of 5 scenes per project reached.");
-  }
-
-  let updatedScenes: ProjectScene[] = parseProjectScenes(payload.scenes);
   let existingSavedLayout: any[] | undefined;
   if (Array.isArray(payload.canvasLayout)) {
     existingSavedLayout = payload.canvasLayout;
@@ -677,9 +724,15 @@ export const executeCurationPipeline = onCall({
         title: displaySeeds || `Scene ${targetSceneIndex + 1}`,
         name: displaySeeds || `Scene ${targetSceneIndex + 1}`,
         ...(prevTargetScene?.customName ? { customName: prevTargetScene.customName } : {}),
-        seedArtists: resolvedSeedArray.map(s => s.name || s.id).join('::'),
-        seedIds: resolvedSeedArray.map(s => s.id),
-        seedArtistIds: resolvedSeedArray.map(s => s.id),
+        seedArtists: resolvedSeedArray.length > 0
+          ? resolvedSeedArray.map(s => s.name || s.id).join('::')
+          : (artistList.map((s: string) => seedNamesMap[s] || s).join('::') || displaySeeds),
+        seedIds: resolvedSeedArray.length > 0
+          ? resolvedSeedArray.map(s => s.id)
+          : artistList.map((a: string) => normalizeArtistId(a)),
+        seedArtistIds: resolvedSeedArray.length > 0
+          ? resolvedSeedArray.map(s => s.id)
+          : artistList.map((a: string) => normalizeArtistId(a)),
         discoveryFilters: payload.filters || {},
         graphData: finalGraph,
         synthesisRationale: finalGraph.synthesisRationale || "",
@@ -778,7 +831,7 @@ export const executeCurationPipeline = onCall({
              scenes: updatedScenes,
              curationSessionId: settlement.curationSessionId,
              tokensSpent: settlement.tokensSpent,
-             artists: resolvedSeedArray.map(s => s.id).join('::'),
+             artists: resolvedSeedArray.length > 0 ? resolvedSeedArray.map(s => s.id).join('::') : artistList.join('::'),
              seedNames: {
                ...seedNamesMap,
                ...Object.fromEntries(resolvedSeedArray.map(s => [s.id, s.name]))

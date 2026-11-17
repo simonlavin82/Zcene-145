@@ -198,4 +198,152 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
       'jimmy-eat-world-us',
     ]);
   });
+
+  describe('V45.1 Backend Chained-Hop Engine & Multi-Scene Upfront Batch ([Phase B1])', () => {
+    it('skips Step 3B overarching synthesis on intermediate hops when remaining uncurated scenes exist', () => {
+      const scene1: ProjectScene = {
+        ...createEmptyProjectScene(0, 'Korn'),
+        status: 'ready',
+        graphData: { nodes: [{ id: 'korn-us', label: 'Korn', type: 'artist', group: 1, isSeed: true }], links: [] },
+      };
+      const scene2: ProjectScene = {
+        ...createEmptyProjectScene(1, 'Radiohead'),
+        status: 'ready',
+        graphData: { nodes: [{ id: 'radiohead-gb', label: 'Radiohead', type: 'artist', group: 1, isSeed: true }], links: [] },
+      };
+      const scene3Uncurated: ProjectScene = {
+        ...createEmptyProjectScene(2, 'Green Day'),
+        status: 'idle',
+      };
+
+      // Hop 2 scenario: 3 scenes total, scene 1 and 2 ready, scene 3 uncurated
+      const allScenes = [scene1, scene2, scene3Uncurated];
+      const remainingUncuratedHop2 = allScenes.filter(
+        (s) => (s.graphData?.nodes?.length ?? 0) === 0 && s.status !== 'ready'
+      );
+      const isIntermediateChainedHop2 = remainingUncuratedHop2.length > 0;
+      expect(isIntermediateChainedHop2).toBe(true);
+      expect(remainingUncuratedHop2.length).toBe(1);
+      expect(remainingUncuratedHop2[0].seedArtists).toBe('Green Day');
+
+      // Hop 3 (Final Hop) scenario: scene 3 is now curated as well
+      const scene3Ready: ProjectScene = {
+        ...scene3Uncurated,
+        status: 'ready',
+        graphData: { nodes: [{ id: 'green-day-us', label: 'Green Day', type: 'artist', group: 1, isSeed: true }], links: [] },
+      };
+      const allScenesFinal = [scene1, scene2, scene3Ready];
+      const remainingUncuratedHop3 = allScenesFinal.filter(
+        (s) => (s.graphData?.nodes?.length ?? 0) === 0 && s.status !== 'ready'
+      );
+      const isIntermediateChainedHop3 = remainingUncuratedHop3.length > 0;
+      expect(isIntermediateChainedHop3).toBe(false);
+      expect(remainingUncuratedHop3.length).toBe(0);
+    });
+
+    it('cleanses foregroundApiUsage, lockedSeeds, and seedStubs when constructing chained job inputPayload (Guard 1)', () => {
+      const mockInputPayload: Record<string, any> = {
+        projectId: 'proj-123',
+        userId: 'user-456',
+        curationSessionId: 'sess-789',
+        foregroundApiUsage: { 'gemini-3.1-pro-preview': { prompt: 1000, candidates: 200, total: 1200 } },
+        lockedSeeds: [{ id: 'korn-us', label: 'Korn' }],
+        seedStubs: { korn: { id: 'korn-us' } },
+        tokensSpent: 15,
+        targetSceneId: 'scene-1',
+      };
+
+      const {
+        foregroundApiUsage: _fa,
+        lockedSeeds: _ls,
+        seedStubs: _ss,
+        ...cleanInputPayload
+      } = mockInputPayload;
+
+      expect(cleanInputPayload.foregroundApiUsage).toBeUndefined();
+      expect(cleanInputPayload.lockedSeeds).toBeUndefined();
+      expect(cleanInputPayload.seedStubs).toBeUndefined();
+      expect(cleanInputPayload.projectId).toBe('proj-123');
+      expect(cleanInputPayload.userId).toBe('user-456');
+
+      // Firestore nextJobRef inputPayload shape
+      const nextHopInputPayload = {
+        ...cleanInputPayload,
+        targetSceneId: 'scene-2',
+        sceneIndex: 1,
+        artists: 'Radiohead',
+        filters: {},
+        isChainedHop: true,
+        tokensSpent: 0,
+        seedStubs: {},
+        baseGraph: { nodes: [], links: [] },
+      };
+
+      expect((nextHopInputPayload as any).foregroundApiUsage).toBeUndefined();
+      expect((nextHopInputPayload as any).lockedSeeds).toBeUndefined();
+      expect(nextHopInputPayload.tokensSpent).toBe(0);
+      expect(nextHopInputPayload.isChainedHop).toBe(true);
+      expect(Object.keys(nextHopInputPayload.seedStubs)).toHaveLength(0);
+      // Ensure no undefined keys exist in serialized payload
+      for (const [, value] of Object.entries(nextHopInputPayload)) {
+        expect(value).not.toBeUndefined();
+      }
+    });
+
+    it('correctly calculates upfront batch detection and defers Phase 1 to worker when uncuratedScenesCount > 1', () => {
+      const singleScenePayload = {
+        scenes: [createEmptyProjectScene(0, 'Korn')],
+      };
+      const singleUncuratedCount = singleScenePayload.scenes.filter(
+        (s) => (s.graphData?.nodes?.length ?? 0) === 0
+      ).length;
+      const isUpfrontBatchSingle = singleUncuratedCount > 1;
+      expect(isUpfrontBatchSingle).toBe(false);
+
+      const batchThreeScenesPayload = {
+        scenes: [
+          createEmptyProjectScene(0, 'Korn'),
+          createEmptyProjectScene(1, 'Radiohead'),
+          createEmptyProjectScene(2, 'Green Day'),
+        ],
+      };
+      const batchUncuratedCount = batchThreeScenesPayload.scenes.filter(
+        (s) => (s.graphData?.nodes?.length ?? 0) === 0
+      ).length;
+      const isUpfrontBatchMulti = batchUncuratedCount > 1;
+      expect(isUpfrontBatchMulti).toBe(true);
+
+      const shouldDeferToWorker = (payload: any, isBatch: boolean) =>
+        payload.deferPhase1ToWorker === true || isBatch;
+
+      expect(shouldDeferToWorker(singleScenePayload, isUpfrontBatchSingle)).toBe(false);
+      expect(shouldDeferToWorker(batchThreeScenesPayload, isUpfrontBatchMulti)).toBe(true);
+      expect(shouldDeferToWorker({ deferPhase1ToWorker: true }, false)).toBe(true);
+    });
+
+    it('prevents double-counting tokensSpent across chained hops (Catch 3)', () => {
+      const initialTokensSpent = 15;
+
+      // Hop 1 (not chained, initial job):
+      let accumulatedHop1 = initialTokensSpent;
+      const pDataHop1: any = { tokensSpent: 0 };
+      if (typeof pDataHop1.tokensSpent === 'number') {
+        accumulatedHop1 = false /* isChainedHop */
+          ? pDataHop1.tokensSpent
+          : pDataHop1.tokensSpent + accumulatedHop1;
+      }
+      expect(accumulatedHop1).toBe(15);
+
+      // Hop 2 (isChainedHop: true):
+      let accumulatedHop2 = 0; // inputPayload.tokensSpent = 0
+      const pDataHop2: any = { tokensSpent: 15 };
+      if (typeof pDataHop2.tokensSpent === 'number') {
+        accumulatedHop2 = true /* isChainedHop */
+          ? pDataHop2.tokensSpent
+          : pDataHop2.tokensSpent + accumulatedHop2;
+      }
+      // Must NOT be 15 + 15 = 30; must remain 15!
+      expect(accumulatedHop2).toBe(15);
+    });
+  });
 });

@@ -543,9 +543,10 @@ export async function refundProjectSettlementOnError(params: {
   uid: string;
   projectId?: string;
   curationSessionId?: string;
+  refundAmountOverride?: number;
   reason?: string;
 }): Promise<void> {
-  const { uid, projectId, curationSessionId, reason } = params;
+  const { uid, projectId, curationSessionId, refundAmountOverride, reason } = params;
   if (!uid || !curationSessionId) return;
 
   const userRef = db.collection("users").doc(uid);
@@ -561,17 +562,28 @@ export async function refundProjectSettlementOnError(params: {
       if (!sessionSnap.exists) return;
 
       const sData = sessionSnap.data() || {};
-      if (sData.uid !== uid || sData.status !== "settled") return;
+      if (sData.uid !== uid || (sData.status !== "settled" && sData.status !== "partially_refunded_settlement")) return;
 
-      const refundAmount = Math.max(0, Math.floor(Number(sData.settlementTokensDeducted) || 0));
-      const retainedPreFlight = Math.max(0, Math.floor(Number(sData.preFlightTokensDeducted) || 0));
+      const fullSettlementAmount = Math.max(0, Math.floor(Number(sData.settlementTokensDeducted) || 0));
+      const alreadyRefunded = Math.max(0, Math.floor(Number(sData.settlementTokensRefunded) || 0));
+      const remainingRefundable = Math.max(0, fullSettlementAmount - alreadyRefunded);
+
+      const refundAmount = typeof refundAmountOverride === "number" && refundAmountOverride > 0
+        ? Math.min(remainingRefundable, refundAmountOverride)
+        : remainingRefundable;
+
+      if (refundAmount <= 0) return;
+
+      const newRefundedTotal = alreadyRefunded + refundAmount;
+      const isFullRefund = newRefundedTotal >= fullSettlementAmount;
 
       tx.update(sessionRef, {
-        status: "refunded_settlement",
+        status: isFullRefund ? "refunded_settlement" : "partially_refunded_settlement",
+        settlementTokensRefunded: newRefundedTotal,
         updatedAt: FieldValue.serverTimestamp(),
       });
 
-      if (refundAmount > 0 && userSnap.exists) {
+      if (userSnap.exists) {
         const userData = userSnap.data() || {};
         const prevBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
         const prevSpent = Math.max(0, Math.floor(Number(userData.lifetimeTokensSpent) || 0));
@@ -591,20 +603,32 @@ export async function refundProjectSettlementOnError(params: {
           balanceAfter: newBalance,
           ...(projectId ? { projectId } : {}),
           curationSessionId,
-          description: `Automatic Refund (Synthesis Error${reason ? `: ${reason}` : ""})`,
+          description: `Automatic Refund (${isFullRefund ? "Full" : "Partial"} Synthesis Error${reason ? `: ${reason}` : ""})`,
           createdAt: FieldValue.serverTimestamp(),
         });
       }
 
       if (projectRef) {
-        tx.set(
-          projectRef,
-          {
-            tokensSpent: retainedPreFlight,
-            updatedAt: FieldValue.serverTimestamp(),
-          },
-          { merge: true }
-        );
+        if (isFullRefund) {
+          const retainedPreFlight = Math.max(0, Math.floor(Number(sData.preFlightTokensDeducted) || 0));
+          tx.set(
+            projectRef,
+            {
+              tokensSpent: retainedPreFlight,
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+        } else {
+          tx.set(
+            projectRef,
+            {
+              tokensSpent: FieldValue.increment(-refundAmount),
+              updatedAt: FieldValue.serverTimestamp(),
+            },
+            { merge: true }
+          );
+        }
       }
     });
   } catch (err) {
