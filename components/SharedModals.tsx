@@ -2031,6 +2031,8 @@ export const FilterGuidanceModal: React.FC<{
 export interface PreFlightSeed {
   id: string;
   query: string;
+  sceneId?: string;
+  sceneLabel?: string;
   predictedOrigin: string;
   genre?: string;
   isKnownCacheHit: boolean;
@@ -2100,6 +2102,7 @@ export interface ConsolidatedValidationModalProps {
   isAdminPreview?: boolean;
   expectedSpeed?: ExpectedCurationSpeed;
   onOpenTopUp?: (tierId?: TokenTopUpTierId) => void;
+  uncachedScenesCount?: number;
 }
 
 export function ConsolidatedValidationModal({
@@ -2112,9 +2115,10 @@ export function ConsolidatedValidationModal({
   isAdminPreview = false,
   expectedSpeed,
   onOpenTopUp,
+  uncachedScenesCount,
 }: ConsolidatedValidationModalProps) {
   const [localSeeds, setLocalSeeds] = React.useState<PreFlightSeed[]>(seeds);
-  const [editingSeedId, setEditingSeedId] = React.useState<string | null>(null);
+  const [editingKey, setEditingKey] = React.useState<string | null>(null);
   const [customOrigin, setCustomOrigin] = React.useState<string>('');
   const [customGenre, setCustomGenre] = React.useState<string>('');
   const [isVerifying, setIsVerifying] = React.useState<boolean>(false);
@@ -2124,7 +2128,7 @@ export function ConsolidatedValidationModal({
 
   React.useEffect(() => {
     setLocalSeeds(seeds);
-    setEditingSeedId(null);
+    setEditingKey(null);
     setVerificationError(null);
     setNeedsTopUpForEscape(false);
     setIsVerifying(false);
@@ -2140,9 +2144,12 @@ export function ConsolidatedValidationModal({
     }
   };
 
-  const handleSelectCandidate = (seedId: string, candidate: DisambiguationCandidateStub) => {
+  const getSeedKey = (s: PreFlightSeed) => s.sceneId ? `${s.sceneId}::${s.id}` : s.id;
+
+  const handleSelectCandidate = (seed: PreFlightSeed, candidate: DisambiguationCandidateStub) => {
+    const targetKey = getSeedKey(seed);
     setLocalSeeds(prev => prev.map(s => {
-      if (s.id === seedId) {
+      if (getSeedKey(s) === targetKey) {
         return {
           ...s,
           selectedCandidateId: candidate.id,
@@ -2156,7 +2163,7 @@ export function ConsolidatedValidationModal({
   };
 
   const handleStartEdit = (seed: PreFlightSeed) => {
-    setEditingSeedId(seed.id);
+    setEditingKey(getSeedKey(seed));
     setCustomOrigin('');
     setCustomGenre('');
     setVerificationError(null);
@@ -2164,7 +2171,7 @@ export function ConsolidatedValidationModal({
   };
 
   const handleCancelEdit = () => {
-    setEditingSeedId(null);
+    setEditingKey(null);
     setVerificationError(null);
     setNeedsTopUpForEscape(false);
   };
@@ -2178,6 +2185,7 @@ export function ConsolidatedValidationModal({
     try {
       const validateCallable = httpsCallable(functions, 'validateSeedOriginCallable');
       const seedQuery = seed.correctedQuery || seed.query;
+      const targetKey = getSeedKey(seed);
       
       const response = await validateCallable({
         seed: seedQuery,
@@ -2190,7 +2198,7 @@ export function ConsolidatedValidationModal({
 
       if (data && data.isValid) {
         setLocalSeeds(prev => prev.map(s => {
-          if (s.id === seed.id) {
+          if (getSeedKey(s) === targetKey) {
             const hasCollision = !!(data.hasCollision && Array.isArray(data.candidates) && data.candidates.length > 1);
             return {
               ...s,
@@ -2208,7 +2216,7 @@ export function ConsolidatedValidationModal({
           }
           return s;
         }));
-        setEditingSeedId(null);
+        setEditingKey(null);
         setVerificationError(null);
         setNeedsTopUpForEscape(false);
       } else {
@@ -2321,7 +2329,10 @@ export function ConsolidatedValidationModal({
     return !seed.predictedOrigin || seed.predictedOrigin.trim() === '' || seed.predictedOrigin === 'Unknown Origin';
   });
 
-  const isConfirmDisabled = hasInvalidSeeds || hasVerifyingSeeds || !!editingSeedId || isVerifying || isSubmitting;
+  const isConfirmDisabled = hasInvalidSeeds || hasVerifyingSeeds || !!editingKey || isVerifying || isSubmitting;
+
+  const distinctSceneIds = Array.from(new Set(localSeeds.map(s => s.sceneId).filter(Boolean)));
+  const hasMultipleScenes = distinctSceneIds.length > 1;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -2359,109 +2370,127 @@ export function ConsolidatedValidationModal({
                 : "Please verify the regional origins and exact acts for your selected artists."}
             </p>
             <div className="flex flex-col gap-4">
-              {localSeeds.map(seed => {
+              {localSeeds.map((seed, idx) => {
                 const isAmbiguous = !!(seed.isAmbiguous && seed.candidates && seed.candidates.length > 1);
-                const isEditing = editingSeedId === seed.id;
+                const seedKey = getSeedKey(seed);
+                const isEditing = editingKey === seedKey;
+                const showSceneHeader = hasMultipleScenes && seed.sceneLabel && (idx === 0 || localSeeds[idx - 1].sceneId !== seed.sceneId);
 
                 if (isAmbiguous) {
                   return (
-                    <div key={seed.id} className="flex flex-col gap-3 p-3.5 bg-amber-950/20 border border-amber-500/40 rounded-xl">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-white font-medium text-base truncate">
-                          {seed.query}
-                        </span>
-                        <span className="text-[10px] uppercase tracking-wider text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">
-                          COLLISION DETECTED
-                        </span>
-                      </div>
-                      {!isEditing ? (
-                        <>
-                          <p className="text-xs text-zinc-300 font-light">
-                            Multiple prominent acts share this name. Select your intended artist:
-                          </p>
-                          <div className="flex flex-col gap-2 mt-1">
-                            {seed.candidates!.map(candidate => (
-                              <DisambiguationRadio
-                                key={candidate.id}
-                                candidate={candidate}
-                                isSelected={seed.selectedCandidateId === candidate.id}
-                                onSelect={() => handleSelectCandidate(seed.id, candidate)}
-                              />
-                            ))}
-                          </div>
-                          <div className="mt-1 pt-2 border-t border-amber-500/20 flex items-center justify-between">
-                            <button
-                              type="button"
-                              onClick={() => handleStartEdit(seed)}
-                              className="text-[11px] text-zinc-400 hover:text-amber-400 transition-colors flex items-center gap-1 font-light underline decoration-zinc-700 underline-offset-2"
-                            >
-                              <span className="material-symbols-outlined !text-[13px]">help_outline</span>
-                              Not listed? Specify another origin
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        renderEscapeHatchEditor(seed)
+                    <React.Fragment key={seedKey}>
+                      {showSceneHeader && (
+                        <div className="flex items-center gap-2 pt-2 pb-1 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                          <span className="material-symbols-outlined !text-[14px] text-primary">view_carousel</span>
+                          <span>{seed.sceneLabel}</span>
+                        </div>
                       )}
-                    </div>
+                      <div className="flex flex-col gap-3 p-3.5 bg-amber-950/20 border border-amber-500/40 rounded-xl">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-white font-medium text-base truncate">
+                            {seed.query}
+                          </span>
+                          <span className="text-[10px] uppercase tracking-wider text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">
+                            COLLISION DETECTED
+                          </span>
+                        </div>
+                        {!isEditing ? (
+                          <>
+                            <p className="text-xs text-zinc-300 font-light">
+                              Multiple prominent acts share this name. Select your intended artist:
+                            </p>
+                            <div className="flex flex-col gap-2 mt-1">
+                              {seed.candidates!.map(candidate => (
+                                <DisambiguationRadio
+                                  key={candidate.id}
+                                  candidate={candidate}
+                                  isSelected={seed.selectedCandidateId === candidate.id}
+                                  onSelect={() => handleSelectCandidate(seed, candidate)}
+                                />
+                              ))}
+                            </div>
+                            <div className="mt-1 pt-2 border-t border-amber-500/20 flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(seed)}
+                                className="text-[11px] text-zinc-400 hover:text-amber-400 transition-colors flex items-center gap-1 font-light underline decoration-zinc-700 underline-offset-2"
+                              >
+                                <span className="material-symbols-outlined !text-[13px]">help_outline</span>
+                                Not listed? Specify another origin
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          renderEscapeHatchEditor(seed)
+                        )}
+                      </div>
+                    </React.Fragment>
                   );
                 }
 
                 return (
-                  <div key={seed.id} className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
-                    <div className="flex flex-col">
-                      <div className="flex items-center gap-2">
-                        <span className="text-white font-medium text-base truncate">
-                          {seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
-                        </span>
-                        {isAdmin && !isAdminPreview && seed.isKnownCacheHit && (
-                          <span className="text-[9px] uppercase tracking-wider text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full font-semibold">CACHE HIT</span>
-                        )}
-                      </div>
-                      
-                      {seed.isVerifyingOrigin ? (
-                        <div className="flex items-center gap-1.5 mt-1.5 text-xs text-zinc-400 font-light">
-                          <span className="material-symbols-outlined !text-[13px] animate-spin text-amber-500">progress_activity</span>
-                          <span>Searching artist origin & genre...</span>
-                        </div>
-                      ) : !isEditing ? (
-                        <>
-                          <span data-testid="validation-origin-text" className="text-xs text-zinc-400 font-light truncate mt-0.5">
-                            {seed.predictedOrigin || 'Unknown Origin'}{seed.genre ? ` • ${seed.genre}` : ''}
-                          </span>
-                          
-                          {seed.isCorrected && seed.originalQuery && (
-                            <span className="text-[10px] text-amber-500/80 font-medium truncate mt-0.5">
-                              Auto-corrected from "{seed.originalQuery}"
-                            </span>
-                          )}
-
-                          {/* "Not this artist?" Escape Hatch */}
-                          <div className="mt-2 pt-1 border-t border-zinc-800/60 flex items-center justify-between">
-                            <button
-                              type="button"
-                              onClick={() => handleStartEdit(seed)}
-                              className="text-[11px] text-zinc-400 hover:text-amber-400 transition-colors flex items-center gap-1 font-light underline decoration-zinc-700 underline-offset-2"
-                            >
-                              <span className="material-symbols-outlined !text-[13px]">help_outline</span>
-                              Not this artist?
-                            </button>
-                          </div>
-                        </>
-                      ) : (
-                        renderEscapeHatchEditor(seed)
-                      )}
-                    </div>
-
-                    {(!seed.predictedOrigin || seed.predictedOrigin.trim() === '') && !isEditing && !seed.isVerifyingOrigin && (
-                      <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-2.5 mt-1 flex items-start gap-2">
-                        <span className="material-symbols-outlined text-amber-500 !text-[16px] mt-0.5">warning</span>
-                        <p className="text-xs text-amber-200/90 leading-relaxed">
-                          We couldn't confidently locate this artist. Use "Not this artist?" to specify their region.
-                        </p>
+                  <React.Fragment key={seedKey}>
+                    {showSceneHeader && (
+                      <div className="flex items-center gap-2 pt-2 pb-1 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
+                        <span className="material-symbols-outlined !text-[14px] text-primary">view_carousel</span>
+                        <span>{seed.sceneLabel}</span>
                       </div>
                     )}
-                  </div>
+                    <div className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
+                      <div className="flex flex-col">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-medium text-base truncate">
+                            {seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
+                          </span>
+                          {isAdmin && !isAdminPreview && seed.isKnownCacheHit && (
+                            <span className="text-[9px] uppercase tracking-wider text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full font-semibold">CACHE HIT</span>
+                          )}
+                        </div>
+                        
+                        {seed.isVerifyingOrigin ? (
+                          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-zinc-400 font-light">
+                            <span className="material-symbols-outlined !text-[13px] animate-spin text-amber-500">progress_activity</span>
+                            <span>Searching artist origin & genre...</span>
+                          </div>
+                        ) : !isEditing ? (
+                          <>
+                            <span data-testid="validation-origin-text" className="text-xs text-zinc-400 font-light truncate mt-0.5">
+                              {seed.predictedOrigin || 'Unknown Origin'}{seed.genre ? ` • ${seed.genre}` : ''}
+                            </span>
+                            
+                            {seed.isCorrected && seed.originalQuery && (
+                              <span className="text-[10px] text-amber-500/80 font-medium truncate mt-0.5">
+                                Auto-corrected from "{seed.originalQuery}"
+                              </span>
+                            )}
+
+                            {/* "Not this artist?" Escape Hatch */}
+                            <div className="mt-2 pt-1 border-t border-zinc-800/60 flex items-center justify-between">
+                              <button
+                                type="button"
+                                onClick={() => handleStartEdit(seed)}
+                                className="text-[11px] text-zinc-400 hover:text-amber-400 transition-colors flex items-center gap-1 font-light underline decoration-zinc-700 underline-offset-2"
+                              >
+                                <span className="material-symbols-outlined !text-[13px]">help_outline</span>
+                                Not this artist?
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          renderEscapeHatchEditor(seed)
+                        )}
+                      </div>
+
+                      {(!seed.predictedOrigin || seed.predictedOrigin.trim() === '') && !isEditing && !seed.isVerifyingOrigin && (
+                        <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-2.5 mt-1 flex items-start gap-2">
+                          <span className="material-symbols-outlined text-amber-500 !text-[16px] mt-0.5">warning</span>
+                          <p className="text-xs text-amber-200/90 leading-relaxed">
+                            We couldn't confidently locate this artist. Use "Not this artist?" to specify their region.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  </React.Fragment>
                 );
               })}
             </div>
@@ -2477,9 +2506,15 @@ export function ConsolidatedValidationModal({
                 <div className="flex items-center gap-1.5 flex-wrap">
                   <span>Estimated time:</span>
                   <span className="text-zinc-200 font-medium">
-                    {effectiveSpeed === 'instant' && 'Ready in a few seconds'}
-                    {effectiveSpeed === 'partial' && '~1–2 minutes'}
-                    {effectiveSpeed === 'deep' && '~3–5 minutes'}
+                    {uncachedScenesCount && uncachedScenesCount >= 2
+                      ? `~2–4 minutes per scene (${uncachedScenesCount} scenes queued — safe to leave tab)`
+                      : (
+                        <>
+                          {effectiveSpeed === 'instant' && 'Ready in a few seconds'}
+                          {effectiveSpeed === 'partial' && '~1–2 minutes'}
+                          {effectiveSpeed === 'deep' && '~3–5 minutes'}
+                        </>
+                      )}
                   </span>
                 </div>
               </div>

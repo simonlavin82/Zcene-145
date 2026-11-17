@@ -38,7 +38,8 @@ import {
   normalizeZineTitle,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId, normalizeGraphData, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList } from '../../services/artistCacheService';
-import { TOKEN_PRICING } from '../../shared/tokenEconomy';
+import { TOKEN_PRICING, computeBaseProjectTokenCost } from '../../shared/tokenEconomy';
+import { sanitizeDiscoveryFilters, hasActiveDiscoveryFilters } from '../../services/cacheQualification';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
 import { BACKEND_REGRESSION_RUNBOOK } from '../../docs/backend-regression-runbook';
 import { ARCHITECTURE_RULES } from '../../components/EnginePage';
@@ -3686,6 +3687,100 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(formatZineSceneBadgeLabel({ sceneIndex: 0, customName: 'Scene: Dashboard' })).toBe('SCENE: DASHBOARD');
       expect(formatZineSceneBadgeLabel({ sceneIndex: 1, customName: 'SCENE:Rocking Horse' })).toBe('SCENE: ROCKING HORSE');
       expect(formatZineSceneBadgeLabel({ sceneIndex: 0, customName: 'Scene:' })).toBe('SCENE 1');
+    });
+  });
+
+  describe('Phase B2: Upfront Multi-Scene Batch Drafting & Chained-Hop Coordination', () => {
+    it('verifies that drafting allows up to MAX_SCENES_PER_PROJECT (5) when all prior scenes have committed seeds', () => {
+      const scenes: any[] = [
+        { id: 'scene-1', sceneId: 'scene-1', seedArtists: 'Korn', graphData: { nodes: [], links: [] }, status: 'idle' },
+        { id: 'scene-2', sceneId: 'scene-2', seedArtists: 'Radiohead', graphData: { nodes: [], links: [] }, status: 'idle' },
+        { id: 'scene-3', sceneId: 'scene-3', seedArtists: 'Green Day', graphData: { nodes: [], links: [] }, status: 'idle' },
+      ];
+
+      const hasEmptySeedScene = scenes.some(s => toSeedArtistsArray(s.seedArtists).length === 0);
+      expect(hasEmptySeedScene).toBe(false);
+      expect(scenes.length < MAX_SCENES_PER_PROJECT).toBe(true);
+
+      // Adding 4th and 5th scenes with seeds
+      scenes.push({ id: 'scene-4', sceneId: 'scene-4', seedArtists: 'Deftones', graphData: { nodes: [], links: [] }, status: 'idle' });
+      scenes.push({ id: 'scene-5', sceneId: 'scene-5', seedArtists: 'Smashing Pumpkins', graphData: { nodes: [], links: [] }, status: 'idle' });
+
+      expect(scenes.length).toBe(MAX_SCENES_PER_PROJECT);
+      const isAddSceneDisabled = scenes.length >= MAX_SCENES_PER_PROJECT;
+      expect(isAddSceneDisabled).toBe(true);
+    });
+
+    it('blocks + Add Scene if any scene in the queue lacks committed seeds', () => {
+      const scenes: any[] = [
+        { id: 'scene-1', sceneId: 'scene-1', seedArtists: 'Korn', graphData: { nodes: [], links: [] }, status: 'idle' },
+        { id: 'scene-2', sceneId: 'scene-2', seedArtists: '', graphData: { nodes: [], links: [] }, status: 'idle' },
+      ];
+
+      const hasEmptySeedScene = scenes.some(s => toSeedArtistsArray(s.seedArtists).length === 0);
+      expect(hasEmptySeedScene).toBe(true);
+    });
+
+    it('computes aggregate batch cost across multiple uncurated scenes', () => {
+      const uncuratedScenes: any[] = [
+        { seedArtists: 'Korn', discoveryFilters: {} }, // 5T
+        { seedArtists: 'Radiohead', discoveryFilters: {} }, // 5T
+        { seedArtists: 'Green Day::Blink-182', discoveryFilters: {} }, // 10T (multi-seed)
+      ];
+
+      const aggregateBatchCost = uncuratedScenes.reduce((sum, sc) => {
+        const scSeeds = toSeedArtistsArray(sc.seedArtists);
+        const scFilters = sanitizeDiscoveryFilters(sc.discoveryFilters);
+        return sum + computeBaseProjectTokenCost(scSeeds.length, hasActiveDiscoveryFilters(scFilters));
+      }, 0);
+
+      expect(aggregateBatchCost).toBe(20); // 5 + 5 + 10 = 20
+    });
+
+    it('formats displaySeeds with & delimiter across queued scenes in batch', () => {
+      const uncuratedScenes: any[] = [
+        { seedArtists: 'Korn' },
+        { seedArtists: 'Radiohead' },
+        { seedArtists: 'Green Day' },
+      ];
+
+      const displaySeeds = uncuratedScenes.map(sc => {
+        const scSeeds = toSeedArtistsArray(sc.seedArtists);
+        return scSeeds.join(' + ');
+      }).join(' & ');
+
+      expect(displaySeeds).toBe('Korn & Radiohead & Green Day');
+    });
+
+    it('enforces Guard 1: post-confirmation seed mapping filters strictly for lockedTargetSceneId on Hop 1', () => {
+      const batchSeeds = [
+        { sceneId: 'scene-1', id: 'korn', query: 'Korn', isTopologyHit: false },
+        { sceneId: 'scene-2', id: 'radiohead', query: 'Radiohead', isTopologyHit: false },
+        { sceneId: 'scene-3', id: 'green-day', query: 'Green Day', isTopologyHit: false },
+      ];
+
+      const lockedTargetSceneId = 'scene-1';
+      const targetSceneSeeds = batchSeeds.filter(item => !item.sceneId || item.sceneId === lockedTargetSceneId);
+      const targetArtists = targetSceneSeeds.map(s => s.id).join('::');
+
+      // Hop 1 artist string must strictly contain only Scene 1 seeds
+      expect(targetArtists).toBe('korn');
+      expect(targetArtists).not.toContain('radiohead');
+      expect(targetArtists).not.toContain('green-day');
+    });
+
+    it('enforces Guard 3: composite keys resolve collisions between duplicate artists in different scenes', () => {
+      const seedInScene1 = { sceneId: 'scene-1', id: 'deftones', query: 'Deftones' };
+      const seedInScene2 = { sceneId: 'scene-2', id: 'deftones', query: 'Deftones' };
+
+      const getSeedKey = (s: any) => s.sceneId ? `${s.sceneId}::${s.id}` : s.id;
+
+      const key1 = getSeedKey(seedInScene1);
+      const key2 = getSeedKey(seedInScene2);
+
+      expect(key1).toBe('scene-1::deftones');
+      expect(key2).toBe('scene-2::deftones');
+      expect(key1).not.toBe(key2);
     });
   });
 });

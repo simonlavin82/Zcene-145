@@ -325,6 +325,7 @@ export const processCurationJob = onDocumentCreated({
     console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
 
     let result: any = null;
+    let nextChainedJobId: string | null = null;
 
     const collectedTokens: Record<string, { prompt: number, candidates: number, total: number }> = {};
     const usageCollector = {
@@ -2765,7 +2766,7 @@ export const processCurationJob = onDocumentCreated({
         result.overarchingHistory = serializedOverarchingHistory;
       }
 
-      let nextChainedJobId: string | null = null;
+      nextChainedJobId = null;
       if (result.isIntermediateChainedHop && result.remainingUncuratedScenes?.length > 0) {
         const nextScene = result.remainingUncuratedScenes[0];
         const nextJobRef = db.collection("curationJobs").doc();
@@ -2889,6 +2890,7 @@ export const processCurationJob = onDocumentCreated({
     await jobDocRef.update({
       status: "completed",
       result,
+      ...(nextChainedJobId ? { nextChainedJobId } : {}),
       updatedAt: FieldValue.serverTimestamp(),
       completedAt: FieldValue.serverTimestamp(),
       expireAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)

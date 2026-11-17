@@ -1859,6 +1859,7 @@ const App: React.FC = () => {
           seedIds: nextSeedIds,
           seedArtistIds: nextSeedIds,
           discoveryFilters: discoveryFiltersRef.current || {},
+          status: (activeScene.graphData?.nodes?.length || 0) > 0 ? (activeScene.status || 'completed') : 'idle'
         }, activeIdx);
         scenesRef.current[activeIdx] = updatedActiveScene;
         setScenes([...scenesRef.current]);
@@ -1950,12 +1951,19 @@ const App: React.FC = () => {
     curationSessionIdRef.current = null;
     sessionTokenApprovedRef.current = false;
 
-    // Option A UX Guard: Block adding a new scene if canvas is empty or any existing scene is uncurated
-    const hasUncuratedScene = (graphDataRef.current?.nodes?.length || 0) === 0 ||
-      scenesRef.current.length === 0 ||
-      scenesRef.current.some(s => (s.graphData?.nodes?.length || 0) === 0);
-    if (hasUncuratedScene) {
-      console.warn('[App] Blocked handleAddScene: All existing scenes must be curated before adding another scene.');
+    // V45.1 UX Guard: Block adding a new scene if active scene or any existing scene lacks seed artists
+    const activeSeedCount = toSeedArtistsArray(seedArtistsRef.current).length;
+    if (activeSeedCount === 0) {
+      console.warn('[App] Blocked handleAddScene: Active scene must have at least 1 seed artist before adding another scene.');
+      return;
+    }
+    const hasEmptySeedScene = scenesRef.current.some(s => {
+      const sId = s.sceneId || s.id;
+      if (sId === activeSceneIdRef.current) return false;
+      return toSeedArtistsArray(s.seedArtists).length === 0;
+    });
+    if (hasEmptySeedScene) {
+      console.warn('[App] Blocked handleAddScene: Every existing scene must have at least 1 seed artist before adding another scene.');
       return;
     }
 
@@ -2134,6 +2142,10 @@ const App: React.FC = () => {
         setGraphData(composite);
         const dedupedNodes = buildCanonicalDeduplicatedNodesFromScenes(populatedScenes);
         setActiveNodeIds(dedupedNodes.map(n => n.id));
+      } else {
+        graphDataRef.current = { nodes: [], links: [] };
+        setGraphData({ nodes: [], links: [] });
+        setActiveNodeIds([]);
       }
 
       if (user && !isGuest && currentProjectIdRef.current) {
@@ -4729,10 +4741,6 @@ const App: React.FC = () => {
     explicitProjectId?: string,
     targetSceneIdOverride?: string
   ) => {
-    const lockedTargetSceneId = targetSceneIdOverride || activeSceneIdRef.current || 'scene-1';
-    activeSceneIdRef.current = lockedTargetSceneId;
-    setActiveSceneId(lockedTargetSceneId);
-
     if (!bypassTokenConfirmation) {
       sessionTokenApprovedRef.current = false;
     }
@@ -4760,6 +4768,58 @@ const App: React.FC = () => {
     if (isLiveSynthesisTemp) {
       artists = await resolveContextualEntityIds(rawArtists, activeDiscoveryFilters);
     }
+
+    // Edge Case 2 Fix: Helper to determine if a scene has uncurated seeds or dirty changes
+    const normalizeSeedSlug = (s: string) => stripCountrySlug(normalizeArtistId(s));
+    const isSceneDirtyOrUncurated = (s: ProjectScene): boolean => {
+      const sSeeds = toSeedArtistsArray(s.seedArtists);
+      if (sSeeds.length === 0) return false;
+      const isCurated = (s.graphData?.nodes?.length ?? 0) > 0;
+      if (!isCurated) return true;
+      if (isRegeneration) return true;
+      const curSeeds = sSeeds.map(normalizeSeedSlug).sort().join('::');
+      const baseSeeds = toSeedArtistsArray(s.curatedSeedArtists || '').map(normalizeSeedSlug).sort().join('::');
+      if (curSeeds !== baseSeeds) return true;
+      const curFilters = JSON.stringify(sanitizeDiscoveryFilters(s.discoveryFilters));
+      const baseFilters = JSON.stringify(sanitizeDiscoveryFilters(s.curatedDiscoveryFilters || {}));
+      return curFilters !== baseFilters;
+    };
+
+    // Synchronize current scene draft inputs into allTargetScenes
+    const activeKey = targetSceneIdOverride || activeSceneIdRef.current || 'scene-1';
+    const allTargetScenes: ProjectScene[] = scenesRef.current.length > 0
+      ? scenesRef.current.map((s, idx) => {
+          if ((s.sceneId || s.id) === activeKey) {
+            return normalizeProjectScene({
+              ...s,
+              seedArtists: rawArtists || s.seedArtists,
+              seedIds: toSeedArtistsArray(rawArtists || s.seedArtists).map(normalizeArtistId),
+              seedArtistIds: toSeedArtistsArray(rawArtists || s.seedArtists).map(normalizeArtistId),
+              discoveryFilters: activeDiscoveryFilters,
+            }, idx);
+          }
+          return s;
+        })
+      : [normalizeProjectScene({
+          ...createEmptyScene(0),
+          id: activeKey,
+          sceneId: activeKey,
+          seedArtists: rawArtists,
+          seedIds: toSeedArtistsArray(rawArtists).map(normalizeArtistId),
+          seedArtistIds: toSeedArtistsArray(rawArtists).map(normalizeArtistId),
+          discoveryFilters: activeDiscoveryFilters,
+        }, 0)];
+
+    let uncuratedOrDirtyScenes = allTargetScenes.filter(isSceneDirtyOrUncurated);
+    if (uncuratedOrDirtyScenes.length === 0) {
+      const activeObj = allTargetScenes.find(s => (s.sceneId || s.id) === activeKey) || allTargetScenes[0];
+      uncuratedOrDirtyScenes = [activeObj];
+    }
+
+    // Edge Case 2 (Bug B Fix): Always start curation at the first uncurated/dirty scene in canonical order
+    const lockedTargetSceneId = targetSceneIdOverride || uncuratedOrDirtyScenes[0].sceneId || uncuratedOrDirtyScenes[0].id || 'scene-1';
+    activeSceneIdRef.current = lockedTargetSceneId;
+    setActiveSceneId(lockedTargetSceneId);
 
     if (bypassDisambiguation) {
       isHydratingSessionRef.current = true;
@@ -4844,30 +4904,54 @@ const App: React.FC = () => {
     }
 
     
-    const artistList = artists.split('::').map(a => normalizeArtistId(a)).filter(Boolean);
-    if (artistList.length > 25) {
+    // Multi-scene seed collection: build batch entries across all uncuratedOrDirtyScenes
+    type BatchSeedEntry = {
+      sceneId: string;
+      sceneLabel: string;
+      rawInput: string;
+      searchId: string;
+    };
+    const batchSeedEntries: BatchSeedEntry[] = [];
+    uncuratedOrDirtyScenes.forEach((sc, scIdx) => {
+      const sSeeds = toSeedArtistsArray(sc.seedArtists);
+      const sceneLabel = sc.customName || `Scene ${allTargetScenes.findIndex(s => (s.sceneId || s.id) === (sc.sceneId || sc.id)) + 1}`;
+      sSeeds.forEach(raw => {
+        const trimmed = raw.trim();
+        if (trimmed) {
+          batchSeedEntries.push({
+            sceneId: sc.sceneId || sc.id || `scene-${scIdx + 1}`,
+            sceneLabel,
+            rawInput: trimmed,
+            searchId: normalizeArtistId(trimmed),
+          });
+        }
+      });
+    });
+
+    let artistList = artists.split('::').map(a => normalizeArtistId(a)).filter(Boolean);
+    if (batchSeedEntries.length > 25) {
       setIsPreFlightChecking(false);
       isHydratingSessionRef.current = false;
       isProjectLoadingRef.current = false;
       setIsLoading(false);
-      setError(`Limit: 25 artists.`);
+      setError(`Limit: 25 artists across queued scenes.`);
       return;
     }
 
     try {
       const hasActiveFilters = hasActiveDiscoveryFilters(activeDiscoveryFilters);
 
-      const isLiveSynthesis = hasActiveFilters || artistList.length > 1;
+      const isLiveSynthesis = hasActiveFilters || artistList.length > 1 || uncuratedOrDirtyScenes.length > 1;
 
-      // 1. Silent Phase: Build PreFlightSeeds for all artists
+      // 1. Silent Phase: Build PreFlightSeeds for all artists across all queued scenes
       let cacheCandidatesPerSeed: any[] = [];
       const verdicts: CacheVerdict[] = [];
       let singleCacheDocData = null;
       let singleCacheResolvedSearchId = "";
 
       if (!skipCacheLookup) {
-        cacheCandidatesPerSeed = await Promise.all(artistList.map(async (searchId, i) => {
-          const rawInput = artists.split('::').map(s => s.trim()).filter(Boolean)[i] || searchId;
+        cacheCandidatesPerSeed = await Promise.all(batchSeedEntries.map(async (entry) => {
+          const { searchId, rawInput, sceneId, sceneLabel } = entry;
           const searchIdLower = searchId.toLowerCase();
           
           let predictedOrigin = '';
@@ -4927,7 +5011,7 @@ const App: React.FC = () => {
               predictedOrigin = unwrappedDetails?.details?.origin || unwrappedDetails?.origin || unwrappedDetails?.location || unwrappedDetails?.country || data?.details?.origin || "";
               genre = unwrappedDetails?.details?.genre || unwrappedDetails?.genre || unwrappedDetails?.genres || data?.details?.genre || "";
               
-              if (artistList.length === 1 && !hasActiveFilters) {
+              if (uncuratedOrDirtyScenes.length === 1 && batchSeedEntries.length === 1 && !hasActiveFilters) {
                   singleCacheDocData = data;
                   singleCacheResolvedSearchId = (canonicalId && canonicalId.toLowerCase() !== searchIdLower) ? canonicalId : searchId;
               }
@@ -4951,6 +5035,8 @@ const App: React.FC = () => {
           return {
             id: searchId,
             query: rawInput,
+            sceneId,
+            sceneLabel,
             predictedOrigin,
             genre,
             isKnownCacheHit,
@@ -4970,7 +5056,30 @@ const App: React.FC = () => {
       const routingDecision = deriveRoutingDecision(verdicts, isLiveSynthesis);
       const requiresLiveSynthesis = isLiveSynthesis || isLiveSynthesisTemp;
       const needsCacheUpgrade = routingDecision === 'PARTIAL';
-      const projectTokenCost = computeBaseProjectTokenCost(artistList.length, hasActiveFilters);
+      
+      // Multi-scene aggregate token calculation:
+      const aggregateBatchCost = uncuratedOrDirtyScenes.reduce((sum, sc) => {
+        const scSeeds = toSeedArtistsArray(sc.seedArtists);
+        const scHasFilters = hasActiveDiscoveryFilters(sc.discoveryFilters);
+        return sum + computeBaseProjectTokenCost(scSeeds.length, scHasFilters);
+      }, 0);
+      const projectTokenCost = aggregateBatchCost;
+
+      // Count scenes in batch that need live AI generation (not instant topology hits)
+      let uncachedScenesCount = 0;
+      uncuratedOrDirtyScenes.forEach(sc => {
+        const scSeeds = toSeedArtistsArray(sc.seedArtists);
+        const scHasFilters = hasActiveDiscoveryFilters(sc.discoveryFilters);
+        if (scSeeds.length > 1 || scHasFilters) {
+          uncachedScenesCount++;
+        } else if (scSeeds.length === 1) {
+          const sId = normalizeArtistId(scSeeds[0]);
+          const cand = cacheCandidatesPerSeed.find(c => c.sceneId === (sc.sceneId || sc.id) && (c.id === sId || c.candidateId === sId));
+          if (!cand || !cand.isTopologyHit) {
+            uncachedScenesCount++;
+          }
+        }
+      });
 
       let tokenType = 'generation';
       if (requiresLiveSynthesis) tokenType = 'live_synthesis';
@@ -5008,6 +5117,13 @@ const App: React.FC = () => {
         }
         sessionTokenApprovedRef.current = true;
       }
+
+      let resolvedArtistSeeds = [...artistList];
+      let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
+      let activeDisambiguationGenres: Record<string, string> = disambiguationGenres || {};
+      let activeOriginalQueries: Record<string, string> = originalQueries || {};
+      let activeSeedNames: Record<string, string> = seedNames ? { ...seedNames } : {};
+      let hasDisambiguated = false;
 
       // Box 4: Visual Confirmation & Inline Artist Origin Verification (ConsolidatedValidationModal)
       if (!bypassDisambiguation && cacheCandidatesPerSeed.length > 0) {
@@ -5166,6 +5282,7 @@ const App: React.FC = () => {
             isOpen: true,
             seeds: initialModalSeeds,
             expectedSpeed: calculatedExpectedSpeed,
+            uncachedScenesCount,
             onConfirm: (updatedSeeds) => {
               if (updatedSeeds) {
                 for (let idx = 0; idx < updatedSeeds.length; idx++) {
@@ -5210,6 +5327,57 @@ const App: React.FC = () => {
           });
         }
 
+        // Map confirmed seeds across allTargetScenes and populate global metadata maps
+        cacheCandidatesPerSeed.forEach(item => {
+          const normId = normalizeArtistId(item.selectedCandidateId || item.candidateId || item.id);
+          const cleanDisplayName = item.correctedQuery?.trim() || item.query.trim();
+          if (cleanDisplayName) {
+            activeSeedNames[item.id] = cleanDisplayName;
+            activeSeedNames[normId] = cleanDisplayName;
+            activeSeedNames[cleanDisplayName.toLowerCase()] = cleanDisplayName;
+          }
+          if (item.predictedOrigin) {
+            activeDisambiguationHints[normId] = item.predictedOrigin;
+            activeDisambiguationHints[item.id] = item.predictedOrigin;
+          }
+          if (item.genre) {
+            activeDisambiguationGenres[normId] = item.genre;
+            activeDisambiguationGenres[item.id] = item.genre;
+          }
+          if (item.originalQuery || (item.selectedCandidateId && item.selectedCandidateId !== item.id)) {
+            activeOriginalQueries[normId] = item.originalQuery || item.id;
+          }
+        });
+
+        const updatedProjectScenes: ProjectScene[] = allTargetScenes.map((s, idx) => {
+          const sKey = s.sceneId || s.id;
+          const matchingSeeds = cacheCandidatesPerSeed.filter(item => item.sceneId === sKey);
+          if (matchingSeeds.length > 0) {
+            const resolvedIds = matchingSeeds.map(m => normalizeArtistId(m.isCorrected && m.correctedQuery ? m.correctedQuery : (m.selectedCandidateId || m.candidateId || m.id)));
+            const resolvedDisplay = matchingSeeds.map(m => m.isCorrected && m.correctedQuery ? m.correctedQuery : m.query).join('::');
+            return normalizeProjectScene({
+              ...s,
+              seedArtists: resolvedDisplay || s.seedArtists,
+              seedIds: resolvedIds.length > 0 ? resolvedIds : s.seedIds,
+              seedArtistIds: resolvedIds.length > 0 ? resolvedIds : s.seedArtistIds,
+            }, idx);
+          }
+          return s;
+        });
+        scenesRef.current = updatedProjectScenes;
+        setScenes(updatedProjectScenes);
+
+        // Guard 1: Filter strictly to seeds belonging to lockedTargetSceneId for Hop 1
+        const targetSceneSeeds = cacheCandidatesPerSeed.filter(item => !item.sceneId || item.sceneId === lockedTargetSceneId);
+        const targetArtistSeeds = targetSceneSeeds.length > 0
+          ? targetSceneSeeds.map(s => normalizeArtistId(s.isCorrected && s.correctedQuery ? s.correctedQuery : (s.selectedCandidateId || s.candidateId || s.id)))
+          : artistList;
+        const targetArtists = targetSceneSeeds.length > 0
+          ? targetArtistSeeds.join('::')
+          : artists;
+        artists = targetArtists;
+        artistList = targetArtistSeeds;
+
         // Only after user clicks Confirm & Generate: flip to CONNECTIONS on mobile & start full loader
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('switch-to-connections-tab'));
@@ -5236,16 +5404,8 @@ const App: React.FC = () => {
           setProjectStatus('curating');
       }
 
-
-
-      
       // --- DISAMBIGUATION RE-ROUTE BLOCK (HOISTED) ---
-      let resolvedArtistSeeds = [...artistList];
-      let activeDisambiguationHints: Record<string, string> = disambiguationHints || {};
-      let activeDisambiguationGenres: Record<string, string> = disambiguationGenres || {};
-      let activeOriginalQueries: Record<string, string> = originalQueries || {};
-      let activeSeedNames: Record<string, string> = seedNames ? { ...seedNames } : {};
-      let hasDisambiguated = false;
+      resolvedArtistSeeds = [...artistList];
 
       // Only re-route on the first (user-confirmed) pass. On the re-entrant pass
       // (bypassDisambiguation === true) the seeds are already resolved; re-running
@@ -5255,10 +5415,10 @@ const App: React.FC = () => {
         const searchId = artistList[i];
         if (!bypassDisambiguation && cacheCandidatesPerSeed.length > 0) {
             const preFlightSeed = cacheCandidatesPerSeed[i];
-            const rawCountryName = preFlightSeed.predictedOrigin;
+            const rawCountryName = preFlightSeed?.predictedOrigin;
             
             if (rawCountryName) {
-              const cleanDisplayName = preFlightSeed.correctedQuery?.trim() || preFlightSeed.query.trim();
+              const cleanDisplayName = preFlightSeed.correctedQuery?.trim() || preFlightSeed.query?.trim();
               if (cleanDisplayName) {
                 activeSeedNames[searchId] = cleanDisplayName;
                 activeSeedNames[normalizeArtistId(searchId)] = cleanDisplayName;
@@ -5309,7 +5469,9 @@ const App: React.FC = () => {
         }
       }
 
-      if (hasDisambiguated) {
+      const isBatchMultiScene = uncuratedOrDirtyScenes.length > 1;
+
+      if (!isBatchMultiScene && hasDisambiguated) {
         const newArtistsStr = resolvedArtistSeeds.join('::');
         const hasActiveFiltersNext = hasActiveDiscoveryFilters(activeDiscoveryFilters);
         const isCustomNext = resolvedArtistSeeds.length > 1 || hasActiveFiltersNext;
@@ -5323,8 +5485,8 @@ const App: React.FC = () => {
         return;
       }
 
-      // 5. Apply Cache Hit for Single Qualified Hits (V38 Authorize Direct Hit Callable: Settles -5T, or -4T Remainder)
-      if (routingDecision === 'TOPOLOGY_HIT' && artistList.length === 1 && singleCacheDocData) {
+      // 5. Apply Cache Hit for Single Qualified Hits (Bypassed in batch multi-scene)
+      if (!isBatchMultiScene && routingDecision === 'TOPOLOGY_HIT' && artistList.length === 1 && singleCacheDocData) {
           if (singleCacheResolvedSearchId && singleCacheResolvedSearchId !== artistList[0]) {
               setSeedArtists(singleCacheResolvedSearchId);
               artistList.splice(0, artistList.length, singleCacheResolvedSearchId);
@@ -5395,18 +5557,35 @@ const App: React.FC = () => {
           }
         }
 
-        const stepZeroScene: ProjectScene = normalizeProjectScene({
-          ...createEmptyScene(0),
-          seedArtists: displayArtists,
-          seedIds: resolvedSeedIds,
-          seedArtistIds: resolvedSeedIds,
-          discoveryFilters: activeDiscoveryFilters,
-          status: 'curating'
-        }, 0);
-        scenesRef.current = [stepZeroScene];
-        setScenes([stepZeroScene]);
-        activeSceneIdRef.current = stepZeroScene.sceneId;
-        setActiveSceneId(stepZeroScene.sceneId);
+        const stepZeroScenes: ProjectScene[] = scenesRef.current.length > 1
+          ? scenesRef.current.map((s, idx) => {
+              if ((s.sceneId || s.id) === lockedTargetSceneId) {
+                return normalizeProjectScene({
+                  ...s,
+                  seedArtists: displayArtists || s.seedArtists,
+                  seedIds: resolvedSeedIds.length > 0 ? resolvedSeedIds : s.seedIds,
+                  seedArtistIds: resolvedSeedIds.length > 0 ? resolvedSeedIds : s.seedArtistIds,
+                  discoveryFilters: activeDiscoveryFilters,
+                  status: 'curating',
+                }, idx);
+              }
+              return normalizeProjectScene({
+                ...s,
+                status: s.status || 'idle',
+              }, idx);
+            })
+          : [normalizeProjectScene({
+              ...createEmptyScene(0),
+              seedArtists: displayArtists,
+              seedIds: resolvedSeedIds,
+              seedArtistIds: resolvedSeedIds,
+              discoveryFilters: activeDiscoveryFilters,
+              status: 'curating'
+            }, 0)];
+        scenesRef.current = stepZeroScenes;
+        setScenes(stepZeroScenes);
+        activeSceneIdRef.current = lockedTargetSceneId;
+        setActiveSceneId(lockedTargetSceneId);
 
         await setDoc(newDocRef, {
           name: defaultName,
@@ -5421,13 +5600,13 @@ const App: React.FC = () => {
           authorId: user.uid,
           supportsLabelDeepCuts: true,
           schemaVersion: 43,
-          scenes: JSON.stringify([stepZeroScene]),
-          activeSceneId: stepZeroScene.id,
+          scenes: JSON.stringify(stepZeroScenes),
+          activeSceneId: lockedTargetSceneId,
           overarchingRationale: '',
           overarchingZineIntro: '',
           overarchingZineImages: [],
           crossSceneLinks: '[]',
-          sceneCount: 1,
+          sceneCount: stepZeroScenes.length,
           createdAt: serverTimestamp(),
           updatedAt: serverTimestamp(),
           status: 'curating'
@@ -8630,6 +8809,32 @@ const App: React.FC = () => {
       console.log(`[Curation Reconnect] Job ${activeJobId} status updated: ${job.status}`);
 
       if (job.status === 'completed') {
+        if (job.nextChainedJobId) {
+          console.log(`[Curation Reconnect] Chained hop detected: ${job.nextChainedJobId}. Seamlessly advancing activeJobId.`);
+          // Sync interim job result (scenes, detailsCache) into React memory
+          if (job.result?.scenes) {
+            try {
+              const parsedScenesFromJob = parseProjectScenes(job.result.scenes);
+              scenesRef.current = parsedScenesFromJob;
+              setScenes(parsedScenesFromJob);
+            } catch (e) {}
+          }
+          if (job.result?.detailsCache) {
+            try {
+              const expandedMap = expandDetailsCacheMap(job.result.detailsCache);
+              setDetailsCache(prev => {
+                const next = new Map(prev);
+                expandedMap.forEach((v, k) => next.set(k, v));
+                return next;
+              });
+              expandedMap.forEach((v, k) => detailsCacheRef.current.set(k, v));
+            } catch (e) {}
+          }
+          setActiveJobId(job.nextChainedJobId);
+          activeJobIdRef.current = job.nextChainedJobId;
+          return;
+        }
+
         setIsLoading(false);
         console.log(`[Curation Reconnect] Job completed. Authoritatively clearing activeJobId & unlocking curation state.`);
 

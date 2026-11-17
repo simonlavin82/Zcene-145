@@ -256,6 +256,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
     try {
         console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
         let result = null;
+        let nextChainedJobId = null;
         const collectedTokens = {};
         const usageCollector = {
             push: (model, usage) => {
@@ -2479,7 +2480,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             if (serializedOverarchingHistory) {
                 result.overarchingHistory = serializedOverarchingHistory;
             }
-            let nextChainedJobId = null;
+            nextChainedJobId = null;
             if (result.isIntermediateChainedHop && result.remainingUncuratedScenes?.length > 0) {
                 const nextScene = result.remainingUncuratedScenes[0];
                 const nextJobRef = db.collection("curationJobs").doc();
@@ -2592,6 +2593,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
         await jobDocRef.update({
             status: "completed",
             result,
+            ...(nextChainedJobId ? { nextChainedJobId } : {}),
             updatedAt: firestore_2.FieldValue.serverTimestamp(),
             completedAt: firestore_2.FieldValue.serverTimestamp(),
             expireAt: firestore_2.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)

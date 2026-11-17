@@ -1811,14 +1811,29 @@ const GraphPage: React.FC<GraphPageProps> = ({
       .join('::');
     const hasSearchTerm = searchTerm.trim().length > 0;
 
-    if (!isSceneCurated) {
-      // Uncurated scene (Scene 2..5 with 0 nodes): any enabled seed or search term enables curation
-      return currentEnabled.length > 0 || hasSearchTerm;
+    const activeSceneDirty = !isSceneCurated
+      ? (currentEnabled.length > 0 || hasSearchTerm)
+      : ((currentEnabled !== baseline && currentEnabled.length > 0) || hasSearchTerm || areFiltersChanged);
+
+    if (activeSceneDirty) return true;
+
+    // Multi-Scene Upfront Batch Check: Is ANY other scene in scenes uncurated or dirty?
+    if (scenes.length > 1) {
+      return scenes.some(s => {
+        const sId = s.sceneId || s.id;
+        if (sId === activeSceneId) return false;
+        const isCurated = (s.graphData?.nodes?.length ?? 0) > 0;
+        if (!isCurated) {
+          return (s.seedArtists || '').trim().length > 0;
+        }
+        const curSeeds = (s.seedArtists || '').split('::').map(normalizeSeedSlug).filter(Boolean).sort().join('::');
+        const baseSeeds = (s.curatedSeedArtists || '').split('::').map(normalizeSeedSlug).filter(Boolean).sort().join('::');
+        return curSeeds !== baseSeeds;
+      });
     }
 
-    // Curated scene: dirty if enabled seeds differ from baseline, search term exists, or filters changed
-    return (currentEnabled !== baseline && currentEnabled.length > 0) || hasSearchTerm || areFiltersChanged;
-  }, [selectedSeedArtists, baselineSeedArtists, isSceneCurated, searchTerm, areFiltersChanged]);
+    return false;
+  }, [selectedSeedArtists, baselineSeedArtists, isSceneCurated, searchTerm, areFiltersChanged, scenes, activeSceneId]);
 
   const memoizedLibraryArtists = useMemo(() => libraryArtists.map(a => a.name), [libraryArtists]);
   const memoizedSeedArtists = useMemo(() => selectedSeedArtists.filter(a => a.enabled).map(a => a.name), [selectedSeedArtists]);
@@ -1831,25 +1846,37 @@ const GraphPage: React.FC<GraphPageProps> = ({
   
   const isFirstGeneration = useMemo(() => data.nodes.length === 0, [data.nodes.length]);
   
-  // Option A UX: A user can only add up to 5 scenes after mapping existing scenes
-  const hasUncuratedScene = useMemo(() => {
-    if (data.nodes.length === 0) return true;
-    return scenes.length === 0 || scenes.some(s => (s.graphData?.nodes?.length ?? 0) === 0);
-  }, [data.nodes.length, scenes]);
+  // V45.1 Upfront Multi-Scene: Allow adding up to 5 scenes upfront if every scene has at least 1 committed seed pill
+  const hasSceneWithoutSeeds = useMemo(() => {
+    // Check active scene live committed pills only (selectedSeedArtists, matching App.tsx handleAddScene 1:1)
+    const activeSeedCount = selectedSeedArtists.filter(a => a.enabled).length;
+    if (activeSeedCount === 0) return true;
+
+    // Check all other scenes in scenes
+    if (scenes.length > 0) {
+      return scenes.some(s => {
+        const sId = s.sceneId || s.id;
+        if (sId === activeSceneId) return false;
+        const sSeedCount = (s.seedArtists || '').split('::').map(a => a.trim()).filter(Boolean).length;
+        return sSeedCount === 0;
+      });
+    }
+    return false;
+  }, [selectedSeedArtists, scenes, activeSceneId]);
 
   const isAddSceneDisabled = useMemo(() => {
-    return isLoading || Boolean(isHydrating) || scenes.length >= MAX_SCENES_PER_PROJECT || hasUncuratedScene;
-  }, [isLoading, isHydrating, scenes.length, hasUncuratedScene]);
+    return isLoading || Boolean(isHydrating) || scenes.length >= MAX_SCENES_PER_PROJECT || hasSceneWithoutSeeds;
+  }, [isLoading, isHydrating, scenes.length, hasSceneWithoutSeeds]);
 
   const addSceneTooltip = useMemo(() => {
     if (scenes.length >= MAX_SCENES_PER_PROJECT) {
       return "Maximum of 5 scenes reached for this Zcene";
     }
-    if (hasUncuratedScene) {
-      return "Map your current scene first before adding another scene";
+    if (hasSceneWithoutSeeds) {
+      return "Add at least one seed artist to each scene before adding another scene";
     }
     return "Add a new Scene cluster to this Zcene board";
-  }, [scenes.length, hasUncuratedScene]);
+  }, [scenes.length, hasSceneWithoutSeeds]);
 
   // Step 1: Button wording and Overwrite Intercept gate. Once ANY scene across the project is mapped on canvas,
   // the button wording becomes "Update Zcene" (or "Add & Update Zcene" / "Verifying...").
@@ -2300,11 +2327,25 @@ const GraphPage: React.FC<GraphPageProps> = ({
       : "Mapping your Zcene connections... This usually takes 3–5 minutes to find the best musical paths.";
 
   const totalPendingCount = useMemo(() => {
-    if (!searchTerm.trim()) return enabledArtistsCount;
-    const newArtists = searchTerm.split(',').map(a => a.trim()).filter(Boolean);
-    const uniqueNewCount = newArtists.filter(name => !selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizeArtistId(name))).length;
-    return enabledArtistsCount + uniqueNewCount;
-  }, [searchTerm, enabledArtistsCount, selectedSeedArtists]);
+    let count = enabledArtistsCount;
+    if (searchTerm.trim()) {
+      const newArtists = searchTerm.split(',').map(a => a.trim()).filter(Boolean);
+      const uniqueNewCount = newArtists.filter(name => !selectedSeedArtists.some(s => normalizeArtistId(s.name) === normalizeArtistId(name))).length;
+      count += uniqueNewCount;
+    }
+    // Sum seeds across other uncurated scenes in the queue
+    if (scenes.length > 1) {
+      for (const s of scenes) {
+        const sId = s.sceneId || s.id;
+        if (sId === activeSceneId) continue;
+        const isCurated = (s.graphData?.nodes?.length ?? 0) > 0;
+        if (!isCurated && s.seedArtists) {
+          count += s.seedArtists.split('::').map(a => a.trim()).filter(Boolean).length;
+        }
+      }
+    }
+    return count;
+  }, [searchTerm, enabledArtistsCount, selectedSeedArtists, scenes, activeSceneId]);
 
   const createButtonLabel = useMemo(() => {
     if (isPreFlightChecking) {
@@ -2334,7 +2375,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                       onClick={onAddScene}
                       disabled={isAddSceneDisabled}
                       className={`h-7 flex items-center gap-1.5 px-2.5 rounded-xl border text-[11px] font-medium transition-all leading-none ${
-                        scenes.length >= MAX_SCENES_PER_PROJECT || hasUncuratedScene
+                        scenes.length >= MAX_SCENES_PER_PROJECT || hasSceneWithoutSeeds
                           ? 'border-zinc-800 bg-zinc-900/40 text-zinc-600 cursor-not-allowed opacity-60'
                           : 'border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed group'
                       }`}

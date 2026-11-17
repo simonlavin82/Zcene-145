@@ -33,6 +33,7 @@ import {
   normalizeProjectScene,
   buildCompositeCanvasGraph,
   MAX_SCENES_PER_PROJECT,
+  toSeedArtistsArray,
 } from "./shared/multiSceneUtils";
 import {
   requireAuthenticatedCaller,
@@ -590,25 +591,21 @@ export const executeCurationPipeline = onCall({
   payload.filters = sanitizeDiscoveryFilters(payload.filters);
   const hasActiveFilters = hasActiveDiscoveryFilters(payload.filters);
 
-  // Rule 18 & 43: Settle remaining project token balance (4T/5T Single-Seed or 9T/10T Complex)
-  const totalProjectCost = computeBaseProjectTokenCost(artistList.length, hasActiveFilters);
-  const displaySeeds = artistList.map((s: string) => seedNamesMap[s] || s).join(' + ');
-  const settlement = await settleCurationProjectTokens({
-    caller,
-    curationSessionId: payload.curationSessionId,
-    totalProjectCost,
-    projectId: payload.projectId,
-    targetSceneId: payload.targetSceneId || payload.activeSceneId || "scene-1",
-    txType: "spend_live_synthesis",
-    description: `Zcene Synthesis: ${displaySeeds}`,
-    generationTypeToStamp: hasActiveFilters ? "Filtered Live Synthesis" : "Root Generation",
-    seedArtist: displaySeeds,
-  });
+  let updatedScenes: ProjectScene[] = parseProjectScenes(payload.scenes);
 
-  try {
-  const targetSceneId: string = payload.targetSceneId || payload.activeSceneId || "scene-1";
+  // Catch 5A: isUpfrontBatch triggers ONLY when >1 scenes in the batch are uncurated
+  const uncuratedScenesInBatch = updatedScenes.filter(
+    s => (s.graphData?.nodes?.length ?? 0) === 0
+  );
+  const isUpfrontBatch = uncuratedScenesInBatch.length > 1;
+
+  let targetSceneId: string = payload.targetSceneId || payload.activeSceneId || "scene-1";
+  if (isUpfrontBatch && uncuratedScenesInBatch[0]) {
+    const firstUncurated = uncuratedScenesInBatch[0];
+    targetSceneId = firstUncurated.sceneId || firstUncurated.id || targetSceneId;
+  }
   const parsedSceneIdx = parseInt(String(targetSceneId).replace(/^scene-/i, ""), 10);
-  const targetSceneIndex: number =
+  let targetSceneIndex: number =
     typeof payload.sceneIndex === "number" && payload.sceneIndex >= 0
       ? payload.sceneIndex
       : Number.isFinite(parsedSceneIdx) && parsedSceneIdx >= 1
@@ -619,13 +616,35 @@ export const executeCurationPipeline = onCall({
     throw new HttpsError("invalid-argument", "Maximum of 5 scenes per project reached.");
   }
 
-  let updatedScenes: ProjectScene[] = parseProjectScenes(payload.scenes);
+  // Rule 18 & 43: Settle remaining project token balance (supports multi-scene batch aggregate)
+  let totalProjectCost: number = computeBaseProjectTokenCost(artistList.length, hasActiveFilters);
+  let displaySeeds = artistList.map((s: string) => seedNamesMap[s] || s).join(' + ');
 
-  // Catch 5A: isUpfrontBatch triggers ONLY when >1 scenes in the batch are uncurated
-  const uncuratedScenesCount = updatedScenes.filter(
-    s => (s.graphData?.nodes?.length ?? 0) === 0
-  ).length;
-  const isUpfrontBatch = uncuratedScenesCount > 1;
+  if (isUpfrontBatch) {
+    totalProjectCost = uncuratedScenesInBatch.reduce<number>((sum, sc) => {
+      const scSeeds = toSeedArtistsArray(sc.seedArtists);
+      const scFilters = sanitizeDiscoveryFilters(sc.discoveryFilters);
+      return sum + computeBaseProjectTokenCost(scSeeds.length, hasActiveDiscoveryFilters(scFilters));
+    }, 0);
+    displaySeeds = uncuratedScenesInBatch.map(sc => {
+      const scSeeds = toSeedArtistsArray(sc.seedArtists);
+      return scSeeds.map((s: string) => seedNamesMap[s] || s).join(' + ');
+    }).join(' & ');
+  }
+
+  const settlement = await settleCurationProjectTokens({
+    caller,
+    curationSessionId: payload.curationSessionId,
+    totalProjectCost,
+    projectId: payload.projectId,
+    targetSceneId,
+    txType: "spend_live_synthesis",
+    description: `Zcene Synthesis: ${displaySeeds}`,
+    generationTypeToStamp: hasActiveFilters ? "Filtered Live Synthesis" : "Root Generation",
+    seedArtist: displaySeeds,
+  });
+
+  try {
   const shouldDeferToWorker = payload.deferPhase1ToWorker === true || isUpfrontBatch;
 
   let finalGraph = payload.baseGraph || { nodes: [], links: [] };

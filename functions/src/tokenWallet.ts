@@ -158,10 +158,10 @@ export async function chargePreFlightLookupIfNeeded(params: {
         throw new HttpsError("failed-precondition", "Curation session has already been settled.");
       }
 
-      // Multi-seed batch protection: up to 3 initial pre-flight seed lookups share the single 1-Token pre-flight fee.
+      // Multi-seed batch protection: up to 15 initial pre-flight seed lookups share the single 1-Token pre-flight fee across queued scenes.
       if (mode === "initial_preflight" && sData.initialPreFlightCharged === true) {
         const callsUsed = Math.max(1, Math.floor(Number(sData.initialPreFlightCallsUsed) || 1));
-        if (callsUsed < 3) {
+        if (callsUsed < 15) {
           tx.update(sessionRef, {
             initialPreFlightCallsUsed: callsUsed + 1,
             updatedAt: FieldValue.serverTimestamp(),
@@ -347,7 +347,7 @@ export async function recordPreFlightApiUsage(params: {
 export async function settleCurationProjectTokens(params: {
   caller: CallerIdentity;
   curationSessionId?: string;
-  totalProjectCost: 5 | 10;
+  totalProjectCost: number;
   projectId?: string;
   targetSceneId?: string;
   sceneTitle?: string;

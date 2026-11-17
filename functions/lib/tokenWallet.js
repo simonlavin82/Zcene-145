@@ -122,10 +122,10 @@ async function chargePreFlightLookupIfNeeded(params) {
             if (sData.status && sData.status !== "preflight") {
                 throw new https_1.HttpsError("failed-precondition", "Curation session has already been settled.");
             }
-            // Multi-seed batch protection: up to 3 initial pre-flight seed lookups share the single 1-Token pre-flight fee.
+            // Multi-seed batch protection: up to 15 initial pre-flight seed lookups share the single 1-Token pre-flight fee across queued scenes.
             if (mode === "initial_preflight" && sData.initialPreFlightCharged === true) {
                 const callsUsed = Math.max(1, Math.floor(Number(sData.initialPreFlightCallsUsed) || 1));
-                if (callsUsed < 3) {
+                if (callsUsed < 15) {
                     tx.update(sessionRef, {
                         initialPreFlightCallsUsed: callsUsed + 1,
                         updatedAt: firestore_1.FieldValue.serverTimestamp(),
