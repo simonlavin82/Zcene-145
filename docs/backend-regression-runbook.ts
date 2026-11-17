@@ -1,11 +1,14 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
 # V45 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator.
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 17 test suites (384 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
+# Run entire full-stack regression test suite (17 test files, 384 tests)
+npm test
+
 # Run backend pipeline tests
 cd functions && npx vitest run tests/pipeline.test.ts
 
@@ -36,6 +39,9 @@ npx vitest run tests/v40-itunes-preview.test.tsx
 # Run DetailsPanel 3-column layout, style & Zine Editorial Image Curation Assistant tests
 npx vitest run components/DetailsPanel.test.tsx
 
+# Run V41/V45 Immutable Ledger, 2-Stage Trash & Architecture Parity Gate tests
+npx vitest run tests/v41-immutable-ledger-and-trash.test.tsx
+
 # Run V42 Global 249-Country ISO-3166 Registry & Disambiguation Lock tests
 cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts
 
@@ -45,9 +51,24 @@ cd functions && npx vitest run tests/idempotencyAndCooldown.test.ts
 # Run V42.1 Escape Hatch Blank-Input UX & Zero "Is connected to" Tooltip tests
 npx vitest run tests/v42_1-escape-hatch-and-tooltips.test.tsx
 
+# Run Pre-Stripe audit & landing page lexicon modernization tests
+npx vitest run tests/v42_4-pre-stripe-audit.test.tsx
+
 # Run V45 Multi-Scene Infinite Board, Scene Namespacing & Layered Zine tests
 npx vitest run src/test/v43-multi-scene-board.test.ts
 cd functions && npx vitest run src/__tests__/v43MultiScenePipeline.test.ts
+
+# Run V44 Roots hierarchy, input controls & curation intercept tests
+npx vitest run tests/v44-roots-hierarchy-and-inputs.test.tsx
+
+# Run V45 dynamic document title & route cleanup tests
+npx vitest run tests/v45-document-title-and-route-cleanup.test.tsx
+
+# Run V45 dashboard project search & filtering tests
+npx vitest run tests/v45-dashboard-search.test.tsx
+
+# Run V45.1 curation time estimate, admin badge, overarching history archive & per-node territory self-healing tests
+npx vitest run tests/v45_1-curation-time-and-admin-badge.test.tsx
 
 # Or run with UI for visual tracing:
 npx vitest --ui
