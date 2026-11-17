@@ -2555,7 +2555,7 @@ export const processCurationJob = onDocumentCreated({
 
       // Overarching History Persistence ([Rule 29], Guardrail 1, Safeguard B)
       const existingHistoryMap: Record<string, OverarchingHistoryEntry> = parseOverarchingHistory(
-        pData?.overarchingHistory || initialProjectDocData?.overarchingHistory
+        pData?.overarchingHistory || initialProjectDocData?.overarchingHistory || inputPayload?.overarchingHistory
       );
 
       const newSig = (result.overarchingRationale && finalProjectScenes.length >= 2)
@@ -2612,15 +2612,23 @@ export const processCurationJob = onDocumentCreated({
         }
       }
 
-      // 2. Archive the newly synthesized overarching state if multi-scene
+      // 2. Archive the newly synthesized overarching state if multi-scene (bank at birth with editorial metadata)
       if (newSig) {
         const priorEntryForSig = existingHistoryMap[newSig];
         existingHistoryMap[newSig] = {
           sceneSignature: newSig,
           overarchingRationale: result.overarchingRationale,
-          ...(priorEntryForSig?.overarchingZineTitle ? { overarchingZineTitle: priorEntryForSig.overarchingZineTitle } : {}),
-          ...(priorEntryForSig?.overarchingZineIntro ? { overarchingZineIntro: priorEntryForSig.overarchingZineIntro } : {}),
-          ...(priorEntryForSig?.overarchingZineImages ? { overarchingZineImages: priorEntryForSig.overarchingZineImages } : {}),
+          ...(result.overarchingZineTitle || priorEntryForSig?.overarchingZineTitle
+            ? { overarchingZineTitle: result.overarchingZineTitle || priorEntryForSig?.overarchingZineTitle }
+            : {}),
+          ...(result.overarchingZineIntro || priorEntryForSig?.overarchingZineIntro
+            ? { overarchingZineIntro: result.overarchingZineIntro || priorEntryForSig?.overarchingZineIntro }
+            : {}),
+          ...(result.overarchingZineImages && Array.isArray(result.overarchingZineImages) && result.overarchingZineImages.length > 0
+            ? { overarchingZineImages: result.overarchingZineImages }
+            : priorEntryForSig?.overarchingZineImages
+              ? { overarchingZineImages: priorEntryForSig.overarchingZineImages }
+              : {}),
           crossSceneLinks: result.crossSceneLinks || [],
           archivedAt: new Date().toISOString(),
           sceneCount: finalProjectScenes.length,

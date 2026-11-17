@@ -453,7 +453,7 @@ exports.authorizeDirectHitCallable = (0, https_1.onCall)({
     memory: "256MiB",
 }, async (request) => {
     const caller = requireAuthenticatedCaller(request);
-    const { projectId, seedArtistId, projectName, curationSessionId, targetSceneId, scenes, detailsCache, triggerOverarchingSynthesis, } = request.data || {};
+    const { projectId, seedArtistId, projectName, curationSessionId, targetSceneId, scenes, detailsCache, triggerOverarchingSynthesis, overarchingHistory, } = request.data || {};
     if (!seedArtistId && !projectName) {
         throw new https_1.HttpsError("invalid-argument", "Missing Direct Hit artist identifier.");
     }
@@ -507,6 +507,7 @@ exports.authorizeDirectHitCallable = (0, https_1.onCall)({
                     generationType: "Direct Hit",
                     tokensSpent: settlement.tokensSpent,
                     curationSessionId: settlement.curationSessionId,
+                    overarchingHistory: overarchingHistory || null,
                 },
             });
             await db
@@ -514,7 +515,12 @@ exports.authorizeDirectHitCallable = (0, https_1.onCall)({
                 .doc(caller.uid)
                 .collection("projects")
                 .doc(cleanProjectId)
-                .set({ activeJobId }, { merge: true });
+                .set({
+                status: "curating",
+                activeJobId,
+                generationType: "Direct Hit",
+                updatedAt: firestore_1.FieldValue.serverTimestamp(),
+            }, { merge: true });
         }
         catch (jobErr) {
             console.warn("[authorizeDirectHitCallable] Non-fatal error queueing overarching_only job:", jobErr);

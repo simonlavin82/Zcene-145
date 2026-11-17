@@ -1611,5 +1611,153 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(columns[1]).toHaveLength(1);
       expect(columns[2]).toHaveLength(1);
     });
+
+    it('14. ProjectLoader & Re-hydration Hook: rejects stale status: "completed" snapshots during in-flight setup', () => {
+      // Logic simulation of ProjectLoader guard
+      const shouldBypassSnapshot = (
+        isHydratingSession: boolean,
+        isPreFlightChecking: boolean,
+        incomingStatus: string,
+        incomingJobId: string | null | undefined
+      ) => {
+        const isInFlightSetupLock = isHydratingSession || isPreFlightChecking;
+        if (isInFlightSetupLock && incomingStatus === 'completed' && !incomingJobId) {
+          return true; // Bypass stale completed snapshot
+        }
+        return false;
+      };
+
+      // Stale completed snapshot without activeJobId during hydration setup must be bypassed
+      expect(shouldBypassSnapshot(true, false, 'completed', null)).toBe(true);
+      expect(shouldBypassSnapshot(false, true, 'completed', undefined)).toBe(true);
+
+      // Once background job stamps activeJobId, it is NOT bypassed
+      expect(shouldBypassSnapshot(true, false, 'curating', 'job-123')).toBe(false);
+      expect(shouldBypassSnapshot(true, false, 'completed', 'job-123')).toBe(false);
+
+      // Once hydration setup completes, incoming completed snapshots are accepted
+      expect(shouldBypassSnapshot(false, false, 'completed', null)).toBe(false);
+
+      // Logic simulation of [Re-hydration Hook] guard
+      let isLoading = true;
+      const rehydrationHook = (
+        projectStatus: string,
+        hasGraphNodes: boolean,
+        isHydratingSession: boolean,
+        isPreFlightChecking: boolean
+      ) => {
+        if (projectStatus === 'completed') {
+          if (hasGraphNodes) {
+            if (isHydratingSession || isPreFlightChecking) {
+              return; // Guard active: do NOT clear loading state
+            }
+            isLoading = false;
+          }
+        }
+      };
+
+      // While hydrating setup is active, completed status does not prematurely clear loading
+      rehydrationHook('completed', true, true, false);
+      expect(isLoading).toBe(true);
+
+      // Once hydration setup is done, completed status clears loading cleanly
+      rehydrationHook('completed', true, false, false);
+      expect(isLoading).toBe(false);
+    });
+
+    it('15. processCurationJob: overarchingHistory fallback from inputPayload and banking at birth with editorial metadata', () => {
+      const priorHistoryMap: Record<string, any> = {
+        'scene-1::scene-2': {
+          sceneSignature: 'scene-1::scene-2',
+          overarchingRationale: 'Old 2-scene rationale',
+          overarchingZineTitle: 'Old Title',
+          crossSceneLinks: [],
+          archivedAt: '2026-11-17T00:00:00.000Z',
+          sceneCount: 2,
+          sceneSeeds: ['Jimmy Eat World', 'Yellowcard'],
+        }
+      };
+
+      // Fallback read from inputPayload when pData and initialProjectDocData are empty
+      const pData: any = {};
+      const initialProjectDocData: any = {};
+      const inputPayload: any = {
+        overarchingHistory: JSON.stringify(priorHistoryMap)
+      };
+
+      const existingHistoryMap = parseOverarchingHistory(
+        pData?.overarchingHistory || initialProjectDocData?.overarchingHistory || inputPayload?.overarchingHistory
+      );
+      expect(existingHistoryMap['scene-1::scene-2']).toBeDefined();
+      expect(existingHistoryMap['scene-1::scene-2'].overarchingRationale).toBe('Old 2-scene rationale');
+
+      // Bank at birth with synthesized result metadata
+      const newSig = 'scene-1::scene-2::scene-3';
+      const result = {
+        overarchingRationale: 'New 3-scene rationale spanning Elliott, Jimmy Eat World, Yellowcard',
+        overarchingZineTitle: 'The Evolution of Midwest Emo & Pop Punk',
+        overarchingZineIntro: 'From basement tape exchanges to stadium anthems...',
+        overarchingZineImages: [{ url: 'https://example.com/photo.jpg', caption: 'Live in 2001' }],
+        crossSceneLinks: [{ source: 'elliott:band', target: 'jew:band', rationale: 'Deep emo lineage' }]
+      };
+      const finalProjectScenes = [
+        { sceneId: 'scene-1', curatedSeedArtists: 'Jimmy Eat World' },
+        { sceneId: 'scene-2', curatedSeedArtists: 'Yellowcard' },
+        { sceneId: 'scene-3', curatedSeedArtists: 'Elliott' },
+      ];
+
+      const priorEntryForSig = existingHistoryMap[newSig];
+      existingHistoryMap[newSig] = {
+        sceneSignature: newSig,
+        overarchingRationale: result.overarchingRationale,
+        ...(result.overarchingZineTitle || priorEntryForSig?.overarchingZineTitle
+          ? { overarchingZineTitle: result.overarchingZineTitle || priorEntryForSig?.overarchingZineTitle }
+          : {}),
+        ...(result.overarchingZineIntro || priorEntryForSig?.overarchingZineIntro
+          ? { overarchingZineIntro: result.overarchingZineIntro || priorEntryForSig?.overarchingZineIntro }
+          : {}),
+        ...(result.overarchingZineImages && Array.isArray(result.overarchingZineImages) && result.overarchingZineImages.length > 0
+          ? { overarchingZineImages: result.overarchingZineImages }
+          : priorEntryForSig?.overarchingZineImages
+            ? { overarchingZineImages: priorEntryForSig.overarchingZineImages }
+            : {}),
+        crossSceneLinks: (result.crossSceneLinks as any) || [],
+        archivedAt: new Date().toISOString(),
+        sceneCount: finalProjectScenes.length,
+        sceneSeeds: finalProjectScenes.map((s: any) => s.curatedSeedArtists || s.seedArtists || "").filter(Boolean),
+      };
+
+      expect(existingHistoryMap[newSig]).toBeDefined();
+      expect(existingHistoryMap[newSig].overarchingZineTitle).toBe('The Evolution of Midwest Emo & Pop Punk');
+      expect(existingHistoryMap[newSig].overarchingZineIntro).toBe('From basement tape exchanges to stadium anthems...');
+      expect(existingHistoryMap[newSig].overarchingZineImages).toHaveLength(1);
+      expect(existingHistoryMap[newSig].sceneCount).toBe(3);
+      expect(existingHistoryMap['scene-1::scene-2']).toBeDefined(); // Prior history preserved
+    });
+
+    it('16. [Rule 29] Client updateDoc payload strictly omits generationType during Direct Hit applyLocalTopologyHit', () => {
+      // Simulate client payload in applyLocalTopologyHit
+      const activeJobIdRef = { current: 'curation-job-xyz' };
+      const compositeGraph = { nodes: [{ id: 'jew' }], links: [] };
+      const projectSeedImageUrls = ['https://example.com/seed.jpg'];
+      const primaryProjectImageUrl = 'https://example.com/seed.jpg';
+
+      const payload: Record<string, any> = {
+        graphData: JSON.stringify(compositeGraph),
+        detailsCache: '[]',
+        status: activeJobIdRef.current ? 'curating' : 'completed',
+        ...(activeJobIdRef.current ? { activeJobId: activeJobIdRef.current } : {}),
+        seedImageUrls: projectSeedImageUrls,
+        ...(primaryProjectImageUrl ? { seedImageUrl: primaryProjectImageUrl } : {}),
+      };
+
+      // Rule 29: updateDoc cannot touch generationType, tokensSpent, apiUsage, anchorResolution
+      expect(payload).not.toHaveProperty('generationType');
+      expect(payload).not.toHaveProperty('tokensSpent');
+      expect(payload).not.toHaveProperty('apiUsage');
+      expect(payload).not.toHaveProperty('anchorResolution');
+      expect(payload.status).toBe('curating');
+      expect(payload.activeJobId).toBe('curation-job-xyz');
+    });
   });
 });

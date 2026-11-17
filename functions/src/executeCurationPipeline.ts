@@ -794,9 +794,11 @@ export const executeCurationPipeline = onCall({
         });
         console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration (scene=${targetSceneId}, lockedSeeds=${resolvedSeedArray.map(s => s.id).join(', ')})`);
 
-        // Update project with activeJobId
+        // Update project with activeJobId and lock status to curating
         await projectDocRef.set({
-           activeJobId: curationJobId
+           status: "curating",
+           activeJobId: curationJobId,
+           updatedAt: FieldValue.serverTimestamp(),
         }, { merge: true });
       } else {
         console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Skipping background hydration job.`);

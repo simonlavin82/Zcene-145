@@ -159,7 +159,8 @@ const generateGraphDataViaCloudJob = async (
   curationSessionId?: string | null,
   targetSceneId?: string,
   sceneIndex?: number,
-  scenes?: ProjectScene[]
+  scenes?: ProjectScene[],
+  overarchingHistory?: string
 ): Promise<{ graphData: GraphData, activeJobId?: string }> => {
   let success = false;
   let finalGraphData = null;
@@ -184,7 +185,8 @@ const generateGraphDataViaCloudJob = async (
       ...(curationSessionId && { curationSessionId }),
       ...(targetSceneId && { targetSceneId }),
       ...(sceneIndex !== undefined && { sceneIndex }),
-      ...(scenes && { scenes })
+      ...(scenes && { scenes }),
+      ...(overarchingHistory && { overarchingHistory })
     };
 
     try {
@@ -4493,7 +4495,6 @@ const App: React.FC = () => {
           detailsCache: JSON.stringify(compactDetailsCacheToCanonical(detailsCacheRef.current, compositeGraph.nodes)),
           status: activeJobIdRef.current ? 'curating' : 'completed',
           ...(activeJobIdRef.current ? { activeJobId: activeJobIdRef.current } : {}),
-          generationType: 'Direct Hit',
           seedImageUrls: projectSeedImageUrls,
           ...(primaryProjectImageUrl ? { seedImageUrl: primaryProjectImageUrl } : {}),
           updatedAt: serverTimestamp()
@@ -4502,6 +4503,7 @@ const App: React.FC = () => {
         if (isNewProject) {
            await setDoc(doc(db, projectPath), {
               ...payload,
+              generationType: 'Direct Hit',
               authorId: user.uid,
               createdAt: serverTimestamp(),
               chatHistories: '[]',
@@ -4511,12 +4513,14 @@ const App: React.FC = () => {
               supportsLabelDeepCuts: true
            }, { merge: true });
         } else {
+           // Rule 29: Omit generationType from client updateDoc to satisfy firestore.rules
            await updateDoc(doc(db, projectPath), payload);
         }
         if (hoistedActiveNodes.length > 0) {
           setActiveNodeIds(hoistedActiveNodes);
         }
-        if (primaryMatchedNode) {
+        // Defer auto-selection of target node if overarching curation job is queued
+        if (primaryMatchedNode && !activeJobIdRef.current) {
           setSelectedNode({
             ...primaryMatchedNode,
             id: stripSceneNamespace(primaryMatchedNode.canonicalId || primaryMatchedNode.id),
@@ -4525,18 +4529,27 @@ const App: React.FC = () => {
           hasAutoSelectedRef.current = targetProjectId;
         }
         lastHydratedProjectFingerprintRef.current = computeProjectHydrationFingerprint(targetProjectId, payload);
-      } catch (e) { }
+      } catch (e) {
+        console.error('[applyLocalTopologyHit] Firestore project update error:', e);
+      }
     }
     
     graphDataRef.current = compositeGraph;
     setGraphData(compositeGraph);
     setSeedArtists(artistsString);
-    if (!activeJobIdRef.current) {
+    const hasActiveJob = Boolean(activeJobIdRef.current);
+    if (!hasActiveJob) {
       projectStatusRef.current = 'completed';
       setProjectStatus('completed');
       setIsLoading(false);
+    } else {
+      // Multi-scene Direct Hit queued overarching_only synthesis: keep loading spinner active!
+      projectStatusRef.current = 'curating';
+      setProjectStatus('curating');
+      setIsLoading(true);
     }
 
+    // Deadlock Safeguard 2: Unconditionally release client setup locks once activeJobIdRef and projectStatus are locked in
     isFetchingDetailsRef.current = false;
     isHydratingSessionRef.current = false;
     isProjectLoadingRef.current = false;
@@ -4648,7 +4661,10 @@ const App: React.FC = () => {
           targetSceneId,
           scenes: shouldTriggerOverarching ? sanitizeScenesForTransport(previewScenes) : undefined,
           detailsCache: shouldTriggerOverarching ? JSON.stringify(compactDetailsCacheToCanonical(detailsCacheRef.current)) : undefined,
-          triggerOverarchingSynthesis: shouldTriggerOverarching
+          triggerOverarchingSynthesis: shouldTriggerOverarching,
+          overarchingHistory: (overarchingHistoryRef.current && Object.keys(overarchingHistoryRef.current).length > 0)
+            ? JSON.stringify(overarchingHistoryRef.current)
+            : undefined
         });
         const resData = (res?.data || {}) as any;
         if (resData.activeJobId) {
@@ -5176,6 +5192,16 @@ const App: React.FC = () => {
         // Pre-archive settled multi-scene editorial before mutating scene state for cloud curation
         preArchiveCurrentSettledOverarching();
 
+        // Persist pre-archived overarchingHistory to Firestore immediately before curation dispatches
+        if (currentProjectId && user && !isGuest && overarchingHistoryRef.current && Object.keys(overarchingHistoryRef.current).length > 0) {
+          updateDoc(doc(db, 'users', user.uid, 'projects', currentProjectId), {
+            overarchingHistory: JSON.stringify(overarchingHistoryRef.current),
+            updatedAt: serverTimestamp(),
+          }).catch((err) => {
+            console.warn('[handleGenerateGraph] Non-fatal overarchingHistory pre-archive write error:', err);
+          });
+        }
+
         // Only after user clicks Confirm & Generate: flip to CONNECTIONS on mobile & start full loader
         if (typeof window !== 'undefined') {
           window.dispatchEvent(new CustomEvent('switch-to-connections-tab'));
@@ -5314,7 +5340,9 @@ const App: React.FC = () => {
           await applyLocalTopologyHit(artistList[0], singleCacheDocData, artistList, artists, explicitProjectId, lockedTargetSceneId);
           isHydratingSessionRef.current = false;
           isProjectLoadingRef.current = false;
-          setIsLoading(false);
+          if (!activeJobIdRef.current) {
+            setIsLoading(false);
+          }
           return;
       }
       
@@ -6630,7 +6658,10 @@ const App: React.FC = () => {
           curationSessionIdRef.current, // V38 Split-Debit session ID
           targetSceneIdForJob,
           targetSceneIdxForJob,
-          synchronizedScenesForJob
+          synchronizedScenesForJob,
+          (overarchingHistoryRef.current && Object.keys(overarchingHistoryRef.current).length > 0)
+            ? JSON.stringify(overarchingHistoryRef.current)
+            : undefined
         );
       } else {
         const payloadArtists = artistList.map(a => normalizeArtistId(a)).join('::');
@@ -7714,6 +7745,16 @@ const App: React.FC = () => {
         }
       }
 
+      // Deadlock Safeguard 1: In-Flight Setup Lock.
+      // During active pre-flight check or initial client setup/hydration of a new curation turn,
+      // ignore stale incoming snapshots that report status: 'completed' without an activeJobId.
+      // That snapshot is the stale pre-curation document state from before the new curation was started.
+      const isInFlightSetupLock = isHydratingSessionRef.current || isPreFlightCheckingRef.current;
+      if (isInFlightSetupLock && incomingStatus === 'completed' && !incomingJobId) {
+        console.log('[ProjectLoader] Bypassing stale completed snapshot: curation setup is in flight');
+        return false;
+      }
+
       const statusChanged = incomingStatus !== projectStatusRef.current;
       const jobChanged = incomingJobId !== activeJobIdRef.current;
       const incomingHasGraph = data.graphData && typeof data.graphData === 'string' && data.graphData.trim().length > 20;
@@ -8683,6 +8724,10 @@ const App: React.FC = () => {
     if (projectStatus === 'completed') {
       const hasGraphNodes = graphData && graphData.nodes && graphData.nodes.length > 0;
       if (hasGraphNodes) {
+        // Deadlock Safeguard 1: Do NOT clear loading state if client setup is in flight
+        if (isHydratingSessionRef.current || isPreFlightCheckingRef.current) {
+          return;
+        }
         console.log(`[Re-hydration Hook] Project completed with graph. Clearing loading state.`);
         setIsLoading(false);
 

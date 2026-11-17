@@ -634,6 +634,7 @@ export const authorizeDirectHitCallable = onCall(
       scenes,
       detailsCache,
       triggerOverarchingSynthesis,
+      overarchingHistory,
     } = request.data || {};
 
     if (!seedArtistId && !projectName) {
@@ -693,6 +694,7 @@ export const authorizeDirectHitCallable = onCall(
             generationType: "Direct Hit",
             tokensSpent: settlement.tokensSpent,
             curationSessionId: settlement.curationSessionId,
+            overarchingHistory: overarchingHistory || null,
           },
         });
         await db
@@ -700,7 +702,12 @@ export const authorizeDirectHitCallable = onCall(
           .doc(caller.uid)
           .collection("projects")
           .doc(cleanProjectId)
-          .set({ activeJobId }, { merge: true });
+          .set({
+            status: "curating",
+            activeJobId,
+            generationType: "Direct Hit",
+            updatedAt: FieldValue.serverTimestamp(),
+          }, { merge: true });
       } catch (jobErr) {
         console.warn("[authorizeDirectHitCallable] Non-fatal error queueing overarching_only job:", jobErr);
       }
