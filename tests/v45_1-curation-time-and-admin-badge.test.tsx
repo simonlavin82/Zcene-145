@@ -442,6 +442,52 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(screen.getByTestId('curation-time-estimate')).toHaveTextContent('Ready in a few seconds');
     });
 
+    it('enforces overflow-hidden on modal container, overflow-y-auto on body, and renders pinned curation estimate with scene headers', () => {
+      const multiSeeds: PreFlightSeed[] = [
+        {
+          id: 'korn-us',
+          query: 'Korn',
+          sceneId: 'scene-1',
+          sceneLabel: 'Scene 1 • Nu Metal',
+          predictedOrigin: 'Bakersfield, USA',
+          genre: 'Nu Metal',
+          isKnownCacheHit: true,
+          isTopologyHit: true,
+        },
+        {
+          id: 'radiohead-gb',
+          query: 'Radiohead',
+          sceneId: 'scene-2',
+          sceneLabel: 'Scene 2 • Brit Indie',
+          predictedOrigin: 'Abingdon, United Kingdom',
+          genre: 'Alternative Rock',
+          isKnownCacheHit: true,
+          isTopologyHit: true,
+        },
+      ];
+
+      render(
+        <ConsolidatedValidationModal
+          isOpen={true}
+          seeds={multiSeeds}
+          expectedSpeed="partial"
+          uncachedScenesCount={0}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+
+      const modalContainer = screen.getByTestId('validation-modal');
+      expect(modalContainer.className).toContain('overflow-hidden');
+      expect(modalContainer.className).not.toContain('!overflow-visible');
+
+      expect(screen.getByText('Scene 1 • Nu Metal')).toBeInTheDocument();
+      expect(screen.getByText('Scene 2 • Brit Indie')).toBeInTheDocument();
+
+      const estimate = screen.getByTestId('curation-time-estimate');
+      expect(estimate).toHaveTextContent('~1–2 minutes');
+    });
+
     it('successfully transitions TokenConfirmationDialog from isOpen={false} to isOpen={true} without violating Rules of Hooks', () => {
       const { rerender } = render(
         <TokenConfirmationDialog

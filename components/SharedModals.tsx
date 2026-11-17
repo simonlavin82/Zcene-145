@@ -2347,9 +2347,9 @@ export function ConsolidatedValidationModal({
 
   return (
     <ModalBackdrop onClick={() => !isSubmitting && onCancel()} className="z-[1100]">
-      <ModalContainer data-testid="validation-modal" className="!overflow-visible relative z-[1150] max-w-lg w-full">
-        <form onSubmit={handleSubmit} className="flex flex-col w-full" onClick={e => e.stopPropagation()}>
-          <ModalHeader>
+      <ModalContainer data-testid="validation-modal" className="relative z-[1150] max-w-lg w-full max-h-[85vh] flex flex-col overflow-hidden">
+        <form onSubmit={handleSubmit} className="flex flex-col w-full flex-1 min-h-0 overflow-hidden" onClick={e => e.stopPropagation()}>
+          <ModalHeader className="flex-shrink-0">
             <div className="flex items-center gap-2">
               <span className="material-symbols-outlined text-primary !text-[18px]">checklist</span>
               <h3 className="text-lg font-medium text-white">Confirm Your Artists</h3>
@@ -2363,8 +2363,8 @@ export function ConsolidatedValidationModal({
               <span className="material-symbols-outlined !text-[18px]">close</span>
             </button>
           </ModalHeader>
-          <ModalBody className="p-5 flex flex-col gap-4 !overflow-visible max-h-[70vh] overflow-y-auto">
-            <p className="text-sm font-light text-zinc-400 leading-relaxed">
+          <ModalBody className="p-5 flex flex-col gap-4 flex-1 min-h-0 overflow-y-auto">
+            <p className="text-sm font-light text-zinc-400 leading-relaxed flex-shrink-0">
               {hasVerifyingSeeds
                 ? "Verifying your selected artists... You will confirm in a moment."
                 : "Please verify the regional origins and exact acts for your selected artists."}
@@ -2494,11 +2494,12 @@ export function ConsolidatedValidationModal({
                 );
               })}
             </div>
-
-            {!hasVerifyingSeeds && (
+          </ModalBody>
+          {!hasVerifyingSeeds && (
+            <div className="px-5 py-2.5 bg-zinc-900/60 border-t border-zinc-800/80 flex-shrink-0">
               <div 
                 data-testid="curation-time-estimate" 
-                className="flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl bg-zinc-900/80 border border-zinc-800 text-xs text-zinc-400 mt-1"
+                className="flex items-center gap-2.5 px-3.5 py-2 rounded-xl bg-zinc-900/90 border border-zinc-800 text-xs text-zinc-400"
               >
                 <span className="material-symbols-outlined text-primary !text-[16px] flex-shrink-0">
                   {effectiveSpeed === 'instant' ? 'bolt' : effectiveSpeed === 'partial' ? 'schedule' : 'hourglass_top'}
@@ -2518,9 +2519,9 @@ export function ConsolidatedValidationModal({
                   </span>
                 </div>
               </div>
-            )}
-          </ModalBody>
-          <ModalFooter>
+            </div>
+          )}
+          <ModalFooter className="flex-shrink-0">
             <button
               type="button"
               disabled={isSubmitting}

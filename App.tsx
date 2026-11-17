@@ -4914,7 +4914,11 @@ const App: React.FC = () => {
     const batchSeedEntries: BatchSeedEntry[] = [];
     uncuratedOrDirtyScenes.forEach((sc, scIdx) => {
       const sSeeds = toSeedArtistsArray(sc.seedArtists);
-      const sceneLabel = sc.customName || `Scene ${allTargetScenes.findIndex(s => (s.sceneId || s.id) === (sc.sceneId || sc.id)) + 1}`;
+      const scIndex = allTargetScenes.findIndex(s => (s.sceneId || s.id) === (sc.sceneId || sc.id));
+      const sceneNumber = scIndex >= 0 ? scIndex + 1 : scIdx + 1;
+      const sceneLabel = sc.customName
+        ? `Scene ${sceneNumber} • ${sc.customName}`
+        : `Scene ${sceneNumber}`;
       sSeeds.forEach(raw => {
         const trimmed = raw.trim();
         if (trimmed) {
@@ -4941,7 +4945,8 @@ const App: React.FC = () => {
     try {
       const hasActiveFilters = hasActiveDiscoveryFilters(activeDiscoveryFilters);
 
-      const isLiveSynthesis = hasActiveFilters || artistList.length > 1 || uncuratedOrDirtyScenes.length > 1;
+      const isBatchMultiScene = uncuratedOrDirtyScenes.length > 1;
+      const isLiveSynthesis = hasActiveFilters || artistList.length > 1 || isBatchMultiScene;
 
       // 1. Silent Phase: Build PreFlightSeeds for all artists across all queued scenes
       let cacheCandidatesPerSeed: any[] = [];
@@ -5268,13 +5273,16 @@ const App: React.FC = () => {
         ).length >= 1;
         const allSeedsTopologyCached = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isTopologyHit);
 
-        const calculatedExpectedSpeed = classifyCurationSpeed({
+        let calculatedExpectedSpeed = classifyCurationSpeed({
           seedCount: artistList.length,
           hasActiveFilters,
           routingDecision,
           allSeedsTopologyCached,
           isMultiSceneOverarching,
         });
+        if (isBatchMultiScene && uncachedScenesCount === 0) {
+          calculatedExpectedSpeed = 'partial';
+        }
         setExpectedCurationSpeed(calculatedExpectedSpeed);
 
         const confirmed = await new Promise<boolean>((resolve) => {
@@ -5469,8 +5477,6 @@ const App: React.FC = () => {
         }
       }
 
-      const isBatchMultiScene = uncuratedOrDirtyScenes.length > 1;
-
       if (!isBatchMultiScene && hasDisambiguated) {
         const newArtistsStr = resolvedArtistSeeds.join('::');
         const hasActiveFiltersNext = hasActiveDiscoveryFilters(activeDiscoveryFilters);
@@ -5547,16 +5553,6 @@ const App: React.FC = () => {
         currentProjectIdRef.current = newId;
         navigate(`/p/${newId}`);
 
-        let defaultName = projectName || "Untitled Zcene";
-        if (!projectName || projectName === "Untitled Zcene" || isLiveSynthesisTemp) {
-          const seeds = displayArtists.split('::').map(s => s.trim()).filter(Boolean);
-          if (seeds.length > 1) {
-            defaultName = seeds.map(formatSeed).join(' + ');
-          } else if (seeds.length === 1) {
-            defaultName = formatSeed(seeds[0]);
-          }
-        }
-
         const stepZeroScenes: ProjectScene[] = scenesRef.current.length > 1
           ? scenesRef.current.map((s, idx) => {
               if ((s.sceneId || s.id) === lockedTargetSceneId) {
@@ -5586,6 +5582,20 @@ const App: React.FC = () => {
         setScenes(stepZeroScenes);
         activeSceneIdRef.current = lockedTargetSceneId;
         setActiveSceneId(lockedTargetSceneId);
+
+        let defaultName = projectName || "Untitled Zcene";
+        if (stepZeroScenes.length > 1) {
+          defaultName = generateProjectTitleFromScenes(stepZeroScenes, detailsCacheRef.current as Map<string, any>);
+        } else if (!projectName || projectName === "Untitled Zcene" || isLiveSynthesisTemp) {
+          const seeds = displayArtists.split('::').map(s => s.trim()).filter(Boolean);
+          if (seeds.length > 1) {
+            defaultName = seeds.map(formatSeed).join(' + ');
+          } else if (seeds.length === 1) {
+            defaultName = formatSeed(seeds[0]);
+          }
+        }
+        setProjectName(defaultName);
+        projectNameRef.current = defaultName;
 
         await setDoc(newDocRef, {
           name: defaultName,
@@ -6636,7 +6646,7 @@ const App: React.FC = () => {
     // This catches any edge case where Phase 02's validation gates (isGraphDataPresent / filtersMatch)
     // returned false for non-critical reasons (e.g. missing link context, filter mismatch).
     // If we find a valid graphData document for ALL artists, we load from cache and return.
-    if (!skipCacheLookup && !bypassToken && artistList.length >= 1 && !isCustomSpiderweb) {
+    if (!isBatchMultiScene && (scenesRef.current?.length ?? 0) <= 1 && !skipCacheLookup && !bypassToken && artistList.length >= 1 && !isCustomSpiderweb) {
       try {
         const hardGuardResults = await Promise.allSettled(
           artistList.map(async (name) => {
@@ -6738,6 +6748,8 @@ const App: React.FC = () => {
           const projectScopedSeedArtists = allSceneSeedStrs.length > 0 ? allSceneSeedStrs.join('::') : displayArtists;
           if (isNewOrUntitled || (isLiveSynthesisTemp && !isRegeneration) || scenesRef.current.length > 1) {
             defaultName = generateProjectTitleFromScenes(scenesRef.current, detailsCacheRef.current as Map<string, any>);
+            setProjectName(defaultName);
+            projectNameRef.current = defaultName;
           }
 
           try {
@@ -6874,6 +6886,16 @@ const App: React.FC = () => {
       // worker fully hydrates the graph and the onSnapshot listener detects status === 'completed'.
       if (useCloudCuration && user?.uid && (activeProjId || currentProjectId || currentProjectIdRef.current) && !isGuest && activeJobId) {
         console.log(`[Render Lock] Structural payload received (200 OK) with activeJobId ${activeJobId}. Bypassing legacy state merge. Awaiting background hydration.`);
+        activeJobIdRef.current = activeJobId;
+        setActiveJobId(activeJobId);
+        setIsLoading(true);
+        projectStatusRef.current = 'curating';
+        setProjectStatus('curating');
+        if (Array.isArray(rawNewData?.scenes) && rawNewData.scenes.length > 0) {
+          const parsed = parseProjectScenes(rawNewData.scenes);
+          scenesRef.current = parsed;
+          setScenes(parsed);
+        }
         return; 
       }
 

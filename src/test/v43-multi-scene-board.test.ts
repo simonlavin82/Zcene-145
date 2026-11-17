@@ -509,6 +509,41 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     expect(fallbackTitle).toBe('Sense Field + Reason To Believe + Jimmy Eat World');
   });
 
+  it('generateProjectTitleFromScenes derives full project title across uncurated scenes (nodes: []) with seedArtists', () => {
+    const uncuratedScenes: ProjectScene[] = [
+      normalizeProjectScene({
+        id: 'scene-1',
+        sceneId: 'scene-1',
+        sceneIndex: 0,
+        customName: 'Nu Metal',
+        seedArtists: 'korn-us',
+        graphData: { nodes: [], links: [] },
+        status: 'curating',
+      }, 0),
+      normalizeProjectScene({
+        id: 'scene-2',
+        sceneId: 'scene-2',
+        sceneIndex: 1,
+        customName: 'Brit Indie',
+        seedArtists: 'radiohead',
+        graphData: { nodes: [], links: [] },
+        status: 'idle',
+      }, 1),
+      normalizeProjectScene({
+        id: 'scene-3',
+        sceneId: 'scene-3',
+        sceneIndex: 2,
+        customName: 'Pop Punk',
+        seedArtists: 'green day',
+        graphData: { nodes: [], links: [] },
+        status: 'idle',
+      }, 2),
+    ];
+
+    const title = generateProjectTitleFromScenes(uncuratedScenes);
+    expect(title).toBe('Korn + Radiohead + Green Day');
+  });
+
   it('compactDetailsCacheToCanonical reduces alias duplicates to a single canonical entry while preserving 100% of profile fields', () => {
     const rawAliases = [
       ['Sense Field', { details: { artist: 'Sense Field', genre: 'Emo' }, summary: 'Bio 1' }],

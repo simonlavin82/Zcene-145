@@ -1767,9 +1767,11 @@ function generateProjectTitleFromScenes(scenes, detailsCache) {
     const seenCanonicalIds = new Set();
     const titleParts = [];
     for (const scene of scenes) {
-        const rawSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+        const rawSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists || scene.title || scene.name);
         for (const seed of rawSeeds) {
             if (!seed || typeof seed !== 'string')
+                continue;
+            if (/^Scene\s+\d+$/i.test(seed.trim()))
                 continue;
             const strippedSeed = stripSceneNamespace(seed).trim();
             if (!strippedSeed)
@@ -1821,14 +1823,14 @@ function generateProjectTitleFromScenes(scenes, detailsCache) {
                 }
             }
             if (!displayName) {
-                // If the seed was already formatted (e.g. "Sense Field" or "Jimmy Eat World")
-                if (strippedSeed.includes(' ') && !strippedSeed.includes('-')) {
+                // If the seed was already formatted in Title/Mixed Case (e.g. "Sense Field" or "Jimmy Eat World")
+                if (strippedSeed.includes(' ') && !strippedSeed.includes('-') && strippedSeed !== strippedSeed.toLowerCase()) {
                     displayName = strippedSeed;
                 }
                 else {
                     // Format slug into Title Case
                     displayName = bareSlug
-                        .split(/[-_]+/)
+                        .split(/[\s-_]+/)
                         .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
                         .join(' ');
                 }

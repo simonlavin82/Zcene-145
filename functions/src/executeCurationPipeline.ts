@@ -34,6 +34,7 @@ import {
   buildCompositeCanvasGraph,
   MAX_SCENES_PER_PROJECT,
   toSeedArtistsArray,
+  generateProjectTitleFromScenes,
 } from "./shared/multiSceneUtils";
 import {
   requireAuthenticatedCaller,
@@ -618,7 +619,8 @@ export const executeCurationPipeline = onCall({
 
   // Rule 18 & 43: Settle remaining project token balance (supports multi-scene batch aggregate)
   let totalProjectCost: number = computeBaseProjectTokenCost(artistList.length, hasActiveFilters);
-  let displaySeeds = artistList.map((s: string) => seedNamesMap[s] || s).join(' + ');
+  const targetSceneDisplaySeeds = artistList.map((s: string) => seedNamesMap[s] || s).join(' + ');
+  let batchDisplaySeeds = targetSceneDisplaySeeds;
 
   if (isUpfrontBatch) {
     totalProjectCost = uncuratedScenesInBatch.reduce<number>((sum, sc) => {
@@ -626,7 +628,7 @@ export const executeCurationPipeline = onCall({
       const scFilters = sanitizeDiscoveryFilters(sc.discoveryFilters);
       return sum + computeBaseProjectTokenCost(scSeeds.length, hasActiveDiscoveryFilters(scFilters));
     }, 0);
-    displaySeeds = uncuratedScenesInBatch.map(sc => {
+    batchDisplaySeeds = uncuratedScenesInBatch.map(sc => {
       const scSeeds = toSeedArtistsArray(sc.seedArtists);
       return scSeeds.map((s: string) => seedNamesMap[s] || s).join(' + ');
     }).join(' & ');
@@ -639,9 +641,9 @@ export const executeCurationPipeline = onCall({
     projectId: payload.projectId,
     targetSceneId,
     txType: "spend_live_synthesis",
-    description: `Zcene Synthesis: ${displaySeeds}`,
+    description: `Zcene Synthesis: ${batchDisplaySeeds}`,
     generationTypeToStamp: hasActiveFilters ? "Filtered Live Synthesis" : "Root Generation",
-    seedArtist: displaySeeds,
+    seedArtist: batchDisplaySeeds,
   });
 
   try {
@@ -740,12 +742,12 @@ export const executeCurationPipeline = onCall({
         id: targetSceneId,
         sceneId: targetSceneId,
         sceneIndex: targetSceneIndex,
-        title: displaySeeds || `Scene ${targetSceneIndex + 1}`,
-        name: displaySeeds || `Scene ${targetSceneIndex + 1}`,
+        title: targetSceneDisplaySeeds || prevTargetScene?.title || `Scene ${targetSceneIndex + 1}`,
+        name: targetSceneDisplaySeeds || prevTargetScene?.name || `Scene ${targetSceneIndex + 1}`,
         ...(prevTargetScene?.customName ? { customName: prevTargetScene.customName } : {}),
         seedArtists: resolvedSeedArray.length > 0
           ? resolvedSeedArray.map(s => s.name || s.id).join('::')
-          : (artistList.map((s: string) => seedNamesMap[s] || s).join('::') || displaySeeds),
+          : (artistList.map((s: string) => seedNamesMap[s] || s).join('::') || prevTargetScene?.seedArtists || targetSceneDisplaySeeds),
         seedIds: resolvedSeedArray.length > 0
           ? resolvedSeedArray.map(s => s.id)
           : artistList.map((a: string) => normalizeArtistId(a)),
@@ -798,6 +800,13 @@ export const executeCurationPipeline = onCall({
         tokensSpent: settlement.tokensSpent,
         updatedAt: FieldValue.serverTimestamp()
       };
+
+      if (updatedScenes.length > 1) {
+        const multiSceneTitle = generateProjectTitleFromScenes(updatedScenes);
+        if (multiSceneTitle && multiSceneTitle !== 'Untitled Zcene') {
+          projectUpdate.name = multiSceneTitle;
+        }
+      }
       
       await projectDocRef.set(projectUpdate, { merge: true });
       console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} graphData & scenes via Admin SDK`);

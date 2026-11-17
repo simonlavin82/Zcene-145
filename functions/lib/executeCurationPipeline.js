@@ -501,14 +501,15 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     }
     // Rule 18 & 43: Settle remaining project token balance (supports multi-scene batch aggregate)
     let totalProjectCost = (0, tokenEconomy_1.computeBaseProjectTokenCost)(artistList.length, hasActiveFilters);
-    let displaySeeds = artistList.map((s) => seedNamesMap[s] || s).join(' + ');
+    const targetSceneDisplaySeeds = artistList.map((s) => seedNamesMap[s] || s).join(' + ');
+    let batchDisplaySeeds = targetSceneDisplaySeeds;
     if (isUpfrontBatch) {
         totalProjectCost = uncuratedScenesInBatch.reduce((sum, sc) => {
             const scSeeds = (0, multiSceneUtils_1.toSeedArtistsArray)(sc.seedArtists);
             const scFilters = (0, cacheQualification_1.sanitizeDiscoveryFilters)(sc.discoveryFilters);
             return sum + (0, tokenEconomy_1.computeBaseProjectTokenCost)(scSeeds.length, (0, cacheQualification_1.hasActiveDiscoveryFilters)(scFilters));
         }, 0);
-        displaySeeds = uncuratedScenesInBatch.map(sc => {
+        batchDisplaySeeds = uncuratedScenesInBatch.map(sc => {
             const scSeeds = (0, multiSceneUtils_1.toSeedArtistsArray)(sc.seedArtists);
             return scSeeds.map((s) => seedNamesMap[s] || s).join(' + ');
         }).join(' & ');
@@ -520,9 +521,9 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         projectId: payload.projectId,
         targetSceneId,
         txType: "spend_live_synthesis",
-        description: `Zcene Synthesis: ${displaySeeds}`,
+        description: `Zcene Synthesis: ${batchDisplaySeeds}`,
         generationTypeToStamp: hasActiveFilters ? "Filtered Live Synthesis" : "Root Generation",
-        seedArtist: displaySeeds,
+        seedArtist: batchDisplaySeeds,
     });
     try {
         const shouldDeferToWorker = payload.deferPhase1ToWorker === true || isUpfrontBatch;
@@ -618,12 +619,12 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     id: targetSceneId,
                     sceneId: targetSceneId,
                     sceneIndex: targetSceneIndex,
-                    title: displaySeeds || `Scene ${targetSceneIndex + 1}`,
-                    name: displaySeeds || `Scene ${targetSceneIndex + 1}`,
+                    title: targetSceneDisplaySeeds || prevTargetScene?.title || `Scene ${targetSceneIndex + 1}`,
+                    name: targetSceneDisplaySeeds || prevTargetScene?.name || `Scene ${targetSceneIndex + 1}`,
                     ...(prevTargetScene?.customName ? { customName: prevTargetScene.customName } : {}),
                     seedArtists: resolvedSeedArray.length > 0
                         ? resolvedSeedArray.map(s => s.name || s.id).join('::')
-                        : (artistList.map((s) => seedNamesMap[s] || s).join('::') || displaySeeds),
+                        : (artistList.map((s) => seedNamesMap[s] || s).join('::') || prevTargetScene?.seedArtists || targetSceneDisplaySeeds),
                     seedIds: resolvedSeedArray.length > 0
                         ? resolvedSeedArray.map(s => s.id)
                         : artistList.map((a) => (0, curatorService_1.normalizeArtistId)(a)),
@@ -671,6 +672,12 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     tokensSpent: settlement.tokensSpent,
                     updatedAt: firestore_1.FieldValue.serverTimestamp()
                 };
+                if (updatedScenes.length > 1) {
+                    const multiSceneTitle = (0, multiSceneUtils_1.generateProjectTitleFromScenes)(updatedScenes);
+                    if (multiSceneTitle && multiSceneTitle !== 'Untitled Zcene') {
+                        projectUpdate.name = multiSceneTitle;
+                    }
+                }
                 await projectDocRef.set(projectUpdate, { merge: true });
                 console.log(`[Pipeline Diamond] -> Successfully updated project ${payload.projectId} graphData & scenes via Admin SDK`);
                 if (determinedGenerationType !== "Direct Hit" || updatedScenes.length >= 2) {
