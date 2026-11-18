@@ -464,19 +464,23 @@ export const validateSeedOriginCallable = onCall({
   memory: "512MiB",
 }, async (request) => {
   const caller = requireAuthenticatedCaller(request);
-  const { seed, originHint, genreHint, curationSessionId, mode, expectedProjectCost } = request.data || {};
+  const { seed, bundledSeedsLabel, originHint, genreHint, curationSessionId, mode, expectedProjectCost } = request.data || {};
   if (!seed) {
     throw new HttpsError("invalid-argument", "Missing seed in payload");
   }
 
   // Rule 18 & 43: Atomic 1-Token Non-Refundable Pre-Flight / Escape-Hatch Lookup Fee (Admin bypassed)
   const resolvedMode = originHint || mode === "escape_hatch" ? "escape_hatch" : "initial_preflight";
+  const effectiveLabel = (resolvedMode === "initial_preflight" && typeof bundledSeedsLabel === "string" && bundledSeedsLabel.trim())
+    ? bundledSeedsLabel.trim()
+    : String(seed).trim();
+
   const lookupBilling = await chargePreFlightLookupIfNeeded({
     caller,
     curationSessionId,
     mode: resolvedMode,
     expectedProjectCost: expectedProjectCost === 10 ? 10 : 5,
-    seedLabel: String(seed).trim(),
+    seedLabel: effectiveLabel,
   });
 
   const validationResult = await validateSeedOriginBackend(seed, { originHint, genreHint });

@@ -2710,9 +2710,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 seedImageUrls: extractedSeedImageUrls,
                 ...(extractedSeedImageUrl ? { seedImageUrl: extractedSeedImageUrl } : {})
             });
-            // V41 Immutable Telemetry Dual-Write: Stamp exact telemetry onto tokenTransactions
+            // V41/V43 Immutable Telemetry Dual-Write: Stamp exact cumulative telemetry onto the curation settlement transaction
             let calculatedCostUsd = 0;
-            for (const [model, usage] of Object.entries(mergedApiUsage)) {
+            for (const [model, usage] of Object.entries(accumulatedProjectApiUsage)) {
                 const u = usage;
                 const prompt = Number(u.prompt) || 0;
                 const candidates = Number(u.candidates) || 0;
@@ -2734,22 +2734,26 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             try {
                 const userTxCol = db.collection("users").doc(jobData.userId).collection("tokenTransactions");
                 let targetTxRef = null;
+                // Strictly filter in-memory by settlement types so spend_preflight_lookup is NEVER overwritten
+                // and no composite Firestore index on (curationSessionId, type) is required.
                 if (inputPayload?.curationSessionId) {
-                    const q = await userTxCol.where("curationSessionId", "==", inputPayload.curationSessionId).limit(1).get();
-                    if (!q.empty) {
-                        targetTxRef = q.docs[0].ref;
+                    const q = await userTxCol.where("curationSessionId", "==", inputPayload.curationSessionId).get();
+                    const match = q.docs.find(d => ["spend_live_synthesis", "spend_direct_hit"].includes(d.data()?.type));
+                    if (match) {
+                        targetTxRef = match.ref;
                     }
                 }
                 if (!targetTxRef && inputPayload?.projectId) {
-                    const q = await userTxCol.where("projectId", "==", inputPayload.projectId).limit(1).get();
-                    if (!q.empty) {
-                        targetTxRef = q.docs[0].ref;
+                    const q = await userTxCol.where("projectId", "==", inputPayload.projectId).get();
+                    const match = q.docs.find(d => ["spend_live_synthesis", "spend_direct_hit"].includes(d.data()?.type));
+                    if (match) {
+                        targetTxRef = match.ref;
                     }
                 }
                 if (targetTxRef) {
                     await targetTxRef.set({
                         projectId: inputPayload.projectId,
-                        apiUsage: mergedApiUsage,
+                        apiUsage: accumulatedProjectApiUsage,
                         costUsd: calculatedCostUsd,
                         ...(inputPayload?.generationType ? { generationType: inputPayload.generationType } : {}),
                         ...(result.anchorResolution ? { anchorResolution: result.anchorResolution } : {}),

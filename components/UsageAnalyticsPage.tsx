@@ -520,13 +520,13 @@ export const buildUnifiedActivityRows = (
 
             const resolvedStatus = matchedProj?.status || 'archived';
             const txDeterminedScope = Math.abs(delta) > 0
-                ? (txSceneTokens >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Seed Zcene' : 'Single-Seed Zcene')
+                ? (txSceneTokens >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Root Zcene' : 'Single-Root Zcene')
                 : undefined;
 
             const resolvedScope =
                 (Math.abs(delta) > 0 && !matchedProj?.isComplexProject)
-                    ? (txSceneTokens >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Seed Zcene' : 'Single-Seed Zcene')
-                    : (txDeterminedScope || matchedProj?.userFacingScope || (totalProjectTokens >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Seed Zcene' : 'Single-Seed Zcene'));
+                    ? (txSceneTokens >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Root Zcene' : 'Single-Root Zcene')
+                    : (txDeterminedScope || matchedProj?.userFacingScope || (totalProjectTokens >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Root Zcene' : 'Single-Root Zcene'));
             const resolvedGenType =
                 tx.generationType ||
                 matchedProj?.generationType ||
@@ -584,9 +584,14 @@ export const buildUnifiedActivityRows = (
         }
 
         if (isPreflightTx) {
-            const aiCostUsd = typeof tx.costUsd === 'number'
+            // Guardrail: A true Flash pre-flight lookup costs ~$0.0015. Any historical tx.costUsd >= $0.05
+            // was caused by the dual-write misdirection attaching Hop 1 curation costs to preflight.
+            const rawPreflightCost = typeof tx.costUsd === 'number'
                 ? tx.costUsd
                 : (tx.apiUsage ? computeApiUsageCostUsd(tx.apiUsage) : perPreflightLookupCost);
+            const aiCostUsd = (typeof rawPreflightCost === 'number' && rawPreflightCost < 0.05)
+                ? rawPreflightCost
+                : perPreflightLookupCost;
             const rowRevUsd = authorIsAdmin ? 0 : tokensToUsd(Math.abs(delta));
             const netMarginUsd = aiCostUsd !== null ? rowRevUsd - aiCostUsd : null;
             const netMarginPct = !authorIsAdmin && rowRevUsd > 0 && netMarginUsd !== null
@@ -730,7 +735,7 @@ export const buildUnifiedActivityRows = (
             rawDescription: proj.seedArtist,
             isCurationRow: true,
             projectStatus: proj.status || 'active',
-            userFacingScope: proj.userFacingScope || 'Single-Seed Zcene',
+            userFacingScope: proj.userFacingScope || 'Single-Root Zcene',
             generationType: proj.generationType || 'Direct Hit',
             categoryBadge: formatTxTypeBadge(fallbackTxType),
             delta: tokenDelta,
@@ -801,7 +806,7 @@ export const TokenEconomicsKeyStrip: React.FC<{ isNormalUserView: boolean }> = (
             </span>
             <span className="text-zinc-700 select-none">•</span>
             <span className="whitespace-nowrap">
-                Single-Seed Zcene (<span className="font-mono text-white">5T</span>) = <span className="font-mono text-zinc-300">£{singleGbp} / ~${singleUsd}</span>
+                Single-Root Zcene (<span className="font-mono text-white">5T</span>) = <span className="font-mono text-zinc-300">£{singleGbp} / ~${singleUsd}</span>
             </span>
             <span className="text-zinc-700 select-none">•</span>
             <span className="whitespace-nowrap">
@@ -1705,8 +1710,8 @@ export const calculateTelemetryForUser = (
             generationType === 'Clone'
                 ? 'Saved Shared Zcene'
                 : isComplexProject
-                    ? 'Multi-Seed Zcene'
-                    : 'Single-Seed Zcene';
+                    ? 'Multi-Root Zcene'
+                    : 'Single-Root Zcene';
 
         const createdAt = extractTimestampMs(pData.createdAt);
         const status = pData.status === 'trashed' ? 'trashed' : (pData.status === 'deleted' ? 'deleted' : 'active');
@@ -1833,7 +1838,7 @@ export const calculateTelemetryForUser = (
                 seedArtist: cleanSeed,
                 canonicalSeed: cleanSeed,
                 generationType,
-                userFacingScope: tokensSpent >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Seed Zcene' : 'Single-Seed Zcene',
+                userFacingScope: tokensSpent >= TOKEN_PRICING.COMPLEX_QUERY ? 'Multi-Root Zcene' : 'Single-Root Zcene',
                 tokensSpent,
                 hasRecordedTokens: true,
                 cost: txCost,
@@ -2381,7 +2386,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                         </span>
                                     </div>
                                     <p className="text-xs text-zinc-400 max-w-xl">
-                                        Tokens unlock new Single-Seed Zcenes, Multi-Seed / Anchored Zcenes, and Deep Connections grounded artist consults.
+                                        Tokens unlock new Single-Root Zcenes, Multi-Root / Anchored Zcenes, and Deep Connections grounded artist consults.
                                     </p>
                                 </div>
 
@@ -2449,8 +2454,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
 
                             {/* Transparent Pricing Reference */}
                             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-400 pt-1">
-                                <span><strong className="text-white font-mono">5T</strong> Single-Seed Zcene</span>
-                                <span><strong className="text-white font-mono">10T</strong> Multi-Seed / Anchored Zcene</span>
+                                <span><strong className="text-white font-mono">5T</strong> Single-Root Zcene</span>
+                                <span><strong className="text-white font-mono">10T</strong> Multi-Root / Anchored Zcene</span>
                                 <span><strong className="text-white font-mono">3T</strong> Deep Connections (3 Messages)</span>
                                 <span><strong className="text-emerald-300 font-mono">0T</strong> Shared Zcenes & Clones</span>
                             </div>

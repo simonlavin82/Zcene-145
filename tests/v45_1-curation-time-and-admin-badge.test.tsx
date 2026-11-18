@@ -6,7 +6,7 @@ import { LoadingSpinner } from '../components/Icons';
 import GraphPage from '../components/GraphPage';
 import { DetailsPanel, normalizeMarkdownLineBreaks, splitMarkdownIntoEditorialBlocks, partitionBlockIndicesIntoThreeColumns } from '../components/DetailsPanel';
 import { classifyCurationSpeed } from '../services/cacheQualification';
-import { computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates, detectLegacyStrideShiftX, canonicalizeCrossSceneLinks, canonicalizeProjectScenes, buildCompositeCanvasGraph } from '../shared/multiSceneUtils';
+import { computeProjectCardMetrics, computeSceneSetSignature, parseOverarchingHistory, pruneOverarchingHistory, shiftSceneClusterCoordinates, detectLegacyStrideShiftX, canonicalizeCrossSceneLinks, canonicalizeProjectScenes, buildCompositeCanvasGraph } from '../shared/multiSceneUtils';
 import { OVERARCHING_ZINE_SCHEMA, sanitizeOverarchingRationale } from '../functions/src/services/curatorService';
 import { calculateTelemetryForUser, buildUnifiedActivityRows } from '../components/UsageAnalyticsPage';
 import { httpsCallable } from 'firebase/functions';
@@ -2105,7 +2105,7 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(sanitized).toContain('the corresponding scene');
     });
 
-    it('22. Polish Fix B: Multi-scene projects with single-seed scenes resolve to Single-Seed Zcene scope in project telemetry and transaction rows', () => {
+    it('22. Polish Fix B: Multi-scene projects with single-seed scenes resolve to Single-Root Zcene scope in project telemetry and transaction rows', () => {
       const mockMultiSceneDoc = {
         id: 'proj-k-r-gd',
         data: () => ({
@@ -2195,7 +2195,7 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(telemetry.projects).toHaveLength(1);
       const project = telemetry.projects[0];
       expect(project.isComplexProject).toBe(false);
-      expect(project.userFacingScope).toBe('Single-Seed Zcene');
+      expect(project.userFacingScope).toBe('Single-Root Zcene');
 
       // 2. Verify transaction row resolution
       const activityRows = buildUnifiedActivityRows(telemetry);
@@ -2203,23 +2203,168 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
 
       const kornRow = curationRows.find((r) => r.title === 'Korn');
       expect(kornRow).toBeDefined();
-      expect(kornRow?.userFacingScope).toBe('Single-Seed Zcene');
+      expect(kornRow?.userFacingScope).toBe('Single-Root Zcene');
       expect(kornRow?.totalProjectTokens).toBe(5);
 
       const radioheadRow = curationRows.find((r) => r.title === 'Radiohead');
       expect(radioheadRow).toBeDefined();
-      expect(radioheadRow?.userFacingScope).toBe('Single-Seed Zcene');
+      expect(radioheadRow?.userFacingScope).toBe('Single-Root Zcene');
       expect(radioheadRow?.totalProjectTokens).toBe(5);
 
       const greenDayRow = curationRows.find((r) => r.title === 'Green Day');
       expect(greenDayRow).toBeDefined();
-      expect(greenDayRow?.userFacingScope).toBe('Single-Seed Zcene');
+      expect(greenDayRow?.userFacingScope).toBe('Single-Root Zcene');
       expect(greenDayRow?.totalProjectTokens).toBe(5);
 
       const deftonesRow = curationRows.find((r) => r.title === 'Deftones');
       expect(deftonesRow).toBeDefined();
-      expect(deftonesRow?.userFacingScope).toBe('Multi-Seed Zcene');
+      expect(deftonesRow?.userFacingScope).toBe('Multi-Root Zcene');
       expect(deftonesRow?.totalProjectTokens).toBe(10);
+    });
+  });
+
+  describe('Phase B2.6 Tests: Telemetry Isolation, Preload SCENES Count, and Multi-Root Labels', () => {
+    it('1. Heals corrupted pre-flight rows (costUsd >= 0.05 or apiUsage >= 0.05) back to perPreflightLookupCost', () => {
+      const mockTelemetry: any = {
+        uid: 'user-snapcase',
+        email: 'test@zcene.com',
+        preflightLookups: { calls: 2, costUsd: 0.0030 }, // perPreflightLookupCost = $0.0015
+        projects: [],
+        transactions: [
+          {
+            id: 'tx_corrupted_preflight',
+            type: 'spend_preflight_lookup',
+            delta: -1,
+            description: 'Artist Lookup (Pre-Flight): Snapcase',
+            costUsd: 0.3848, // Corrupted by Hop 1 dual-write bug
+            apiUsage: {
+              'gemini-3.1-pro-preview': { prompt: 50000, candidates: 20000, total: 70000 },
+            },
+            createdAt: 1762100000000,
+          },
+          {
+            id: 'tx_clean_preflight',
+            type: 'spend_preflight_lookup',
+            delta: -1,
+            description: 'Artist Lookup (Pre-Flight): Nirvana',
+            costUsd: 0.0015, // Clean Flash lookup
+            createdAt: 1762100001000,
+          },
+        ],
+      };
+
+      const rows = buildUnifiedActivityRows(mockTelemetry);
+      const corruptedRow = rows.find((r) => r.id === 'tx_corrupted_preflight');
+      const cleanRow = rows.find((r) => r.id === 'tx_clean_preflight');
+
+      expect(corruptedRow).toBeDefined();
+      expect(corruptedRow?.aiCostUsd).toBe(0.0015); // Healed from 0.3848 to 0.0015!
+
+      expect(cleanRow).toBeDefined();
+      expect(cleanRow?.aiCostUsd).toBe(0.0015);
+    });
+
+    it('2. computeProjectCardMetrics returns sceneCount: 5 immediately when 5 scenes are configured with seedArtists even while scenes 2–5 have nodes: []', () => {
+      const fiveScenes = [
+        {
+          sceneId: 'scene-1',
+          seedArtists: 'Snapcase',
+          graphData: {
+            nodes: [
+              { id: 'snapcase', canonicalId: 'snapcase', label: 'Snapcase', type: 'artist' },
+              { id: 'refused', canonicalId: 'refused', label: 'Refused', type: 'artist' },
+            ],
+            links: [],
+          },
+        },
+        {
+          sceneId: 'scene-2',
+          seedArtists: 'Quicksand',
+          graphData: { nodes: [], links: [] },
+        },
+        {
+          sceneId: 'scene-3',
+          seedArtists: 'The Smashing Pumpkins',
+          graphData: { nodes: [], links: [] },
+        },
+        {
+          sceneId: 'scene-4',
+          seedArtists: 'Bad Religion',
+          graphData: { nodes: [], links: [] },
+        },
+        {
+          sceneId: 'scene-5',
+          seedArtists: 'Pennywise',
+          graphData: { nodes: [], links: [] },
+        },
+      ];
+
+      const metrics = computeProjectCardMetrics({
+        scenes: fiveScenes as any,
+        graphData: { nodes: [{ id: 'snapcase', type: 'artist', group: 1 } as any], links: [] },
+      });
+
+      expect(metrics.sceneCount).toBe(5);
+      expect(metrics.rootArtistsCount).toBe(5);
+    });
+
+    it('3. Multi-Root Zcene and Single-Root Zcene labels render in activity rows and project telemetry', () => {
+      const mockTelemetry: any = {
+        uid: 'user-roots',
+        email: 'test@zcene.com',
+        projects: [
+          {
+            id: 'proj-single',
+            seedArtist: 'Korn',
+            generationType: 'Root Generation',
+            userFacingScope: 'Single-Root Zcene',
+            tokensSpent: 5,
+            hasRecordedTokens: true,
+            cost: 0.15,
+            isEstimate: false,
+            createdAt: 1762100000000,
+            status: 'active',
+          },
+          {
+            id: 'proj-multi',
+            seedArtist: 'Snapcase & Quicksand',
+            generationType: 'Root Generation',
+            userFacingScope: 'Multi-Root Zcene',
+            tokensSpent: 10,
+            hasRecordedTokens: true,
+            cost: 0.35,
+            isEstimate: false,
+            createdAt: 1762200000000,
+            status: 'active',
+            isComplexProject: true,
+          },
+        ],
+        transactions: [
+          {
+            id: 'tx_single',
+            projectId: 'proj-single',
+            type: 'spend_live_synthesis',
+            delta: -5,
+            seedArtist: 'Korn',
+            createdAt: 1762100000000,
+          },
+          {
+            id: 'tx_multi',
+            projectId: 'proj-multi',
+            type: 'spend_live_synthesis',
+            delta: -10,
+            seedArtist: 'Snapcase & Quicksand',
+            createdAt: 1762200000000,
+          },
+        ],
+      };
+
+      const rows = buildUnifiedActivityRows(mockTelemetry);
+      const singleRow = rows.find((r) => r.id === 'tx_single');
+      const multiRow = rows.find((r) => r.id === 'tx_multi');
+
+      expect(singleRow?.userFacingScope).toBe('Single-Root Zcene');
+      expect(multiRow?.userFacingScope).toBe('Multi-Root Zcene');
     });
   });
 });

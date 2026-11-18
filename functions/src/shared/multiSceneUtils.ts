@@ -1790,6 +1790,13 @@ export function computeProjectCardMetrics(project: {
 
   const scenes = parseProjectScenes(project.scenes as any);
   const mappedScenes = scenes.filter((s) => (s.graphData?.nodes?.length || 0) > 0);
+  const configuredScenes = scenes.filter((s) =>
+    Boolean(
+      (typeof s.seedArtists === 'string' && s.seedArtists.trim().length > 0) ||
+      (Array.isArray(s.seedArtistIds) && s.seedArtistIds.length > 0) ||
+      (s.graphData?.nodes && s.graphData.nodes.length > 0)
+    )
+  );
   const seedList = getAllProjectSeedArtistsList(scenes, project.seedArtists);
 
   // Prefer authoritative per-scene topology; fall back to the composite / legacy graphData.
@@ -1843,7 +1850,12 @@ export function computeProjectCardMetrics(project: {
   }
 
   return {
-    sceneCount: Math.max(mappedScenes.length, scenes.length > 0 ? 1 : 0),
+    sceneCount: Math.max(
+      configuredScenes.length,
+      mappedScenes.length,
+      Number((project as any)?.sceneCount) || 0,
+      scenes.length > 0 ? 1 : 0
+    ),
     seedList,
     rootArtistsCount: seedList.length > 0 ? seedList.length : rootArtistsInGraph,
     recommendedCount,

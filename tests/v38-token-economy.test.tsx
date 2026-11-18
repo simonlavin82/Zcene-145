@@ -305,7 +305,7 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(await screen.findByTestId('wallet-hero-card')).toBeInTheDocument();
     expect(screen.getByTestId('wallet-balance-value')).toHaveTextContent('45');
     expect(await screen.findByText('-5 T')).toBeInTheDocument();
-    expect(screen.getAllByText(/Single-Seed Zcene/i).length).toBeGreaterThanOrEqual(2);
+    expect(screen.getAllByText(/Single-Root Zcene/i).length).toBeGreaterThanOrEqual(2);
     expect(screen.queryByTestId('standard-projects-ledger')).not.toBeInTheDocument();
     expect(screen.queryByText(/Sync Archives/i)).not.toBeInTheDocument();
 

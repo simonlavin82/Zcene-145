@@ -616,7 +616,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
                             <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-primary">Single-Seed</span>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-primary">Single-Root</span>
                                     <span className="text-lg font-mono font-bold text-white">{TOKEN_PRICING.SINGLE_SEED}T</span>
                                 </div>
                                 <h4 className="text-base font-medium text-white">5 Tokens (~£0.50)</h4>
@@ -627,7 +627,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
 
                             <div className="p-6 bg-zinc-900/50 border border-primary/40 rounded-xl space-y-3 relative">
                                 <div className="flex items-center justify-between">
-                                    <span className="text-xs font-bold uppercase tracking-wider text-primary">Multi-Seed / Anchored</span>
+                                    <span className="text-xs font-bold uppercase tracking-wider text-primary">Multi-Root / Anchored</span>
                                     <span className="text-lg font-mono font-bold text-white">{TOKEN_PRICING.COMPLEX_QUERY}T</span>
                                 </div>
                                 <h4 className="text-base font-medium text-white">10 Tokens (~£1.00)</h4>

@@ -45,7 +45,7 @@ exports.TOP_UP_TIERS = {
         priceDisplay: '£5',
         tokens: 50,
         label: 'Starter Crate',
-        tagline: 'Up to 10 Single-Seed Zcenes',
+        tagline: 'Up to 10 Single-Root Zcenes',
     },
     gbp_10: {
         id: 'gbp_10',
@@ -53,7 +53,7 @@ exports.TOP_UP_TIERS = {
         priceDisplay: '£10',
         tokens: 100,
         label: 'Scene Explorer',
-        tagline: 'Up to 20 Single-Seed or 10 Complex Zcenes',
+        tagline: 'Up to 20 Single-Root or 10 Complex Zcenes',
         featured: true,
     },
     gbp_15: {
@@ -62,7 +62,7 @@ exports.TOP_UP_TIERS = {
         priceDisplay: '£15',
         tokens: 150,
         label: 'Deep Archive',
-        tagline: 'Up to 30 Single-Seed or 15 Complex Zcenes',
+        tagline: 'Up to 30 Single-Root or 15 Complex Zcenes',
     },
 };
 exports.TOP_UP_TIER_LIST = [

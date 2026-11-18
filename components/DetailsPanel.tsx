@@ -3412,10 +3412,49 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     };
 
-    const scrollToTop = () => {
-        const container = document.getElementById('magazine-scroll-container');
-        if (container) {
-            container.scrollTo({ top: 0, behavior: 'smooth' });
+    const scrollToTop = (e?: React.MouseEvent) => {
+        if (e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+        const containers = typeof document !== 'undefined'
+            ? Array.from(document.querySelectorAll<HTMLElement>('#magazine-scroll-container'))
+            : [];
+        const primaryEl = typeof document !== 'undefined' ? document.getElementById('magazine-scroll-container') : null;
+        if (primaryEl && !containers.includes(primaryEl)) {
+            containers.push(primaryEl);
+        }
+
+        containers.forEach((container) => {
+            try {
+                container.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch {
+                container.scrollTop = 0;
+            }
+            setTimeout(() => {
+                if (container && container.scrollTop > 0) {
+                    container.scrollTop = 0;
+                }
+            }, 350);
+        });
+
+        // Also scroll any mobile fixed overlay wrapper and window
+        const mobileWrapper = typeof document !== 'undefined' ? document.querySelector<HTMLElement>('.fixed.inset-0.z-\\[9999\\]') : null;
+        if (mobileWrapper) {
+            try {
+                mobileWrapper.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch {
+                mobileWrapper.scrollTop = 0;
+            }
+            setTimeout(() => {
+                if (mobileWrapper && mobileWrapper.scrollTop > 0) {
+                    mobileWrapper.scrollTop = 0;
+                }
+            }, 350);
+        }
+
+        if (typeof window !== 'undefined') {
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
@@ -4676,14 +4715,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             )}
                             {!isSmallScreen && <div className="w-12 md:w-16"></div>}
 
-                            <div
+                            <button
+                                type="button"
                                 onClick={scrollToTop}
-                                className={`w-12 md:w-16 flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-all duration-300 cursor-pointer pointer-events-auto ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
+                                className={`w-12 md:w-16 flex flex-col items-center gap-1 text-zinc-500 hover:text-zinc-300 transition-all duration-300 cursor-pointer pointer-events-auto bg-transparent border-0 p-0 outline-none focus:outline-none ${showScrollTop ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4 pointer-events-none'}`}
                                 aria-label="Scroll to top"
                             >
-                                <span className="material-symbols-outlined !text-[20px]">expand_less</span>
-                                <span className="text-[9px] font-bold uppercase tracking-[0.3em] ml-[0.3em]">Top</span>
-                            </div>
+                                <span className="material-symbols-outlined !text-[20px] pointer-events-none">expand_less</span>
+                                <span className="text-[9px] font-bold uppercase tracking-[0.3em] ml-[0.3em] pointer-events-none">Top</span>
+                            </button>
                         </div>,
                         document.body
                     )}

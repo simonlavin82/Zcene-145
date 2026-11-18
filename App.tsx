@@ -5144,11 +5144,13 @@ const App: React.FC = () => {
         if (!skipCacheLookup && uncachedSeeds.length > 0) {
           (async () => {
             const validate = httpsCallable(functions, 'validateSeedOriginCallable');
+            const allUncachedNames = uncachedSeeds.map(u => u.query.trim()).filter(Boolean).join(', ');
             for (let s of uncachedSeeds) {
               if (validationRunIdRef.current !== currentRunId) return;
               try {
                 const result = await validate({
                   seed: s.query,
+                  bundledSeedsLabel: allUncachedNames || s.query,
                   curationSessionId: curationSessionIdRef.current || undefined,
                   mode: 'initial_preflight',
                   expectedProjectCost: projectTokenCost,
