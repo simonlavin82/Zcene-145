@@ -84,8 +84,8 @@ npx vitest --ui
 
 ## Core Pathways Validated
 
-1.  **Root Generation:** Validates cold-start execution on a single seed.
-2.  **Complex Generation (Multi-Seed / 3-Tier Anchored):** Asserts bridging logic, Level 2 hard Era (\`1965 to N-2 (Current Year - 2) Era Slider\`) and Country (22 canonical countries) boundary enforcement, and Rule 41 Level 3 Graceful Degradation (\`anchorResolution\` telemetry).
+1.  **Root Generation:** Validates cold-start execution for a single root.
+2.  **Complex Generation (Multi-Root / 3-Tier Anchored):** Asserts bridging logic, Level 2 hard Era (\`1965 to N-2 (Current Year - 2) Era Slider\`) and Country (22 canonical countries) boundary enforcement, and Rule 41 Level 3 Graceful Degradation (\`anchorResolution\` telemetry).
 3.  **Partial Generation, Multi-Tenant Disambiguation & Root-as-Router Contract:** Ensures existing static data is grafted into newly generated topologies and multi-candidate collisions are resolved without data loss.
     *   *Assertion (Frontend Pre-Flight Callable & Collision Detection):* Asserts that \`validateSeedOriginCallable\` correctly detects homonym collisions, returning candidate arrays with distinct disambiguation hints.
     *   *Assertion (Escape Hatch Re-Query Bouncer - \`tests/v15-core.test.tsx\`):* Asserts that the Re-Query Bouncer synchronously validates manual "Not this artist?" origin/genre hints via Flash 3.6, hard-blocking unverified inputs (\`isValid: false\`) with an inline UI error banner while locking "Confirm & Generate", and cleanly unlocking upon verified input.
@@ -107,9 +107,9 @@ npx vitest --ui
     *   *Assertion (Step 0 Direct Hit & Peer Profile Hydration):* Asserts that cached entities across all batch scenes are pre-hydrated into \`existingProjectDetailsMap\` with stripped \`canonicalKey\`s to eliminate client request storms upon completion.
     *   *Assertion (Settlement Dual-Write Isolation & Deterministic Scene 1 Centering):* Asserts that \`apiUsage\` and \`costUsd\` dual-writes are strictly isolated to settlement rows (\`['spend_live_synthesis', 'spend_direct_hit']\`), and upon batch completion, \`activeSceneId\` defaults to \`'scene-1'\` centering the camera on Scene 1 \`(1000, 1000)\` post-D3 zoom init.
 
-## Database Purge Runbook Protocol (V45 Multi-Scene Architecture)
+## Database Purge Runbook Protocol (V45.1 Multi-Scene Architecture)
 
-Note: The V45 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V45 operations.
+Note: The V45.1 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V45.1 operations.
 
 When rolling out structural schema migrations, Tier 1 Global Assets (\`/artists\` and \`/labels\`) remain canonical and 100% unchanged. Legacy purge automation (\`scripts/execute_v43_purge.cjs\`) is retained for emergency reset procedures only, while **strictly preserving Tier 1 \`/artists\` and \`/labels\`**, user wallets, and financial ledgers.
 
@@ -120,7 +120,7 @@ When rolling out structural schema migrations, Tier 1 Global Assets (\`/artists\
 4. \`curationSessions\` — Ephemeral pre-flight split-debit session records
 
 ### Strictly Preserved:
-* **Tier 1 Global Assets (\`/artists\` & \`/labels\`)** — Canonical verified entity biographies, discographies, iTunes artwork, and single-seed subgraphs.
+* **Tier 1 Global Assets (\`/artists\` & \`/labels\`)** — Canonical verified entity biographies, discographies, iTunes artwork, and single-root subgraphs.
 * Root \`users/{uid}\` documents — User accounts, authentication data, token balances (\`tokenBalance\`), settings, and custom Style / Taste Profiles (\`tasteProfiles\`).
 * \`users/{uid}/tokenTransactions\` — Immutable user token transaction and top-up receipts.
 * \`adminLedger\` (\`adminLedger/system/settings\`, \`adminLedger/system/jitHeals\`) — Platform-wide settings, JIT kill-switch toggles, and historical cost telemetry.

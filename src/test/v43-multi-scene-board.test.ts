@@ -1215,7 +1215,7 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
     it('verifies V45.1 Runbook Protocol specifies schemaVersion: 43 backward compatibility with 0 database purge required', () => {
       expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V45.1 Regression Suite (Full-Stack)');
       expect(BACKEND_REGRESSION_RUNBOOK).toContain('schemaVersion: 43');
-      expect(BACKEND_REGRESSION_RUNBOOK).toContain('Zero database purge is required for V45 operations');
+      expect(BACKEND_REGRESSION_RUNBOOK).toContain('Zero database purge is required for V45.1 operations');
     });
 
     it('verifies ARCHITECTURE_RULES contains all 45 contiguous laws with Rule 22 as Deep Cloning Isolation', () => {
