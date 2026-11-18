@@ -764,6 +764,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   }, [fitGraphToScreen]);
 
   const hasInitialCentered = useRef(false);
+
+  // Reset initial centering flag when nodes are completely emptied (e.g. project reset or curation start)
+  useEffect(() => {
+    if (!data?.nodes || data.nodes.length === 0) {
+      hasInitialCentered.current = false;
+    }
+  }, [data?.nodes]);
+
   const detectedSceneCount = useMemo(() => {
     if (scenes && scenes.length > 0) return scenes.length;
     if (!data?.nodes || data.nodes.length === 0) return 1;
@@ -772,6 +780,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   }, [scenes, data?.nodes]);
 
   const lastSceneCountRef = useRef(detectedSceneCount);
+
+  // Count scenes that actually have mapped nodes or are completed
+  const mappedSceneCount = useMemo(() => {
+    if (scenes && scenes.length > 0) {
+      return scenes.filter(s => (s.graphData?.nodes?.length ?? 0) > 0 || s.status === 'completed').length;
+    }
+    return 0;
+  }, [scenes]);
+
+  const prevMappedSceneCountRef = useRef(mappedSceneCount);
 
   useEffect(() => {
     if (lastSceneCountRef.current !== detectedSceneCount) {
@@ -785,6 +803,20 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       }
     }
   }, [detectedSceneCount, activeSceneId, focusSceneCluster]);
+
+  // V45.1 (Phase B2.3): When upfront batch curation transitions mapped scenes from 0 -> >0,
+  // automatically focus on Scene 1 so the Connections panel centers on the primary cluster immediately.
+  useEffect(() => {
+    if (prevMappedSceneCountRef.current === 0 && mappedSceneCount > 0) {
+      prevMappedSceneCountRef.current = mappedSceneCount;
+      hasInitialCentered.current = false;
+      setTimeout(() => {
+        focusSceneCluster(activeSceneId || 'scene-1', 0);
+      }, 50);
+    } else {
+      prevMappedSceneCountRef.current = mappedSceneCount;
+    }
+  }, [mappedSceneCount, activeSceneId, focusSceneCluster]);
 
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;

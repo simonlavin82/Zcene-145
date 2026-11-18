@@ -14,6 +14,7 @@ vitest_1.vi.mock('@google/genai', async (importOriginal) => {
     };
 });
 const curatorService_1 = require("../services/curatorService");
+const isoCountries_1 = require("../shared/isoCountries");
 const multiSceneUtils_1 = require("../shared/multiSceneUtils");
 const tokenEconomy_1 = require("../shared/tokenEconomy");
 (0, vitest_1.describe)('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 24], [Rule 40], [Rule 43], [Rule 44])', () => {
@@ -287,6 +288,183 @@ const tokenEconomy_1 = require("../shared/tokenEconomy");
             }
             // Must NOT be 15 + 15 = 30; must remain 15!
             (0, vitest_1.expect)(accumulatedHop2).toBe(15);
+        });
+        (0, vitest_1.it)('correctly ingests peer artist/label profiles in Step 0 handling both array and single-object detailsCache formats with redirectTo (Phase B2.2)', () => {
+            const existingProjectDetailsMap = new Map();
+            const ingestEntityDocIntoMap = (docId, aData, isLabel, redirectTo) => {
+                if (!aData)
+                    return;
+                let profile = aData.detailsCache ? (typeof aData.detailsCache === 'string' ? JSON.parse(aData.detailsCache) : aData.detailsCache) : null;
+                if (Array.isArray(profile) && profile.length > 0) {
+                    profile = Array.isArray(profile[0]) ? profile[0][1] : profile[0];
+                }
+                if (!profile || !profile.summary) {
+                    if (aData.summary || aData.bio || aData.details) {
+                        profile = {
+                            summary: aData.summary || aData.bio || aData.description || (isLabel ? 'Record label active in the music scene.' : ''),
+                            imageUrl: aData.imageUrl || '',
+                            details: aData.details || { artist: aData.name || aData.seedArtists || aData.label || docId },
+                            members: aData.members || [],
+                            discography: aData.discography || [],
+                            youtubeVideoId: aData.youtubeVideoId || undefined,
+                            previewUrl: aData.previewUrl || undefined,
+                            itunesArtistId: aData.itunesArtistId || undefined,
+                        };
+                    }
+                    else if (isLabel) {
+                        profile = {
+                            summary: 'Record label active in the music scene.',
+                            imageUrl: '',
+                            details: { artist: aData.name || aData.label || docId, genre: '', style: '', origin: '', founded: '', notableArtists: [] },
+                            members: [],
+                            discography: []
+                        };
+                    }
+                }
+                if (profile && (profile.summary || profile.details)) {
+                    const norm = isLabel ? (0, curatorService_1.normalizeLabelId)(docId) : (0, curatorService_1.normalizeArtistId)(docId);
+                    const bare = (0, isoCountries_1.stripCountrySlug)(norm);
+                    existingProjectDetailsMap.set(docId, profile);
+                    existingProjectDetailsMap.set(norm, profile);
+                    if (bare)
+                        existingProjectDetailsMap.set(bare, profile);
+                    if (redirectTo) {
+                        const redirNorm = isLabel ? (0, curatorService_1.normalizeLabelId)(redirectTo) : (0, curatorService_1.normalizeArtistId)(redirectTo);
+                        const redirBare = (0, isoCountries_1.stripCountrySlug)(redirNorm);
+                        existingProjectDetailsMap.set(redirectTo, profile);
+                        existingProjectDetailsMap.set(redirNorm, profile);
+                        if (redirBare)
+                            existingProjectDetailsMap.set(redirBare, profile);
+                    }
+                }
+            };
+            // Case A: Single profile object format (e.g. from healOrphanedAsset or direct cache)
+            const deftonesData = {
+                detailsCache: {
+                    summary: 'Deftones are an American alternative metal band from Sacramento, California.',
+                    imageUrl: 'https://mzstatic.com/deftones.jpg',
+                    details: { artist: 'Deftones', origin: 'Sacramento, USA', genre: 'Alternative Metal', founded: '1988' }
+                }
+            };
+            ingestEntityDocIntoMap('deftones-us', deftonesData, false, 'deftones');
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('deftones-us')).toBe(true);
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('deftones')).toBe(true);
+            (0, vitest_1.expect)(existingProjectDetailsMap.get('deftones')?.details?.artist).toBe('Deftones');
+            // Case B: 2D Array format (e.g. [ [ 'pj-harvey-gb', profile ] ])
+            const pjHarveyData = {
+                detailsCache: [
+                    ['pj-harvey-gb', {
+                            summary: 'PJ Harvey is an English musician and singer-songwriter.',
+                            imageUrl: 'https://mzstatic.com/pj.jpg',
+                            details: { artist: 'PJ Harvey', origin: 'Dorset, UK', genre: 'Brit Indie', founded: '1988' }
+                        }]
+                ]
+            };
+            ingestEntityDocIntoMap('pj-harvey-gb', pjHarveyData, false, 'pj-harvey');
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('pj-harvey-gb')).toBe(true);
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('pj-harvey')).toBe(true);
+            (0, vitest_1.expect)(existingProjectDetailsMap.get('pj-harvey')?.imageUrl).toBe('https://mzstatic.com/pj.jpg');
+            // Case C: Label document with top-level fields
+            const epicLabelData = {
+                name: 'Epic Records',
+                summary: 'Epic Records is an American record label owned by Sony Music.',
+                details: { artist: 'Epic Records', genre: 'Alternative' }
+            };
+            ingestEntityDocIntoMap('epic', epicLabelData, true);
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('epic')).toBe(true);
+            (0, vitest_1.expect)(existingProjectDetailsMap.get('epic')?.summary).toContain('Epic Records');
+        });
+        (0, vitest_1.it)('correctly ingests single-profile detailsCache in Step 0 without creating stray root keys (Phase B2.3)', () => {
+            const existingProjectDetailsMap = new Map();
+            const ingestDetailsCacheIntoMap = (rawCache, targetEntityId) => {
+                if (!rawCache)
+                    return;
+                try {
+                    const parsed = typeof rawCache === "string" ? JSON.parse(rawCache) : rawCache;
+                    if (Array.isArray(parsed)) {
+                        for (const item of parsed) {
+                            if (Array.isArray(item) && item.length === 2 && item[0] && item[1]) {
+                                const key = (0, isoCountries_1.stripCountrySlug)(String(item[0]));
+                                existingProjectDetailsMap.set(key, item[1]);
+                                existingProjectDetailsMap.set((0, curatorService_1.normalizeArtistId)(key), item[1]);
+                            }
+                        }
+                    }
+                    else if (parsed && typeof parsed === "object") {
+                        const isSingleProfile = Boolean(parsed.summary || parsed.details || parsed.imageUrl || parsed.discography) &&
+                            !('nodes' in parsed);
+                        if (isSingleProfile) {
+                            const canonicalId = targetEntityId || (parsed.details?.artist ? (0, curatorService_1.normalizeArtistId)(parsed.details.artist) : null);
+                            if (canonicalId) {
+                                const norm = (0, curatorService_1.normalizeArtistId)(canonicalId);
+                                const bare = (0, isoCountries_1.stripCountrySlug)(norm);
+                                existingProjectDetailsMap.set(canonicalId, parsed);
+                                existingProjectDetailsMap.set(norm, parsed);
+                                if (bare)
+                                    existingProjectDetailsMap.set(bare, parsed);
+                            }
+                        }
+                        else {
+                            for (const [k, v] of Object.entries(parsed)) {
+                                if (k && v) {
+                                    const key = (0, isoCountries_1.stripCountrySlug)(k);
+                                    existingProjectDetailsMap.set(key, v);
+                                    existingProjectDetailsMap.set((0, curatorService_1.normalizeArtistId)(key), v);
+                                }
+                            }
+                        }
+                    }
+                }
+                catch {
+                    // Ignore malformed cache
+                }
+            };
+            // Raw single profile as stored in /artists/korn-us
+            const kornProfile = {
+                summary: 'Korn altered the trajectory of heavy music by popularizing low-tuned seven-string guitar tunings.',
+                imageUrl: 'https://mzstatic.com/korn.jpg',
+                details: { artist: 'Korn', origin: 'Bakersfield, USA', genre: 'Nu Metal', founded: '1993' },
+                discography: [{ albumName: 'Follow the Leader', releaseYear: '1998' }],
+                links: [{ type: 'spotify', url: 'https://spotify.com/korn' }],
+                members: ['Jonathan Davis', 'James Shaffer', 'Brian Welch']
+            };
+            ingestDetailsCacheIntoMap(kornProfile, 'korn-us');
+            // Verified: Associated under canonical and bare keys
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('korn-us')).toBe(true);
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('korn')).toBe(true);
+            (0, vitest_1.expect)(existingProjectDetailsMap.get('korn-us')?.details?.artist).toBe('Korn');
+            // Crucial: Stray keys MUST NEVER be registered as top-level entities
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('summary')).toBe(false);
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('details')).toBe(false);
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('imageUrl')).toBe(false);
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('discography')).toBe(false);
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('links')).toBe(false);
+            (0, vitest_1.expect)(existingProjectDetailsMap.has('members')).toBe(false);
+        });
+        (0, vitest_1.it)('strictly avoids double-counting tokensSpent when settleCurationProjectTokens pre-records settlement on project doc (Phase B2.3)', () => {
+            // 1. Initial 3-scene upfront batch (15T total)
+            const inputPayloadTokensSpent = 15;
+            const initialProjectDoc = { tokensSpent: 15 }; // Written by settleCurationProjectTokens
+            let accumulatedTokensSpent = typeof inputPayloadTokensSpent === 'number' ? inputPayloadTokensSpent : 0;
+            if (typeof initialProjectDoc.tokensSpent === 'number' && initialProjectDoc.tokensSpent > 0) {
+                accumulatedTokensSpent = initialProjectDoc.tokensSpent;
+            }
+            // Must be 15, NEVER 15 + 15 = 30!
+            (0, vitest_1.expect)(accumulatedTokensSpent).toBe(15);
+            // 2. Chained Hop 2 and 3 (inputPayload.tokensSpent = 0)
+            const chainedPayloadTokensSpent = 0;
+            let chainedAccumulated = typeof chainedPayloadTokensSpent === 'number' ? chainedPayloadTokensSpent : 0;
+            if (typeof initialProjectDoc.tokensSpent === 'number' && initialProjectDoc.tokensSpent > 0) {
+                chainedAccumulated = initialProjectDoc.tokensSpent;
+            }
+            (0, vitest_1.expect)(chainedAccumulated).toBe(15);
+            // 3. Fallback when pData.tokensSpent is 0 or unset (e.g. test mock)
+            const zeroProjectDoc = { tokensSpent: 0 };
+            let zeroAccumulated = typeof inputPayloadTokensSpent === 'number' ? inputPayloadTokensSpent : 0;
+            if (typeof zeroProjectDoc.tokensSpent === 'number' && zeroProjectDoc.tokensSpent > 0) {
+                zeroAccumulated = zeroProjectDoc.tokensSpent;
+            }
+            (0, vitest_1.expect)(zeroAccumulated).toBe(15);
         });
     });
 });

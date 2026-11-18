@@ -8479,9 +8479,15 @@ const App: React.FC = () => {
             (Array.isArray(data.artistIds) && data.artistIds.length > 0) ||
             (Array.isArray(data.labelIds) && data.labelIds.length > 0) ||
             Boolean(data.cacheKey);
-          if (isHydratingSessionRef.current || !hasLegacyLookupKeys) {
+          const isActivelyCurating =
+            incomingStatus === 'curating' ||
+            Boolean(data.activeJobId) ||
+            Boolean(activeJobIdRef.current) ||
+            isPreFlightCheckingRef.current;
+
+          if (isHydratingSessionRef.current || isActivelyCurating || !hasLegacyLookupKeys) {
             loadedFromGraphData = true;
-            if (!isHydratingSessionRef.current) {
+            if (!isHydratingSessionRef.current && !curatingWithSettledScenes) {
               syncGraphDataState({ nodes: [], links: [] });
             }
           } else {
@@ -8493,7 +8499,7 @@ const App: React.FC = () => {
           loadedFromGraphData = true;
         }
 
-        if (!loadedFromGraphData && incomingStatus !== 'completed' && populatedScenesFromDoc.length === 0) {
+        if (!loadedFromGraphData && incomingStatus !== 'completed' && incomingStatus !== 'curating' && !data.activeJobId && !activeJobIdRef.current && !isPreFlightCheckingRef.current && populatedScenesFromDoc.length === 0) {
           const hasEntityIds = (data.artistIds && Array.isArray(data.artistIds) && data.artistIds.length > 0) ||
                                (data.labelIds && Array.isArray(data.labelIds) && data.labelIds.length > 0);
           if (hasEntityIds) {

@@ -421,7 +421,11 @@ export async function settleCurationProjectTokens(params: {
     : null;
 
   return await db.runTransaction(async (tx) => {
-    const [userSnap, sessionSnap] = await Promise.all([tx.get(userRef), tx.get(sessionRef)]);
+    const [userSnap, sessionSnap, projectSnap] = await Promise.all([
+      tx.get(userRef),
+      tx.get(sessionRef),
+      projectRef ? tx.get(projectRef) : Promise.resolve(null),
+    ]);
     const userData = userSnap.exists ? userSnap.data() || {} : {};
     const currentBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
     const prevSpent = Math.max(0, Math.floor(Number(userData.lifetimeTokensSpent) || 0));
@@ -513,11 +517,16 @@ export async function settleCurationProjectTokens(params: {
       createdAt: FieldValue.serverTimestamp(),
     });
 
+    const prevProjectTokens = projectSnap?.exists
+      ? Math.max(0, Math.floor(Number(projectSnap.data()?.tokensSpent) || 0))
+      : 0;
+    const finalProjectTokensSpent = prevProjectTokens + totalActualTokensForProject;
+
     if (projectRef) {
       tx.set(
         projectRef,
         {
-          tokensSpent: totalActualTokensForProject,
+          tokensSpent: finalProjectTokensSpent,
           ...(generationTypeToStamp ? { generationType: generationTypeToStamp } : {}),
           updatedAt: FieldValue.serverTimestamp(),
         },

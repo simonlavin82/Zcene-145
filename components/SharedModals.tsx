@@ -2381,7 +2381,6 @@ export function ConsolidatedValidationModal({
                     <React.Fragment key={seedKey}>
                       {showSceneHeader && (
                         <div className="flex items-center gap-2 pt-2 pb-1 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                          <span className="material-symbols-outlined !text-[14px] text-primary">view_carousel</span>
                           <span>{seed.sceneLabel}</span>
                         </div>
                       )}
@@ -2432,7 +2431,6 @@ export function ConsolidatedValidationModal({
                   <React.Fragment key={seedKey}>
                     {showSceneHeader && (
                       <div className="flex items-center gap-2 pt-2 pb-1 text-xs font-semibold text-zinc-400 uppercase tracking-wider">
-                        <span className="material-symbols-outlined !text-[14px] text-primary">view_carousel</span>
                         <span>{seed.sceneLabel}</span>
                       </div>
                     )}

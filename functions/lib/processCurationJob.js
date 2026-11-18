@@ -282,7 +282,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             }
         }
         const existingProjectDetailsMap = new Map();
-        const ingestDetailsCacheIntoMap = (rawCache) => {
+        const ingestDetailsCacheIntoMap = (rawCache, targetEntityId) => {
             if (!rawCache)
                 return;
             try {
@@ -297,11 +297,27 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     }
                 }
                 else if (parsed && typeof parsed === "object") {
-                    for (const [k, v] of Object.entries(parsed)) {
-                        if (k && v) {
-                            const key = (0, multiSceneUtils_1.stripSceneNamespace)(k);
-                            existingProjectDetailsMap.set(key, v);
-                            existingProjectDetailsMap.set((0, curatorService_1.normalizeArtistId)(key), v);
+                    // Check if parsed is itself a single entity profile object (e.g. from an artists/{id} document)
+                    const isSingleProfile = Boolean(parsed.summary || parsed.details || parsed.imageUrl || parsed.discography) &&
+                        !('nodes' in parsed);
+                    if (isSingleProfile) {
+                        const canonicalId = targetEntityId || (parsed.details?.artist ? (0, curatorService_1.normalizeArtistId)(parsed.details.artist) : null);
+                        if (canonicalId) {
+                            const norm = (0, curatorService_1.normalizeArtistId)((0, multiSceneUtils_1.stripSceneNamespace)(canonicalId));
+                            const bare = (0, isoCountries_1.stripCountrySlug)(norm);
+                            existingProjectDetailsMap.set(canonicalId, parsed);
+                            existingProjectDetailsMap.set(norm, parsed);
+                            if (bare)
+                                existingProjectDetailsMap.set(bare, parsed);
+                        }
+                    }
+                    else {
+                        for (const [k, v] of Object.entries(parsed)) {
+                            if (k && v) {
+                                const key = (0, multiSceneUtils_1.stripSceneNamespace)(k);
+                                existingProjectDetailsMap.set(key, v);
+                                existingProjectDetailsMap.set((0, curatorService_1.normalizeArtistId)(key), v);
+                            }
                         }
                     }
                 }
@@ -435,7 +451,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 s.seedIds = [resolvedCanonicalId];
                                 s.seedArtistIds = [resolvedCanonicalId];
                                 s.activeNodes = parsedGraph.nodes.map((n) => n.id);
-                                ingestDetailsCacheIntoMap(sCache.detailsCache);
+                                ingestDetailsCacheIntoMap(sCache.detailsCache, resolvedCanonicalId);
                                 // Architecture V45.1 (Phase B2.2): Batch-fetch peer artists and labels from global
                                 // collections for this Direct Hit scene so existingProjectDetailsMap is 100% complete.
                                 // Eliminates client-side net::ERR_INSUFFICIENT_RESOURCES storm on project load.
@@ -2538,10 +2554,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             accumulatedProjectApiUsage[model].total = (accumulatedProjectApiUsage[model].total || 0) + (u.total || 0);
                         }
                     }
-                    if (typeof pData.tokensSpent === "number") {
-                        accumulatedTokensSpent = inputPayload?.isChainedHop
-                            ? pData.tokensSpent
-                            : pData.tokensSpent + accumulatedTokensSpent;
+                    if (typeof pData.tokensSpent === "number" && pData.tokensSpent > 0) {
+                        // tokensSpent is already settled authoritatively on the project document by settleCurationProjectTokens
+                        accumulatedTokensSpent = pData.tokensSpent;
                     }
                 }
             }

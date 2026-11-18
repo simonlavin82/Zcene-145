@@ -351,7 +351,7 @@ export const processCurationJob = onDocumentCreated({
     }
     const existingProjectDetailsMap = new Map<string, any>();
 
-    const ingestDetailsCacheIntoMap = (rawCache: any) => {
+    const ingestDetailsCacheIntoMap = (rawCache: any, targetEntityId?: string) => {
       if (!rawCache) return;
       try {
         const parsed = typeof rawCache === "string" ? JSON.parse(rawCache) : rawCache;
@@ -364,11 +364,27 @@ export const processCurationJob = onDocumentCreated({
             }
           }
         } else if (parsed && typeof parsed === "object") {
-          for (const [k, v] of Object.entries(parsed)) {
-            if (k && v) {
-              const key = stripSceneNamespace(k);
-              existingProjectDetailsMap.set(key, v);
-              existingProjectDetailsMap.set(normalizeArtistId(key), v);
+          // Check if parsed is itself a single entity profile object (e.g. from an artists/{id} document)
+          const isSingleProfile =
+            Boolean(parsed.summary || parsed.details || parsed.imageUrl || parsed.discography) &&
+            !('nodes' in parsed);
+
+          if (isSingleProfile) {
+            const canonicalId = targetEntityId || (parsed.details?.artist ? normalizeArtistId(parsed.details.artist) : null);
+            if (canonicalId) {
+              const norm = normalizeArtistId(stripSceneNamespace(canonicalId));
+              const bare = stripCountrySlug(norm);
+              existingProjectDetailsMap.set(canonicalId, parsed);
+              existingProjectDetailsMap.set(norm, parsed);
+              if (bare) existingProjectDetailsMap.set(bare, parsed);
+            }
+          } else {
+            for (const [k, v] of Object.entries(parsed)) {
+              if (k && v) {
+                const key = stripSceneNamespace(k);
+                existingProjectDetailsMap.set(key, v);
+                existingProjectDetailsMap.set(normalizeArtistId(key), v);
+              }
             }
           }
         }
@@ -501,7 +517,7 @@ export const processCurationJob = onDocumentCreated({
                 s.seedIds = [resolvedCanonicalId];
                 s.seedArtistIds = [resolvedCanonicalId];
                 s.activeNodes = parsedGraph.nodes.map((n: any) => n.id);
-                ingestDetailsCacheIntoMap(sCache.detailsCache);
+                ingestDetailsCacheIntoMap(sCache.detailsCache, resolvedCanonicalId);
 
                 // Architecture V45.1 (Phase B2.2): Batch-fetch peer artists and labels from global
                 // collections for this Direct Hit scene so existingProjectDetailsMap is 100% complete.
@@ -2815,10 +2831,9 @@ export const processCurationJob = onDocumentCreated({
               accumulatedProjectApiUsage[model].total = (accumulatedProjectApiUsage[model].total || 0) + (u.total || 0);
             }
           }
-          if (typeof pData.tokensSpent === "number") {
-            accumulatedTokensSpent = inputPayload?.isChainedHop
-              ? pData.tokensSpent
-              : pData.tokensSpent + accumulatedTokensSpent;
+          if (typeof pData.tokensSpent === "number" && pData.tokensSpent > 0) {
+            // tokensSpent is already settled authoritatively on the project document by settleCurationProjectTokens
+            accumulatedTokensSpent = pData.tokensSpent;
           }
         }
       } catch (pErr: any) {

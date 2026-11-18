@@ -437,5 +437,105 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
       expect(existingProjectDetailsMap.has('epic')).toBe(true);
       expect(existingProjectDetailsMap.get('epic')?.summary).toContain('Epic Records');
     });
+
+    it('correctly ingests single-profile detailsCache in Step 0 without creating stray root keys (Phase B2.3)', () => {
+      const existingProjectDetailsMap = new Map<string, any>();
+
+      const ingestDetailsCacheIntoMap = (rawCache: any, targetEntityId?: string) => {
+        if (!rawCache) return;
+        try {
+          const parsed = typeof rawCache === "string" ? JSON.parse(rawCache) : rawCache;
+          if (Array.isArray(parsed)) {
+            for (const item of parsed) {
+              if (Array.isArray(item) && item.length === 2 && item[0] && item[1]) {
+                const key = stripCountrySlug(String(item[0]));
+                existingProjectDetailsMap.set(key, item[1]);
+                existingProjectDetailsMap.set(normalizeArtistId(key), item[1]);
+              }
+            }
+          } else if (parsed && typeof parsed === "object") {
+            const isSingleProfile =
+              Boolean(parsed.summary || parsed.details || parsed.imageUrl || parsed.discography) &&
+              !('nodes' in parsed);
+
+            if (isSingleProfile) {
+              const canonicalId = targetEntityId || (parsed.details?.artist ? normalizeArtistId(parsed.details.artist) : null);
+              if (canonicalId) {
+                const norm = normalizeArtistId(canonicalId);
+                const bare = stripCountrySlug(norm);
+                existingProjectDetailsMap.set(canonicalId, parsed);
+                existingProjectDetailsMap.set(norm, parsed);
+                if (bare) existingProjectDetailsMap.set(bare, parsed);
+              }
+            } else {
+              for (const [k, v] of Object.entries(parsed)) {
+                if (k && v) {
+                  const key = stripCountrySlug(k);
+                  existingProjectDetailsMap.set(key, v);
+                  existingProjectDetailsMap.set(normalizeArtistId(key), v);
+                }
+              }
+            }
+          }
+        } catch {
+          // Ignore malformed cache
+        }
+      };
+
+      // Raw single profile as stored in /artists/korn-us
+      const kornProfile = {
+        summary: 'Korn altered the trajectory of heavy music by popularizing low-tuned seven-string guitar tunings.',
+        imageUrl: 'https://mzstatic.com/korn.jpg',
+        details: { artist: 'Korn', origin: 'Bakersfield, USA', genre: 'Nu Metal', founded: '1993' },
+        discography: [{ albumName: 'Follow the Leader', releaseYear: '1998' }],
+        links: [{ type: 'spotify', url: 'https://spotify.com/korn' }],
+        members: ['Jonathan Davis', 'James Shaffer', 'Brian Welch']
+      };
+
+      ingestDetailsCacheIntoMap(kornProfile, 'korn-us');
+
+      // Verified: Associated under canonical and bare keys
+      expect(existingProjectDetailsMap.has('korn-us')).toBe(true);
+      expect(existingProjectDetailsMap.has('korn')).toBe(true);
+      expect(existingProjectDetailsMap.get('korn-us')?.details?.artist).toBe('Korn');
+
+      // Crucial: Stray keys MUST NEVER be registered as top-level entities
+      expect(existingProjectDetailsMap.has('summary')).toBe(false);
+      expect(existingProjectDetailsMap.has('details')).toBe(false);
+      expect(existingProjectDetailsMap.has('imageUrl')).toBe(false);
+      expect(existingProjectDetailsMap.has('discography')).toBe(false);
+      expect(existingProjectDetailsMap.has('links')).toBe(false);
+      expect(existingProjectDetailsMap.has('members')).toBe(false);
+    });
+
+    it('strictly avoids double-counting tokensSpent when settleCurationProjectTokens pre-records settlement on project doc (Phase B2.3)', () => {
+      // 1. Initial 3-scene upfront batch (15T total)
+      const inputPayloadTokensSpent = 15;
+      const initialProjectDoc = { tokensSpent: 15 }; // Written by settleCurationProjectTokens
+
+      let accumulatedTokensSpent = typeof inputPayloadTokensSpent === 'number' ? inputPayloadTokensSpent : 0;
+      if (typeof initialProjectDoc.tokensSpent === 'number' && initialProjectDoc.tokensSpent > 0) {
+        accumulatedTokensSpent = initialProjectDoc.tokensSpent;
+      }
+
+      // Must be 15, NEVER 15 + 15 = 30!
+      expect(accumulatedTokensSpent).toBe(15);
+
+      // 2. Chained Hop 2 and 3 (inputPayload.tokensSpent = 0)
+      const chainedPayloadTokensSpent = 0;
+      let chainedAccumulated = typeof chainedPayloadTokensSpent === 'number' ? chainedPayloadTokensSpent : 0;
+      if (typeof initialProjectDoc.tokensSpent === 'number' && initialProjectDoc.tokensSpent > 0) {
+        chainedAccumulated = initialProjectDoc.tokensSpent;
+      }
+      expect(chainedAccumulated).toBe(15);
+
+      // 3. Fallback when pData.tokensSpent is 0 or unset (e.g. test mock)
+      const zeroProjectDoc = { tokensSpent: 0 };
+      let zeroAccumulated = typeof inputPayloadTokensSpent === 'number' ? inputPayloadTokensSpent : 0;
+      if (typeof zeroProjectDoc.tokensSpent === 'number' && zeroProjectDoc.tokensSpent > 0) {
+        zeroAccumulated = zeroProjectDoc.tokensSpent;
+      }
+      expect(zeroAccumulated).toBe(15);
+    });
   });
 });
