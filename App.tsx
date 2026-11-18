@@ -1348,6 +1348,7 @@ const App: React.FC = () => {
     isOpen: boolean;
     seeds: PreFlightSeed[];
     expectedSpeed?: ExpectedCurationSpeed;
+    uncachedScenesCount?: number;
     onConfirm: (updatedSeeds?: PreFlightSeed[]) => void;
     onCancel: () => void;
   } | null>(null);
@@ -5177,13 +5178,13 @@ const App: React.FC = () => {
                     candidateId = data.candidates[0].id;
                   }
 
-                  if (data.correctedInput && data.id && data.id !== s.query) {
-                    s.isCorrected = true;
-                    correctedQuery = data.id;
+                  if (data.correctedInput && data.id && data.id.trim() !== s.query.trim()) {
+                    isCorrected = true;
+                    correctedQuery = data.id.trim();
                     originalQuery = s.query;
 
                     if (!isAmbiguous) {
-                      const interceptCandidates = await searchDisambiguationCandidates(data.id);
+                      const interceptCandidates = await searchDisambiguationCandidates(data.id.trim());
                       if (interceptCandidates.length > 0) {
                         predictedOrigin = interceptCandidates[0].origin || predictedOrigin;
                         genre = interceptCandidates[0].genre || genre;
@@ -8121,14 +8122,17 @@ const App: React.FC = () => {
             }
             const isCurating = incomingStatus === 'curating' || !!data.activeJobId;
             const isInitialLoad = isProjectLoadingRef.current;
+            const isCurationJustCompleted = projectStatusRef.current === 'curating' && incomingStatus === 'completed';
             const isUnconfirmedForkOrPreFlight = pendingUnconfirmedForkIdRef.current === currentProjectId || isPreFlightCheckingRef.current || isPreFlightChecking;
             const resolvedActiveSceneId = isUnconfirmedForkOrPreFlight && (data.activeSceneId || activeSceneIdRef.current) && parsedScenes.some(s => (s.sceneId || s.id) === (data.activeSceneId || activeSceneIdRef.current))
               ? (data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId) ? data.activeSceneId : (activeSceneIdRef.current || 'scene-1'))
               : isCurating && data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId)
                 ? data.activeSceneId
-                : (!isInitialLoad && activeSceneIdRef.current && parsedScenes.some(s => (s.sceneId || s.id) === activeSceneIdRef.current))
-                  ? activeSceneIdRef.current
-                  : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
+                : isCurationJustCompleted && data.activeSceneId && parsedScenes.some(s => (s.sceneId || s.id) === data.activeSceneId)
+                  ? data.activeSceneId
+                  : (!isInitialLoad && activeSceneIdRef.current && parsedScenes.some(s => (s.sceneId || s.id) === activeSceneIdRef.current))
+                    ? activeSceneIdRef.current
+                    : (parsedScenes[0].sceneId || parsedScenes[0].id || 'scene-1');
             activeSceneIdRef.current = resolvedActiveSceneId;
             setActiveSceneId(resolvedActiveSceneId);
             const activeIdxInParsed = parsedScenes.findIndex(s => (s.sceneId || s.id) === resolvedActiveSceneId);
@@ -8942,6 +8946,12 @@ const App: React.FC = () => {
         setProjectStatus('completed');
         projectStatusRef.current = 'completed';
         isHydratingSessionRef.current = false;
+
+        if ((scenesRef.current?.length ?? 0) > 1) {
+          const defaultSceneId = scenesRef.current[0]?.sceneId || scenesRef.current[0]?.id || 'scene-1';
+          activeSceneIdRef.current = defaultSceneId;
+          setActiveSceneId(defaultSceneId);
+        }
 
         // Direct In-Memory Overarching Hydration: Pipe overarching editorial, archive, & bridges directly into React memory
         if (job.result?.overarchingHistory) {
@@ -11485,6 +11495,7 @@ const App: React.FC = () => {
         isAdmin={isAdmin}
         isAdminPreview={isAdminPreview}
         expectedSpeed={consolidatedValidationDialog?.expectedSpeed}
+        uncachedScenesCount={consolidatedValidationDialog?.uncachedScenesCount}
         onOpenTopUp={(tierId) => setSimulatedStripeModal({ isOpen: true, initialTierId: tierId || 'gbp_5' })}
         onConfirm={(updatedSeeds) => consolidatedValidationDialog?.onConfirm(updatedSeeds)}
         onCancel={() => consolidatedValidationDialog?.onCancel()}

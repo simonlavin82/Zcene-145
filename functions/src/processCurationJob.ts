@@ -320,6 +320,7 @@ export const processCurationJob = onDocumentCreated({
     .split('::')
     .map((a: string) => a.trim())
     .filter(Boolean);
+  let isAllScenesDirectHitBatch = false;
 
   try {
     console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
@@ -589,7 +590,7 @@ export const processCurationJob = onDocumentCreated({
       const targetSceneObj = existingProjectScenes.find(s => (s.sceneId || s.id) === targetSceneId);
       const targetSceneAlreadyHydrated = (targetSceneObj?.graphData?.nodes?.length ?? 0) > 0;
 
-      let isAllScenesDirectHitBatch = false;
+      isAllScenesDirectHitBatch = false;
       if (targetSceneAlreadyHydrated) {
         const remainingUncurated = existingProjectScenes.find(s => (s.graphData?.nodes?.length ?? 0) === 0);
         if (remainingUncurated) {
@@ -2980,7 +2981,11 @@ export const processCurationJob = onDocumentCreated({
         ...(finalProjectScenes.length > 0
           ? {
             scenes: JSON.stringify(finalProjectScenes),
-            activeSceneId: nextChainedJobId ? (result.remainingUncuratedScenes[0]?.sceneId || targetSceneId) : targetSceneId,
+            activeSceneId: nextChainedJobId
+              ? (result.remainingUncuratedScenes[0]?.sceneId || targetSceneId)
+              : (isAllScenesDirectHitBatch || inputPayload?.isChainedHop || Boolean(inputPayload?.deferPhase1ToWorker)
+                  ? (finalProjectScenes[0]?.sceneId || 'scene-1')
+                  : targetSceneId),
             sceneCount: finalProjectScenes.length,
             seedArtistIds: getAllProjectSeedIds(finalProjectScenes),
             overarchingRationale: result.overarchingRationale || "",

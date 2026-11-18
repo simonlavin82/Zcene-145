@@ -303,6 +303,72 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(pill).not.toHaveTextContent('Deep AI synthesis');
     });
 
+    it('renders multiplied time estimate ~6–10 minutes when uncachedScenesCount is 2', () => {
+      render(
+        <ConsolidatedValidationModal
+          isOpen={true}
+          seeds={[verifiedSeed]}
+          expectedSpeed="deep"
+          uncachedScenesCount={2}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+
+      const pill = screen.getByTestId('curation-time-estimate');
+      expect(pill).toBeInTheDocument();
+      expect(pill).toHaveTextContent('Estimated time:');
+      expect(pill).toHaveTextContent('~6–10 minutes (2 scenes queued — safe to leave tab)');
+    });
+
+    it('renders multiplied time estimate ~9–15 minutes when uncachedScenesCount is 3', () => {
+      render(
+        <ConsolidatedValidationModal
+          isOpen={true}
+          seeds={[verifiedSeed]}
+          expectedSpeed="deep"
+          uncachedScenesCount={3}
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+
+      const pill = screen.getByTestId('curation-time-estimate');
+      expect(pill).toBeInTheDocument();
+      expect(pill).toHaveTextContent('Estimated time:');
+      expect(pill).toHaveTextContent('~9–15 minutes (3 scenes queued — safe to leave tab)');
+    });
+
+    it('renders canonical title and auto-corrected badge when isCorrected is true with originalQuery', () => {
+      const correctedSeed: PreFlightSeed = {
+        id: 'nine-in-nails',
+        query: 'Nine in nails',
+        predictedOrigin: 'USA',
+        genre: 'Industrial Rock',
+        isCorrected: true,
+        correctedQuery: 'Nine Inch Nails',
+        originalQuery: 'Nine in nails',
+        isKnownCacheHit: false,
+        isTopologyHit: false,
+        isVerifyingOrigin: false,
+      };
+
+      render(
+        <ConsolidatedValidationModal
+          isOpen={true}
+          seeds={[correctedSeed]}
+          expectedSpeed="deep"
+          onConfirm={vi.fn()}
+          onCancel={vi.fn()}
+        />
+      );
+
+      // Card header should display corrected canonical query
+      expect(screen.getByText('Nine Inch Nails')).toBeInTheDocument();
+      // Badge should clearly indicate auto-correction from original query
+      expect(screen.getByText('Auto-corrected from "Nine in nails"')).toBeInTheDocument();
+    });
+
     it('does not display estimate pill while seeds are verifying origin', () => {
       const verifyingSeed: PreFlightSeed = {
         ...verifiedSeed,

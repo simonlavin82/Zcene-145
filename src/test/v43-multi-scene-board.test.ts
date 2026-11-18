@@ -3984,6 +3984,114 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
           expect.objectContaining({ sceneId: 'scene-1' })
         );
       });
+
+      it('correctly resolves isCorrected, correctedQuery, and originalQuery on Pass 1 pre-flight typo correction', () => {
+        const rawSeed = {
+          id: 'nine-in-nails',
+          query: 'Nine in nails',
+          sceneId: 'scene-2',
+        };
+
+        const callableResultData = {
+          isValid: true,
+          correctedInput: true,
+          id: 'Nine Inch Nails',
+          origin: 'USA',
+          genre: 'Industrial Rock',
+        };
+
+        let isCorrected = false;
+        let correctedQuery: string | undefined = undefined;
+        let originalQuery: string | undefined = undefined;
+
+        if (
+          callableResultData.correctedInput &&
+          callableResultData.id &&
+          callableResultData.id.trim() !== rawSeed.query.trim()
+        ) {
+          isCorrected = true;
+          correctedQuery = callableResultData.id.trim();
+          originalQuery = rawSeed.query;
+        }
+
+        const updatedSeed = {
+          ...rawSeed,
+          isCorrected,
+          correctedQuery,
+          originalQuery,
+        };
+
+        expect(updatedSeed.isCorrected).toBe(true);
+        expect(updatedSeed.correctedQuery).toBe('Nine Inch Nails');
+        expect(updatedSeed.originalQuery).toBe('Nine in nails');
+      });
+
+      it('defaults activeSceneId to scene-1 upon multi-scene batch or chained hop completion, while preserving targetSceneId for incremental single-scene additions', () => {
+        const resolveActiveSceneIdOnCompletion = (
+          nextChainedJobId: string | null,
+          targetSceneId: string,
+          isAllScenesDirectHitBatch: boolean,
+          isChainedHop: boolean,
+          deferPhase1ToWorker: boolean,
+          finalProjectScenes: { sceneId: string }[]
+        ) => {
+          return nextChainedJobId
+            ? targetSceneId
+            : (isAllScenesDirectHitBatch || isChainedHop || deferPhase1ToWorker
+                ? (finalProjectScenes[0]?.sceneId || 'scene-1')
+                : targetSceneId);
+        };
+
+        const finalScenes = [
+          { sceneId: 'scene-1' },
+          { sceneId: 'scene-2' },
+          { sceneId: 'scene-3' },
+        ];
+
+        // 1. Chained hop final completion (e.g. Hop 3 of 3)
+        const chainedBatchResult = resolveActiveSceneIdOnCompletion(
+          null,
+          'scene-3',
+          false,
+          true,
+          false,
+          finalScenes
+        );
+        expect(chainedBatchResult).toBe('scene-1');
+
+        // 2. All-scenes direct hit batch completion
+        const directHitBatchResult = resolveActiveSceneIdOnCompletion(
+          null,
+          'scene-1',
+          true,
+          false,
+          false,
+          finalScenes
+        );
+        expect(directHitBatchResult).toBe('scene-1');
+
+        // 3. Upfront deferred worker batch completion
+        const deferredBatchResult = resolveActiveSceneIdOnCompletion(
+          null,
+          'scene-3',
+          false,
+          false,
+          true,
+          finalScenes
+        );
+        expect(deferredBatchResult).toBe('scene-1');
+
+        // 4. Single-scene incremental addition of Scene 3 (not a batch, no chained hops)
+        const incrementalSingleSceneResult = resolveActiveSceneIdOnCompletion(
+          null,
+          'scene-3',
+          false,
+          false,
+          false,
+          finalScenes
+        );
+        expect(incrementalSingleSceneResult).toBe('scene-3');
+      });
     });
   });
 });

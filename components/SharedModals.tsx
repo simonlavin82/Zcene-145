@@ -2506,7 +2506,7 @@ export function ConsolidatedValidationModal({
                   <span>Estimated time:</span>
                   <span className="text-zinc-200 font-medium">
                     {uncachedScenesCount && uncachedScenesCount >= 2
-                      ? `~2–4 minutes per scene (${uncachedScenesCount} scenes queued — safe to leave tab)`
+                      ? `~${uncachedScenesCount * 3}–${uncachedScenesCount * 5} minutes (${uncachedScenesCount} scenes queued — safe to leave tab)`
                       : (
                         <>
                           {effectiveSpeed === 'instant' && 'Ready in a few seconds'}

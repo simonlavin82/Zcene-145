@@ -253,6 +253,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
         .split('::')
         .map((a) => a.trim())
         .filter(Boolean);
+    let isAllScenesDirectHitBatch = false;
     try {
         console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
         let result = null;
@@ -519,7 +520,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             // If targetSceneId was just hydrated by Step 0, retarget to the first remaining uncurated scene!
             const targetSceneObj = existingProjectScenes.find(s => (s.sceneId || s.id) === targetSceneId);
             const targetSceneAlreadyHydrated = (targetSceneObj?.graphData?.nodes?.length ?? 0) > 0;
-            let isAllScenesDirectHitBatch = false;
+            isAllScenesDirectHitBatch = false;
             if (targetSceneAlreadyHydrated) {
                 const remainingUncurated = existingProjectScenes.find(s => (s.graphData?.nodes?.length ?? 0) === 0);
                 if (remainingUncurated) {
@@ -2686,7 +2687,11 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 ...(finalProjectScenes.length > 0
                     ? {
                         scenes: JSON.stringify(finalProjectScenes),
-                        activeSceneId: nextChainedJobId ? (result.remainingUncuratedScenes[0]?.sceneId || targetSceneId) : targetSceneId,
+                        activeSceneId: nextChainedJobId
+                            ? (result.remainingUncuratedScenes[0]?.sceneId || targetSceneId)
+                            : (isAllScenesDirectHitBatch || inputPayload?.isChainedHop || Boolean(inputPayload?.deferPhase1ToWorker)
+                                ? (finalProjectScenes[0]?.sceneId || 'scene-1')
+                                : targetSceneId),
                         sceneCount: finalProjectScenes.length,
                         seedArtistIds: (0, multiSceneUtils_1.getAllProjectSeedIds)(finalProjectScenes),
                         overarchingRationale: result.overarchingRationale || "",
