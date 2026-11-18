@@ -157,7 +157,7 @@ async function resolveSceneTopologyBackend(params) {
             console.warn(`[resolveSceneTopologyBackend] Failed cache lookup for ${resolvedSeedNorm}`, e);
         }
         const qualificationIso = expectedSeedIso || (0, isoCountries_1.extractTrailingCountryIso)(resolvedSeedNorm);
-        if ((0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, false, qualificationIso)) {
+        if ((0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, false, qualificationIso, { requireMembersAndPeers: true })) {
             const cleanHitName = seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || seed;
             if (hasGraphData) {
                 resolvedSeedArray.push({

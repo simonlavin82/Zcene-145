@@ -1848,7 +1848,7 @@ exports.ARTIST_NODE_DETAILS_SCHEMA = {
         members: {
             type: genai_1.Type.ARRAY,
             items: { type: genai_1.Type.STRING },
-            description: "List of authentic, verified members and their roles. Grounding guard: Only include verified members of this specific artist. NEVER include guest musicians, touring package mates, or members of other bands. If uncertain, return []."
+            description: "MANDATORY list of authentic current or historical members with instruments/roles in parentheses: 'Name (Instrument/Role)' e.g. 'Billie Joe Armstrong (Lead Vocals, Guitar)'. For solo artists, list the artist's full name and their roles: 'Name (Lead Vocals, Primary Instruments/Roles)' e.g. 'Jeff Buckley (Lead Vocals, Guitar)', 'PJ Harvey (Vocals, Guitar, Autoharp)'. Obscure underground acts with zero verifiable lineup history may return an honest []."
         },
         details: {
             type: genai_1.Type.OBJECT,
@@ -1868,7 +1868,7 @@ exports.ARTIST_NODE_DETAILS_SCHEMA = {
                 notableArtists: {
                     type: genai_1.Type.ARRAY,
                     items: { type: genai_1.Type.STRING },
-                    description: "Array of 2 to 6 authentic peer or contemporary band/artist names (e.g. ['Jesus Piece', 'Code Orange']). NEVER output explanatory sentences, scene summaries, or generic phrases. If no peer bands are verified, return []."
+                    description: "Array of 2 to 6 authentic PEER OR CONTEMPORARY BANDS/ARTISTS from the same era/scene (e.g. ['Deftones', 'Korn', 'Slipknot']). STRICT NEGATIVE CONSTRAINT: NEVER include individual band members of this artist (e.g. for System of a Down, NEVER return Serj Tankian or Daron Malakian; return peer bands). NEVER include the artist themselves. For solo artists, list peer solo artists or contemporary bands (e.g. for Jeff Buckley, return ['Elliott Smith', 'Fiona Apple', 'Chris Cornell']). NEVER output sentences or scene summaries."
                 }
             },
             required: ["genre", "style", "origin", "founded", "notableArtists"]
@@ -1921,7 +1921,7 @@ exports.ARTIST_NODE_DETAILS_SCHEMA = {
             description: "A guaranteed-non-null YouTube search query string to use as a fallback when youtubeVideoId cannot be confirmed. Format: '[Artist Name] [genre] [live OR official video]'. Example: 'Turnstile hardcore punk official music video'. Always populate this field. Append semantic terms such as 'full set', 'live performance', or 'official music video' before resolving."
         }
     },
-    required: ["summary", "details", "discography", "recommendationReason", "youtubeSearchQuery"]
+    required: ["summary", "details", "discography", "members", "recommendationReason", "youtubeSearchQuery"]
 };
 exports.LABEL_NODE_DETAILS_SCHEMA = {
     type: genai_1.Type.OBJECT,
@@ -2065,11 +2065,11 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     - NEGATIVE SHORTS CONSTRAINT: DO NOT parse or return video hashes derived from search queries matching vertical formats or the '/shorts/' route structure. Prioritize landscape video IDs with durations longer than 2 minutes.
     - ZERO HALLUCINATION (MANDATORY): You must only return a youtubeVideoId if you can extract the exact 11-character ID from a YouTube watch URL (e.g., youtube.com/watch?v=...) present in your EXTERNAL SEARCH CONTEXT. If you do not see the exact URL or video ID in the context, set youtubeVideoId to null. NEVER guess or hallucinate a video ID under any circumstances.
 
-    MEMBERS GROUNDING & ZERO-HALLUCINATION RULE (CRITICAL):
-    - Only include authentic, verified current or historical members of THIS specific entity.
-    - ABSOLUTELY FORBIDDEN: NEVER include guest contributors, touring package mates, festival peers, or members of other bands (e.g. do NOT associate musicians from touring peers like '68 with Vein.fm).
-    - If you do not possess high-confidence historical knowledge of the artist's lineup, you MUST return an empty array: "members": [].
-    - An empty array [] is 100% compliant, fully valid, and strictly preferred over any unverified, approximate, or hallucinated members.
+    MEMBERS SPECIFICATION & FORMAT RULE (MANDATORY):
+    - For BANDS: List 2 to 8 authentic current or historical members with instruments/roles in parentheses: "Name (Instrument/Role)" (e.g. "Billie Joe Armstrong (Lead Vocals, Guitar)", "Mike Dirnt (Bass, Backing Vocals)").
+    - For SOLO ARTISTS: List the artist's full name and their roles: "Name (Lead Vocals, Primary Instruments/Roles)" (e.g. "Jeff Buckley (Lead Vocals, Guitar)", "PJ Harvey (Vocals, Guitar, Autoharp)", "Björk (Lead Vocals, Production)").
+    - ABSOLUTELY FORBIDDEN: NEVER include guest contributors, touring package mates, festival peers, or members of other bands.
+    - Obscure underground/DIY acts with zero verifiable lineup history online may return an honest empty array: "members": [].
 
     DISCOGRAPHY GROUNDING & ZERO-HALLUCINATION RULE (CRITICAL):
     - Only include real, officially released studio albums, EPs, or qualifying demos that exist in authoritative discographies.
@@ -2077,9 +2077,12 @@ exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = `Please provide detailed informatio
     - ABSOLUTELY FORBIDDEN: NEVER invent, fabricate, guess, or extrapolate plausible album titles based on the band's location, lyrics, song titles, or genre clichés (e.g. NEVER invent regional titles like 'To Live and Die in New England' for a Massachusetts hardcore band).
     - An empty array [] is 100% compliant, fully valid, and strictly preferred over any unverified, approximate, or hallucinated titles.
 
-    NOTABLE ARTISTS GROUNDING RULE:
-    - Array of 2 to 6 authentic peer or contemporary band/artist names (e.g. ["Jesus Piece", "Code Orange", "Fleshwater"]).
-    - ABSOLUTELY FORBIDDEN: NEVER output explanatory sentences, scene summaries, or generic phrases (e.g. DO NOT return "Inclusive of modern metallic hardcore...").
+    NOTABLE ARTISTS (SCENE CIRCLE) GROUNDING RULE (CRITICAL):
+    - Array of 2 to 6 authentic PEER OR CONTEMPORARY BANDS OR MUSICAL ACTS from the same era/scene (e.g. ["Deftones", "Korn", "Slipknot", "Limp Bizkit"]).
+    - STRICT NEGATIVE CONSTRAINT (NEVER LEAK MEMBERS): You are STRICTLY FORBIDDEN from putting individual band members of the subject artist into "notableArtists" (e.g. for System of a Down, DO NOT return Serj Tankian, Daron Malakian, Shavo Odadjian, or John Dolmayan; return peer bands like Deftones, Korn, Slipknot).
+    - STRICT NEGATIVE CONSTRAINT (NEVER LEAK SELF): NEVER put the artist themselves into "notableArtists" (e.g. for PJ Harvey, do NOT return PJ Harvey).
+    - For solo artists, return peer solo artists or contemporary bands from their era (e.g. for Jeff Buckley, return ["Elliott Smith", "Fiona Apple", "Chris Cornell", "Rufus Wainwright"]).
+    - NEVER output explanatory sentences, scene summaries, or generic phrases.
     - If no specific peer bands are verified, return [].
 
     WIKIPEDIA ORDERING RULE (MANDATORY):
@@ -2149,13 +2152,23 @@ exports.buildHydrationIdentityLockBlock = buildHydrationIdentityLockBlock;
  * - Strips trailing punctuation
  * - Strips sentence-length or explanatory category phrases (> 4 words, > 35 chars,
  *   or matching prefixes like "inclusive of", "acts", "bands", etc.)
- * - Returns only clean, verified artist/band names
+ * - Strips artist self-references and member leaks
+ * - Returns only clean, verified peer artist/band names
  */
-const sanitizeNotableArtists = (artists) => {
+const sanitizeNotableArtists = (artists, members, currentArtistName) => {
     if (!Array.isArray(artists))
         return [];
     const SENTENCE_PREFIX_REGEX = /^(?:inclusive of|associated with|related to|peers in|features|bands like|including|various|such as|influence of|consisting of|pioneers of|spanning|known for)\b/i;
     const GENERIC_CATEGORY_REGEX = /\b(?:acts|bands|artists|musicians|scene|subgenres?|influences)\b/i;
+    const normalizedCurrentArtist = currentArtistName ? currentArtistName.trim().toLowerCase() : '';
+    const memberNames = Array.isArray(members)
+        ? members
+            .map((m) => {
+            const raw = typeof m === 'string' ? m : (typeof m?.name === 'string' ? m.name : '');
+            return raw.replace(/\s*\(.*?\)/g, '').trim().toLowerCase();
+        })
+            .filter((n) => n.length > 0)
+        : [];
     return artists
         .filter((item) => typeof item === 'string' && item.trim().length > 0)
         .map(s => s.trim().replace(/[.;!?]+$/, ''))
@@ -2167,6 +2180,13 @@ const sanitizeNotableArtists = (artists) => {
         if (SENTENCE_PREFIX_REGEX.test(name))
             return false;
         if (GENERIC_CATEGORY_REGEX.test(name) && !/^(the|a)\s/i.test(name))
+            return false;
+        const lower = name.toLowerCase();
+        // Negative check: strip artist self-reference
+        if (normalizedCurrentArtist && lower === normalizedCurrentArtist)
+            return false;
+        // Negative check: strip band members from notable artists
+        if (memberNames.includes(lower))
             return false;
         return true;
     });
@@ -2432,6 +2452,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
             ? l.url.trim()
             : null
     }));
+    const rawMembers = Array.isArray(details.members) ? details.members.map(sanitizeString) : [];
     const hydratedDetails = {
         ...details,
         summary: (0, exports.sanitizeBioText)(details.summary || "No summary available (AI response was truncated)."),
@@ -2450,7 +2471,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
                 genre: sanitizeMetaField(d.genre),
                 origin: sanitizeMetaField(d.origin),
                 founded: sanitizeString(d.founded),
-                notableArtists: (0, exports.sanitizeNotableArtists)(d.notableArtists)
+                notableArtists: (0, exports.sanitizeNotableArtists)(d.notableArtists, rawMembers, searchArtistName)
             };
             if (isLabelNode) {
                 delete cleanedDetails.style;
@@ -2465,7 +2486,7 @@ const fetchNodeDetailsBackend = async (node, graphData, seedArtists, originHint,
             albumName: (0, exports.sanitizeAlbumName)(album?.albumName, details.details?.notableArtists),
             releaseYear: sanitizeString(album?.releaseYear)
         })),
-        members: (details.members || []).map(sanitizeString),
+        members: rawMembers,
         recommendationReason: sanitizeString(details.recommendationReason || ""),
         youtubeVideoId: (0, exports.extractValidYoutubeId)(details.youtubeVideoId),
         imageUrl: isLabelNode ? null : (0, exports.sanitizeImageUrl)(details.imageUrl, sanitizeString),

@@ -1774,63 +1774,109 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 </div>
                             )}
 
-                            {details.details?.notableArtists && details.details.notableArtists.length > 0 && (
-                                <div>
-                                    <h4 className="font-semibold text-zinc-500 mb-3 text-[10px] uppercase tracking-widest">
-                                        {isLabelNode ? 'Released Artists / Scene Circle' : 'Scene Circle'}
-                                    </h4>
-                                    <div className="flex flex-wrap gap-2">
-                                        {details.details.notableArtists.map(artistName => {
-                                            const normalizedArtist = normalizeArtistId(artistName);
-                                            const existingNode = graphData?.nodes.find(n =>
-                                                n.type === 'artist' && isArtistIdMatch(n.id, artistName)
-                                            );
-                                            const isExistingInGraph = !!existingNode;
+                            {(() => {
+                                const rawNotable = details.details?.notableArtists;
+                                if (!rawNotable || !Array.isArray(rawNotable) || rawNotable.length === 0) {
+                                    return null;
+                                }
 
-                                            if (isGuest) {
-                                                return (
-                                                    <div
-                                                        key={artistName}
-                                                        className="border border-zinc-800 bg-zinc-900/50 text-zinc-500 py-1.5 px-4 text-sm rounded-xl"
-                                                    >
-                                                        <span className="truncate px-0.5 tracking-normal">{artistName}</span>
-                                                    </div>
-                                                );
+                                const filteredNotableArtists = isLabelNode ? rawNotable : (() => {
+                                    const currentArtistLower = String(details.details?.artist || details.artist || node?.label || node?.id || '').trim().toLowerCase();
+                                    const currentArtistNorm = normalizeArtistId(currentArtistLower);
+
+                                    const memberNamesSet = new Set<string>();
+                                    const memberNormsSet = new Set<string>();
+
+                                    if (Array.isArray(details.members)) {
+                                        details.members.forEach((m: any) => {
+                                            const raw = typeof m === 'string' ? m : (typeof m?.name === 'string' ? m.name : '');
+                                            const clean = raw.replace(/\s*\(.*?\)/g, '').trim().toLowerCase();
+                                            if (clean) {
+                                                memberNamesSet.add(clean);
+                                                memberNormsSet.add(normalizeArtistId(clean));
                                             }
-                                            return (
-                                                <button
-                                                    key={artistName}
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (isExistingInGraph) {
-                                                            if (onNodeClick && existingNode) {
-                                                                onNodeClick(existingNode);
-                                                            }
-                                                        } else {
-                                                            if (onStashArtist) {
-                                                                onStashArtist(artistName);
+                                        });
+                                    }
+
+                                    return rawNotable.filter(artistName => {
+                                        if (typeof artistName !== 'string' || !artistName.trim()) return false;
+                                        const lower = artistName.trim().toLowerCase();
+                                        const norm = normalizeArtistId(artistName);
+
+                                        // Filter out self-reference (e.g. PJ Harvey in her own scene circle)
+                                        if (lower === currentArtistLower || (norm && norm === currentArtistNorm)) {
+                                            return false;
+                                        }
+
+                                        // Filter out any name matching a band member
+                                        if (memberNamesSet.has(lower) || (norm && memberNormsSet.has(norm))) {
+                                            return false;
+                                        }
+
+                                        return true;
+                                    });
+                                })();
+
+                                if (filteredNotableArtists.length === 0) return null;
+
+                                return (
+                                    <div>
+                                        <h4 className="font-semibold text-zinc-500 mb-3 text-[10px] uppercase tracking-widest">
+                                            {isLabelNode ? 'Released Artists / Scene Circle' : 'Scene Circle'}
+                                        </h4>
+                                        <div className="flex flex-wrap gap-2">
+                                            {filteredNotableArtists.map(artistName => {
+                                                const normalizedArtist = normalizeArtistId(artistName);
+                                                const existingNode = graphData?.nodes.find(n =>
+                                                    n.type === 'artist' && isArtistIdMatch(n.id, artistName)
+                                                );
+                                                const isExistingInGraph = !!existingNode;
+
+                                                if (isGuest) {
+                                                    return (
+                                                        <div
+                                                            key={artistName}
+                                                            className="border border-zinc-800 bg-zinc-900/50 text-zinc-500 py-1.5 px-4 text-sm rounded-xl"
+                                                        >
+                                                            <span className="truncate px-0.5 tracking-normal">{artistName}</span>
+                                                        </div>
+                                                    );
+                                                }
+                                                return (
+                                                    <button
+                                                        key={artistName}
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (isExistingInGraph) {
+                                                                if (onNodeClick && existingNode) {
+                                                                    onNodeClick(existingNode);
+                                                                }
                                                             } else {
-                                                                onAddArtist(normalizedArtist);
+                                                                if (onStashArtist) {
+                                                                    onStashArtist(artistName);
+                                                                } else {
+                                                                    onAddArtist(normalizedArtist);
+                                                                }
                                                             }
-                                                        }
-                                                    }}
-                                                    className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl cursor-pointer ${isExistingInGraph
-                                                        ? 'border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700'
-                                                        : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
-                                                        }`}
-                                                >
-                                                    <span className="truncate tracking-normal">{artistName}</span>
-                                                    {isExistingInGraph ? (
-                                                        <span className="material-symbols-outlined !text-[14px] text-primary">check_circle</span>
-                                                    ) : (
-                                                        <StackIcon className="!text-[14px] opacity-70" />
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
+                                                        }}
+                                                        className={`border py-1.5 px-4 transition-all text-sm flex items-center gap-1.5 rounded-xl cursor-pointer ${isExistingInGraph
+                                                            ? 'border-zinc-700 bg-zinc-800 text-white hover:bg-zinc-700'
+                                                            : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:text-white hover:bg-zinc-800 hover:border-zinc-700 active:scale-95'
+                                                            }`}
+                                                    >
+                                                        <span className="truncate tracking-normal">{artistName}</span>
+                                                        {isExistingInGraph ? (
+                                                            <span className="material-symbols-outlined !text-[14px] text-primary">check_circle</span>
+                                                        ) : (
+                                                            <StackIcon className="!text-[14px] opacity-70" />
+                                                        )}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
 
                             {details.discography && details.discography.length > 0 && (
                                 <div>

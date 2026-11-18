@@ -92,23 +92,7 @@ const parseGraphField = (graphField) => {
     return { ...parsed, nodes, links };
 };
 exports.parseGraphField = parseGraphField;
-/**
- * Architecture V33 (Rule 8 & Rule 40) — Unified Entity Profile Qualification Gate.
- *
- * Enforces that a cached or newly hydrated entity profile (`detailsCache`) is complete
- * and free of prose-fallback degradation before being accepted as a Read Hit or written
- * to global `/artists` or `/labels`:
- *   1. Valid summary (> 50 chars, no mock/placeholder text).
- *   2. Non-empty details.genre, details.origin, and details.founded.
- *   3. Authentic recommendationReason (non-empty for artists, and never containing
- *      "Synthesised from live cultural archives").
- *   4. For artists (!isLabel):
- *      - Array.isArray(profile.discography) (honest empty arrays [] are fully qualified for unindexed underground artists)
- *      - Non-empty imageUrl string (either a verified https:// URL or the terminal
- *        "not-found" monogram state after a real 4-tier scrape;
- *        only undefined/null/"" means image scraping has not run).
- */
-const isFullyQualifiedEntityProfile = (profile, isLabel = false, expectedIsoOrEntityId) => {
+const isFullyQualifiedEntityProfile = (profile, isLabel = false, expectedIsoOrEntityId, options) => {
     if (!profile || typeof profile !== 'object' || Array.isArray(profile))
         return false;
     if (profile._isStub === true || profile.redirectTo)
@@ -161,6 +145,53 @@ const isFullyQualifiedEntityProfile = (profile, isLabel = false, expectedIsoOrEn
             : (typeof profile.image === 'string' ? profile.image.trim() : '');
         if (imageUrl.length === 0) {
             return false;
+        }
+        const notableArtists = profile.details?.notableArtists ?? profile.notableArtists;
+        // UNCONDITIONAL ANTI-POLLUTION GUARD (ALL GATES):
+        // If notableArtists is present, it must NEVER contain the artist's own name or any of its own members
+        if (Array.isArray(notableArtists) && notableArtists.length > 0) {
+            const artistNameLower = String(profile.details?.artist || profile.artist || '').trim().toLowerCase();
+            const cleanMemberNames = Array.isArray(profile.members)
+                ? profile.members
+                    .map((m) => {
+                    const raw = typeof m === 'string' ? m : (typeof m?.name === 'string' ? m.name : '');
+                    return raw.replace(/\s*\(.*?\)/g, '').trim().toLowerCase();
+                })
+                    .filter((n) => n.length > 0)
+                : [];
+            const isPolluted = notableArtists.some((candidate) => {
+                if (typeof candidate !== 'string')
+                    return false;
+                const candLower = candidate.trim().toLowerCase();
+                if (!candLower)
+                    return false;
+                if (artistNameLower && candLower === artistNameLower)
+                    return true;
+                return cleanMemberNames.includes(candLower);
+            });
+            if (isPolluted) {
+                return false;
+            }
+        }
+        // OPT-IN READ GATE (COLUMN 3 HYDRATION GATE ONLY):
+        // Requires non-empty members and notableArtists so stale cached docs self-heal on curation.
+        // The Write Gate and JIT Healer omit this flag to respect [Rule 8] for honest underground bands.
+        if (options?.requireMembersAndPeers) {
+            if (!Array.isArray(profile.members) || profile.members.length === 0) {
+                return false;
+            }
+            if (!Array.isArray(notableArtists) || notableArtists.length === 0) {
+                return false;
+            }
+        }
+    }
+    else {
+        // Labels require non-empty notableArtists if requireMembersAndPeers is enabled
+        if (options?.requireMembersAndPeers) {
+            const notableArtists = profile.details?.notableArtists ?? profile.notableArtists;
+            if (!Array.isArray(notableArtists) || notableArtists.length === 0) {
+                return false;
+            }
         }
     }
     return true;

@@ -25,6 +25,7 @@ import {
   normalizeArtistId,
   normalizeGraphData,
   cleanLabelDisplayName as backendCleanLabelDisplayName,
+  sanitizeNotableArtists,
   GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE,
   GENERATE_GRAPH_PROMPT_TEMPLATE
 } from '../src/services/curatorService';
@@ -340,6 +341,98 @@ describe('Architecture V35: 3-Tier Anchor System & Deep Cut Anti-Pollution Gates
         recommendationReason: 'Synthesised from live cultural archives via Google Search grounding.'
       };
       expect(isFullyQualifiedEntityProfile(prosePollutedLabel, true)).toBe(false);
+    });
+
+    describe('Phase B2.11 Anti-Pollution Parity & Lineup Qualification ([Rule 8] & [Rule 40])', () => {
+      const cleanArtistProfile = {
+        summary: 'Green Day is an American rock band formed in Rodeo, California in 1987 by Billie Joe Armstrong and Mike Dirnt.',
+        details: {
+          artist: 'Green Day',
+          genre: 'Punk Rock / Pop Punk',
+          style: 'Melodic',
+          origin: 'Rodeo, California, United States',
+          founded: '1987',
+          notableArtists: ['Rancid', 'The Offspring', 'Blink-182', 'Jawbreaker']
+        },
+        discography: [
+          { albumName: 'Dookie', releaseYear: '1994' }
+        ],
+        members: [
+          'Billie Joe Armstrong (Lead Vocals, Guitar)',
+          'Mike Dirnt (Bass, Backing Vocals)',
+          'Tré Cool (Drums, Percussion)'
+        ],
+        recommendationReason: 'Pioneered pop-punk mainstream renaissance in 1994.',
+        imageUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music/greenday.jpg'
+      };
+
+      it('Rejects artist profiles where notableArtists contains the artist own name (unconditional self-pollution)', () => {
+        const selfPollutedProfile = {
+          ...cleanArtistProfile,
+          details: {
+            ...cleanArtistProfile.details,
+            notableArtists: ['Green Day', 'Rancid', 'The Offspring']
+          }
+        };
+        expect(isFullyQualifiedEntityProfile(selfPollutedProfile, false)).toBe(false);
+      });
+
+      it('Rejects artist profiles where notableArtists leaks the band own members (unconditional member pollution)', () => {
+        const memberPollutedProfile = {
+          ...cleanArtistProfile,
+          details: {
+            ...cleanArtistProfile.details,
+            notableArtists: ['Billie Joe Armstrong', 'Mike Dirnt', 'Tré Cool']
+          }
+        };
+        expect(isFullyQualifiedEntityProfile(memberPollutedProfile, false)).toBe(false);
+      });
+
+      it('Accepts honest underground artist profiles with members: [] at Write Gate (default requireMembersAndPeers: false) under [Rule 8]', () => {
+        const undergroundProfile = {
+          summary: 'Obscure DIY hardcore collective from Richmond, VA with limited pressing 7-inch releases.',
+          details: {
+            artist: 'Richmond Underground',
+            genre: 'Hardcore Punk',
+            style: 'Aggressive',
+            origin: 'Richmond, Virginia, United States',
+            founded: '2022',
+            notableArtists: ['Downfall', 'Division of Mind']
+          },
+          discography: [],
+          members: [],
+          recommendationReason: 'Crucial underground Richmond DIY hardcore contributor.',
+          imageUrl: 'not-found'
+        };
+        expect(isFullyQualifiedEntityProfile(undergroundProfile, false)).toBe(true);
+      });
+
+      it('Flags profiles missing members or notableArtists as unqualified when requireMembersAndPeers: true is set (Column 3 Read Gate Self-Healing)', () => {
+        const profileMissingMembers = {
+          ...cleanArtistProfile,
+          members: []
+        };
+        expect(isFullyQualifiedEntityProfile(profileMissingMembers, false, null, { requireMembersAndPeers: true })).toBe(false);
+
+        const profileMissingPeers = {
+          ...cleanArtistProfile,
+          details: {
+            ...cleanArtistProfile.details,
+            notableArtists: []
+          }
+        };
+        expect(isFullyQualifiedEntityProfile(profileMissingPeers, false, null, { requireMembersAndPeers: true })).toBe(false);
+
+        // Clean profile passes with requireMembersAndPeers: true
+        expect(isFullyQualifiedEntityProfile(cleanArtistProfile, false, null, { requireMembersAndPeers: true })).toBe(true);
+      });
+
+      it('sanitizeNotableArtists deterministically scrubs member leaks and self-references', () => {
+        const pollutedNotable = ['Serj Tankian', 'Deftones', 'System of a Down', 'Korn', 'Daron Malakian'];
+        const members = ['Serj Tankian (Lead Vocals, Keyboards)', 'Daron Malakian (Guitar, Vocals)'];
+        const scrubbed = sanitizeNotableArtists(pollutedNotable, members, 'System of a Down');
+        expect(scrubbed).toEqual(['Deftones', 'Korn']);
+      });
     });
 
     it('Marks qualifyCacheEntry as USABLE_STALE (isFullyQualified: false) if detailsCache has invalid non-array discography or prose-fallback reason (V37 Rule 40)', () => {

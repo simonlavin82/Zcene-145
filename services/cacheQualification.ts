@@ -114,10 +114,15 @@ export const parseGraphField = (graphField: any): { nodes: any[]; links: any[] }
  *        "not-found" monogram state after a real 4-tier scrape;
  *        only undefined/null/"" means image scraping has not run).
  */
+export interface CacheQualificationOptions {
+  requireMembersAndPeers?: boolean;
+}
+
 export const isFullyQualifiedEntityProfile = (
   profile: any,
   isLabel: boolean = false,
-  expectedIsoOrEntityId?: string | null
+  expectedIsoOrEntityId?: string | null,
+  options?: CacheQualificationOptions
 ): boolean => {
   if (!profile || typeof profile !== 'object' || Array.isArray(profile)) return false;
   if (profile._isStub === true || profile.redirectTo) return false;
@@ -174,6 +179,54 @@ export const isFullyQualifiedEntityProfile = (
       : (typeof profile.image === 'string' ? profile.image.trim() : '');
     if (imageUrl.length === 0) {
       return false;
+    }
+
+    const notableArtists = profile.details?.notableArtists ?? profile.notableArtists;
+
+    // UNCONDITIONAL ANTI-POLLUTION GUARD (ALL GATES):
+    // If notableArtists is present, it must NEVER contain the artist's own name or any of its own members
+    if (Array.isArray(notableArtists) && notableArtists.length > 0) {
+      const artistNameLower = String(profile.details?.artist || profile.artist || '').trim().toLowerCase();
+      const cleanMemberNames = Array.isArray(profile.members)
+        ? profile.members
+            .map((m: any) => {
+              const raw = typeof m === 'string' ? m : (typeof m?.name === 'string' ? m.name : '');
+              return raw.replace(/\s*\(.*?\)/g, '').trim().toLowerCase();
+            })
+            .filter((n: string) => n.length > 0)
+        : [];
+
+      const isPolluted = notableArtists.some((candidate: any) => {
+        if (typeof candidate !== 'string') return false;
+        const candLower = candidate.trim().toLowerCase();
+        if (!candLower) return false;
+        if (artistNameLower && candLower === artistNameLower) return true;
+        return cleanMemberNames.includes(candLower);
+      });
+
+      if (isPolluted) {
+        return false;
+      }
+    }
+
+    // OPT-IN READ GATE (COLUMN 3 HYDRATION GATE ONLY):
+    // Requires non-empty members and notableArtists so stale cached docs self-heal on curation.
+    // The Write Gate and JIT Healer omit this flag to respect [Rule 8] for honest underground bands.
+    if (options?.requireMembersAndPeers) {
+      if (!Array.isArray(profile.members) || profile.members.length === 0) {
+        return false;
+      }
+      if (!Array.isArray(notableArtists) || notableArtists.length === 0) {
+        return false;
+      }
+    }
+  } else {
+    // Labels require non-empty notableArtists if requireMembersAndPeers is enabled
+    if (options?.requireMembersAndPeers) {
+      const notableArtists = profile.details?.notableArtists ?? profile.notableArtists;
+      if (!Array.isArray(notableArtists) || notableArtists.length === 0) {
+        return false;
+      }
     }
   }
 

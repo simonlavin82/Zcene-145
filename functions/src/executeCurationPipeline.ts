@@ -232,7 +232,7 @@ export async function resolveSceneTopologyBackend(
       }
       
       const qualificationIso = expectedSeedIso || extractTrailingCountryIso(resolvedSeedNorm);
-      if (isFullyQualifiedEntityProfile(cachedDetails, false, qualificationIso)) {
+      if (isFullyQualifiedEntityProfile(cachedDetails, false, qualificationIso, { requireMembersAndPeers: true })) {
          const cleanHitName = seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || seed;
          if (hasGraphData) {
             resolvedSeedArray.push({

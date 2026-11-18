@@ -443,7 +443,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 const match = cachedDetails.find((item) => (0, curatorService_1.normalizeArtistId)(item[0]) === resolvedCanonicalId);
                                 cachedDetails = match ? match[1] : (Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0]);
                             }
-                            if (parsedGraph?.nodes?.length >= 2 && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails)) {
+                            if (parsedGraph?.nodes?.length >= 2 && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, false, null, { requireMembersAndPeers: true })) {
                                 s.graphData = parsedGraph;
                                 s.synthesisRationale = sCache.synthesisRationale || parsedGraph.synthesisRationale || "";
                                 s.status = "ready";
@@ -749,7 +749,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         (0, isoCountries_1.stripCountrySlug)(seed);
                     const seedLock = getSeedLock(canonicalSeedId) || getSeedLock(seed);
                     const expectedSeedIso = seedLock?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(canonicalSeedId);
-                    if ((0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, false, expectedSeedIso)) {
+                    if ((0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, false, expectedSeedIso, { requireMembersAndPeers: true })) {
                         console.log(`[Phase 1] Cache Hit for seed: ${seed}`);
                         resolvedSeedArray.push({
                             id: canonicalSeedId,
@@ -977,7 +977,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         let details = null;
                         const priorSceneCached = existingProjectDetailsMap.get(artistNormId) ||
                             existingProjectDetailsMap.get((0, curatorService_1.normalizeArtistId)(artistNormId));
-                        if (priorSceneCached && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(priorSceneCached, isLabel, expectedNodeIso)) {
+                        if (priorSceneCached && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(priorSceneCached, isLabel, expectedNodeIso, { requireMembersAndPeers: true })) {
                             details = { ...priorSceneCached, _isReadOnly: true };
                             console.log(`[Curation Backend] [V43 Cross-Scene Cache Hit] Reusing project detailsCache for: ${artistNormId}`);
                         }
@@ -1011,7 +1011,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                             // A cached document is only a valid hit if it satisfies isFullyQualifiedEntityProfile
                                             // (summary > 50 chars, genre, origin, founded, non-empty discography >= 1 album for artists,
                                             // authentic recommendationReason free of prose-fallback text, and non-empty imageUrl).
-                                            const isCacheComplete = (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, isLabel, expectedNodeIso);
+                                            const isCacheComplete = (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, isLabel, expectedNodeIso, { requireMembersAndPeers: true });
                                             if (isCacheComplete) {
                                                 details = cachedDetails;
                                                 console.log(`[Curation Backend] Direct cache hit (complete) for details of: ${artistNormId}`);
@@ -1038,7 +1038,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         if (details && details.details && details.details.artist && details.details.artist !== rawName) {
                             searchArtistName = seedNamesMap[artistNormId] || details.details.artist;
                         }
-                        if (!details || !(0, cacheQualification_1.isFullyQualifiedEntityProfile)(details, isLabel, expectedNodeIso)) {
+                        if (!details || !(0, cacheQualification_1.isFullyQualifiedEntityProfile)(details, isLabel, expectedNodeIso, { requireMembersAndPeers: true })) {
                             requiresTextHydration = true;
                             requiresImageScraping = true;
                             requiresVideoScraping = true;

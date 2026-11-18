@@ -2565,6 +2565,114 @@ describe('DetailsPanel', () => {
             });
         });
     });
+
+    describe('Phase B2.11 SCENE CIRCLE Defensive Member & Self-Reference Filtering', () => {
+        it('filters out members and self-references from SCENE CIRCLE chips', () => {
+            const mockNode = { id: 'slipknot-us', type: 'artist', label: 'Slipknot' };
+            const mockDetails = {
+                summary: 'Influential American nu metal band from Des Moines, Iowa.',
+                members: [
+                    'Corey Taylor (Lead Vocals)',
+                    'Shawn Crahan (Custom Percussion, Backing Vocals)',
+                    'Mick Thomson (Guitars)'
+                ],
+                details: {
+                    artist: 'Slipknot',
+                    notableArtists: ['Corey Taylor', 'Deftones', 'Korn', 'Slipknot', 'Shawn Crahan']
+                },
+                links: []
+            };
+
+            render(
+                <NodeDetailsCard
+                    node={mockNode as any}
+                    details={mockDetails as any}
+                    isLoading={false}
+                    isGlobalLoading={false}
+                    graphData={{ nodes: [], links: [] } as any}
+                    libraryArtists={[]}
+                    seedArtists={[]}
+                    onAddArtist={() => {}}
+                    isSmallScreen={false}
+                    onClose={() => {}}
+                    onNodeClick={() => {}}
+                    onNavigate={() => {}}
+                    chatHistory={[]}
+                    onSendMessage={() => {}}
+                    isChatLoading={false}
+                    chatMode="instant"
+                    onChatModeChange={() => {}}
+                    liveMessageCount={0}
+                    isInStack={false}
+                    onToggleStack={() => {}}
+                    stack={[]}
+                />
+            );
+
+            // Peer bands must be present
+            expect(screen.getByText('Deftones')).toBeInTheDocument();
+            expect(screen.getByText('Korn')).toBeInTheDocument();
+
+            // Band members must NOT appear in Scene Circle buttons
+            const allButtons = screen.getAllByRole('button');
+            const buttonTexts = allButtons.map(b => b.textContent);
+            expect(buttonTexts).not.toContain('Corey Taylor');
+            expect(buttonTexts).not.toContain('Shawn Crahan');
+
+            // Artist self-reference must NOT appear in Scene Circle buttons
+            expect(buttonTexts).not.toContain('Slipknot');
+        });
+
+        it('completely hides SCENE CIRCLE header when all notableArtists are members (System of a Down scenario)', () => {
+            const mockNode = { id: 'system-of-a-down-us', type: 'artist', label: 'System of a Down' };
+            const mockDetails = {
+                summary: 'Armenian-American heavy metal band from Glendale, California.',
+                members: [
+                    'Serj Tankian (Lead Vocals, Keyboards)',
+                    'Daron Malakian (Guitar, Vocals)',
+                    'Shavo Odadjian (Bass)',
+                    'John Dolmayan (Drums)'
+                ],
+                details: {
+                    artist: 'System of a Down',
+                    notableArtists: ['Serj Tankian', 'Daron Malakian', 'Shavo Odadjian', 'John Dolmayan']
+                },
+                links: []
+            };
+
+            render(
+                <NodeDetailsCard
+                    node={mockNode as any}
+                    details={mockDetails as any}
+                    isLoading={false}
+                    isGlobalLoading={false}
+                    graphData={{ nodes: [], links: [] } as any}
+                    libraryArtists={[]}
+                    seedArtists={[]}
+                    onAddArtist={() => {}}
+                    isSmallScreen={false}
+                    onClose={() => {}}
+                    onNodeClick={() => {}}
+                    onNavigate={() => {}}
+                    chatHistory={[]}
+                    onSendMessage={() => {}}
+                    isChatLoading={false}
+                    chatMode="instant"
+                    onChatModeChange={() => {}}
+                    liveMessageCount={0}
+                    isInStack={false}
+                    onToggleStack={() => {}}
+                    stack={[]}
+                />
+            );
+
+            // Members section renders correctly
+            expect(screen.getByText('Members')).toBeInTheDocument();
+
+            // Scene Circle header must be completely hidden because all entries were members
+            expect(screen.queryByText('Scene Circle')).not.toBeInTheDocument();
+        });
+    });
 });
 
 

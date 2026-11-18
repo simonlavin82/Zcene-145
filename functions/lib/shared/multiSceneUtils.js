@@ -2263,16 +2263,16 @@ function shiftSceneClusterCoordinates({ scenes, removedSceneId, canvasLayout, })
         // 2. Custom Name vs Default Re-indexing Resolution
         const seedsArray = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
         const seedsJoined = seedsArray.join(', ');
-        const isAutoSceneTitle = scene.title.trim() === seedsJoined ||
-            scene.title.trim() === seedsArray.join(' + ');
+        const titleStr = typeof scene.title === 'string' ? scene.title.trim() : '';
+        const isAutoSceneTitle = titleStr === seedsJoined ||
+            titleStr === seedsArray.join(' + ');
         const hasExplicitCustomName = typeof scene.customName === 'string' && scene.customName.trim().length > 0;
-        const hasCustomTitle = typeof scene.title === 'string' &&
-            scene.title.trim().length > 0 &&
-            !/^scene(?:\s+\d+)?$/i.test(scene.title.trim()) &&
+        const hasCustomTitle = titleStr.length > 0 &&
+            !/^scene(?:\s+\d+)?$/i.test(titleStr) &&
             !isAutoSceneTitle;
         const preservedCustomName = hasExplicitCustomName
             ? scene.customName.trim()
-            : (hasCustomTitle ? scene.title.trim() : undefined);
+            : (hasCustomTitle ? titleStr : undefined);
         const resolvedTitle = preservedCustomName || (seedsArray.length > 0 ? seedsJoined : `Scene ${newIdx + 1}`);
         const normalized = normalizeProjectScene({
             ...scene,
