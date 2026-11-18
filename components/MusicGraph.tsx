@@ -622,10 +622,10 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       isSmallScreenRef.current = isSmallScreen;
   }, [isSmallScreen]);
 
-  const fitGraphToScreenRef = useRef<((duration?: number) => void) | null>(null);
+  const fitGraphToScreenRef = useRef<((duration?: number) => boolean) | null>(null);
   
-  const fitGraphToScreen = useCallback((duration: number = 1000) => {
-      if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0 || visibleNodesRef.current.length === 0) return;
+  const fitGraphToScreen = useCallback((duration: number = 1000): boolean => {
+      if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0 || visibleNodesRef.current.length === 0) return false;
       isTrackingRef.current = false;
       const width = dimensionsRef.current.width;
       const height = dimensionsRef.current.height;
@@ -642,7 +642,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
           }
       });
       
-      if (validNodesCount === 0) return;
+      if (validNodesCount === 0) return false;
 
       const contentWidth = maxX - minX;
       const contentHeight = maxY - minY;
@@ -666,10 +666,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       const ty = height / 2 - cy * k;
       
       d3.select(svgRef.current).transition().duration(duration).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
+      return true;
   }, []);
 
-  const focusSceneCluster = useCallback((targetSceneId: string, duration: number = 750) => {
-    if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0) return;
+  const focusSceneCluster = useCallback((targetSceneId: string, duration: number = 750): boolean => {
+    if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0) return false;
     isTrackingRef.current = false;
     const width = dimensionsRef.current.width;
     const height = dimensionsRef.current.height;
@@ -717,8 +718,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       // fit the existing settled scenes to screen so the constellation remains visible.
       const settledNodes = visibleNodesRef.current.filter(n => n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y));
       if (settledNodes.length > 0) {
-        fitGraphToScreen(duration);
-        return;
+        return fitGraphToScreen(duration);
       }
       const fallbackIdx = targetIndex >= 0 ? targetIndex : 0;
       const center = getSceneCenterOffset(fallbackIdx);
@@ -744,6 +744,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     } else {
       d3.select(svgRef.current).transition().duration(duration).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
     }
+    return true;
   }, [scenes, fitGraphToScreen]);
 
   const focusSceneClusterRef = useRef(focusSceneCluster);
@@ -789,7 +790,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     return 0;
   }, [scenes]);
 
-  const prevMappedSceneCountRef = useRef(mappedSceneCount);
+  const prevMappedSceneCountRef = useRef(0);
 
   useEffect(() => {
     if (lastSceneCountRef.current !== detectedSceneCount) {
@@ -809,10 +810,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   useEffect(() => {
     if (prevMappedSceneCountRef.current === 0 && mappedSceneCount > 0) {
       prevMappedSceneCountRef.current = mappedSceneCount;
-      hasInitialCentered.current = false;
-      setTimeout(() => {
-        focusSceneCluster(activeSceneId || 'scene-1', 0);
-      }, 50);
+      if (zoomRef.current && dimensionsRef.current.width > 0) {
+        const centered = focusSceneCluster(activeSceneId || 'scene-1', 0);
+        if (centered) hasInitialCentered.current = true;
+      } else {
+        setTimeout(() => {
+          if (zoomRef.current && dimensionsRef.current.width > 0) {
+            const centered = focusSceneCluster(activeSceneId || 'scene-1', 0);
+            if (centered) hasInitialCentered.current = true;
+          }
+        }, 50);
+      }
     } else {
       prevMappedSceneCountRef.current = mappedSceneCount;
     }
@@ -820,18 +828,6 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
   useEffect(() => {
     if (!svgRef.current || dimensions.width === 0) return;
-
-    // Architecture V45.1 (Phase B2.2): If initial centering was blocked while width was 0,
-    // execute it immediately upon first non-zero layout measurement.
-    if (!hasInitialCentered.current && visibleNodes.length > 0) {
-      hasInitialCentered.current = true;
-      const sceneCount = detectedSceneCount;
-      if (sceneCount > 1 && focusSceneClusterRef.current) {
-        focusSceneClusterRef.current(activeSceneId || 'scene-1', 0);
-      } else if (fitGraphToScreenRef.current) {
-        fitGraphToScreenRef.current(0);
-      }
-    }
 
     const svg = d3.select(svgRef.current);
     const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
@@ -1268,6 +1264,20 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             });
         svg.call(zoom).on("dblclick.zoom", null);
         zoomRef.current = zoom;
+
+        // V45.1 (Phase B2.4): Execute initial camera centering immediately AFTER zoomRef.current is bound
+        if (!hasInitialCentered.current && visibleNodes.length > 0) {
+            const sceneCount = detectedSceneCount;
+            let centered = false;
+            if (sceneCount > 1) {
+                centered = focusSceneCluster(activeSceneId || 'scene-1', 0);
+            } else {
+                centered = fitGraphToScreen(0);
+            }
+            if (centered) {
+                hasInitialCentered.current = true;
+            }
+        }
         
         // Custom conditional double-click zoom to restore background zooming without hijacking mobile node taps
         svg.on("dblclick", (event) => {
@@ -1438,10 +1448,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         return false;
                     }
                     const sceneCount = detectedSceneCount;
+                    let centered = false;
                     if (sceneCount > 1 && focusSceneClusterRef.current) {
-                        focusSceneClusterRef.current(activeSceneId || 'scene-1', 0);
+                        centered = focusSceneClusterRef.current(activeSceneId || 'scene-1', 0);
                     } else if (fitGraphToScreenRef.current) {
-                        fitGraphToScreenRef.current(0);
+                        centered = fitGraphToScreenRef.current(0);
                         if (sceneCount <= 1) {
                             setTimeout(() => {
                                 if (svgRef.current && zoomRef.current) {
@@ -1450,7 +1461,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             }, 50);
                         }
                     }
-                    return true;
+                    return centered;
                 };
 
                 if (!hasInitialCentered.current) {

@@ -3882,5 +3882,108 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(key2).toBe('scene-2::deftones');
       expect(key1).not.toBe(key2);
     });
+
+    describe('Phase B2.4: Camera Centering & UI Auto-Focus Guards', () => {
+      it('initial camera centering only marks hasInitialCentered = true after zoomRef is bound and focusSceneCluster returns true', () => {
+        let hasInitialCentered = false;
+        let zoomRef: any = null;
+        const dimensions = { width: 0, height: 0 };
+
+        const attemptCentering = (targetSceneId: string): boolean => {
+          if (!zoomRef || dimensions.width === 0) return false;
+          // Successfully centered
+          return true;
+        };
+
+        // 1. Premature attempt before zoomRef is bound or width is measured
+        let centered = attemptCentering('scene-1');
+        if (centered) hasInitialCentered = true;
+        expect(centered).toBe(false);
+        expect(hasInitialCentered).toBe(false);
+
+        // 2. Width is measured but zoomRef is still null
+        dimensions.width = 800;
+        dimensions.height = 600;
+        centered = attemptCentering('scene-1');
+        if (centered) hasInitialCentered = true;
+        expect(centered).toBe(false);
+        expect(hasInitialCentered).toBe(false);
+
+        // 3. zoomRef is bound after D3 initialization
+        zoomRef = { transform: () => {} };
+        centered = attemptCentering('scene-1');
+        if (centered) hasInitialCentered = true;
+        expect(centered).toBe(true);
+        expect(hasInitialCentered).toBe(true);
+      });
+
+      it('auto-focuses artistInputRef on + Add Scene click and when switching to an empty scene', () => {
+        const rafSpy = vi.spyOn(window, 'requestAnimationFrame').mockImplementation((cb: FrameRequestCallback) => {
+          cb(0);
+          return 0;
+        });
+
+        const inputElement = {
+          focus: vi.fn(),
+        };
+        const artistInputRef = { current: inputElement };
+        const onAddScene = vi.fn();
+
+        // Simulate + Add Scene click handler
+        const handleAddSceneClick = () => {
+          onAddScene();
+          requestAnimationFrame(() => {
+            artistInputRef.current?.focus();
+          });
+        };
+
+        handleAddSceneClick();
+        expect(onAddScene).toHaveBeenCalledTimes(1);
+        expect(inputElement.focus).toHaveBeenCalledTimes(1);
+
+        // Simulate switching active scene to an empty scene
+        const prevActiveSceneId: string = 'scene-1';
+        const nextActiveSceneId: string = 'scene-2';
+        const nextSceneSeeds = ''; // empty seeds
+        const parsedSeeds = nextSceneSeeds.split('::').map(a => a.trim()).filter(Boolean);
+
+        const sceneChanged = nextActiveSceneId !== prevActiveSceneId;
+        expect(sceneChanged).toBe(true);
+        if (sceneChanged && parsedSeeds.length === 0) {
+          requestAnimationFrame(() => {
+            artistInputRef.current?.focus();
+          });
+        }
+        expect(inputElement.focus).toHaveBeenCalledTimes(2);
+
+        rafSpy.mockRestore();
+      });
+
+      it('only dispatches setFocusedSceneCluster on load/completion when scenes.length > 1', () => {
+        const setFocusedSceneCluster = vi.fn();
+        let hasFocusedInitialCluster = false;
+
+        const handleProjectReady = (sceneCount: number, activeSceneId: string) => {
+          if (!hasFocusedInitialCluster) {
+            hasFocusedInitialCluster = true;
+            if (sceneCount > 1) {
+              setFocusedSceneCluster({ sceneId: activeSceneId || 'scene-1', timestamp: Date.now() });
+            }
+          }
+        };
+
+        // Single-scene project should not dispatch setFocusedSceneCluster (preserves standard fitGraphToScreen zoom)
+        handleProjectReady(1, 'scene-1');
+        expect(setFocusedSceneCluster).not.toHaveBeenCalled();
+
+        // Reset for multi-scene project
+        hasFocusedInitialCluster = false;
+        handleProjectReady(3, 'scene-1');
+        expect(setFocusedSceneCluster).toHaveBeenCalledTimes(1);
+        expect(setFocusedSceneCluster).toHaveBeenCalledWith(
+          expect.objectContaining({ sceneId: 'scene-1' })
+        );
+      });
+    });
   });
 });

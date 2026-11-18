@@ -1267,9 +1267,14 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
     if (sceneChanged) {
       lastEmittedSeedsRef.current = seedArtists;
-      setSelectedSeedArtists(
-        seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }))
-      );
+      const parsedSeeds = seedArtists.split('::').map(a => a.trim()).filter(Boolean).map(name => ({ name, enabled: true }));
+      setSelectedSeedArtists(parsedSeeds);
+      // V45.1 (Phase B2.4): Auto-focus Add artist input if switching to a new empty scene
+      if (parsedSeeds.length === 0) {
+        requestAnimationFrame(() => {
+          artistInputRef.current?.focus();
+        });
+      }
       return;
     }
 
@@ -1298,6 +1303,25 @@ const GraphPage: React.FC<GraphPageProps> = ({
   const [isCopied, setIsCopied] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
   const [isSimulationSettling, setIsSimulationSettling] = useState(true);
+  const hasFocusedInitialClusterRef = useRef(false);
+
+  // V45.1 (Phase B2.4): Automatically focus Scene 1 cluster on project load or curation completion
+  useEffect(() => {
+    if (isLoading || isHydrating || data.nodes.length === 0) {
+      hasFocusedInitialClusterRef.current = false;
+      return;
+    }
+    if (!hasFocusedInitialClusterRef.current && data.nodes.length > 0) {
+      const timer = setTimeout(() => {
+        hasFocusedInitialClusterRef.current = true;
+        if (scenes.length > 1) {
+          const targetScene = activeSceneId || 'scene-1';
+          setFocusedSceneCluster({ sceneId: targetScene, timestamp: Date.now() });
+        }
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading, isHydrating, data.nodes.length, activeSceneId, scenes.length]);
 
   // Simulation Settling Safety Timeout: If not loading, not hydrating, and nodes are present,
   // ensure the connections overlay blur/spinner never deadlocks longer than 2.5s.
@@ -2372,7 +2396,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     <button
                       type="button"
                       data-testid="add-scene-button"
-                      onClick={onAddScene}
+                      onClick={() => {
+                        onAddScene();
+                        // V45.1 (Phase B2.4): Auto-focus Add artist input immediately upon clicking + Add Scene
+                        requestAnimationFrame(() => {
+                          artistInputRef.current?.focus();
+                        });
+                      }}
                       disabled={isAddSceneDisabled}
                       className={`h-7 flex items-center gap-1.5 px-2.5 rounded-xl border text-[11px] font-medium transition-all leading-none ${
                         scenes.length >= MAX_SCENES_PER_PROJECT || hasSceneWithoutSeeds
