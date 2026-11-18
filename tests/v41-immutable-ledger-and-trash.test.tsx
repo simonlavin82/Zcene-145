@@ -555,15 +555,17 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       const runbookPath = path.resolve(__dirname, '../docs/backend-regression-runbook.ts');
       const runbookContent = fs.readFileSync(runbookPath, 'utf8');
 
-      // Check V45 headers & badges (44 Laws)
-      expect(truthContent).toContain('V45 — 44 Laws');
-      expect(engineContent).toContain('Zcene V45 Blueprint');
-      expect(engineContent).toContain('V45 Locked');
-      expect(engineContent).toContain('44 Laws');
-      expect(engineContent).toContain('V45 Full-Stack Regression Runbook');
-      expect(runbookContent).toContain('# V45 Regression Suite (Full-Stack)');
+      // Check V45.1 headers & badges (45 Laws)
+      expect(truthContent).toContain('V45.1 — 45 Laws');
+      expect(engineContent).toContain('Zcene V45.1 Blueprint');
+      expect(engineContent).toContain('V45.1 Locked');
+      expect(engineContent).toContain('45 Laws');
+      expect(engineContent).toContain('V45.1 Full-Stack Regression Runbook');
+      expect(runbookContent).toContain('# V45.1 Regression Suite (Full-Stack)');
       expect(runbookContent).toContain('cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts');
       expect(runbookContent).toContain('npx vitest run src/test/v43-multi-scene-board.test.ts');
+      expect(truthContent).toContain('### 45. Upfront Multi-Scene Batch Curation, Worker Phase 1 Deferral & Chained Baton Handoff ("Cup of Tea" Pipeline)');
+      expect(engineContent).toContain('Upfront Multi-Scene Batch Curation, Worker Phase 1 Deferral & Chained Baton Handoff');
 
       // Check V43 Purge Protocol alignment (Tier 1 /artists & /labels and tokenTransactions preserved)
       const purgeTargetsSlice = runbookContent.split('### Purge Targets:')[1]?.split('### Strictly Preserved:')[0] || '';

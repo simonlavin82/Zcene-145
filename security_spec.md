@@ -6,6 +6,9 @@
 3. User emails must be verified.
 4. Timestamps (`createdAt`, `updatedAt`) must be strictly controlled via `request.time`.
 5. IDs must follow a strict alphanumeric pattern.
+6. Token Wallet balances (`users/{uid}.tokenBalance`) and transactions (`users/{uid}/tokenTransactions`) are strictly server-authoritative and write-locked against client mutation in `firestore.rules`.
+7. Settlement dual-writes of `apiUsage` and `costUsd` are strictly isolated to settlement transactions (`['spend_live_synthesis', 'spend_direct_hit']`), protecting pre-flight rows from cost inflation.
+8. Workspace deletions strictly follow a 2-Stage 30-Day Trash lifecycle (`status: 'trashed'`, `purgeAt: trashedAt + 30d`). Permanent deletion transitions to `status: 'deleted'`, nullifying heavy topology blobs while permanently preserving financial telemetry headers (`tokensSpent`, `apiUsage`, `anchorResolution`). Hard `deleteDoc` is permanently write-locked.
 
 ## The "Dirty Dozen" Payloads
 
@@ -68,3 +71,18 @@
 **Attempt**: Add a `lastLoginIp` field to the user document.
 **Payload**: `updateDoc(doc(db, 'users', 'my_uid'), { lastLoginIp: '1.2.3.4' })`
 **Expectation**: PERMISSION_DENIED (affectedKeys().hasOnly gate).
+
+### 13. Client-Side Wallet Forgery (Token Balance Mutation)
+**Attempt**: Client attempts to directly increment `tokenBalance` or inject a fabricated `tokenTransactions` receipt.
+**Payload**: `updateDoc(doc(db, 'users', 'my_uid'), { tokenBalance: 9999 })` or `setDoc(doc(db, 'users/my_uid/tokenTransactions', 'fake_tx'), { tokens: 50, type: 'top_up' })`
+**Expectation**: PERMISSION_DENIED (write-locked in `firestore.rules`; only Admin SDK / Cloud Functions can mutate wallet balances and mint transaction receipts).
+
+### 14. Hard Project Document Deletion Bypass (2-Stage Trash Bypass)
+**Attempt**: Client calls `deleteDoc` directly on an owned project workspace to circumvent the 2-Stage Trash compaction protocol.
+**Payload**: `deleteDoc(doc(db, 'users/my_uid/projects', 'pid'))`
+**Expectation**: PERMISSION_DENIED (hard deletions are write-locked in `firestore.rules`; projects must transition through `status: 'trashed'` with `purgeAt: trashedAt + 30d` and compacted `status: 'deleted'`).
+
+### 15. Settlement Cost Inflation Hijack (Telemetry Dual-Write Injection)
+**Attempt**: Client attempts to update pre-flight transaction receipts or mutate `apiUsage` / `costUsd` telemetry.
+**Payload**: `updateDoc(doc(db, 'users/my_uid/tokenTransactions', 'preflight_tx'), { costUsd: 1.50 })`
+**Expectation**: PERMISSION_DENIED (token transaction documents are immutable and write-locked; Cloud Functions strictly isolate dual-writes to settlement types `['spend_live_synthesis', 'spend_direct_hit']`).

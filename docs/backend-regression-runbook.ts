@@ -1,12 +1,12 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V45 Regression Suite (Full-Stack)
+# V45.1 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 17 test suites (384 unit/integration tests).
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 17 test suites (413 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
-# Run entire full-stack regression test suite (17 test files, 384 tests)
+# Run entire full-stack regression test suite (17 test files, 413 tests)
 npm test
 
 # Run backend pipeline tests
@@ -99,6 +99,13 @@ npx vitest --ui
     *   *In-Flight Memory Dedup:* Asserts that concurrent clicks on the same un-hydrated node trigger only a single network invocation.
     *   *Circuit Breaker & Kill Switch:* Asserts that exceeding 100 heals in 24 hours trips the auto-kill circuit breaker, throws \`resource-exhausted\`, and honors the admin toggle in \`adminLedger/system/settings\`.
     *   *Telemetry Audit:* Validates receipt creation in \`adminLedger/system/jitHeals\` with accurate token counts and list-price cost calculations.
+7.  **Upfront Multi-Scene Batch Curation & Chained Worker Handoff ("Cup of Tea" Mode):**
+    *   *Assertion (Bundled Pre-Flight & Dynamic Batch Pricing):* Asserts that multi-scene batches calculate aggregate token totals (5T–50T) with a single bundled 1T pre-flight fee across uncached scenes (\`bundledSeedsLabel\`).
+    *   *Assertion (Pass 1 Typo Auto-Correction):* Asserts that \`validateSeedOriginCallable\` auto-corrects typos (\`correctedInput: true\`), dynamically updating input cards to verified entities with inline correction notices.
+    *   *Assertion (Worker Phase 1 Deferral & Fast Return <1.5s):* Asserts that Column 2 sets \`deferPhase1ToWorker: true\`, persisting projects in \`status: 'curating'\` and returning HTTP 200 OK immediately.
+    *   *Assertion (Chained Worker Baton Handoffs & Intermediate Hop Step 3B Bypass):* Asserts that sequential chained hops (\`job_1 -> ... -> job_N\` with \`isChainedHop: true\`) execute without client coordination, bypassing Overarching Zine synthesis until the final hop across the completed constellation.
+    *   *Assertion (Step 0 Direct Hit & Peer Profile Hydration):* Asserts that cached entities across all batch scenes are pre-hydrated into \`existingProjectDetailsMap\` with stripped \`canonicalKey\`s to eliminate client request storms upon completion.
+    *   *Assertion (Settlement Dual-Write Isolation & Deterministic Scene 1 Centering):* Asserts that \`apiUsage\` and \`costUsd\` dual-writes are strictly isolated to settlement rows (\`['spend_live_synthesis', 'spend_direct_hit']\`), and upon batch completion, \`activeSceneId\` defaults to \`'scene-1'\` centering the camera on Scene 1 \`(1000, 1000)\` post-D3 zoom init.
 
 ## Database Purge Runbook Protocol (V45 Multi-Scene Architecture)
 

@@ -3459,17 +3459,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     };
 
     useEffect(() => {
+        let timer: any;
         if (isMagazineViewOpen) {
             setIsTransitioning(true);
             setRenderMode('magazine');
-            setTimeout(() => setIsTransitioning(false), 50);
+            timer = setTimeout(() => setIsTransitioning(false), 50);
         } else {
             setIsTransitioning(true);
-            setTimeout(() => {
+            timer = setTimeout(() => {
                 setRenderMode('panel');
                 setIsTransitioning(false);
             }, 300);
         }
+        return () => clearTimeout(timer);
     }, [isMagazineViewOpen]);
 
     // JIT Stub Fallback (Rule 17)
