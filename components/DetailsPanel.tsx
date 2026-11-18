@@ -1124,28 +1124,37 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             // 3. Match Style
             if (styleActive) {
                 const rawStyle = (profile.style || '').trim().toLowerCase();
-                const nodeStyle = (details?.details?.style || (details as any)?.style || '').toLowerCase().trim();
-                const genre = (details?.details?.genre || '').toLowerCase();
-                const bio = (details?.summary || '').toLowerCase();
-                const deepCutDesc = (details?.recommendationReason || '').toLowerCase();
+                const nodeStyle = (details?.details?.style || (details as any)?.style || (node as any)?.style || '').toLowerCase().trim();
 
-                // Evaluate exact-phrase match first to prevent false-positives from multi-word styles (e.g. "Dream Pop", "Wall of Sound")
-                if (rawStyle.length > 0 && (
-                    (nodeStyle.length > 0 && (nodeStyle.includes(rawStyle) || rawStyle.includes(nodeStyle))) ||
-                    genre.includes(rawStyle) ||
-                    bio.includes(rawStyle) ||
-                    deepCutDesc.includes(rawStyle)
-                )) {
-                    styleMatched = true;
-                } else if (rawStyle.includes(',')) {
-                    // Secondary fallback for legacy comma-separated entries (e.g. "melodic, post")
-                    const styleTokens = rawStyle.split(',').map(k => k.trim()).filter(k => k.length > 0);
-                    styleMatched = styleTokens.some(token =>
-                        (nodeStyle.length > 0 && nodeStyle.includes(token)) ||
-                        genre.includes(token) ||
-                        bio.includes(token) ||
-                        deepCutDesc.includes(token)
-                    );
+                if (nodeStyle.length > 0) {
+                    // Authoritative match strictly against canonical style metadata
+                    if (rawStyle.includes(',')) {
+                        const styleTokens = rawStyle.split(',').map(k => k.trim()).filter(k => k.length > 0);
+                        styleMatched = styleTokens.some(token =>
+                            nodeStyle.includes(token) || token.includes(nodeStyle)
+                        );
+                    } else if (rawStyle.length > 0) {
+                        styleMatched = nodeStyle.includes(rawStyle) || rawStyle.includes(nodeStyle);
+                    }
+                } else {
+                    // Fallback strictly for legacy unhydrated nodes lacking canonical style metadata
+                    const genre = (details?.details?.genre || '').toLowerCase();
+                    const bio = (details?.summary || '').toLowerCase();
+                    const deepCutDesc = (details?.recommendationReason || '').toLowerCase();
+
+                    if (rawStyle.includes(',')) {
+                        const styleTokens = rawStyle.split(',').map(k => k.trim()).filter(k => k.length > 0);
+                        styleMatched = styleTokens.some(token =>
+                            genre.includes(token) ||
+                            bio.includes(token) ||
+                            deepCutDesc.includes(token)
+                        );
+                    } else if (rawStyle.length > 0) {
+                        styleMatched =
+                            genre.includes(rawStyle) ||
+                            bio.includes(rawStyle) ||
+                            deepCutDesc.includes(rawStyle);
+                    }
                 }
             }
 

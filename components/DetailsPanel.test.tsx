@@ -880,6 +880,139 @@ describe('DetailsPanel', () => {
         });
     });
 
+    describe('Architecture V45.1 — Style Bar Canonical Matching & Zero Prose Bleed', () => {
+        const mockNode = { id: 'the-jealous-sound-us', type: 'artist', label: 'The Jealous Sound' };
+        const mockDetailsWithCanonicalStyle = {
+            summary: 'The Jealous Sound was an American indie rock band from Los Angeles, California.',
+            recommendationReason: 'The Jealous Sound defined the early 2000s transition from aggressive post-hardcore into articulate, highly melodic indie rock through impeccably crafted guitar work and emotional songwriting.',
+            details: {
+                artist: 'The Jealous Sound',
+                genre: 'Emo / Indie Rock',
+                style: 'Melodic',
+                origin: 'Los Angeles, USA',
+                founded: '2000'
+            },
+            links: []
+        };
+
+        it('strictly matches canonical details.details.style without bleeding into recommendationReason or summary prose (0/5 hits for Nails, 1/1 hits for Melodic profile)', async () => {
+            const mockUserTaste = [
+                {
+                    id: 'nails-profile',
+                    name: 'Nails',
+                    isActive: true,
+                    color: 'teal',
+                    favoriteLabel: 'Southern Lord',
+                    favoriteGenre: 'Metallic Hardcore',
+                    style: 'Aggressive',
+                    favoriteOrigin: 'Oxnard, California, USA',
+                    eraMin: 2007,
+                    eraMax: null
+                },
+                {
+                    id: 'melodic-profile',
+                    name: 'Melodic Only',
+                    isActive: true,
+                    color: 'purple',
+                    favoriteLabel: '',
+                    favoriteGenre: '',
+                    style: 'Melodic',
+                    favoriteOrigin: '',
+                    eraMin: null,
+                    eraMax: null
+                }
+            ];
+
+            render(
+                <NodeDetailsCard
+                    node={mockNode as any}
+                    details={mockDetailsWithCanonicalStyle as any}
+                    isLoading={false}
+                    isGlobalLoading={false}
+                    graphData={{ nodes: [mockNode], links: [] } as any}
+                    libraryArtists={[]}
+                    seedArtists={[]}
+                    onAddArtist={() => {}}
+                    isSmallScreen={false}
+                    onNodeClick={() => {}}
+                    onNavigate={() => {}}
+                    chatHistory={[]}
+                    onSendMessage={() => {}}
+                    isChatLoading={false}
+                    chatMode="instant"
+                    onChatModeChange={() => {}}
+                    liveMessageCount={0}
+                    userTaste={mockUserTaste as any}
+                />
+            );
+
+            // Nails profile has 5 active criteria (Label, Genre, Style, Origin, Founded).
+            // Even though recommendationReason contains "aggressive", canonical style is "Melodic".
+            // Therefore, Nails must receive 0/5 Hits (NOT 1/5 Hits).
+            expect(await screen.findByText('0/5 Hits')).toBeInTheDocument();
+
+            // Melodic profile has 1 active criterion (Style: Melodic) and must match the canonical style.
+            expect(await screen.findByText('1/1 Hits')).toBeInTheDocument();
+        });
+
+        it('falls back cleanly to checking genre, summary, and recommendationReason for legacy unhydrated nodes where details.details.style is undefined', async () => {
+            const mockLegacyNode = { id: 'legacy-band-us', type: 'artist', label: 'Legacy Band' };
+            const mockLegacyDetails = {
+                summary: 'Formed in 1998, this underground band pioneered heavy breakdowns.',
+                recommendationReason: 'Known for their raw and aggressive post-hardcore sound.',
+                details: {
+                    artist: 'Legacy Band',
+                    genre: 'Post-Hardcore',
+                    // style is intentionally undefined/missing
+                    origin: 'Chicago, USA',
+                    founded: '1998'
+                },
+                links: []
+            };
+
+            const mockUserTaste = [
+                {
+                    id: 'aggressive-taste',
+                    name: 'Aggressive Seeker',
+                    isActive: true,
+                    color: 'orange',
+                    favoriteLabel: '',
+                    favoriteGenre: '',
+                    style: 'Aggressive',
+                    favoriteOrigin: '',
+                    eraMin: null,
+                    eraMax: null
+                }
+            ];
+
+            render(
+                <NodeDetailsCard
+                    node={mockLegacyNode as any}
+                    details={mockLegacyDetails as any}
+                    isLoading={false}
+                    isGlobalLoading={false}
+                    graphData={{ nodes: [mockLegacyNode], links: [] } as any}
+                    libraryArtists={[]}
+                    seedArtists={[]}
+                    onAddArtist={() => {}}
+                    isSmallScreen={false}
+                    onNodeClick={() => {}}
+                    onNavigate={() => {}}
+                    chatHistory={[]}
+                    onSendMessage={() => {}}
+                    isChatLoading={false}
+                    chatMode="instant"
+                    onChatModeChange={() => {}}
+                    liveMessageCount={0}
+                    userTaste={mockUserTaste as any}
+                />
+            );
+
+            // Because style is undefined on the legacy node, the fallback activates and matches "aggressive" in recommendationReason.
+            expect(await screen.findByText('1/1 Hits')).toBeInTheDocument();
+        });
+    });
+
     describe('Magazine button conditional visibility', () => {
         const mockNode = { id: 'spaced-us', type: 'artist' as const, label: 'Spaced' };
         const mockDetails = { summary: 'Hardcore punk band from Buffalo, NY', details: { artist: 'Spaced' }, links: [] };
