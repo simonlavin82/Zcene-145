@@ -1171,9 +1171,9 @@ describe('DetailsPanel', () => {
             );
 
             // Verify stacked Zine renders both Scene breakdown headers with formatted "::"-delimited seedArtists without throwing
-            expect(screen.getByText(/ROOTS:\s*Sense Field \+ Reason To Believe/i)).toBeInTheDocument();
+            expect(screen.getByText(/ROOTS:\s*Sense Field,\s*Reason To Believe/i)).toBeInTheDocument();
             expect(screen.getByText(/ROOTS:\s*Jimmy Eat World/i)).toBeInTheDocument();
-            expect(screen.getByRole('heading', { name: 'Sense Field + Reason To Believe', level: 2 })).toBeInTheDocument();
+            expect(screen.getByRole('heading', { name: 'Sense Field, Reason To Believe', level: 2 })).toBeInTheDocument();
             expect(screen.getByRole('heading', { name: 'Jimmy Eat World', level: 2 })).toBeInTheDocument();
         });
 

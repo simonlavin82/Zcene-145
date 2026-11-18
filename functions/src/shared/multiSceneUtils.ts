@@ -553,7 +553,7 @@ export function normalizeProjectScene(
     rawTitle && (!isGenericDefaultTitle || seedsArray.length === 0)
       ? rawTitle
       : seedsArray.length > 0
-        ? seedsArray.join(' + ')
+        ? seedsArray.join(', ')
         : `Scene ${sceneIndex + 1}`;
 
   // Heal slug title if graphData.nodes has matching human label
@@ -567,7 +567,7 @@ export function normalizeProjectScene(
     if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
       title = matchingNode.label.trim();
     } else if (curatedSeedArtists && (!rawTitle || isGenericDefaultTitle || /^[a-z0-9_-]+$/.test(title))) {
-      title = toSeedArtistsArray(curatedSeedArtists).join(' + ');
+      title = toSeedArtistsArray(curatedSeedArtists).join(', ');
     }
   }
 
@@ -1899,6 +1899,121 @@ export function parseCrossSceneLinks(
  * Resolves each seed across scenes to clean display names (via detailsCache or title-casing),
  * strips trailing ISO country slugs (-us, -gb, etc.), and deduplicates repeated artists case-insensitively.
  */
+/**
+ * Resolves the display names for root artists of a single scene, checking scene graphData.nodes,
+ * detailsCache, and formatted slug Title Case.
+ */
+function resolveSceneRootDisplayNames(
+  scene: ProjectScene,
+  cacheMap?: Map<string, any> | null,
+  seenCanonicalIds?: Set<string>
+): string[] {
+  const rawSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists || scene.title || scene.name);
+  const resolvedNames: string[] = [];
+
+  for (const seed of rawSeeds) {
+    if (!seed || typeof seed !== 'string') continue;
+    if (/^Scene\s+\d+$/i.test(seed.trim())) continue;
+    const strippedSeed = stripSceneNamespace(seed).trim();
+    if (!strippedSeed) continue;
+
+    // Extract canonical slug and strip ISO country codes (-us, -gb, etc.)
+    const bareSlug = strippedSeed
+      .toLowerCase()
+      .replace(/-(?:us|gb|uk|de|fr|ca|au|jp|se|no|fi|nl|be|ch|at|es|it|br|mx|nz|ie|pl|za)$/i, '')
+      .trim();
+
+    const canonNorm = bareSlug.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    if (!canonNorm) continue;
+    if (seenCanonicalIds) {
+      if (seenCanonicalIds.has(canonNorm)) continue;
+      seenCanonicalIds.add(canonNorm);
+    }
+
+    let displayName: string | null = null;
+
+    // 1. Check scene graphData.nodes for matching root artist node
+    const sceneNodes = scene.graphData?.nodes || [];
+    const matchingNode = sceneNodes.find((n: any) => {
+      if (!n || n.type === 'label') return false;
+      const nNorm = normalizeCanonicalEntityId(n.canonicalId || n.id);
+      const nLabelNorm = n.label ? normalizeCanonicalEntityId(n.label) : '';
+      const bareNode = stripCountrySlug(nNorm);
+      return nNorm === canonNorm || nLabelNorm === canonNorm || bareNode === canonNorm;
+    });
+    if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
+      const candidateLabel = matchingNode.label.trim();
+      // Ensure it's not a raw country-suffixed slug
+      if (!candidateLabel.includes('-us') && !candidateLabel.includes('-gb')) {
+        displayName = candidateLabel;
+      }
+    }
+
+    // 2. Attempt to resolve display name from detailsCache
+    if (!displayName && cacheMap) {
+      let entry = cacheMap.get(strippedSeed) ||
+                  cacheMap.get(canonNorm) ||
+                  cacheMap.get(strippedSeed.toLowerCase()) ||
+                  cacheMap.get(bareSlug);
+      if (!entry) {
+        for (const [k, v] of cacheMap.entries()) {
+          const strippedK = stripCountrySlug(normalizeCanonicalEntityId(k));
+          if (strippedK === canonNorm) {
+            entry = v;
+            break;
+          }
+        }
+      }
+      if (entry) {
+        displayName = entry.details?.artist || entry.artist || entry.name || entry.title || null;
+      }
+    }
+
+    if (!displayName) {
+      // If the seed was already formatted in Title/Mixed Case (e.g. "Sense Field" or "Jimmy Eat World")
+      if (strippedSeed.includes(' ') && !strippedSeed.includes('-') && strippedSeed !== strippedSeed.toLowerCase()) {
+        displayName = strippedSeed;
+      } else {
+        // Format slug into Title Case
+        displayName = bareSlug
+          .split(/[\s-_]+/)
+          .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+          .join(' ');
+      }
+    }
+
+    if (displayName) {
+      resolvedNames.push(displayName);
+    }
+  }
+
+  return resolvedNames;
+}
+
+function parseCacheMapHelper(detailsCache?: Map<string, any> | Record<string, any> | string | null): Map<string, any> | null {
+  if (!detailsCache) return null;
+  if (typeof (detailsCache as any).get === 'function') {
+    return detailsCache as Map<string, any>;
+  } else if (typeof detailsCache === 'string') {
+    try {
+      const parsed = JSON.parse(detailsCache);
+      if (Array.isArray(parsed)) {
+        return new Map(parsed);
+      } else if (typeof parsed === 'object') {
+        return new Map(Object.entries(parsed));
+      }
+    } catch {}
+  } else if (typeof detailsCache === 'object') {
+    return new Map(Object.entries(detailsCache));
+  }
+  return null;
+}
+
+/**
+ * Derives a clean, multi-scene display title for a project by joining root artists
+ * within each scene using ", " and joining distinct scenes using " + ".
+ * (Phase B2.10: e.g. "The Jealous Sound, Hey Mercedes + Elliott + Jimmy Eat World + Yellowcard")
+ */
 export function generateProjectTitleFromScenes(
   scenes: ProjectScene[],
   detailsCache?: Map<string, any> | Record<string, any> | string | null
@@ -1907,102 +2022,76 @@ export function generateProjectTitleFromScenes(
     return 'Untitled Zcene';
   }
 
-  let cacheMap: Map<string, any> | null = null;
-  if (detailsCache) {
-    if (typeof (detailsCache as any).get === 'function') {
-      cacheMap = detailsCache as Map<string, any>;
-    } else if (typeof detailsCache === 'string') {
-      try {
-        const parsed = JSON.parse(detailsCache);
-        if (Array.isArray(parsed)) {
-          cacheMap = new Map(parsed);
-        } else if (typeof parsed === 'object') {
-          cacheMap = new Map(Object.entries(parsed));
-        }
-      } catch {}
-    } else if (typeof detailsCache === 'object') {
-      cacheMap = new Map(Object.entries(detailsCache));
-    }
-  }
-
+  const cacheMap = parseCacheMapHelper(detailsCache);
   const seenCanonicalIds = new Set<string>();
-  const titleParts: string[] = [];
+  const sceneTitleParts: string[] = [];
 
   for (const scene of scenes) {
-    const rawSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists || scene.title || scene.name);
-    for (const seed of rawSeeds) {
-      if (!seed || typeof seed !== 'string') continue;
-      if (/^Scene\s+\d+$/i.test(seed.trim())) continue;
-      const strippedSeed = stripSceneNamespace(seed).trim();
-      if (!strippedSeed) continue;
-
-      // Extract canonical slug and strip ISO country codes (-us, -gb, etc.)
-      const bareSlug = strippedSeed
-        .toLowerCase()
-        .replace(/-(?:us|gb|uk|de|fr|ca|au|jp|se|no|fi|nl|be|ch|at|es|it|br|mx|nz|ie|pl|za)$/i, '')
-        .trim();
-
-      const canonNorm = bareSlug.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
-      if (!canonNorm || seenCanonicalIds.has(canonNorm)) continue;
-      seenCanonicalIds.add(canonNorm);
-
-      let displayName: string | null = null;
-
-      // 1. Check scene graphData.nodes for matching root artist node
-      const sceneNodes = scene.graphData?.nodes || [];
-      const matchingNode = sceneNodes.find((n: any) => {
-        if (!n || n.type === 'label') return false;
-        const nNorm = normalizeCanonicalEntityId(n.canonicalId || n.id);
-        const nLabelNorm = n.label ? normalizeCanonicalEntityId(n.label) : '';
-        const bareNode = stripCountrySlug(nNorm);
-        return nNorm === canonNorm || nLabelNorm === canonNorm || bareNode === canonNorm;
-      });
-      if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
-        const candidateLabel = matchingNode.label.trim();
-        // Ensure it's not a raw country-suffixed slug
-        if (!candidateLabel.includes('-us') && !candidateLabel.includes('-gb')) {
-          displayName = candidateLabel;
-        }
-      }
-
-      // 2. Attempt to resolve display name from detailsCache
-      if (!displayName && cacheMap) {
-        let entry = cacheMap.get(strippedSeed) ||
-                    cacheMap.get(canonNorm) ||
-                    cacheMap.get(strippedSeed.toLowerCase()) ||
-                    cacheMap.get(bareSlug);
-        if (!entry) {
-          for (const [k, v] of cacheMap.entries()) {
-            const strippedK = stripCountrySlug(normalizeCanonicalEntityId(k));
-            if (strippedK === canonNorm) {
-              entry = v;
-              break;
-            }
-          }
-        }
-        if (entry) {
-          displayName = entry.details?.artist || entry.artist || entry.name || entry.title || null;
-        }
-      }
-
-      if (!displayName) {
-        // If the seed was already formatted in Title/Mixed Case (e.g. "Sense Field" or "Jimmy Eat World")
-        if (strippedSeed.includes(' ') && !strippedSeed.includes('-') && strippedSeed !== strippedSeed.toLowerCase()) {
-          displayName = strippedSeed;
-        } else {
-          // Format slug into Title Case
-          displayName = bareSlug
-            .split(/[\s-_]+/)
-            .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
-            .join(' ');
-        }
-      }
-
-      titleParts.push(displayName);
+    const sceneRoots = resolveSceneRootDisplayNames(scene, cacheMap, seenCanonicalIds);
+    if (sceneRoots.length > 0) {
+      sceneTitleParts.push(sceneRoots.join(', '));
     }
   }
 
-  return titleParts.length > 0 ? titleParts.join(' + ') : 'Untitled Zcene';
+  return sceneTitleParts.length > 0 ? sceneTitleParts.join(' + ') : 'Untitled Zcene';
+}
+
+/**
+ * Derives the legacy flat project title joining all root artists across all scenes with " + ".
+ * Used strictly for backward-compatible auto-generated title detection ([Rule 16]).
+ */
+export function generateLegacyFlatProjectTitle(
+  scenes: ProjectScene[],
+  detailsCache?: Map<string, any> | Record<string, any> | string | null
+): string {
+  if (!scenes || !Array.isArray(scenes) || scenes.length === 0) {
+    return 'Untitled Zcene';
+  }
+
+  const cacheMap = parseCacheMapHelper(detailsCache);
+  const seenCanonicalIds = new Set<string>();
+  const allRoots: string[] = [];
+
+  for (const scene of scenes) {
+    const sceneRoots = resolveSceneRootDisplayNames(scene, cacheMap, seenCanonicalIds);
+    allRoots.push(...sceneRoots);
+  }
+
+  return allRoots.length > 0 ? allRoots.join(' + ') : 'Untitled Zcene';
+}
+
+/**
+ * Detects whether a project name is auto-generated (or empty / default) versus a bespoke
+ * user-customized title (Paramount Guardrail — Strict Bespoke Project Name Lock [Rule 16]).
+ *
+ * Returns true if:
+ * 1. currentName is null, undefined, empty, or "Untitled Zcene"
+ * 2. currentName matches the current scene-aware title: generateProjectTitleFromScenes(scenes, detailsCache)
+ * 3. currentName matches the legacy flat ' + '-joined root artist list across all scenes
+ *
+ * Returns false if the user has manually typed any bespoke name (e.g. "2000s Emo Classics", "My Custom Emo Anthology").
+ */
+export function isAutoGeneratedProjectTitle(
+  currentName: string | undefined | null,
+  scenes: ProjectScene[],
+  detailsCache?: Map<string, any> | Record<string, any> | string | null
+): boolean {
+  if (!currentName || typeof currentName !== 'string') return true;
+  const trimmed = currentName.trim();
+  if (!trimmed || trimmed === 'Untitled Zcene') return true;
+  if (!scenes || !Array.isArray(scenes) || scenes.length === 0) return false;
+
+  const currentGenerated = generateProjectTitleFromScenes(scenes, detailsCache);
+  if (currentGenerated && currentGenerated !== 'Untitled Zcene' && trimmed.toLowerCase() === currentGenerated.trim().toLowerCase()) {
+    return true;
+  }
+
+  const legacyFlat = generateLegacyFlatProjectTitle(scenes, detailsCache);
+  if (legacyFlat && legacyFlat !== 'Untitled Zcene' && trimmed.toLowerCase() === legacyFlat.trim().toLowerCase()) {
+    return true;
+  }
+
+  return false;
 }
 
 /**
@@ -2375,17 +2464,20 @@ export function shiftSceneClusterCoordinates({
 
     // 2. Custom Name vs Default Re-indexing Resolution
     const seedsArray = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
-    const seedsJoined = seedsArray.join(' + ');
+    const seedsJoined = seedsArray.join(', ');
+    const titleStr = typeof scene.title === 'string' ? scene.title.trim() : '';
+    const isAutoSceneTitle =
+      titleStr === seedsJoined ||
+      titleStr === seedsArray.join(' + ');
 
     const hasExplicitCustomName = typeof scene.customName === 'string' && scene.customName.trim().length > 0;
-    const hasCustomTitle = typeof scene.title === 'string' &&
-      scene.title.trim().length > 0 &&
-      !/^scene(?:\s+\d+)?$/i.test(scene.title.trim()) &&
-      scene.title.trim() !== seedsJoined;
+    const hasCustomTitle = titleStr.length > 0 &&
+      !/^scene(?:\s+\d+)?$/i.test(titleStr) &&
+      !isAutoSceneTitle;
 
     const preservedCustomName = hasExplicitCustomName
       ? scene.customName!.trim()
-      : (hasCustomTitle ? scene.title.trim() : undefined);
+      : (hasCustomTitle ? titleStr : undefined);
 
     const resolvedTitle = preservedCustomName || (seedsArray.length > 0 ? seedsJoined : `Scene ${newIdx + 1}`);
 

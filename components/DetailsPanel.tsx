@@ -4488,7 +4488,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                     </span>
                                                     {sceneSeeds.length > 0 && (
                                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
-                                                            ROOTS: {sceneSeeds.join(' + ')}
+                                                            ROOTS: {sceneSeeds.join(', ')}
                                                         </span>
                                                     )}
                                                 </div>
@@ -4496,7 +4496,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                     level="h2"
                                                     sectionKey={sceneKey}
                                                     customTitle={scene.zineTitle}
-                                                    defaultTitle={sceneSeeds.length > 0 ? sceneSeeds.join(' + ') : (cleanArtistDisplayName(scene.title || scene.name, scene.graphData?.nodes) || `Scene ${idx + 1}`)}
+                                                    defaultTitle={sceneSeeds.length > 0 ? sceneSeeds.join(', ') : (cleanArtistDisplayName(scene.title || scene.name, scene.graphData?.nodes) || `Scene ${idx + 1}`)}
                                                     isEditingZine={isEditingZine}
                                                     onSaveTitle={onUpdateZineTitle ? (nextTitle) => onUpdateZineTitle(sceneKey, nextTitle) : undefined}
                                                 />
