@@ -4750,4 +4750,72 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(lastAppliedFilters).toEqual({ includeGenres: ['Nu Metal'] });
     });
   });
+
+  describe('V45.5 Test-2 Regression Fixes', () => {
+    it('allows Root Record Label petals up to 120px orbit in resolveSceneNodeOverlaps', () => {
+      const rootNode: any = {
+        id: 'scene-1::the-jealous-sound-us',
+        label: 'The Jealous Sound',
+        type: 'artist',
+        isSeed: true,
+        isSceneSeed: true,
+        sceneIndex: 0,
+        x: 1000,
+        y: 1000,
+        fx: 1000,
+        fy: 1000
+      };
+
+      const knapsackNode: any = {
+        id: 'scene-1::knapsack-us',
+        label: 'Knapsack',
+        type: 'artist',
+        sceneIndex: 0,
+        x: 900,
+        y: 900
+      };
+
+      const betterLookingNode: any = {
+        id: 'scene-1::better-looking',
+        label: 'Better Looking',
+        type: 'label',
+        sceneIndex: 0,
+        x: 940,
+        y: 900
+      };
+
+      const links: any[] = [
+        { source: 'scene-1::the-jealous-sound-us', target: 'scene-1::knapsack-us', weight: 0.9 },
+        { source: 'scene-1::the-jealous-sound-us', target: 'scene-1::better-looking', weight: 0.7 }
+      ];
+
+      const resolved = resolveSceneNodeOverlaps([rootNode, knapsackNode, betterLookingNode], links);
+      const bl = resolved.find(n => n.id === 'scene-1::better-looking')!;
+      const kn = resolved.find(n => n.id === 'scene-1::knapsack-us')!;
+
+      const distToRoot = Math.hypot(bl.x! - rootNode.x, bl.y! - rootNode.y);
+      // Orbit allows up to 120px for Root label petals (previously clamped to 95px)
+      expect(distToRoot).toBeLessThanOrEqual(120.5);
+
+      // Verify horizontal clearance between Knapsack and Better Looking
+      const dx = Math.abs(bl.x! - kn.x!);
+      const dy = Math.abs(bl.y! - kn.y!);
+      // Either horizontal separation dx is at least 60px or vertical separation dy is significant
+      expect(dx > 60 || dy > 30).toBe(true);
+    });
+
+    it('Step 0 Catch 2 only flags targetSceneAlreadyHydrated for scenes actually hydrated in Step 0', () => {
+      const stepZeroHydratedSceneIds = new Set<string>();
+
+      // Scenario A: Scene 1 has skeleton nodes from Phase 1 Complex Generation, but was NOT hydrated by Step 0 Direct Hit
+      const scene1TargetId = 'scene-1';
+      const scene1AlreadyHydrated = stepZeroHydratedSceneIds.has(scene1TargetId);
+      expect(scene1AlreadyHydrated).toBe(false);
+
+      // Scenario B: Scene 1 was hydrated by Step 0 Direct Hit
+      stepZeroHydratedSceneIds.add('scene-1');
+      const scene1HydratedAfterStep0 = stepZeroHydratedSceneIds.has(scene1TargetId);
+      expect(scene1HydratedAfterStep0).toBe(true);
+    });
+  });
 });

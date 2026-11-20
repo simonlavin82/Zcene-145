@@ -413,6 +413,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             }
         }
         if (jobType === "graph_generation") {
+            const stepZeroHydratedSceneIds = new Set();
             // ── Step 0: Immediate Global Cache Direct Hit Hydration for Queued Scenes ──
             // Hydrate any pending scenes in existingProjectScenes that are 100% Global Cache Direct Hits.
             // Follows redirectTo router stubs (Catch 1) and sets activeNodes & curatedSeedArtists.
@@ -453,6 +454,12 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 s.seedArtistIds = [resolvedCanonicalId];
                                 s.activeNodes = parsedGraph.nodes.map((n) => n.id);
                                 ingestDetailsCacheIntoMap(sCache.detailsCache, resolvedCanonicalId);
+                                const stepZeroSceneKey = s.sceneId || s.id || `scene-${i + 1}`;
+                                stepZeroHydratedSceneIds.add(stepZeroSceneKey);
+                                if (s.sceneId)
+                                    stepZeroHydratedSceneIds.add(s.sceneId);
+                                if (s.id)
+                                    stepZeroHydratedSceneIds.add(s.id);
                                 // Architecture V45.1 (Phase B2.2): Batch-fetch peer artists and labels from global
                                 // collections for this Direct Hit scene so existingProjectDetailsMap is 100% complete.
                                 // Eliminates client-side net::ERR_INSUFFICIENT_RESOURCES storm on project load.
@@ -519,7 +526,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
             // Catch 2 & Guard 2: Dynamic Hop Retargeting in Outer Scope
             // If targetSceneId was just hydrated by Step 0, retarget to the first remaining uncurated scene!
             const targetSceneObj = existingProjectScenes.find(s => (s.sceneId || s.id) === targetSceneId);
-            const targetSceneAlreadyHydrated = (targetSceneObj?.graphData?.nodes?.length ?? 0) > 0;
+            const targetSceneAlreadyHydrated = Boolean(targetSceneObj && stepZeroHydratedSceneIds.has(targetSceneId));
             isAllScenesDirectHitBatch = false;
             if (targetSceneAlreadyHydrated) {
                 const remainingUncurated = existingProjectScenes.find(s => (s.graphData?.nodes?.length ?? 0) === 0);

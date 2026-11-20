@@ -1729,6 +1729,7 @@ const App: React.FC = () => {
 
   const authRedirectPathRef = useRef<string | null>(null);
   const isHydratingSessionRef = useRef(false);
+  const isSavingDocRef = useRef(false);
   const isProjectLoadingRef = useRef(false);
 
   const currentProjectOwnerIdRef = useRef<string | null>(null);
@@ -2937,6 +2938,8 @@ const App: React.FC = () => {
     setOverarchingZineIntro('');
     crossSceneLinksRef.current = [];
     setCrossSceneLinks([]);
+    overarchingHistoryRef.current = {};
+    setOverarchingHistory({});
 
     // Update route immediately
     navigate(`/p/${newId}`);
@@ -3445,6 +3448,8 @@ const App: React.FC = () => {
     setOverarchingZineIntro('');
     crossSceneLinksRef.current = [];
     setCrossSceneLinks([]);
+    overarchingHistoryRef.current = {};
+    setOverarchingHistory({});
     curationSessionIdRef.current = null;
     sessionTokenApprovedRef.current = false;
     setError(null);
@@ -8152,7 +8157,7 @@ const App: React.FC = () => {
       
       const isCriticalUpdate = statusChanged || jobChanged || (incomingHasGraph && !localHasGraph);
 
-      if (isHydratingSessionRef.current && !isCriticalUpdate) {
+      if ((isHydratingSessionRef.current || isSavingDocRef.current) && !isCriticalUpdate) {
         // Keep lightweight overarchingHistory in sync even on bypassed snapshots
         if (data.overarchingHistory !== undefined) {
           try {
@@ -8327,7 +8332,12 @@ const App: React.FC = () => {
           setOverarchingHistory(parsedHistory);
         } catch (e) {
           console.warn('[ProjectLoader] Failed to parse overarchingHistory:', e);
+          overarchingHistoryRef.current = {};
+          setOverarchingHistory({});
         }
+      } else {
+        overarchingHistoryRef.current = {};
+        setOverarchingHistory({});
       }
       if (!data.scenes && data.discoveryFilters) {
         const parsedFilters = typeof data.discoveryFilters === 'string' && data.discoveryFilters.startsWith('{') ? JSON.parse(data.discoveryFilters) : null;
@@ -9294,7 +9304,7 @@ const App: React.FC = () => {
 
       const projectPath = `users/${user.uid}/projects/${currentProjectId}`;
       try {
-        isHydratingSessionRef.current = true;
+        isSavingDocRef.current = true;
 
         console.log(`[Database Reporter] Attempting PROJECT SAVE | Path: ${projectPath}`);
         
@@ -9317,10 +9327,10 @@ const App: React.FC = () => {
         // Update the last synced payload ref
         lastSyncedDocRef.current = currentSnapshot;
 
-        setTimeout(() => { isHydratingSessionRef.current = false; }, 1000);
+        setTimeout(() => { isSavingDocRef.current = false; }, 1000);
       } catch (err) {
         console.error(`[Database Reporter] PROJECT SAVE FAILED: ${projectPath}`);
-        isHydratingSessionRef.current = false;
+        isSavingDocRef.current = false;
       }
     }, 3000);
 
@@ -9366,7 +9376,7 @@ const App: React.FC = () => {
         // Gate the resulting onSnapshot from re-running the full hydration cycle.
         // The canvasLayout field is a position-only write; the Firestore listener
         // must not treat it as a structural project update requiring re-hydration.
-        isHydratingSessionRef.current = true;
+        isSavingDocRef.current = true;
         await updateDoc(doc(db, projectPath), {
           canvasLayout: serialized,
           updatedAt: serverTimestamp(),
@@ -9374,9 +9384,10 @@ const App: React.FC = () => {
         console.log(`[Coordinate Memory] canvasLayout persisted for project: ${projectId}`);
         // 1s tail matches the autosave pattern — long enough to absorb the onSnapshot
         // echo from Firestore, short enough not to block legitimate critical updates.
-        setTimeout(() => { isHydratingSessionRef.current = false; }, 1000);
+        setTimeout(() => { isSavingDocRef.current = false; }, 1000);
       } catch (err) {
         console.warn(`[Coordinate Memory] updateDoc failed for ${projectPath}:`, err);
+        isSavingDocRef.current = false;
       }
     }, 5000);
   }, [user, isGuest]);
@@ -9491,6 +9502,8 @@ const App: React.FC = () => {
                 setPeekedNode(null);
                 setIsPassiveSelection(true);
                 hasAutoSelectedRef.current = null;
+                overarchingHistoryRef.current = {};
+                setOverarchingHistory({});
                 
                 const localProj = projects.find(p => p.id === projectId);
                 if (localProj) {
@@ -9640,6 +9653,8 @@ const App: React.FC = () => {
                   setProjectStatus(null);
                   setActiveJobId(null);
                   setExpectedCurationSpeed(undefined);
+                  overarchingHistoryRef.current = {};
+                  setOverarchingHistory({});
                 }
               }
               setCurrentProjectId(projectId);

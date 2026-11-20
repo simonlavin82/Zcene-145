@@ -1070,7 +1070,7 @@ function resolveSceneNodeOverlaps(nodes, links = [], options) {
         // Helper for AABB half-extents
         const getHalfExtents = (n) => {
             const label = getNodeDisplayLabel(n);
-            const textWidth = Math.max(28, label.length * 7.2);
+            const textWidth = Math.max(30, label.length * 7.5);
             const isSeed = Boolean(n.isSeed || n.isSceneSeed);
             const r = isSeed ? 18 : (n.type === 'artist' ? 16 : 14);
             // Fix 2: Give Root Artist nodes (+6px to hx) for 32px icon, r=22 halo, and y=27 label clearance
@@ -1199,9 +1199,10 @@ function rotatePetalAlongArc(petal, parent, pushX, pushY, pushDist) {
     const ry = (petal.y ?? py) - py;
     const currentR = Math.hypot(rx, ry);
     const isParentRoot = Boolean(parent.isSeed || parent.isSceneSeed);
-    const minR = isParentRoot ? 78 : 62;
-    const maxR = isParentRoot ? 95 : 85;
-    const defaultR = isParentRoot ? 85 : 72;
+    const isLabelPetal = petal.type === 'label';
+    const minR = isParentRoot ? (isLabelPetal ? 85 : 78) : 62;
+    const maxR = isParentRoot ? (isLabelPetal ? 120 : 95) : 85;
+    const defaultR = isParentRoot ? (isLabelPetal ? 100 : 85) : 72;
     const tetherR = Math.max(minR, Math.min(maxR, currentR || defaultR));
     const currentTheta = Math.atan2(ry === 0 && rx === 0 ? 1 : ry, rx);
     // Tangent vector along orbit: (-sin(theta), cos(theta))

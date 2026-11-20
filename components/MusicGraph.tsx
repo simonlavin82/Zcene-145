@@ -1574,6 +1574,63 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         }
                     });
 
+                    // Flush updated post-overlap coordinates directly to the live SVG DOM elements
+                    // so the settled visual layout immediately matches the saved canvasLayout pixel-for-pixel
+                    if (svgRef.current) {
+                        const currentContainer = d3.select(svgRef.current).select(".main-container");
+                        if (!currentContainer.empty()) {
+                            currentContainer.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")
+                                .style("display", (d: any) => (isNaN(d.x) || isNaN(d.y)) ? "none" : null)
+                                .attr("transform", (d: any) => {
+                                    const x = isNaN(d.x) ? 0 : (d.x ?? 0);
+                                    const y = isNaN(d.y) ? 0 : (d.y ?? 0);
+                                    return `translate(${x},${y})`;
+                                });
+
+                            currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
+                                .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                                .attr("x1", (d: any) => {
+                                    const val = (d.source as any).x;
+                                    return isNaN(val) ? 0 : val;
+                                })
+                                .attr("y1", (d: any) => {
+                                    const val = (d.source as any).y;
+                                    return isNaN(val) ? 0 : val;
+                                })
+                                .attr("x2", (d: any) => {
+                                    const val = (d.target as any).x;
+                                    return isNaN(val) ? 0 : val;
+                                })
+                                .attr("y2", (d: any) => {
+                                    const val = (d.target as any).y;
+                                    return isNaN(val) ? 0 : val;
+                                });
+
+                            currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
+                                .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                                .attr("x1", (d: any) => {
+                                    const val = (d.source as any).x;
+                                    return isNaN(val) ? 0 : val;
+                                })
+                                .attr("y1", (d: any) => {
+                                    const val = (d.source as any).y;
+                                    return isNaN(val) ? 0 : val;
+                                })
+                                .attr("x2", (d: any) => {
+                                    const val = (d.target as any).x;
+                                    return isNaN(val) ? 0 : val;
+                                })
+                                .attr("y2", (d: any) => {
+                                    const val = (d.target as any).y;
+                                    return isNaN(val) ? 0 : val;
+                                });
+
+                            currentContainer.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+                                .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                                .attr("d", (d: any) => computeBridgePathD(d, visibleNodesRef.current));
+                        }
+                    }
+
                     // Phase A — Coordinate Memory: collect ALL settled node positions
                     // (artists, labels, and all metadata petals: genre, country, founded).
                     // Zero Coordinate Amnesia requires every node type to be pinned.
