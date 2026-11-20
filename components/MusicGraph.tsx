@@ -145,6 +145,32 @@ const createSceneIsolatedCenterForce = (strength: number): d3.Force<Node, Link> 
   return force;
 };
 
+/**
+ * [Phase B2.13] Centralized 2-Tier Resting Intra-Scene Link Opacity:
+ *   • artist <-> artist: 0.26 + (weight * 0.24)  [0.28 – 0.50]
+ *   • artist <-> label:  0.30 (shared deg > 1) / 0.22 (1-degree)
+ *   • artist <-> genre / country / founded: 0.18 at rest
+ */
+export const computeRestingLinkOpacity = (
+  l: any,
+  sNode: Node | undefined,
+  tNode: Node | undefined,
+  nodeDegreesMap: Map<string, number>
+): number => {
+  const sType = sNode?.type || 'artist';
+  const tType = tNode?.type || 'artist';
+  if (sType === 'artist' && tType === 'artist') {
+    const w = typeof l?.weight === 'number' ? Math.max(0.1, Math.min(1.0, l.weight)) : 0.5;
+    return Math.round((0.26 + w * 0.24) * 100) / 100;
+  }
+  if (sType === 'label' || tType === 'label') {
+    const labelNode = sType === 'label' ? sNode : tNode;
+    const deg = labelNode ? (nodeDegreesMap.get(labelNode.id) ?? 1) : 1;
+    return deg > 1 ? 0.30 : 0.22;
+  }
+  return 0.18;
+};
+
 const isNodeSeedInOwnScene = (node: Node, seedArtists: string[]): boolean => {
   if (node.type !== 'artist') return false;
   if (typeof node.isSceneSeed === 'boolean') return node.isSceneSeed;
@@ -538,6 +564,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   }, [data, activeFilters, seedArtists]);
   
   const visibleNodesRef = useRef(visibleNodes);
+  const nodeDegreesRef = useRef<Map<string, number>>(new Map());
   const prevArtistIdsRef = useRef<Set<string>>(new Set());
   const prevLayoutSignatureRef = useRef<string>("");
   useEffect(() => {
@@ -1060,8 +1087,16 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     return isConnected ? 2.0 : 1.2;
                 });
 
+            const isNodeInHoverSpotlight = (n: Node) => {
+                const nCanon = stripSceneNamespace(n.canonicalId || n.id);
+                return hasSceneNs
+                    ? neighborNodeIds.has(n.id.toLowerCase())
+                    : (neighborNodeIds.has(n.id.toLowerCase()) || neighborNodeIds.has(normalizeArtistId(nCanon)));
+            };
+
             // Spotlight constellation nodes and dim others
-            svg.selectAll<SVGGElement, Node>("g.node-element")
+            const allNodesSel = svg.selectAll<SVGGElement, Node>("g.node-element");
+            allNodesSel
                 .transition().duration(200)
                 .style("opacity", (n: any) => {
                     const nodeType = n.type as FilterKeys;
@@ -1069,12 +1104,18 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                                           Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
                                           !activeFilters[nodeType];
                     if (isFilteredOut) return 0.1;
-                    const nCanon = stripSceneNamespace(n.canonicalId || n.id);
-                    const isMatch = hasSceneNs 
-                        ? neighborNodeIds.has(n.id.toLowerCase())
-                        : (neighborNodeIds.has(n.id.toLowerCase()) || neighborNodeIds.has(normalizeArtistId(nCanon)));
-                    return isMatch ? 1 : 0.15;
+                    return isNodeInHoverSpotlight(n) ? 1 : 0.15;
                 });
+
+            // Elevate spotlighted labels (including contextual metadata) to full brightness on hover
+            allNodesSel.select("text.node-label")
+                .transition().duration(200)
+                .attr("fill", (n: Node) => {
+                    if (isNodeInHoverSpotlight(n)) return isNodeSeedInOwnScene(n, seedArtists) ? "#F6E468" : "#ffffff";
+                    if (isNodeSeedInOwnScene(n, seedArtists)) return "#F6E468";
+                    return (n.type === 'artist' || n.type === 'label') ? "#e4e4e7" : "#a1a1aa";
+                })
+                .attr("opacity", (n: Node) => isNodeInHoverSpotlight(n) ? 1 : ((n.type === 'artist' || n.type === 'label') ? 1 : 0.8));
 
             if (d.type === 'artist') {
                 const isDirectNodeMatch = (id: string) =>
@@ -1229,7 +1270,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const hlNodes = highlightedNodesRef.current;
             const selHighlight = selectionHighlightIdsRef.current;
 
-            svg.selectAll<SVGGElement, Node>("g.node-element")
+            const allNodesSel = svg.selectAll<SVGGElement, Node>("g.node-element");
+            allNodesSel
                 .transition().duration(200)
                 .style("opacity", (n: any) => {
                     const nodeType = n.type as FilterKeys;
@@ -1250,7 +1292,23 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     return 1;
                 });
 
-            // Restore visual line strokes and opacities
+            allNodesSel.select("text.node-label")
+                .transition().duration(200)
+                .attr("fill", (n: Node) => {
+                    if (isNodeSeedInOwnScene(n, seedArtists)) return "#F6E468";
+                    const isSearchMatch = isSearchActive && (hlNodes.has(n.id) || hlNodes.has(String(n.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(n.id))));
+                    const isSelMatch = Boolean(selHighlight && selHighlight.has(n.id));
+                    if (isSearchMatch || isSelMatch) return "#ffffff";
+                    return (n.type === 'artist' || n.type === 'label') ? "#e4e4e7" : "#a1a1aa";
+                })
+                .attr("opacity", (n: Node) => {
+                    const isSearchMatch = isSearchActive && (hlNodes.has(n.id) || hlNodes.has(String(n.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(n.id))));
+                    const isSelMatch = Boolean(selHighlight && selHighlight.has(n.id));
+                    if (isSearchMatch || isSelMatch) return 1;
+                    return (n.type === 'artist' || n.type === 'label') ? 1 : 0.8;
+                });
+
+            // Restore visual line strokes and 2-tier resting opacities
             svg.selectAll<SVGLineElement, Link>("line.visual-line")
                 .transition().duration(200)
                 .attr("stroke", (l: any) => {
@@ -1284,7 +1342,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     }
 
                     if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
-                    return 0.3;
+                    return computeRestingLinkOpacity(l, sNode, tNode, nodeDegreesRef.current);
                 });
 
             // Restore Cross-Scene Bridge Lines to neutral grey
@@ -1670,6 +1728,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // (e.g. nu-metal, united-states) do not inflate their collideForce.radius.
     const visibleNodeById = new Map<string, Node>(visibleNodes.map(n => [n.id, n]));
     const nodeDegrees = new Map<string, number>();
+    const artistArtistDegrees = new Map<string, number>();
     const nodeTotalWeights = new Map<string, number>();
     visibleLinks.forEach(l => {
         if (l.isCrossSceneBridge) return;
@@ -1681,11 +1740,14 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         const sNode = visibleNodeById.get(s);
         const tNode = visibleNodeById.get(t);
         if (sNode?.type === 'artist' && tNode?.type === 'artist') {
+            artistArtistDegrees.set(s, (artistArtistDegrees.get(s) || 0) + 1);
+            artistArtistDegrees.set(t, (artistArtistDegrees.get(t) || 0) + 1);
             const weight = l.weight ?? 0.5;
             nodeTotalWeights.set(s, (nodeTotalWeights.get(s) || 0) + weight);
             nodeTotalWeights.set(t, (nodeTotalWeights.get(t) || 0) + weight);
         }
     });
+    nodeDegreesRef.current = nodeDegrees;
 
     const forceX = d3.forceX<Node>();
     const forceY = d3.forceY<Node>();
@@ -1865,6 +1927,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     .attr("fill", "transparent")
                     .style("pointer-events", "all");
 
+                // Subtle halo ring for Root Artists and actively selected node
+                g.append("circle")
+                    .attr("class", "node-halo")
+                    .attr("r", 22)
+                    .attr("fill", "none")
+                    .attr("stroke", "transparent")
+                    .attr("stroke-width", 0)
+                    .style("pointer-events", "none");
+
                 g.append("text")
                     .attr("class", "node-icon material-symbols-outlined")
                     .attr("text-anchor", "middle")
@@ -1944,15 +2015,29 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     nodeElements
         .attr("class", d => `node-element ${d.isLoading || d.isPending ? 'animate-pulse' : ''}`);
 
+    nodeElements.select("circle.node-halo")
+        .attr("r", d => isNodeSeedInOwnScene(d, seedArtists) ? 22 : 20)
+        .attr("fill", d => isNodeSeedInOwnScene(d, seedArtists) ? "rgba(246, 228, 104, 0.08)" : "none")
+        .attr("stroke", d => isNodeSeedInOwnScene(d, seedArtists) ? "rgba(246, 228, 104, 0.35)" : "transparent")
+        .attr("stroke-width", d => isNodeSeedInOwnScene(d, seedArtists) ? 1.5 : 0);
+
     nodeElements.select("text.node-icon")
         .attr("fill", d => getNodeColor(d))
         .attr("opacity", d => d.isLoading || d.isPending ? 0.35 : 1)
         .style("font-size", d => {
             const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-            if (isSeed) return "28px";
-            if (d.type === 'artist') return "28px";
-            if (d.type === 'country') return "26px";
-            if (d.type === 'label' || d.type === 'founded') return "24px";
+            if (isSeed) return "32px";
+            if (d.type === 'artist') {
+                const aaDeg = artistArtistDegrees.get(d.id) ?? 0;
+                const sceneProfile = getSceneProfile(d);
+                const isMultiPodBridge = sceneProfile.numSeeds > 1 && (d.group || 1) > sceneProfile.numSeeds;
+                return (aaDeg >= 4 || isMultiPodBridge) ? "28px" : "25px";
+            }
+            if (d.type === 'label') {
+                const deg = nodeDegrees.get(d.id) ?? 1;
+                return deg >= 3 ? "26px" : "22px";
+            }
+            if (d.type === 'country' || d.type === 'founded') return "21px";
             return "20px";
         })
         .text(d => {
@@ -1985,14 +2070,32 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
 
 
-    nodeElements.select("text.node-label")
-        .attr("y", 25)
-        .style("font-size", "12px")
-        .text(d => toDisplayLabel(d));
-
     const isSearchActive = searchQueryRef.current.trim().length > 0;
     const hlNodes = highlightedNodesRef.current;
     const selHighlight = selectionHighlightIdsRef.current;
+
+    nodeElements.select("text.node-label")
+        .attr("y", d => isNodeSeedInOwnScene(d, seedArtists) ? 27 : 25)
+        .attr("fill", d => {
+            if (isNodeSeedInOwnScene(d, seedArtists)) return "#F6E468";
+            if (isSearchActive && (hlNodes.has(d.id) || hlNodes.has(String(d.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(d.id))))) return "#ffffff";
+            if (selHighlight && selHighlight.has(d.id)) return "#ffffff";
+            return (d.type === 'artist' || d.type === 'label') ? "#e4e4e7" : "#a1a1aa";
+        })
+        .attr("opacity", d => {
+            if (isSearchActive && (hlNodes.has(d.id) || hlNodes.has(String(d.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(d.id))))) return 1;
+            if (selHighlight && selHighlight.has(d.id)) return 1;
+            return (d.type === 'artist' || d.type === 'label') ? 1 : 0.8;
+        })
+        .style("font-size", d => {
+            if (isNodeSeedInOwnScene(d, seedArtists)) return "13px";
+            return (d.type === 'artist' || d.type === 'label') ? "12px" : "11px";
+        })
+        .style("font-weight", d => {
+            if (isNodeSeedInOwnScene(d, seedArtists)) return "600";
+            return (d.type === 'artist' || d.type === 'label') ? "500" : "400";
+        })
+        .text(d => toDisplayLabel(d));
 
     nodeElements
         .style("opacity", d => {
@@ -2067,7 +2170,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             }
 
             if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.3 : 0.05;
-            return 0.4;
+            return computeRestingLinkOpacity(d, sNode, tNode, nodeDegreesRef.current);
         })
         .attr("stroke-dasharray", "3,3")
         .style("pointer-events", "none");
@@ -2392,8 +2495,19 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return 1;
         });
 
-    nodeElements.select("path")
+    nodeElements.select("circle.node-halo")
         .transition().duration(300)
+        .attr("r", d => isNodeSeedInOwnScene(d, seedArtists) ? 22 : 20)
+        .attr("fill", d => {
+            const activeNode = (!isSearchActive && !isPassiveSelection) ? (selectedNode || peekedNode) : null;
+            const hasActiveNs = activeNode && String(activeNode.id).includes('::');
+            const isSelected = activeNode
+                ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
+                : false;
+            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
+            if (isSelected) return "rgba(246, 228, 104, 0.14)";
+            return isSeed ? "rgba(246, 228, 104, 0.08)" : "none";
+        })
         .attr("stroke-width", d => {
             const activeNode = (!isSearchActive && !isPassiveSelection) ? (selectedNode || peekedNode) : null;
             const hasActiveNs = activeNode && String(activeNode.id).includes('::');
@@ -2401,8 +2515,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
                 : false;
             const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-            if (isSelected) return 4;
-            return isSeed ? 3 : 2;
+            if (isSelected) return 2;
+            return isSeed ? 1.5 : 0;
         })
         .attr("stroke", d => {
             const activeNode = (!isSearchActive && !isPassiveSelection) ? (selectedNode || peekedNode) : null;
@@ -2411,8 +2525,24 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
                 : false;
             const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-            if (isSelected) return '#F6E468';
-            return isSeed ? '#F6E468' : 'transparent';
+            if (isSelected) return "rgba(246, 228, 104, 0.85)";
+            return isSeed ? "rgba(246, 228, 104, 0.35)" : "transparent";
+        });
+
+    nodeElements.select("text.node-label")
+        .transition().duration(300)
+        .attr("fill", d => {
+            if (isNodeSeedInOwnScene(d, seedArtists)) return "#F6E468";
+            const isSearchMatch = isSearchActive && (highlightedNodes.has(d.id) || highlightedNodes.has(String(d.id).toLowerCase()) || highlightedNodes.has(normalizeArtistId(String(d.id))));
+            const isSelMatch = Boolean(selectionHighlightIds && selectionHighlightIds.has(d.id));
+            if (isSearchMatch || isSelMatch) return "#ffffff";
+            return (d.type === 'artist' || d.type === 'label') ? "#e4e4e7" : "#a1a1aa";
+        })
+        .attr("opacity", d => {
+            const isSearchMatch = isSearchActive && (highlightedNodes.has(d.id) || highlightedNodes.has(String(d.id).toLowerCase()) || highlightedNodes.has(normalizeArtistId(String(d.id))));
+            const isSelMatch = Boolean(selectionHighlightIds && selectionHighlightIds.has(d.id));
+            if (isSearchMatch || isSelMatch) return 1;
+            return (d.type === 'artist' || d.type === 'label') ? 1 : 0.8;
         });
 
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
@@ -2465,7 +2595,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             }
 
             if (selectionHighlightIds) return (selectionHighlightIds.has(s) && selectionHighlightIds.has(t)) ? 0.3 : 0.05;
-            return 0.3;
+            return computeRestingLinkOpacity(d, sNode, tNode, nodeDegreesRef.current);
         });
 
     // Cross-Scene Bridge Lines: Default rest (neutral grey #e4e4e7, opacity 0.35, width 1.2)

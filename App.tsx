@@ -10807,6 +10807,97 @@ const App: React.FC = () => {
     if (previousWorkspace) {
       if (previousWorkspace.view === View.Graph && previousWorkspace.projectId) {
         setCurrentView(View.Graph);
+        navigate(`/p/${previousWorkspace.projectId}`);
+      } else {
+        setCurrentView(View.Dashboard);
+        navigate('/dashboard');
+      }
+    } else {
+      if (currentProjectId) {
+        setCurrentView(View.Graph);
+        navigate(`/p/${currentProjectId}`);
+      } else {
+        setCurrentView(View.Dashboard);
+        navigate('/dashboard');
+      }
+    }
+  }, [previousWorkspace, currentProjectId, navigate]);
+
+  const handleCancel = useCallback(() => { 
+    if (abortControllerRef.current) { 
+      // 1. Sever active network requests
+      abortControllerRef.current.abort(); 
+      abortControllerRef.current = null; 
+    }
+    
+    // 2. Unconditionally clear global UI loading states (Spiderweb)
+    setIsLoading(false); 
+    
+    // 3. Clear node-specific loading states (Deep Cut / DetailsPanel)
+    setLoadingNodeIds(new Set()); 
+    fetchingNodeIdsRef.current.clear();
+    
+    // 4. Release all async pipeline locks
+    isHydratingSessionRef.current = false;
+    isProjectLoadingRef.current = false;
+    isFetchingDetailsRef.current = false;
+    
+    // 5. Clear active Cloud Run jobs & modals
+    setActiveJobId(null);
+  }, []);
+
+  const formattedGraphData = useMemo(() => {
+    if (!graphData) return null;
+    const seedList = scenes.length > 0
+      ? Array.from(new Set([
+          ...scenes.flatMap(s => toSeedArtistsArray(s.seedArtists)),
+          ...toSeedArtistsArray(seedArtists)
+        ]))
+      : toSeedArtistsArray(seedArtists);
+    return {
+      ...graphData,
+      nodes: graphData.nodes.map(n => {
+        const canonicalId = stripSceneNamespace(n.canonicalId || n.id);
+        return {
+          ...n,
+          label: getNodeLabel({ ...n, id: canonicalId }, seedList, detailsCache)
+        };
+      })
+    };
+  }, [graphData, seedArtists, scenes, detailsCache]);
+
+  const formattedSelectedNode = useMemo(() => {
+    if (!selectedNode || !formattedGraphData) return selectedNode;
+    const selectedCanonicalId = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id);
+    const match = formattedGraphData.nodes.find(n => n.id === selectedNode.id) ||
+                  formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === selectedCanonicalId);
+    const isLoadingNode = loadingNodeIds.has(selectedCanonicalId) || 
+                          loadingNodeIds.has(selectedCanonicalId.toLowerCase()) || 
+                          loadingNodeIds.has(normalizeArtistId(selectedCanonicalId));
+    return match 
+      ? { ...selectedNode, label: match.label, isLoading: isLoadingNode } 
+      : { ...selectedNode, isLoading: isLoadingNode };
+  }, [selectedNode, formattedGraphData, loadingNodeIds]);
+
+  const formattedPeekedNode = useMemo(() => {
+    if (!peekedNode || !formattedGraphData) return peekedNode;
+    const peekedCanonicalId = stripSceneNamespace(peekedNode.canonicalId || peekedNode.id);
+    const match = formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === peekedCanonicalId || n.id === peekedNode.id);
+    return match 
+      ? { ...peekedNode, label: match.label } 
+      : peekedNode;
+  }, [peekedNode, formattedGraphData]);
+
+  const formattedActiveNodes = useMemo(() => {
+    if (!activeNodes || !formattedGraphData) return activeNodes;
+    return activeNodes.map(node => {
+      const canonicalId = stripSceneNamespace(node.canonicalId || node.id);
+      const match = formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === canonicalId || n.id === node.id);
+      return match ? { ...node, label: match.label } : node;
+    });
+  }, [activeNodes, formattedGraphData]);
+
+  const areFiltersChanged = useMemo(() => {
     return !areFiltersEqual(discoveryFilters, lastAppliedFilters);
   }, [discoveryFilters, lastAppliedFilters]);
 

@@ -139,7 +139,7 @@ export const ARCHITECTURE_RULES = [
     { 
         id: 21, 
         title: "Locked Topology & Coordinate Memory", 
-        desc: "Node positions are strictly derived from AI-evaluated link weights around deterministic per-scene centers (1000 + sceneIndex * 1050, 1000). Direct D3 node dragging is permanently disabled. resolveSceneNodeOverlaps enforces AABB collision boxes (W = 7.2px/char + 22px + padding, H = 24px) with root mass = ∞, artist mass = 6.7, outward-arc petal sprouting (r ∈ [65px, 75px], charges -100 to -120), and 1-degree metadata satellites tethered to parent artist orbits (r ∈ [62px, 85px]) via tangential arc rotation. Settled (fx, fy) coordinates (keyed by namespaced ID scene-k::canonicalId) are persisted to the owned project's canvasLayout (5s debounce) so existing scenes remain frozen when new scenes are added. Per-Node Scene Territory Sanitizer: buildCompositeCanvasGraph enforces strict ±480px spatial territory limits (SCENE_TERRITORY_MAX_DX = 480, SCENE_TERRITORY_MAX_DY = 480) around each scene cluster center, rejecting out-of-territory bleeding coordinates, placing sanitized nodes at deterministic territory centers, and flagging wasLayoutHealed = true so ProjectLoader automatically persists the repaired layout back to Firestore. D3 Live Coordinate Handshake Guard: MusicGraph tracks a scene-structure fingerprint (lastSceneFingerprintRef) that invalidates live simulation coordinate caches whenever scene counts, scene IDs, or root artists change, preventing re-indexed nodes from inheriting mismatched positions." 
+        desc: "Node positions derive from calibrated artist-only AI link weights around deterministic per-scene centers (1000 + sceneIndex * 1050, 1000) with Scene-Isolated D3 Physics (createSceneIsolatedChargeForce partitioning Barnes-Hut repulsion by sceneIndex, createSceneIsolatedCenterForce(0.005) skipping pinned nodes/scenes, per-scene ScenePhysicsProfile gravity/spacing multipliers, and artist-only nodeTotalWeights collision radii). Direct D3 node dragging is permanently disabled. Unpinned/healed scenes initialize via the Tick-0 Editorial Compass (compassCoords: Ring 0 Roots 0–55px, Ring 1 Peers/Shared Labels 95–175px in link-derived pod wedges + crossover junction, Ring 2 Metadata 185–235px). resolveSceneNodeOverlaps enforces AABB collision boxes (W = 7.2px/char + 22px + padding, H = 24px) with root mass = ∞, artist mass = 6.7, outward-arc petal sprouting (charges -100 to -120, distances 65/70/75px), and 1-degree metadata satellites tethered at r ∈ [62px, 85px]; in saved scenes, remaining sprouted metadata petals are pinned post-overlap. Coordinate Memory persists 2-decimal rounded (fx, fy) positions (keyed by scene-k::canonicalId) to canvasLayout (5s debounce, dirty-checked); wasAllPinnedAtStartRef suppresses read-only Firestore writes across initial mounts and Legend toggles while keeping attemptInitialCentering() active, and handleGenerateGraph strips dirty/overwritten scene IDs from lastSettledLayoutRef. Multi-Root Centroid Guard & Sanitizer: buildCompositeCanvasGraph enforces SCENE_TERRITORY_MAX_DX = 480, SCENE_SEED_MAX_DX/DY = 280 for single roots, and SCENE_MULTI_SEED_MAX_DX/DY = 360 with mean centroid <= SCENE_MULTI_SEED_CENTROID_MAX_D (220px) for multi-root scenes, flagging wasLayoutHealed = true for auto-repair. Phase B2.13 Visual Storytelling Hierarchy renders uniform 1px '3,3' intra-scene links via computeRestingLinkOpacity (artist 0.28–0.50, label 0.30/0.22, metadata 0.18), gold <circle class=\"node-halo\"> rings on Roots & active selection, 4-step icon sizing (32px Root, 28px/25px Peer Artist, 26px/22px Label, 21px Origin/Founded, 20px Genre), and label contrast with #ffffff hover/selection spotlighting." 
     },
     { 
         id: 22, 
@@ -229,7 +229,7 @@ export const ARCHITECTURE_RULES = [
     { 
         id: 39, 
         title: "Deterministic Metadata Projection, Pod Genre Affinity & Canonical Style Matching", 
-        desc: "Prior to Final Node Positioning, the worker deterministically projects verified Country and Founded (YYYY) links onto 100% of artist nodes, while ensuring canonical Style metadata is projected directly from detailsCache. Missing genre links resolve via 2-Tier Pod Affinity. In Deep Cuts, the Taste Profile Style Filter Bar strictly matches against canonical nodeStyle metadata when present, completely eliminating biography summary and recommendationReason prose bleed." 
+        desc: "Prior to Final Node Positioning, the worker executes Step 4B (deterministically projecting Country at 0.2, Founded at 0.1, and 2-Tier Pod Genre Affinity at 0.8 onto 100% of artist nodes, while projecting canonical Style metadata directly from detailsCache) and Step 4C (Artist Component Bridge Guard stitching any disconnected artist sub-island to the primary seed at weight 0.3, locking metadata edge weights at 0.2 Country, 0.1 Founded, 0.8 Genre, and 0.7 Label prior to artist-only Box 5 execution and Step 5 seed write-back). In Deep Cuts, the Taste Profile Style Filter Bar strictly matches against canonical nodeStyle metadata when present, completely eliminating biography summary and recommendationReason prose bleed." 
     },
     { 
         id: 40, 
@@ -392,15 +392,15 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Step 4B: Deterministic Enrichment & Degree-0 Cleanup</span>
+                                <span className="text-primary font-medium">Step 4B: Deterministic Enrichment &amp; Degree-0 Cleanup</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Wires Country, Founded, and 2-Tier Pod Genre nodes before Degree-0 cleanup and strict physical-node <code>anchorResolution</code> evaluation.</li>
+                                    <li>Wires Country (<code>0.2</code>), Founded (<code>0.1</code>), and 2-Tier Pod Genre (<code>0.8</code>) nodes before Degree-0 cleanup and strict physical-node <code>anchorResolution</code> evaluation.</li>
                                 </ul>
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Final Node Positioning | 3.6 Flash (minimal)</span>
+                                <span className="text-primary font-medium">Step 4C &amp; Final Node Positioning | 3.6 Flash (low)</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Evaluates bios to generate semantic link weights (0.1–1.0) with Weight Preservation Guard.</li>
+                                    <li>Runs Artist Component Bridge Guard (stitching disconnected artist islands via <code>0.3</code> bridge), locks metadata weights (<code>0.2</code> Country, <code>0.1</code> Founded, <code>0.8</code> Genre, <code>0.7</code> Label), and scores strictly <code>artist &harr; artist</code> edges via 3-Tier Forced-Distribution Rubric (<code>0.85–1.00</code> / <code>0.45–0.70</code> / <code>0.15–0.35</code>) using <code>forwardContext</code> &amp; <code>seedIds</code> BEFORE Step 5 atomic seed write-back.</li>
                                 </ul>
                             </li>
                             <li>
@@ -1006,28 +1006,33 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         
                         <CodeBlock 
                             title="D3 Force Simulation & Physics Constants" 
-                            content={`STABILITY & MOMENTUM CONSTANTS (MusicGraph.tsx):
-- Velocity Decay: 0.7 (High friction for rapid settling and zero canvas jitter)
-- Charge (ManyBody): -500 (Organic Mode) to -1200 (Cluster Mode); Petal Satellites: -100 to -120
-- Collision Radius: 80 * sizeMult (Prevents overlap while preserving semantic density)
-- Alpha Targets: 0.15 (Initialization) / 0.2 (Selection Wake) / 1.0 (Structural Topology Change)
-- Alpha Cooling: alphaDecay(0.1) and alphaMin(0.01) halt simulation rapidly
-- Horizontal Scene Stride: SCENE_HORIZONTAL_STRIDE = 1050px
+                            content={`STABILITY & MOMENTUM CONSTANTS (MusicGraph.tsx — Phase B2.12 Isolated Physics):
+- Velocity Decay: 0.36 | Alpha Cooling: alphaDecay(0.022) & alphaMin(0.001) | 0 Sync Ticks
+- Scene-Isolated Forces: createSceneIsolatedChargeForce (partitioned by sceneIndex) & createSceneIsolatedCenterForce(0.005) (skipping pinned nodes/scenes)
+- Charge Strengths: Root -800 | Peer Artist -500 | Shared Metadata (deg > 1) -60 | 1-Degree Petals: Genre -120, Label -110, Country/Founded -100
+- Per-Scene Profile (ScenePhysicsProfile): spacingMultiplier = 1.25 if sceneSeeds > 1 or sceneNodes > 35 else 1.0; gravity = 0.03 / 0.045; seedStrength = 0.15 / 0.4
+- Collision Radius: max(minRadius [32 artist / 20 other], labelLen * 3 + 10 + artistOnlyNodeTotalWeights * 5)
+- Alpha Targets: 0.001 (Saved/Pinned or Legend Toggle) | 0.2 (Minor Update) | 0.3 (Tab Activation) | 1.0 (Structural Change)
+- Horizontal Scene Stride: SCENE_HORIZONTAL_STRIDE = 1050px | Territory Bounds: ±480px (Single Seed ±280px; Multi-Root ±360px with centroid <= 220px)
 
-LINK DISTANCES & STIFFNESS:
-- Artist <-> Artist: 450px * distMult (derived from 3.6 Flash semantic weight 0.1 - 1.0)
-- Outward-Arc Petals: Satellites at r ∈ [65px, 75px] radiating away from scene centroid
-- Petal Link Distances: 65px (Genre) / 70px (Origin) / 75px (Founded) at 0.35 spring stiffness
-- Cross-Scene Bridge Lines: Non-physics quadratic Bézier curves with 70–200px upward arc lift; fixed coordinate anchors, hypot >= 12px sub-pixel arc guard; resting and illuminated states governed by Design System (/design)
+LINK DISTANCES, STIFFNESS & TICK-0 EDITORIAL COMPASS:
+- Artist <-> Artist: (300 - weight * 220) * sceneSpacingMultiplier at strength 0.1 + weight * 0.6 (Box 5 3-Tier Rubric: 0.85-1.00 / 0.45-0.70 / 0.15-0.35)
+- Shared Metadata (deg > 1): 160 * sceneSpacingMultiplier at strength 0.08 | 1-Degree Petals: Founded 65px, Label 70px, Genre/Country 75px at strength 0.35
+- Tick-0 Editorial Compass (compassCoords): Ring 0 Roots (0-55px) | Ring 1 Peer Artists & Shared Labels (95-175px pod wedges + crossover junction) | Ring 2 Metadata (185-235px)
+- Cross-Scene Bridge Lines: Non-physics quadratic Bézier curves with 70–200px upward arc lift; fixed coordinate anchors, hypot >= 12px sub-pixel arc guard
+
+VISUAL STORYTELLING HIERARCHY (Phase B2.13):
+- Resting Link Opacity (computeRestingLinkOpacity): artist<->artist 0.26 + weight * 0.24 [0.28–0.50]; artist<->label 0.30 (shared) / 0.22 (1-degree); metadata 0.18; uniform 1px '3,3'
+- Node Halos (<circle class="node-halo">): Gold halo on Root Artists (r=22, 0.08 fill / 0.35 stroke) and actively selected/peeked node (0.14 fill / 0.85 stroke)
+- Icon Scale: 32px Root | 28px Hub/Bridge Peer (aaDeg >= 4 or crossover) | 25px Standard Peer | 26px Hub Label (>= 3) | 22px Label | 21px Country/Founded | 20px Genre
+- Label Hierarchy: #F6E468 13px/600 Root | #e4e4e7 12px/500 Artist & Label | #a1a1aa (opacity 0.8) 11px/400 Metadata; #ffffff Spotlight on Hover/Selection/Search
 
 COLLISION RESOLUTION (resolveSceneNodeOverlaps):
 - Deterministic post-physics AABB bounding box collision resolution (W = 7.2px/char + 22px + padding, H = 24px)
 - Mass Hierarchy: Roots (mass = ∞, immovable), Artists (mass = 6.7), Satellites (1° iterative tethered arc rotation preserving radial distance r ∈ [62px, 85px])
 
-LOCKED SEMANTIC TOPOLOGY (Rule 21):
-- D3 node drag gestures are permanently disabled (.drag() removed).
-- Mobile canvas panning is completely unobstructed.
-- Settled positions committed to canvasLayout via Coordinate Memory.`} 
+LOCKED SEMANTIC TOPOLOGY & ZERO READ-ONLY WRITES (Rule 21):
+- D3 node drag gestures permanently disabled; mobile panning unobstructed; wasAllPinnedAtStartRef skips overlap & Firestore writes on pinned loads/toggles while keeping attemptInitialCentering() active.`} 
                         />
 
                         <CodeBlock 

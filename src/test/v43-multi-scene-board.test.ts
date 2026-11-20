@@ -46,6 +46,7 @@ import { sanitizeDiscoveryFilters, hasActiveDiscoveryFilters } from '../../servi
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
 import { BACKEND_REGRESSION_RUNBOOK } from '../../docs/backend-regression-runbook';
 import { ARCHITECTURE_RULES } from '../../components/EnginePage';
+import { computeRestingLinkOpacity } from '../../components/MusicGraph';
 import {
   applyShareBlacklistMutation,
   USE_CLOUD_CURATION,
@@ -4333,6 +4334,37 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         expect(foundedNode.fx).toBeDefined();
         expect(foundedNode.fy).toBeDefined();
         expect(foundedNode.fx).toBe(foundedNode.x);
+      });
+
+      it('Phase B2.13: computeRestingLinkOpacity computes exact 3-tier resting link opacities (artist 0.28–0.50, label 0.30/0.22, metadata 0.18)', () => {
+        const artistA: any = { id: 'korn-us', type: 'artist', label: 'Korn', group: 1 };
+        const artistB: any = { id: 'deftones-us', type: 'artist', label: 'Deftones', group: 1 };
+        const sharedLabel: any = { id: 'epic', type: 'label', label: 'Epic', group: 3 };
+        const singleLabel: any = { id: 'flip', type: 'label', label: 'Flip', group: 3 };
+        const genreNode: any = { id: 'nu-metal', type: 'genre', label: 'Nu Metal', group: 4 };
+        const countryNode: any = { id: 'united-states', type: 'country', label: 'United States', group: 5 };
+        const foundedNode: any = { id: '1993', type: 'founded', label: '1993', group: 6 };
+
+        const degrees = new Map<string, number>([
+          ['epic', 3],
+          ['flip', 1],
+          ['nu-metal', 4],
+        ]);
+
+        // Tier 1: artist <-> artist smoothed by Box 5 weight [0.28 - 0.50]
+        expect(computeRestingLinkOpacity({ weight: 0.1 }, artistA, artistB, degrees)).toBe(0.28);
+        expect(computeRestingLinkOpacity({ weight: 0.5 }, artistA, artistB, degrees)).toBe(0.38);
+        expect(computeRestingLinkOpacity({ weight: 1.0 }, artistA, artistB, degrees)).toBe(0.5);
+        expect(computeRestingLinkOpacity({}, artistA, artistB, degrees)).toBe(0.38); // default 0.5 fallback
+
+        // Tier 2: artist <-> label (0.30 shared deg > 1; 0.22 single deg <= 1)
+        expect(computeRestingLinkOpacity({ weight: 0.7 }, artistA, sharedLabel, degrees)).toBe(0.3);
+        expect(computeRestingLinkOpacity({ weight: 0.7 }, artistA, singleLabel, degrees)).toBe(0.22);
+
+        // Tier 3: artist <-> genre / country / founded (0.18 at rest)
+        expect(computeRestingLinkOpacity({ weight: 0.8 }, artistA, genreNode, degrees)).toBe(0.18);
+        expect(computeRestingLinkOpacity({ weight: 0.2 }, artistA, countryNode, degrees)).toBe(0.18);
+        expect(computeRestingLinkOpacity({ weight: 0.1 }, artistA, foundedNode, degrees)).toBe(0.18);
       });
     });
   });

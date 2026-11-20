@@ -1,12 +1,12 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
 # V45.1 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 17 test suites (424 unit/integration tests).
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 17 test suites (430 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
-# Run entire full-stack regression test suite (17 test files, 424 tests)
+# Run entire full-stack regression test suite (17 test files, 430 tests)
 npm test
 
 # Run backend pipeline tests
@@ -131,4 +131,9 @@ When rolling out structural schema migrations, Tier 1 Global Assets (\`/artists\
 # Run automated V43 workspace & ephemeral purge script (preserving Tier 1 /artists & /labels)
 node scripts/execute_v43_purge.cjs
 \`\`\`
+
+### Option A (Surgical Topology Purge — Recommended Post-B2.12 Reset Protocol):
+To upgrade legacy cached topologies to calibrated artist-only Box 5 weights (~10x faster curation than a full cold wipe by preserving verified entity biographies, discographies, and iTunes artwork):
+* Clear workspace collections (projects, sharedZcenes, curationJobs, curationSessions) and reset ONLY topology fields (graphData: null, hasUniqueSpiderweb: false, synthesisRationale: null, isPrimarySeed: false) on cached seed docs.
+* Preserve 100% of verified entity detailsCache profiles, Root-as-Router stubs, record label docs, user accounts, and tokenTransactions.
 `;
