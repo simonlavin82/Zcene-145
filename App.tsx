@@ -190,7 +190,7 @@ const generateGraphDataViaCloudJob = async (
     };
 
     try {
-      const curate = httpsCallable(functions, 'executeCurationPipeline');
+      const curate = httpsCallable(functions, 'executeCurationPipeline', { timeout: 180000 });
       const result = await curate(payload);
       const data = result.data as any;
 

@@ -1,4 +1,6 @@
 import { describe, it, expect } from 'vitest';
+import * as fs from 'fs';
+import * as path from 'path';
 import {
   getSceneCenterOffset,
   namespaceSceneNodeId,
@@ -4816,6 +4818,19 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       stepZeroHydratedSceneIds.add('scene-1');
       const scene1HydratedAfterStep0 = stepZeroHydratedSceneIds.has(scene1TargetId);
       expect(scene1HydratedAfterStep0).toBe(true);
+    });
+
+    it('locks executeCurationPipeline callable timeout to 180,000ms (3 minutes) in App.tsx', () => {
+      const appSrc = fs.readFileSync(path.resolve(__dirname, '../../App.tsx'), 'utf-8');
+      expect(appSrc).toMatch(/httpsCallable\(\s*functions\s*,\s*['"]executeCurationPipeline['"]\s*,\s*\{\s*timeout:\s*180000\s*\}\s*\)/);
+    });
+
+    it('verifies App.tsx decouples isSavingDocRef from isInFlightSetupLock with a 1000ms write-echo tail', () => {
+      const appSrc = fs.readFileSync(path.resolve(__dirname, '../../App.tsx'), 'utf-8');
+      expect(appSrc).toContain('const isSavingDocRef = useRef(false);');
+      expect(appSrc).toContain('const isInFlightSetupLock = isHydratingSessionRef.current || isPreFlightCheckingRef.current;');
+      expect(appSrc).toContain('if ((isHydratingSessionRef.current || isSavingDocRef.current) && !isCriticalUpdate)');
+      expect(appSrc).toContain('setTimeout(() => { isSavingDocRef.current = false; }, 1000);');
     });
   });
 });
