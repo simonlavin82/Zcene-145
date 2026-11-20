@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.MAX_OVERARCHING_HISTORY_ENTRIES = exports.createEmptyScene = exports.MAX_ZINE_IMAGE_SLOTS = exports.SCENE_SEED_MAX_DY = exports.SCENE_SEED_MAX_DX = exports.SCENE_TERRITORY_MAX_DY = exports.SCENE_TERRITORY_MAX_DX = exports.LEGACY_SCENE_HORIZONTAL_STRIDE = exports.PREV_SCENE_HORIZONTAL_STRIDE = exports.SCENE_HORIZONTAL_STRIDE = exports.MAX_SCENES_PER_PROJECT = exports.SCENE_BASE_CENTER_Y = exports.SCENE_BASE_CENTER_X = void 0;
+exports.MAX_OVERARCHING_HISTORY_ENTRIES = exports.createEmptyScene = exports.MAX_ZINE_IMAGE_SLOTS = exports.SCENE_MULTI_SEED_CENTROID_MAX_D = exports.SCENE_MULTI_SEED_MAX_DY = exports.SCENE_MULTI_SEED_MAX_DX = exports.SCENE_SEED_MAX_DY = exports.SCENE_SEED_MAX_DX = exports.SCENE_TERRITORY_MAX_DY = exports.SCENE_TERRITORY_MAX_DX = exports.LEGACY_SCENE_HORIZONTAL_STRIDE = exports.PREV_SCENE_HORIZONTAL_STRIDE = exports.SCENE_HORIZONTAL_STRIDE = exports.MAX_SCENES_PER_PROJECT = exports.SCENE_BASE_CENTER_Y = exports.SCENE_BASE_CENTER_X = void 0;
 exports.getSceneCenterOffset = getSceneCenterOffset;
 exports.detectLegacyStrideShiftX = detectLegacyStrideShiftX;
 exports.migrateLegacyCanvasLayout = migrateLegacyCanvasLayout;
@@ -64,6 +64,10 @@ exports.SCENE_TERRITORY_MAX_DX = 480;
 exports.SCENE_TERRITORY_MAX_DY = 750;
 exports.SCENE_SEED_MAX_DX = 280;
 exports.SCENE_SEED_MAX_DY = 280;
+/** Multi-root scenes allow individual co-roots up to ±360px while requiring their centroid within ±220px. */
+exports.SCENE_MULTI_SEED_MAX_DX = 360;
+exports.SCENE_MULTI_SEED_MAX_DY = 360;
+exports.SCENE_MULTI_SEED_CENTROID_MAX_D = 220;
 function getSceneCenterOffset(sceneIndex) {
     const safeIndex = Number.isFinite(sceneIndex) && sceneIndex >= 0 ? Math.floor(sceneIndex) : 0;
     return {
@@ -1163,6 +1167,7 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
     const compositeNodes = [];
     const compositeLinks = [];
     const nodeExistsSet = new Set();
+    const scenesWithValidSavedLayout = new Set();
     let wasCompositeLayoutHealed = false;
     scenes.forEach((scene, idx) => {
         const sceneIndex = typeof scene.sceneIndex === 'number' ? scene.sceneIndex : idx;
@@ -1195,12 +1200,8 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
         }
         const savedShiftX = detectLegacyStrideShiftX(sceneIndex, sceneSavedXs);
         const rawShiftX = detectLegacyStrideShiftX(sceneIndex, sceneRawXs);
-        // Territory & Seed Integrity Sanitizer: verify both savedRef (canvasLayout) and rawNode
-        // coordinates stay within this scene's territory around `center`. If a scene's Root Seed or
-        // any node has drifted into another scene's territory, mark the scene corrupted and reset it
-        // cleanly around `center` without disturbing healthy scenes.
-        let isSceneLayoutCorrupted = false;
-        let sceneSeedCount = 0;
+        // Count scene seeds first so multi-root scenes are evaluated with multi-root centroid bounds
+        const orderedSceneSeedIds = [];
         for (const rawNode of rawNodes) {
             if (!rawNode || !rawNode.id)
                 continue;
@@ -1210,8 +1211,24 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
                     Boolean(rawNode.isSeed) ||
                     isCanonicalSeedMatch(canonicalId, seedList) ||
                     (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false));
-            if (isSeedNode)
-                sceneSeedCount++;
+            if (isSeedNode && !orderedSceneSeedIds.includes(canonicalId.toLowerCase())) {
+                orderedSceneSeedIds.push(canonicalId.toLowerCase());
+            }
+        }
+        const sceneSeedCount = orderedSceneSeedIds.length;
+        // Territory & Seed Integrity Sanitizer: verify both savedRef (canvasLayout) and rawNode
+        // coordinates stay within this scene's territory around `center`.
+        // For multi-root scenes (sceneSeedCount > 1), allow individual co-roots up to ±360px
+        // while verifying that the centroid of all positioned seeds sits within 220px of `center`.
+        let isSceneLayoutCorrupted = false;
+        const positionedSeedCoords = [];
+        const maxSeedDx = sceneSeedCount > 1 ? exports.SCENE_MULTI_SEED_MAX_DX : exports.SCENE_SEED_MAX_DX;
+        const maxSeedDy = sceneSeedCount > 1 ? exports.SCENE_MULTI_SEED_MAX_DY : exports.SCENE_SEED_MAX_DY;
+        for (const rawNode of rawNodes) {
+            if (!rawNode || !rawNode.id)
+                continue;
+            const canonicalId = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
+            const isSeedNode = orderedSceneSeedIds.includes(canonicalId.toLowerCase());
             if (isSceneLayoutCorrupted)
                 continue;
             const namespacedId = namespaceSceneNodeId(sceneId, canonicalId);
@@ -1239,15 +1256,145 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
                 continue;
             const dx = Math.abs(candX - center.x);
             const dy = Math.abs(candY - center.y);
-            if (isSeedNode && (dx > exports.SCENE_SEED_MAX_DX || dy > exports.SCENE_SEED_MAX_DY)) {
-                isSceneLayoutCorrupted = true;
+            if (isSeedNode) {
+                positionedSeedCoords.push({ x: candX, y: candY });
+                if (dx > maxSeedDx || dy > maxSeedDy) {
+                    isSceneLayoutCorrupted = true;
+                }
             }
             else if (dx > exports.SCENE_TERRITORY_MAX_DX || dy > exports.SCENE_TERRITORY_MAX_DY) {
                 isSceneLayoutCorrupted = true;
             }
         }
-        let healedSeedIdx = 0;
-        let healedPeerIdx = 0;
+        if (!isSceneLayoutCorrupted && sceneSeedCount > 1 && positionedSeedCoords.length > 0) {
+            const meanSeedX = positionedSeedCoords.reduce((s, p) => s + p.x, 0) / positionedSeedCoords.length;
+            const meanSeedY = positionedSeedCoords.reduce((s, p) => s + p.y, 0) / positionedSeedCoords.length;
+            if (Math.abs(meanSeedX - center.x) > exports.SCENE_MULTI_SEED_CENTROID_MAX_D ||
+                Math.abs(meanSeedY - center.y) > exports.SCENE_MULTI_SEED_CENTROID_MAX_D) {
+                isSceneLayoutCorrupted = true;
+            }
+        }
+        if (!isSceneLayoutCorrupted && sceneSavedXs.length > 0) {
+            scenesWithValidSavedLayout.add(sceneId);
+        }
+        // Safe Tick-0 "Editorial Compass" Pre-Computation (Scene-Local Pod Sectors + Radial Rings):
+        // Deterministically computes starting (x, y) offsets around `center` from rawLinks adjacency
+        // to `orderedSceneSeedIds` (with `node.group` as tie-breaker):
+        //   • Ring 0 (0–55px): Root Artist(s)
+        //   • Ring 1 (95–175px): Peer Artists & Shared Labels (deg >= 2), grouped into their root's
+        //     angular wedge or the central crossover bridge junction
+        //   • Ring 2 (185–235px): Metadata (genre, country, founded, 1-degree label) aligned with parent angle
+        const compassCoords = new Map();
+        {
+            const canonNeighbors = new Map();
+            const canonDeg = new Map();
+            for (const rl of rawLinks) {
+                if (!rl)
+                    continue;
+                const rs = stripSceneNamespace(typeof rl.source === 'string' ? rl.source : rl.source?.id || '').toLowerCase();
+                const rt = stripSceneNamespace(typeof rl.target === 'string' ? rl.target : rl.target?.id || '').toLowerCase();
+                if (!rs || !rt || rs === rt)
+                    continue;
+                if (!canonNeighbors.has(rs))
+                    canonNeighbors.set(rs, new Set());
+                if (!canonNeighbors.has(rt))
+                    canonNeighbors.set(rt, new Set());
+                canonNeighbors.get(rs).add(rt);
+                canonNeighbors.get(rt).add(rs);
+                canonDeg.set(rs, (canonDeg.get(rs) || 0) + 1);
+                canonDeg.set(rt, (canonDeg.get(rt) || 0) + 1);
+            }
+            const seedAngles = new Map();
+            orderedSceneSeedIds.forEach((sId, k) => {
+                const theta = sceneSeedCount <= 1 ? 0 : Math.PI + (2 * Math.PI * k) / sceneSeedCount;
+                seedAngles.set(sId, theta);
+                const r = sceneSeedCount <= 1 ? 15 : 55;
+                compassCoords.set(sId, {
+                    x: center.x + (sceneSeedCount <= 1 ? 0 : Math.cos(theta) * r),
+                    y: center.y + (sceneSeedCount <= 1 ? 0 : Math.sin(theta) * r),
+                });
+            });
+            const podCounters = new Map();
+            let bridgeCounter = 0;
+            let sceneLocalPeerIdx = 0;
+            // Pass 1: Peer Artists & Shared Labels (Ring 1: 95..175px)
+            for (const rn of rawNodes) {
+                if (!rn || !rn.id)
+                    continue;
+                const cId = stripSceneNamespace(rn.canonicalId || rn.id).toLowerCase();
+                if (compassCoords.has(cId))
+                    continue;
+                const deg = canonDeg.get(cId) || 1;
+                const isCoreActor = rn.type === 'artist' || (rn.type === 'label' && deg >= 2);
+                if (!isCoreActor)
+                    continue;
+                const nbs = canonNeighbors.get(cId) || new Set();
+                const touchedSeedIndices = [];
+                orderedSceneSeedIds.forEach((sId, k) => {
+                    if (nbs.has(sId))
+                        touchedSeedIndices.push(k);
+                });
+                let theta = 0;
+                let radius = 115;
+                if (sceneSeedCount <= 1) {
+                    theta = (sceneLocalPeerIdx * 137.5 * Math.PI) / 180;
+                    radius = 105 + (sceneLocalPeerIdx % 4) * 22;
+                }
+                else if (touchedSeedIndices.length > 1 || (touchedSeedIndices.length === 0 && (rn.group || 1) > sceneSeedCount)) {
+                    // Crossover Bridge actor: place in central junction between pods
+                    const bIdx = bridgeCounter++;
+                    theta = Math.PI / 2 + (bIdx % 2 === 0 ? 1 : -1) * Math.ceil(bIdx / 2) * 0.42;
+                    radius = 95 + (bIdx % 3) * 25;
+                }
+                else {
+                    const podIdx = touchedSeedIndices.length === 1
+                        ? touchedSeedIndices[0]
+                        : Math.max(0, Math.min(sceneSeedCount - 1, (rn.group || 1) - 1));
+                    const pCount = podCounters.get(podIdx) || 0;
+                    podCounters.set(podIdx, pCount + 1);
+                    const baseAngle = seedAngles.get(orderedSceneSeedIds[podIdx]) ?? 0;
+                    const wedgeHalfSpan = Math.min(Math.PI * 0.65, (Math.PI * 0.78) / sceneSeedCount);
+                    const slotOffset = pCount === 0 ? 0 : (pCount % 2 === 1 ? 1 : -1) * Math.ceil(pCount / 2) * 0.28;
+                    theta = baseAngle + Math.max(-wedgeHalfSpan, Math.min(wedgeHalfSpan, slotOffset));
+                    radius = 110 + (pCount % 3) * 28;
+                }
+                sceneLocalPeerIdx++;
+                compassCoords.set(cId, {
+                    x: center.x + Math.cos(theta) * radius,
+                    y: center.y + Math.sin(theta) * radius,
+                });
+            }
+            // Pass 2: Contextual Metadata & 1-Degree Labels (Ring 2: 185..235px)
+            let sceneLocalMetaIdx = 0;
+            for (const rn of rawNodes) {
+                if (!rn || !rn.id)
+                    continue;
+                const cId = stripSceneNamespace(rn.canonicalId || rn.id).toLowerCase();
+                if (compassCoords.has(cId))
+                    continue;
+                const nbs = canonNeighbors.get(cId) || new Set();
+                let sumX = 0;
+                let sumY = 0;
+                let parentCount = 0;
+                nbs.forEach((nbId) => {
+                    const pPos = compassCoords.get(nbId);
+                    if (pPos) {
+                        sumX += pPos.x - center.x;
+                        sumY += pPos.y - center.y;
+                        parentCount++;
+                    }
+                });
+                const baseTheta = parentCount > 0 && Math.hypot(sumX, sumY) > 1
+                    ? Math.atan2(sumY, sumX) + ((sceneLocalMetaIdx % 3) - 1) * 0.18
+                    : (sceneLocalMetaIdx * 137.5 * Math.PI) / 180;
+                const radius = 185 + (sceneLocalMetaIdx % 3) * 25;
+                sceneLocalMetaIdx++;
+                compassCoords.set(cId, {
+                    x: center.x + Math.cos(baseTheta) * radius,
+                    y: center.y + Math.sin(baseTheta) * radius,
+                });
+            }
+        }
         for (const rawNode of rawNodes) {
             if (!rawNode || !rawNode.id)
                 continue;
@@ -1323,31 +1470,24 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
             }
             else if (isSceneLayoutCorrupted || (hasSavedCoords && !isSavedInTerritory) || (hasRawCoords && !isRawInTerritory)) {
                 wasCompositeLayoutHealed = true;
-                // Self-healing reset: pin Root Artist seed(s) at scene center and place peers in deterministic polar rings
-                if (isSceneSeed) {
-                    const seedSpreadOffset = sceneSeedCount > 1 ? healedSeedIdx * 120 - ((sceneSeedCount - 1) * 60) : 0;
-                    healedSeedIdx++;
-                    nodeClone.x = center.x + seedSpreadOffset;
-                    nodeClone.y = center.y;
+                // Self-healing reset using Editorial Compass positions
+                const compassPos = compassCoords.get(canonicalId.toLowerCase());
+                nodeClone.x = compassPos ? compassPos.x : center.x;
+                nodeClone.y = compassPos ? compassPos.y : center.y;
+                if (isSceneSeed && sceneSeedCount <= 1) {
                     nodeClone.fx = nodeClone.x;
                     nodeClone.fy = nodeClone.y;
                 }
                 else {
-                    const angle = (healedPeerIdx * 137.5 * Math.PI) / 180;
-                    const radius = 180 + (healedPeerIdx % 3) * 90;
-                    healedPeerIdx++;
-                    nodeClone.x = center.x + Math.cos(angle) * radius;
-                    nodeClone.y = center.y + Math.sin(angle) * radius;
                     delete nodeClone.fx;
                     delete nodeClone.fy;
                 }
             }
             else {
-                // Initialize near the deterministic Scene center so D3 blooms cleanly around (1000 + k*1050, 1000)
-                const angle = (compositeNodes.length * 137.5 * Math.PI) / 180;
-                const radius = isSceneSeed ? 25 : 90 + (compositeNodes.length % 7) * 30;
-                nodeClone.x = center.x + Math.cos(angle) * radius;
-                nodeClone.y = center.y + Math.sin(angle) * radius;
+                // Initialize using scene-local Editorial Compass around (1000 + k*1050, 1000)
+                const compassPos = compassCoords.get(canonicalId.toLowerCase());
+                nodeClone.x = compassPos ? compassPos.x : center.x;
+                nodeClone.y = compassPos ? compassPos.y : center.y;
             }
             compositeNodes.push(nodeClone);
         }
@@ -1408,6 +1548,26 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
     // Resolve any remaining node and text-label collisions across all scene clusters
     // before returning the composite GraphData ([Rule 21]).
     resolveSceneNodeOverlaps(compositeNodes, compositeLinks);
+    // If a scene restored a valid saved canvasLayout, pin any remaining unpinned sprouted
+    // metadata nodes (e.g. after onFork or filter toggles) at their de-overlapped positions
+    // so metadata petals stay locked at rest with zero physics drift.
+    if (scenesWithValidSavedLayout.size > 0) {
+        for (const n of compositeNodes) {
+            if (n.sceneId &&
+                scenesWithValidSavedLayout.has(n.sceneId) &&
+                n.type !== 'artist' &&
+                (n.fx === undefined || n.fx === null || n.fy === undefined || n.fy === null) &&
+                typeof n.x === 'number' &&
+                Number.isFinite(n.x) &&
+                typeof n.y === 'number' &&
+                Number.isFinite(n.y)) {
+                n.fx = Math.round(n.x * 100) / 100;
+                n.fy = Math.round(n.y * 100) / 100;
+                n.x = n.fx;
+                n.y = n.fy;
+            }
+        }
+    }
     return {
         nodes: compositeNodes,
         links: compositeLinks,

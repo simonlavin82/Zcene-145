@@ -57,6 +57,94 @@ const VIRTUAL_HEIGHT = 2000;
 const VIRTUAL_CENTER_X = VIRTUAL_WIDTH / 2;
 const VIRTUAL_CENTER_Y = VIRTUAL_HEIGHT / 2;
 
+const roundCoord2 = (val: number): number => Math.round(val * 100) / 100;
+
+interface ScenePhysicsProfile {
+  numNodes: number;
+  numSeeds: number;
+  isExpandedLayout: boolean;
+  spacingMultiplier: number;
+  globalGravityStrength: number;
+  seedStrength: number;
+  isFullyPinned: boolean;
+}
+
+/**
+ * [Rule 21] Scene-Isolated Electrostatic Charge Force:
+ * Partitions visibleNodes by `sceneIndex` and delegates each scene to its own native
+ * D3 Barnes-Hut `forceManyBody` quadtree so adjacent scenes never repel each other across
+ * the 1050px territory stride while preserving exact intra-scene repulsion.
+ */
+const createSceneIsolatedChargeForce = (chargeStrengthFn: (d: Node) => number): d3.Force<Node, Link> => {
+  let sceneForces: d3.ForceManyBody<Node>[] = [];
+
+  const force = ((alpha: number) => {
+    for (let i = 0; i < sceneForces.length; i++) {
+      sceneForces[i](alpha);
+    }
+  }) as d3.Force<Node, Link>;
+
+  force.initialize = (nodes: Node[], random: () => number) => {
+    const groups = new Map<number, Node[]>();
+    for (const n of nodes) {
+      const idx = typeof n.sceneIndex === 'number' ? n.sceneIndex : 0;
+      const list = groups.get(idx);
+      if (list) list.push(n);
+      else groups.set(idx, [n]);
+    }
+    sceneForces = [];
+    groups.forEach((sceneNodes) => {
+      const mb = d3.forceManyBody<Node>().strength(chargeStrengthFn);
+      mb.initialize(sceneNodes, random);
+      sceneForces.push(mb);
+    });
+  };
+
+  return force;
+};
+
+/**
+ * [Rule 21] Scene-Isolated Centroid Centering Force:
+ * Applies `d3.forceCenter(center.x, center.y).strength(strength)` independently to each
+ * unpinned scene so multi-scene constellations receive the exact same 0.005 centroid balance
+ * as standalone single-scene constellations without shifting frozen scenes during `+ Add Scene`.
+ * Also skips individual nodes whose `fx != null` or `fy != null`.
+ */
+const createSceneIsolatedCenterForce = (strength: number): d3.Force<Node, Link> => {
+  let sceneCenters: d3.ForceCenter<Node>[] = [];
+
+  const force = ((alpha: number) => {
+    for (let i = 0; i < sceneCenters.length; i++) {
+      sceneCenters[i](alpha);
+    }
+  }) as d3.Force<Node, Link>;
+
+  force.initialize = (nodes: Node[], random: () => number) => {
+    const groups = new Map<number, Node[]>();
+    for (const n of nodes) {
+      const idx = typeof n.sceneIndex === 'number' ? n.sceneIndex : 0;
+      const list = groups.get(idx);
+      if (list) list.push(n);
+      else groups.set(idx, [n]);
+    }
+    sceneCenters = [];
+    groups.forEach((sceneNodes, sceneIdx) => {
+      const isFullyPinned =
+        sceneNodes.length > 0 &&
+        sceneNodes.every((n) => n.fx !== null && n.fx !== undefined && n.fy !== null && n.fy !== undefined);
+      if (isFullyPinned) return;
+      const unpinnedNodes = sceneNodes.filter((n) => n.fx == null && n.fy == null);
+      if (unpinnedNodes.length === 0) return;
+      const center = getSceneCenterOffset(sceneIdx);
+      const fc = d3.forceCenter<Node>(center.x, center.y).strength(strength);
+      fc.initialize(unpinnedNodes, random);
+      sceneCenters.push(fc);
+    });
+  };
+
+  return force;
+};
+
 const isNodeSeedInOwnScene = (node: Node, seedArtists: string[]): boolean => {
   if (node.type !== 'artist') return false;
   if (typeof node.isSceneSeed === 'boolean') return node.isSceneSeed;
@@ -229,6 +317,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     onCoordinatesSettledRef.current = onCoordinatesSettled;
   }, [onCoordinatesSettled]);
   const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
+  const wasAllPinnedAtStartRef = useRef<boolean>(false);
   const lastSceneFingerprintRef = useRef<string>('');
   const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
@@ -354,6 +443,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       const allPinned = artistLabelNodes.length > 0 &&
         artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
                                      n.fy !== null && n.fy !== undefined);
+      wasAllPinnedAtStartRef.current = allPinned;
       simulationRef.current.alpha(allPinned ? 0.001 : 0.3).restart();
     }
   }, [isActive]);
@@ -1308,7 +1398,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     if (!simulationRef.current) {
         const simulation = d3.forceSimulation<Node, Link>()
             .force("link", d3.forceLink<Node, Link>().id((d: any) => String(d.id)).strength(0.3))
-            .force("charge", d3.forceManyBody().strength(-600))
+            .force("charge", createSceneIsolatedChargeForce(() => -600))
             .force("collide", d3.forceCollide().radius(40))
             .velocityDecay(0.36) 
             .alphaMin(0.001)
@@ -1405,36 +1495,44 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     });
             })
             .on("end", () => {
-                const nodes = simulation.nodes();
-                const currentLinks = (simulation.force("link") as d3.ForceLink<Node, Link>)?.links() || [];
+                // [Rule 21] & [Rule 44]: When all artist/label nodes entered this pass already pinned
+                // from Coordinate Memory (1-tick render wake or Legend pill filter toggle),
+                // skip post-settle overlap mutation, rounding/pinning, and read-only Firestore writes.
+                // Do NOT return early so onSimulationCompleteRef and attemptInitialCentering() below always execute.
+                if (!wasAllPinnedAtStartRef.current) {
+                    const nodes = simulation.nodes();
+                    const currentLinks = (simulation.force("link") as d3.ForceLink<Node, Link>)?.links() || [];
 
-                // Resolve any remaining node and text-label collisions across clusters before pinning coordinates ([Rule 21])
-                resolveSceneNodeOverlaps(nodes, currentLinks);
+                    // Resolve any remaining node and text-label collisions across clusters before pinning coordinates ([Rule 21])
+                    resolveSceneNodeOverlaps(nodes, currentLinks);
 
-                // Pin all nodes once the simulation settles to maintain absolute coordinate stability
-                nodes.forEach(n => {
-                    if (n.x !== undefined && n.y !== undefined) {
-                        n.fx = n.x;
-                        n.fy = n.y;
-                    }
-                });
+                    // Pin all nodes once the simulation settles to maintain absolute coordinate stability
+                    nodes.forEach(n => {
+                        if (n.x !== undefined && n.y !== undefined) {
+                            n.x = roundCoord2(n.x);
+                            n.y = roundCoord2(n.y);
+                            n.fx = n.x;
+                            n.fy = n.y;
+                        }
+                    });
 
-                // Phase A — Coordinate Memory: collect ALL settled node positions
-                // (artists, labels, and all metadata petals: genre, country, founded).
-                // Zero Coordinate Amnesia requires every node type to be pinned.
-                if (onCoordinatesSettledRef.current) {
-                    const settledLayout: CanvasNodeRef[] = nodes
-                        .filter(n => n.fx !== undefined && n.fx !== null
-                                  && n.fy !== undefined && n.fy !== null)
-                        .map(n => ({
-                            nodeId: n.id,
-                            x: n.x,
-                            y: n.y,
-                            fx: n.fx ?? null,
-                            fy: n.fy ?? null,
-                        }));
-                    if (settledLayout.length > 0) {
-                        onCoordinatesSettledRef.current(settledLayout);
+                    // Phase A — Coordinate Memory: collect ALL settled node positions
+                    // (artists, labels, and all metadata petals: genre, country, founded).
+                    // Zero Coordinate Amnesia requires every node type to be pinned.
+                    if (onCoordinatesSettledRef.current) {
+                        const settledLayout: CanvasNodeRef[] = nodes
+                            .filter(n => n.fx !== undefined && n.fx !== null
+                                      && n.fy !== undefined && n.fy !== null)
+                            .map(n => ({
+                                nodeId: n.id,
+                                x: roundCoord2(n.x as number),
+                                y: roundCoord2(n.y as number),
+                                fx: n.fx !== undefined && n.fx !== null ? roundCoord2(n.fx) : null,
+                                fy: n.fy !== undefined && n.fy !== null ? roundCoord2(n.fy) : null,
+                            }));
+                        if (settledLayout.length > 0) {
+                            onCoordinatesSettledRef.current(settledLayout);
+                        }
                     }
                 }
 
@@ -1568,6 +1666,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     (simulation.force("link") as d3.ForceLink<Node, Link>).links(visibleLinks);
 
     // Compute connection degrees for all visible nodes
+    // Exclude non-artist metadata links from nodeTotalWeights so high-degree genre/country hubs
+    // (e.g. nu-metal, united-states) do not inflate their collideForce.radius.
+    const visibleNodeById = new Map<string, Node>(visibleNodes.map(n => [n.id, n]));
     const nodeDegrees = new Map<string, number>();
     const nodeTotalWeights = new Map<string, number>();
     visibleLinks.forEach(l => {
@@ -1576,46 +1677,83 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         const t = typeof l.target === 'object' ? l.target.id : l.target;
         nodeDegrees.set(s, (nodeDegrees.get(s) || 0) + 1);
         nodeDegrees.set(t, (nodeDegrees.get(t) || 0) + 1);
-        
-        const weight = l.weight ?? 0.5;
-        nodeTotalWeights.set(s, (nodeTotalWeights.get(s) || 0) + weight);
-        nodeTotalWeights.set(t, (nodeTotalWeights.get(t) || 0) + weight);
+
+        const sNode = visibleNodeById.get(s);
+        const tNode = visibleNodeById.get(t);
+        if (sNode?.type === 'artist' && tNode?.type === 'artist') {
+            const weight = l.weight ?? 0.5;
+            nodeTotalWeights.set(s, (nodeTotalWeights.get(s) || 0) + weight);
+            nodeTotalWeights.set(t, (nodeTotalWeights.get(t) || 0) + weight);
+        }
     });
 
     const forceX = d3.forceX<Node>();
     const forceY = d3.forceY<Node>();
-    const chargeForce = simulation.force("charge") as d3.ForceManyBody<Node>;
     const collideForce = simulation.force("collide") as d3.ForceCollide<Node>;
 
-    // 1. Seed Anchoring & Global Gravity (Per-Scene Center Offsets)
-    const numSeeds = seedArtistSet.size;
-    const numNodes = visibleNodes.length;
-    const hasMultipleScenes = visibleNodes.some(n => (n.sceneIndex ?? 0) > 0);
-    
-    // Multi-seed or high-density projects (node count > 35) trigger wider spacing
-    const isExpandedLayout = numSeeds > 1 || numNodes > 35;
-    
-    const spacingMultiplier = isExpandedLayout ? 1.25 : 1.0;
-    const globalGravityStrength = isExpandedLayout ? 0.03 : 0.045;
-    const seedStrength = numSeeds > 1 ? 0.15 : 0.4;
+    // 1. Per-Scene Seed Anchoring & Gravity Profiles ([Rule 21])
+    // Compute node count and root count independently per sceneIndex so a 1-root, 34-node scene
+    // settles with identical link distances and gravity whether standalone or in a 5-scene board.
+    const sceneProfiles = new Map<number, ScenePhysicsProfile>();
+    const nodesByScene = new Map<number, Node[]>();
+    for (const n of visibleNodes) {
+        const idx = typeof n.sceneIndex === 'number' ? n.sceneIndex : 0;
+        const list = nodesByScene.get(idx);
+        if (list) list.push(n);
+        else nodesByScene.set(idx, [n]);
+    }
+    nodesByScene.forEach((sceneNodes, idx) => {
+        const sceneNumNodes = sceneNodes.length;
+        const sceneNumSeeds = Math.max(
+            1,
+            sceneNodes.filter((n) => n.type === 'artist' && isNodeSeedInOwnScene(n, seedArtists)).length
+        );
+        const isExpandedLayout = sceneNumSeeds > 1 || sceneNumNodes > 35;
+        const isFullyPinned =
+            sceneNodes.length > 0 &&
+            sceneNodes.every((n) => n.fx !== null && n.fx !== undefined && n.fy !== null && n.fy !== undefined);
+        sceneProfiles.set(idx, {
+            numNodes: sceneNumNodes,
+            numSeeds: sceneNumSeeds,
+            isExpandedLayout,
+            spacingMultiplier: isExpandedLayout ? 1.25 : 1.0,
+            globalGravityStrength: isExpandedLayout ? 0.03 : 0.045,
+            seedStrength: sceneNumSeeds > 1 ? 0.15 : 0.4,
+            isFullyPinned,
+        });
+    });
+
+    const getSceneProfile = (d?: Node | null): ScenePhysicsProfile => {
+        const idx = d && typeof d.sceneIndex === 'number' ? d.sceneIndex : 0;
+        return (
+            sceneProfiles.get(idx) || {
+                numNodes: visibleNodes.length,
+                numSeeds: 1,
+                isExpandedLayout: false,
+                spacingMultiplier: 1.0,
+                globalGravityStrength: 0.045,
+                seedStrength: 0.4,
+                isFullyPinned: false,
+            }
+        );
+    };
 
     forceX.strength((d: Node) => {
+        const profile = getSceneProfile(d);
         const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-        return isSeed ? seedStrength : globalGravityStrength;
+        return isSeed ? profile.seedStrength : profile.globalGravityStrength;
     }).x((d: Node) => getSceneCenterOffset(d.sceneIndex ?? 0).x);
 
     forceY.strength((d: Node) => {
+        const profile = getSceneProfile(d);
         const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-        return isSeed ? seedStrength : globalGravityStrength;
+        return isSeed ? profile.seedStrength : profile.globalGravityStrength;
     }).y((d: Node) => getSceneCenterOffset(d.sceneIndex ?? 0).y);
 
-    simulation.force(
-        'center',
-        hasMultipleScenes ? null : d3.forceCenter(VIRTUAL_CENTER_X, VIRTUAL_CENTER_Y).strength(0.005)
-    );
+    simulation.force('center', createSceneIsolatedCenterForce(0.005));
 
-    // 2 & 3. Balanced Repulsion: Spaced but cohesive
-    chargeForce.strength((d: Node) => {
+    // 2 & 3. Scene-Isolated Balanced Repulsion: Spaced but cohesive ([Rule 21])
+    simulation.force('charge', createSceneIsolatedChargeForce((d: Node) => {
         if (d.type === 'artist') {
             const isSeed = isNodeSeedInOwnScene(d, seedArtists);
             return isSeed ? -800 : -500; // Moderated repulsion
@@ -1635,7 +1773,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             case 'country': return -100;
             default: return -100;
         }
-    });
+    }));
 
     // 4. Automatic Collision Protection
     collideForce.radius((d: Node) => {
@@ -1652,10 +1790,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // BFS depth computation
     const depths = computeNodeDepths(visibleNodes, visibleLinks, seedArtists);
 
-    // Condensed dynamic link distances (with density scaling)
+    // Condensed dynamic link distances (with per-scene density scaling)
     (simulation.force("link") as d3.ForceLink<Node, Link>).distance(d => {
         const s = d.source as Node;
         const t = d.target as Node;
+        const sceneSpacingMultiplier = getSceneProfile(s).spacingMultiplier;
 
         // If one of the nodes is a metadata node
         if (s.type !== 'artist' || t.type !== 'artist') {
@@ -1663,7 +1802,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const deg = nodeDegrees.get(metaNode.id) ?? 1;
             
             if (deg > 1) {
-                return 160 * spacingMultiplier; // Shared metadata floats wider in complex layouts
+                return 160 * sceneSpacingMultiplier; // Shared metadata floats wider in complex layouts
             }
             
             // Private petal: keep tight and category-specific
@@ -1678,7 +1817,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
         // Artist-to-Artist links: scale core skeleton using AI semantic weight
         const weight = d.weight ?? 0.5;
-        return (300 - (weight * 220)) * spacingMultiplier;
+        return (300 - (weight * 220)) * sceneSpacingMultiplier;
     });
 
     // Re-tensioned dynamic link strengths (0 for Cross-Scene Bridge Lines so clusters stay independent)
@@ -2006,9 +2145,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             const allPinned = artistLabelNodes.length > 0 &&
                 artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
                                            n.fy !== null && n.fy !== undefined);
+            wasAllPinnedAtStartRef.current = allPinned;
             simulation.alpha(allPinned ? 0.001 : restartAlpha).alphaTarget(0).restart();
         } else {
-            simulation.alpha(restartAlpha).alphaTarget(0).restart();
+            const artistLabelNodes = visibleNodes.filter(n => n.type === 'artist' || n.type === 'label');
+            const allPinned = artistLabelNodes.length > 0 &&
+                artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
+                                           n.fy !== null && n.fy !== undefined);
+            wasAllPinnedAtStartRef.current = allPinned;
+            simulation.alpha(allPinned ? 0.001 : restartAlpha).alphaTarget(0).restart();
         }
     }
   // Used dimensions.width > 0 to trigger initial mount safely while preserving physics isolation during resizes

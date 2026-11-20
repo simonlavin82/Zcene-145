@@ -123,7 +123,7 @@ describe('Zcene Backend Pipeline - Core Execution Pathways', () => {
       links: [
         { source: 'gunmoll-us', target: 'united-states', weight: 0.2 },
         { source: 'gunmoll-us', target: 'punk-rock', weight: 0.8 },
-        { source: 'gunmoll-us', target: '1999', weight: 0.3 },
+        { source: 'gunmoll-us', target: '1999', weight: 0.1 },
         { source: 'gunmoll-us', target: 'hot-water-music-us', weight: 0.7 }
       ]
     };
@@ -184,7 +184,7 @@ describe('Zcene Backend Pipeline - Core Execution Pathways', () => {
           mockGraph.links.push({
             source: node.id,
             target: foundedYear,
-            weight: 0.3
+            weight: 0.1
           });
           existingLinkSet.add(`${node.id}--${foundedYear}`);
         }
@@ -209,7 +209,7 @@ describe('Zcene Backend Pipeline - Core Execution Pathways', () => {
       l => l.source === 'hot-water-music-us' || l.target === 'hot-water-music-us'
     );
     expect(hwmLinks.some(l => (l.target === 'united-states' || l.source === 'united-states') && l.weight === 0.2)).toBe(true);
-    expect(hwmLinks.some(l => (l.target === '1994' || l.source === '1994') && l.weight === 0.3)).toBe(true);
+    expect(hwmLinks.some(l => (l.target === '1994' || l.source === '1994') && l.weight === 0.1)).toBe(true);
     expect(hwmLinks.some(l => (l.target === 'punk-rock' || l.source === 'punk-rock') && l.weight === 0.8)).toBe(true);
     expect(mockGraph.nodes.some(n => n.id === '1994' && n.type === 'founded')).toBe(true);
   });

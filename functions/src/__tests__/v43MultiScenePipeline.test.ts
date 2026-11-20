@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { ThinkingLevel } from '@google/genai';
 import { CrossSceneLink, ProjectScene } from '../types';
 
 const mockGenerateContent = vi.fn();
@@ -18,6 +19,7 @@ vi.mock('@google/genai', async (importOriginal) => {
 import {
   OVERARCHING_ZINE_SCHEMA,
   generateOverarchingZineBackend,
+  generateSemanticLinkWeights,
   UsageCollector,
   normalizeArtistId,
   normalizeLabelId,
@@ -536,6 +538,142 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
         zeroAccumulated = zeroProjectDoc.tokensSpent;
       }
       expect(zeroAccumulated).toBe(15);
+    });
+  });
+
+  describe('Phase B2.12: Calibrated Artist-Only Box 5 & Disconnected Sub-Island Bridge Guard', () => {
+    it('filters Box 5 context to artist link endpoints, forwards seedIds & forwardContext, uses ThinkingLevel.LOW, and prompts the 3-Tier Rubric', async () => {
+      const detailsEntries: [string, any][] = [
+        ['korn-us', { summary: 'Bakersfield nu-metal pioneers.', details: { genre: 'Nu Metal', founded: '1993' } }],
+        ['deftones-us', { summary: 'Sacramento alt-metal peers.', details: { genre: 'Alternative Metal', founded: '1988' } }],
+        ['united-states', { summary: 'North American country.', details: { genre: 'Country' } }],
+        ['1993', { summary: 'Year 1993.', details: {} }],
+      ];
+      const artistLinks = [
+        { source: 'korn-us', target: 'deftones-us', forwardContext: 'toured heavily together in the mid-90s' },
+      ];
+
+      mockGenerateContent.mockResolvedValueOnce({
+        text: JSON.stringify([{ source: 'korn-us', target: 'deftones-us', weight: 0.9 }]),
+        usageMetadata: { promptTokenCount: 120, candidatesTokenCount: 40, totalTokenCount: 160 },
+      });
+
+      const usageCollector: UsageCollector = { push: vi.fn() };
+      const res = await generateSemanticLinkWeights('test-key', detailsEntries, artistLinks, usageCollector, ['korn-us']);
+
+      expect(res).toEqual([{ source: 'korn-us', target: 'deftones-us', weight: 0.9 }]);
+      expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+
+      const callArg = mockGenerateContent.mock.calls[0][0];
+      expect(callArg.config.thinkingConfig.thinkingLevel).toBe(ThinkingLevel.LOW);
+      expect(callArg.contents).toContain('3-Tier Forced-Distribution Rubric');
+      expect(callArg.contents).toContain('0.85 to 1.00');
+      expect(callArg.contents).toContain('0.45 to 0.70');
+      expect(callArg.contents).toContain('0.15 to 0.35');
+      expect(callArg.contents).toContain('toured heavily together in the mid-90s');
+      expect(callArg.contents).toContain('"isSceneRoot":true');
+      // Non-participating metadata context entries excluded
+      expect(callArg.contents).not.toContain('"id":"united-states"');
+      expect(callArg.contents).not.toContain('"id":"1993"');
+      expect(callArg.contents).not.toContain('Year 1993.');
+    });
+
+    it('stitches disconnected artist sub-islands to the primary seed and locks deterministic metadata weights', () => {
+      const nodes: any[] = [
+        { id: 'korn-us', type: 'artist', label: 'Korn', isSeed: true },
+        { id: 'deftones-us', type: 'artist', label: 'Deftones' },
+        { id: 'static-x-us', type: 'artist', label: 'Static-X' },
+        { id: 'disturbed-us', type: 'artist', label: 'Disturbed' },
+        { id: 'drowning-pool-us', type: 'artist', label: 'Drowning Pool' },
+        { id: 'nu-metal', type: 'genre', label: 'Nu Metal' },
+        { id: 'united-states', type: 'country', label: 'United States' },
+        { id: 'epic', type: 'label', label: 'Epic' },
+        { id: '1993', type: 'founded', label: '1993' },
+      ];
+      const links: any[] = [
+        { source: 'korn-us', target: 'deftones-us', weight: 0.8 },
+        { source: 'static-x-us', target: 'disturbed-us', weight: 0.7 },
+        { source: 'disturbed-us', target: 'drowning-pool-us', weight: 0.6 },
+        { source: 'korn-us', target: 'nu-metal', weight: 0.5 },
+        { source: 'korn-us', target: 'united-states', weight: 0.5 },
+        { source: 'korn-us', target: 'epic', weight: 0.5 },
+        { source: 'korn-us', target: '1993', weight: 0.5 },
+        { source: 'disturbed-us', target: 'nu-metal', weight: 0.5 },
+      ];
+
+      // Mirror Step 4C component bridge guard + deterministic metadata weights
+      const nodeById = new Map<string, any>(nodes.map((n) => [n.id, n]));
+      const artistNodesList = nodes.filter((n) => (n.type || 'artist') === 'artist');
+      const seedArtistNodes = artistNodesList.filter((n) => n.isSeed);
+      const aaAdj = new Map<string, Set<string>>();
+      artistNodesList.forEach((n) => aaAdj.set(n.id, new Set()));
+      links.forEach((l) => {
+        if (aaAdj.has(l.source) && aaAdj.has(l.target) && l.source !== l.target) {
+          aaAdj.get(l.source)!.add(l.target);
+          aaAdj.get(l.target)!.add(l.source);
+        }
+      });
+      const reachable = new Set<string>();
+      const q = [seedArtistNodes[0].id];
+      reachable.add(seedArtistNodes[0].id);
+      while (q.length > 0) {
+        const curr = q.shift()!;
+        for (const nb of aaAdj.get(curr) || []) {
+          if (!reachable.has(nb)) {
+            reachable.add(nb);
+            q.push(nb);
+          }
+        }
+      }
+      const unvisited = artistNodesList.filter((n) => !reachable.has(n.id));
+      const visitedIslands = new Set<string>();
+      for (const startNode of unvisited) {
+        if (visitedIslands.has(startNode.id)) continue;
+        const comp: string[] = [];
+        const iq = [startNode.id];
+        visitedIslands.add(startNode.id);
+        while (iq.length > 0) {
+          const c = iq.shift()!;
+          comp.push(c);
+          for (const nb of aaAdj.get(c) || []) {
+            if (!visitedIslands.has(nb) && !reachable.has(nb)) {
+              visitedIslands.add(nb);
+              iq.push(nb);
+            }
+          }
+        }
+        comp.sort((a, b) => (aaAdj.get(b)?.size || 0) - (aaAdj.get(a)?.size || 0));
+        links.push({
+          source: seedArtistNodes[0].id,
+          target: comp[0],
+          value: 1,
+          weight: 0.3,
+          forwardContext: 'shared era and broader scene lineage with',
+        });
+      }
+
+      const artistOnlyLinks: any[] = [];
+      links.forEach((l) => {
+        const sType = nodeById.get(l.source)?.type || 'artist';
+        const tType = nodeById.get(l.target)?.type || 'artist';
+        if (sType === 'artist' && tType === 'artist') {
+          artistOnlyLinks.push(l);
+        } else {
+          const metaType = sType !== 'artist' ? sType : tType;
+          if (metaType === 'country') l.weight = 0.2;
+          else if (metaType === 'founded') l.weight = 0.1;
+          else if (metaType === 'genre') l.weight = 0.8;
+          else if (metaType === 'label') l.weight = 0.7;
+        }
+      });
+
+      // Highest-degree node in the disconnected 3-band island (`disturbed-us`, degree 2) stitched to `korn-us`
+      expect(links.some((l) => l.source === 'korn-us' && l.target === 'disturbed-us' && l.weight === 0.3)).toBe(true);
+      expect(artistOnlyLinks.every((l) => nodeById.get(l.source)?.type === 'artist' && nodeById.get(l.target)?.type === 'artist')).toBe(true);
+      expect(links.find((l) => l.target === 'united-states')?.weight).toBe(0.2);
+      expect(links.find((l) => l.target === '1993')?.weight).toBe(0.1);
+      expect(links.find((l) => l.target === 'nu-metal' && l.source === 'korn-us')?.weight).toBe(0.8);
+      expect(links.find((l) => l.target === 'epic')?.weight).toBe(0.7);
     });
   });
 });

@@ -3193,30 +3193,56 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
     return { imageUrl: null, reconciledDiscography: [], itunesArtistId: null };
 };
 exports.scrapeImageUrlBackend = scrapeImageUrlBackend;
-const generateSemanticLinkWeights = async (apiKey, detailsCacheEntries, links, usageCollector) => {
+const generateSemanticLinkWeights = async (apiKey, detailsCacheEntries, links, usageCollector, seedIds = []) => {
+    if (!Array.isArray(links) || links.length === 0)
+        return [];
     const currentModel = exports.GEMINI_FLASH_MODEL;
     const ai = new genai_1.GoogleGenAI({ apiKey, httpOptions: { timeout: 300000 } });
-    // Map cache to lightweight context
-    const evaluationContext = detailsCacheEntries.map(entry => {
+    const seedIdSet = new Set(seedIds.map(s => String(s).toLowerCase().trim()));
+    const endpointSet = new Set();
+    links.forEach(l => {
+        if (l?.source)
+            endpointSet.add(String(l.source).toLowerCase());
+        if (l?.target)
+            endpointSet.add(String(l.target).toLowerCase());
+    });
+    // Map artist cache entries participating in artist-to-artist links to lightweight context
+    const evaluationContext = detailsCacheEntries
+        .filter(entry => entry && entry[0] && endpointSet.has(String(entry[0]).toLowerCase()))
+        .map(entry => {
         const id = entry[0];
         const details = entry[1];
         return {
             id,
+            isSceneRoot: seedIdSet.has(String(id).toLowerCase()),
             genre: details?.details?.genre || "Unknown",
+            founded: details?.details?.founded || "Unknown",
             bio: details?.summary || details?.bio || ""
         };
     });
-    const prompt = `Evaluate the provided artist biographies. For each provided link, output a semantic weight between 0.1 and 1.0 representing the strength of their musical or cultural connection.
+    const prompt = `You are calibrating the radial force-directed layout weights for a music scene constellation anchored by Root Artist ID(s): ${JSON.stringify(seedIds)}.
 
-Context:
+Evaluate each artist-to-artist link using the provided biographies and relationship predicates (forwardContext), and assign a semantic weight between 0.15 and 1.00 strictly following this 3-Tier Forced-Distribution Rubric:
+
+- TIER 1 — INNER CIRCLE & DIRECT LINEAGE (0.85 to 1.00):
+  Shared band members, direct spinoff/predecessor bands ("formed from the ashes of", "was formed by members of"), direct mentor/protégé discovery, or foundational co-architects of the exact same local micro-scene.
+- TIER 2 — SCENE PEERS & CONTEMPORARIES (0.45 to 0.70):
+  Active touring partners, shared labelmates, regional scene contemporaries, or direct stylistic peers from the same era.
+- TIER 3 — OUTER ECHOES & LOOSE BRIDGES (0.15 to 0.35):
+  Broader era or genre successors, secondary 2nd/3rd-hop stylistic branches, cross-scene stepping stones, or indirect commercial rivalries.
+
+MANDATORY DISTRIBUTION RULE:
+You MUST utilize the full 0.15 to 1.00 dynamic range across the provided links so the constellation forms distinct inner, middle, and outer radial rings. Do NOT bunch all weights in the 0.60–0.85 middle range. Reserve >= 0.85 strictly for Tier 1 Inner Circle ties, place standard contemporaries in 0.45–0.70, and score outer/secondary branches in 0.15–0.35.
+
+Artist Context:
 ${JSON.stringify(evaluationContext)}
 
-Links to evaluate:
+Artist-to-Artist Links to Evaluate:
 ${JSON.stringify(links)}
 `;
     const responseSchema = {
         type: genai_1.Type.ARRAY,
-        description: "An array of evaluated links with assigned semantic weights.",
+        description: "An array of evaluated artist-to-artist links with calibrated 3-tier semantic weights.",
         items: {
             type: genai_1.Type.OBJECT,
             properties: {
@@ -3230,7 +3256,7 @@ ${JSON.stringify(links)}
                 },
                 weight: {
                     type: genai_1.Type.NUMBER,
-                    description: "A float between 0.1 (loose relation) and 1.0 (core defining connection)."
+                    description: "A float between 0.15 (Tier 3 outer echo) and 1.00 (Tier 1 inner-circle lineage)."
                 }
             },
             required: ["source", "target", "weight"]
@@ -3243,7 +3269,7 @@ ${JSON.stringify(links)}
             config: {
                 responseMimeType: "application/json",
                 responseSchema: responseSchema,
-                thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.MINIMAL },
+                thinkingConfig: { thinkingLevel: genai_1.ThinkingLevel.LOW },
             }
         });
         if (response.usageMetadata) {

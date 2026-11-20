@@ -2902,6 +2902,11 @@ const App: React.FC = () => {
     console.log(`[Dashboard] Creating Project: ${newId}`);
 
     // EXPLICITLY RESET CANVAS STATE IMMEDIATELY (Fixing state leak from previous guest projects)
+    if (coordinatePersistTimerRef.current) {
+      clearTimeout(coordinatePersistTimerRef.current);
+      coordinatePersistTimerRef.current = null;
+    }
+    lastSettledLayoutRef.current = '';
     lastHydratedProjectFingerprintRef.current = '';
     setGraphData({ nodes: [], links: [] });
     setSeedArtists('');
@@ -3407,6 +3412,11 @@ const App: React.FC = () => {
   }, [user]);
 
   const handleClearZcene = useCallback(() => {
+    if (coordinatePersistTimerRef.current) {
+      clearTimeout(coordinatePersistTimerRef.current);
+      coordinatePersistTimerRef.current = null;
+    }
+    lastSettledLayoutRef.current = '';
     setSeedArtists('');
     setGraphData(null);
     setBaseGraph(null);
@@ -5353,6 +5363,31 @@ const App: React.FC = () => {
         pendingUnconfirmedForkIdRef.current = null;
         pendingForkOriginIdRef.current = null;
 
+        // Rev 2 Item 3: Cancel pending coordinate persist and strip dirty/overwritten scenes from lastSettledLayoutRef
+        if (coordinatePersistTimerRef.current) {
+          clearTimeout(coordinatePersistTimerRef.current);
+          coordinatePersistTimerRef.current = null;
+        }
+        if (lastSettledLayoutRef.current) {
+          try {
+            const dirtySceneIds = new Set(
+              [lockedTargetSceneId, ...uncuratedOrDirtyScenes.map(s => s.sceneId || s.id)]
+                .filter(Boolean)
+                .map(id => String(id).toLowerCase())
+            );
+            const prevLayout: CanvasNodeRef[] = JSON.parse(lastSettledLayoutRef.current);
+            const retainedLayout = prevLayout.filter((ref) => {
+              const key = String(ref?.nodeId || ref?.id || '').toLowerCase();
+              const match = key.match(/^(scene-\d+)::/i);
+              const refSceneId = match ? match[1].toLowerCase() : 'scene-1';
+              return !dirtySceneIds.has(refSceneId);
+            });
+            lastSettledLayoutRef.current = retainedLayout.length > 0 ? JSON.stringify(retainedLayout) : '';
+          } catch {
+            lastSettledLayoutRef.current = '';
+          }
+        }
+
         // Pre-archive settled multi-scene editorial before mutating scene state for cloud curation
         preArchiveCurrentSettledOverarching();
 
@@ -5788,6 +5823,30 @@ const App: React.FC = () => {
       }, sIdx);
       scenesRef.current = baseScenesList;
       setScenes(baseScenesList);
+    }
+
+    if (coordinatePersistTimerRef.current) {
+      clearTimeout(coordinatePersistTimerRef.current);
+      coordinatePersistTimerRef.current = null;
+    }
+    if (lastSettledLayoutRef.current) {
+      try {
+        const dirtySceneIds = new Set(
+          [lockedTargetSceneId, ...uncuratedOrDirtyScenes.map(s => s.sceneId || s.id)]
+            .filter(Boolean)
+            .map(id => String(id).toLowerCase())
+        );
+        const prevLayout: CanvasNodeRef[] = JSON.parse(lastSettledLayoutRef.current);
+        const retainedLayout = prevLayout.filter((ref) => {
+          const key = String(ref?.nodeId || ref?.id || '').toLowerCase();
+          const match = key.match(/^(scene-\d+)::/i);
+          const refSceneId = match ? match[1].toLowerCase() : 'scene-1';
+          return !dirtySceneIds.has(refSceneId);
+        });
+        lastSettledLayoutRef.current = retainedLayout.length > 0 ? JSON.stringify(retainedLayout) : '';
+      } catch {
+        lastSettledLayoutRef.current = '';
+      }
     }
 
     setIsLoading(true); setError(null); setSeedArtists(displayArtists);
@@ -7983,6 +8042,11 @@ const App: React.FC = () => {
     if (!isAuthInitialized || !isFirebaseReady || !currentProjectId) {
       if (!currentProjectId && !isViewingShare) {
         // Clear ephemeral & project-scoped state if no project selected and not viewing a share
+        if (coordinatePersistTimerRef.current) {
+          clearTimeout(coordinatePersistTimerRef.current);
+          coordinatePersistTimerRef.current = null;
+        }
+        lastSettledLayoutRef.current = '';
         lastHydratedProjectFingerprintRef.current = '';
         setGraphData(null);
         graphDataRef.current = null;
@@ -8404,7 +8468,7 @@ const App: React.FC = () => {
                 if (!prev || typeof prev.x !== 'number' || typeof prev.y !== 'number') return false;
                 return Math.abs((h.x ?? 0) - prev.x) > 1 || Math.abs((h.y ?? 0) - prev.y) > 1;
               });
-              if (healedLayout.length > 0 && (wasLayoutHealed || !lastSettledLayoutRef.current)) {
+              if (healedLayout.length > 0 && (savedPositions.length > 0 || wasLayoutHealed)) {
                 lastSettledLayoutRef.current = JSON.stringify(healedLayout);
                 if (wasLayoutHealed && user && !isGuest && currentProjectId) {
                   const healPayload: any = {
@@ -8418,6 +8482,8 @@ const App: React.FC = () => {
                   updateDoc(doc(db, 'users', user.uid, 'projects', currentProjectId), healPayload)
                     .catch((err) => console.warn('[ProjectLoader] Auto-healed canvasLayout persisted:', err));
                 }
+              } else if (savedPositions.length === 0 && !wasLayoutHealed) {
+                lastSettledLayoutRef.current = '';
               }
             } else if (hasGraphDataNodes) {
               g = normalizeGraphData(parsedGraphData);
@@ -9255,7 +9321,15 @@ const App: React.FC = () => {
   // so the share generation and duplication pathways are completely unaffected.
   const handleCoordinatesSettled = useCallback((layout: CanvasNodeRef[]) => {
     if (!user || isGuest || !currentProjectIdRef.current) return;
-    const serialized = JSON.stringify(layout);
+    if (!Array.isArray(layout) || layout.length === 0) return;
+    const normalizedLayout: CanvasNodeRef[] = layout.map((n) => ({
+      nodeId: n.nodeId || n.id || '',
+      x: typeof n.x === 'number' ? Math.round(n.x * 100) / 100 : n.x,
+      y: typeof n.y === 'number' ? Math.round(n.y * 100) / 100 : n.y,
+      fx: typeof n.fx === 'number' ? Math.round(n.fx * 100) / 100 : null,
+      fy: typeof n.fy === 'number' ? Math.round(n.fy * 100) / 100 : null,
+    }));
+    const serialized = JSON.stringify(normalizedLayout);
     if (serialized === lastSettledLayoutRef.current) {
       // Identical layout — simulation re-fired with no positional change; skip write
       return;
@@ -9381,6 +9455,11 @@ const App: React.FC = () => {
             setPreviousWorkspace({ view: View.Graph, projectId: projectId });
             if (currentViewRef.current !== View.Graph || currentProjectIdRef.current !== projectId) {
               if (currentProjectIdRef.current !== projectId) {
+                if (coordinatePersistTimerRef.current) {
+                  clearTimeout(coordinatePersistTimerRef.current);
+                  coordinatePersistTimerRef.current = null;
+                }
+                lastSettledLayoutRef.current = '';
                 isProjectLoadingRef.current = true;
                 setExpectedCurationSpeed(undefined);
                 setIsViewingShare(false);
@@ -10728,97 +10807,6 @@ const App: React.FC = () => {
     if (previousWorkspace) {
       if (previousWorkspace.view === View.Graph && previousWorkspace.projectId) {
         setCurrentView(View.Graph);
-        navigate(`/p/${previousWorkspace.projectId}`);
-      } else {
-        setCurrentView(View.Dashboard);
-        navigate('/dashboard');
-      }
-    } else {
-      if (currentProjectId) {
-        setCurrentView(View.Graph);
-        navigate(`/p/${currentProjectId}`);
-      } else {
-        setCurrentView(View.Dashboard);
-        navigate('/dashboard');
-      }
-    }
-  }, [previousWorkspace, currentProjectId, navigate]);
-
-  const handleCancel = useCallback(() => { 
-    if (abortControllerRef.current) { 
-      // 1. Sever active network requests
-      abortControllerRef.current.abort(); 
-      abortControllerRef.current = null; 
-    }
-    
-    // 2. Unconditionally clear global UI loading states (Spiderweb)
-    setIsLoading(false); 
-    
-    // 3. Clear node-specific loading states (Deep Cut / DetailsPanel)
-    setLoadingNodeIds(new Set()); 
-    fetchingNodeIdsRef.current.clear();
-    
-    // 4. Release all async pipeline locks
-    isHydratingSessionRef.current = false;
-    isProjectLoadingRef.current = false;
-    isFetchingDetailsRef.current = false;
-    
-    // 5. Clear active Cloud Run jobs & modals
-    setActiveJobId(null);
-  }, []);
-
-  const formattedGraphData = useMemo(() => {
-    if (!graphData) return null;
-    const seedList = scenes.length > 0
-      ? Array.from(new Set([
-          ...scenes.flatMap(s => toSeedArtistsArray(s.seedArtists)),
-          ...toSeedArtistsArray(seedArtists)
-        ]))
-      : toSeedArtistsArray(seedArtists);
-    return {
-      ...graphData,
-      nodes: graphData.nodes.map(n => {
-        const canonicalId = stripSceneNamespace(n.canonicalId || n.id);
-        return {
-          ...n,
-          label: getNodeLabel({ ...n, id: canonicalId }, seedList, detailsCache)
-        };
-      })
-    };
-  }, [graphData, seedArtists, scenes, detailsCache]);
-
-  const formattedSelectedNode = useMemo(() => {
-    if (!selectedNode || !formattedGraphData) return selectedNode;
-    const selectedCanonicalId = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id);
-    const match = formattedGraphData.nodes.find(n => n.id === selectedNode.id) ||
-                  formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === selectedCanonicalId);
-    const isLoadingNode = loadingNodeIds.has(selectedCanonicalId) || 
-                          loadingNodeIds.has(selectedCanonicalId.toLowerCase()) || 
-                          loadingNodeIds.has(normalizeArtistId(selectedCanonicalId));
-    return match 
-      ? { ...selectedNode, label: match.label, isLoading: isLoadingNode } 
-      : { ...selectedNode, isLoading: isLoadingNode };
-  }, [selectedNode, formattedGraphData, loadingNodeIds]);
-
-  const formattedPeekedNode = useMemo(() => {
-    if (!peekedNode || !formattedGraphData) return peekedNode;
-    const peekedCanonicalId = stripSceneNamespace(peekedNode.canonicalId || peekedNode.id);
-    const match = formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === peekedCanonicalId || n.id === peekedNode.id);
-    return match 
-      ? { ...peekedNode, label: match.label } 
-      : peekedNode;
-  }, [peekedNode, formattedGraphData]);
-
-  const formattedActiveNodes = useMemo(() => {
-    if (!activeNodes || !formattedGraphData) return activeNodes;
-    return activeNodes.map(node => {
-      const canonicalId = stripSceneNamespace(node.canonicalId || node.id);
-      const match = formattedGraphData.nodes.find(n => stripSceneNamespace(n.canonicalId || n.id) === canonicalId || n.id === node.id);
-      return match ? { ...node, label: match.label } : node;
-    });
-  }, [activeNodes, formattedGraphData]);
-
-  const areFiltersChanged = useMemo(() => {
     return !areFiltersEqual(discoveryFilters, lastAppliedFilters);
   }, [discoveryFilters, lastAppliedFilters]);
 
@@ -11111,6 +11099,11 @@ const App: React.FC = () => {
                     status: 'idle'
                   });
 
+                  if (coordinatePersistTimerRef.current) {
+                    clearTimeout(coordinatePersistTimerRef.current);
+                    coordinatePersistTimerRef.current = null;
+                  }
+                  lastSettledLayoutRef.current = '';
                   pendingUnconfirmedForkIdRef.current = newId;
                   pendingForkOriginIdRef.current = originProjectId;
                   
@@ -11147,6 +11140,11 @@ const App: React.FC = () => {
                   handleGenerateGraph(n, false, null, false, false, undefined, undefined, false, undefined, undefined, undefined, newId, forkedScene.id);
                   return;
                 } else {
+                  if (coordinatePersistTimerRef.current) {
+                    clearTimeout(coordinatePersistTimerRef.current);
+                    coordinatePersistTimerRef.current = null;
+                  }
+                  lastSettledLayoutRef.current = '';
                   setCurrentProjectId(null);
                   currentProjectIdRef.current = null;
                   setExpectedCurationSpeed(undefined);

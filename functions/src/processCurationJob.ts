@@ -1857,13 +1857,13 @@ export const processCurationJob = onDocumentCreated({
                     source: node.id,
                     target: foundedNodeId,
                     value: 1,
-                    weight: 0.3,
+                    weight: 0.1,
                     forwardContext: `Founded in ${foundedYear}`,
                     inverseContext: `Formation year of ${node.label || node.id}`
                   });
                   existingLinkSet.add(`${node.id}--${foundedNodeId}`);
                   existingLinkSet.add(`${foundedNodeId}--${node.id}`);
-                  console.log(`[Curation Backend] Step 4B: Injected missing founded link: "${node.id}" -> "${foundedNodeId}" (weight: 0.3)`);
+                  console.log(`[Curation Backend] Step 4B: Injected missing founded link: "${node.id}" -> "${foundedNodeId}" (weight: 0.1)`);
                 }
               }
 
@@ -2139,6 +2139,161 @@ export const processCurationJob = onDocumentCreated({
             console.log(`[Curation Backend] Discovery Ledger Telemetry -> anchorResolution: "${resolvedAnchorResolution}"`);
           }
 
+          // ── Step 4C: Deterministic Metadata Edge Weight Lock & Artist-Only Box 5 Calibration ─────────
+          if (finalGraph.nodes && finalGraph.links && finalGraph.links.length > 0) {
+            const nodeById = new Map<string, any>(finalGraph.nodes.map((n: any) => [n.id, n]));
+            const canonicalSeedIdsForBox5 = resolvedSeedArray.map((s: any) => s.id).filter(Boolean);
+
+            // 1. Ensure 100% of artist nodes are reachable from a scene seed over artist<->artist links
+            //    so sub-islands (e.g. static-x -- disturbed -- drowning-pool) never float detached.
+            const artistNodesList = finalGraph.nodes.filter((n: any) => (n.type || 'artist') === 'artist');
+            const seedArtistNodes = artistNodesList.filter((n: any) =>
+              canonicalSeedIdsForBox5.includes(n.id) ||
+              seedNorms.some((s: string) => isEntitySeedMatch(s, n.id))
+            );
+            if (seedArtistNodes.length > 0 && artistNodesList.length > seedArtistNodes.length) {
+              const aaAdj = new Map<string, Set<string>>();
+              artistNodesList.forEach((n: any) => aaAdj.set(n.id, new Set()));
+              finalGraph.links.forEach((l: any) => {
+                const sId = typeof l.source === 'string' ? l.source : l.source?.id;
+                const tId = typeof l.target === 'string' ? l.target : l.target?.id;
+                if (aaAdj.has(sId) && aaAdj.has(tId) && sId !== tId) {
+                  aaAdj.get(sId)!.add(tId);
+                  aaAdj.get(tId)!.add(sId);
+                }
+              });
+
+              const reachableFromSeeds = new Set<string>();
+              const bfsQueue: string[] = [];
+              seedArtistNodes.forEach((sn: any) => {
+                reachableFromSeeds.add(sn.id);
+                bfsQueue.push(sn.id);
+              });
+              while (bfsQueue.length > 0) {
+                const curr = bfsQueue.shift()!;
+                for (const nb of aaAdj.get(curr) || []) {
+                  if (!reachableFromSeeds.has(nb)) {
+                    reachableFromSeeds.add(nb);
+                    bfsQueue.push(nb);
+                  }
+                }
+              }
+
+              // Stitch any unreachable artist component to the primary seed via its highest-degree artist
+              const unvisited = artistNodesList.filter((n: any) => !reachableFromSeeds.has(n.id));
+              const visitedIslands = new Set<string>();
+              for (const startNode of unvisited) {
+                if (visitedIslands.has(startNode.id)) continue;
+                const comp: string[] = [];
+                const q = [startNode.id];
+                visitedIslands.add(startNode.id);
+                while (q.length > 0) {
+                  const c = q.shift()!;
+                  comp.push(c);
+                  for (const nb of aaAdj.get(c) || []) {
+                    if (!visitedIslands.has(nb) && !reachableFromSeeds.has(nb)) {
+                      visitedIslands.add(nb);
+                      q.push(nb);
+                    }
+                  }
+                }
+                comp.sort((a, b) => (aaAdj.get(b)?.size || 0) - (aaAdj.get(a)?.size || 0));
+                const bridgeRepId = comp[0];
+                const anchorSeedId = seedArtistNodes[0].id;
+                if (bridgeRepId && anchorSeedId && bridgeRepId !== anchorSeedId) {
+                  finalGraph.links.push({
+                    source: anchorSeedId,
+                    target: bridgeRepId,
+                    value: 1,
+                    weight: 0.3,
+                    forwardContext: "shared era and broader scene lineage with",
+                    inverseContext: "shared era and broader scene lineage with",
+                  });
+                  console.log(`[Curation Backend] Step 4C: Stitched disconnected artist component (${comp.join(', ')}) via "${anchorSeedId}" -> "${bridgeRepId}"`);
+                }
+              }
+            }
+
+            // 2. Lock clean deterministic weights on all metadata & label links ([Rule 39]):
+            //    0.2 Country, 0.1 Founded, 0.8 Genre, 0.7 Label
+            const artistToArtistLinksInput: Array<{ source: string; target: string; forwardContext?: string }> = [];
+            finalGraph.links.forEach((link: any) => {
+              const sId = typeof link.source === 'string' ? link.source : link.source?.id;
+              const tId = typeof link.target === 'string' ? link.target : link.target?.id;
+              const sNode = nodeById.get(sId);
+              const tNode = nodeById.get(tId);
+              const sType = sNode?.type || 'artist';
+              const tType = tNode?.type || 'artist';
+
+              if (sType === 'artist' && tType === 'artist') {
+                artistToArtistLinksInput.push({
+                  source: sId,
+                  target: tId,
+                  forwardContext: link.forwardContext || link.context || '',
+                });
+              } else {
+                const metaType = sType !== 'artist' ? sType : tType;
+                if (metaType === 'country') link.weight = 0.2;
+                else if (metaType === 'founded') link.weight = 0.1;
+                else if (metaType === 'genre') link.weight = 0.8;
+                else if (metaType === 'label') link.weight = 0.7;
+                else if (link.weight === undefined) link.weight = 0.5;
+              }
+            });
+
+            // 3. Column 3, Box 5: Evaluate ONLY artist<->artist links via Gemini 3.6 Flash
+            if (artistToArtistLinksInput.length > 0 && process.env.GEMINI_API_KEY) {
+              console.log(`[Curation Backend] Executing Final Node Positioning (Box 5) using Flash for ${artistToArtistLinksInput.length} artist-to-artist links (skipped ${finalGraph.links.length - artistToArtistLinksInput.length} metadata links)...`);
+              const weightedLinks = await generateSemanticLinkWeights(
+                process.env.GEMINI_API_KEY,
+                detailsCacheEntries,
+                artistToArtistLinksInput,
+                {
+                  push: (model: string, usage: any) => {
+                    if (!collectedTokens[model]) collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+                    collectedTokens[model].prompt += usage.promptTokenCount || 0;
+                    collectedTokens[model].candidates += usage.candidatesTokenCount || 0;
+                    collectedTokens[model].total += usage.totalTokenCount || 0;
+                  }
+                },
+                canonicalSeedIdsForBox5
+              );
+
+              if (weightedLinks && weightedLinks.length > 0) {
+                const weightMap = new Map<string, number>();
+                weightedLinks.forEach((wl: any) => {
+                  if (wl?.source && wl?.target && typeof wl.weight === 'number') {
+                    const linkKey = [wl.source, wl.target].sort().join('--');
+                    weightMap.set(linkKey, Math.max(0.1, Math.min(1.0, Math.round(wl.weight * 100) / 100)));
+                  }
+                });
+                finalGraph.links.forEach((link: any) => {
+                  const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
+                  const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
+                  const sType = nodeById.get(sId)?.type || 'artist';
+                  const tType = nodeById.get(tId)?.type || 'artist';
+                  if (sType !== 'artist' || tType !== 'artist') return;
+                  const linkKey = [sId, tId].sort().join('--');
+                  if (weightMap.has(linkKey)) {
+                    link.weight = weightMap.get(linkKey);
+                  } else if (link.weight === undefined) {
+                    link.weight = 0.5;
+                  }
+                });
+                console.log(`[Curation Backend] Applied calibrated semantic weights to ${weightMap.size}/${artistToArtistLinksInput.length} artist-to-artist links.`);
+              } else {
+                finalGraph.links.forEach((link: any) => {
+                  if (link.weight === undefined) link.weight = 0.5;
+                });
+                console.warn(`[Curation Backend] Box 5 weight generation returned empty. Applied fallback weight (0.5) to unscored artist links.`);
+              }
+            } else {
+              finalGraph.links.forEach((link: any) => {
+                if (link.weight === undefined) link.weight = 0.5;
+              });
+            }
+          }
+
           // ── Step 5: Root Breakdown Write-Back to Seed Artist Docs (Atomic Self-Heal) ────────────────
           // Per the Unified Canvas Architecture (Column 3, Step 5), Single-Seed jobs persist
           // the Root Breakdown to the seed artist's Firestore doc so that future cache hits
@@ -2256,55 +2411,6 @@ export const processCurationJob = onDocumentCreated({
               } catch (e: any) {
                 console.warn(`[Curation Backend] Root Breakdown / Atomic Heal failed for artist doc: ${canonicalSeedId}`, e.message);
               }
-            }
-          }
-
-          // 3.1 Pro: Final Node Positioning (Semantic Link Weights)
-          if (finalGraph.links && finalGraph.links.length > 0 && process.env.GEMINI_API_KEY) {
-            console.log(`[Curation Backend] Executing Final Node Positioning using Flash for ${finalGraph.links.length} links...`);
-            const weightedLinks = await generateSemanticLinkWeights(
-              process.env.GEMINI_API_KEY,
-              detailsCacheEntries,
-              finalGraph.links.map((l: any) => ({
-                source: typeof l.source === 'string' ? l.source : l.source.id,
-                target: typeof l.target === 'string' ? l.target : l.target.id
-              })),
-              {
-                push: (model: string, usage: any) => {
-                  if (!collectedTokens[model]) collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
-                  collectedTokens[model].prompt += usage.promptTokenCount || 0;
-                  collectedTokens[model].candidates += usage.candidatesTokenCount || 0;
-                  collectedTokens[model].total += usage.totalTokenCount || 0;
-                }
-              }
-            );
-
-            if (weightedLinks && weightedLinks.length > 0) {
-              const weightMap = new Map<string, number>();
-              weightedLinks.forEach((wl: any) => {
-                const linkKey = [wl.source, wl.target].sort().join('--');
-                weightMap.set(linkKey, wl.weight);
-              });
-              finalGraph.links.forEach((link: any) => {
-                const sId = typeof link.source === 'string' ? link.source : (link.source as any).id;
-                const tId = typeof link.target === 'string' ? link.target : (link.target as any).id;
-                const linkKey = [sId, tId].sort().join('--');
-                if (weightMap.has(linkKey)) {
-                  link.weight = weightMap.get(linkKey);
-                } else if (link.weight === undefined) {
-                  // Ensure all links have at least a neutral weight
-                  link.weight = 0.5;
-                }
-              });
-              console.log(`[Curation Backend] Applied semantic weights to ${weightMap.size} links.`);
-            } else {
-              // Graceful Fallback: Apply default neutral weight to ensure physics engine continuity
-              finalGraph.links.forEach((link: any) => {
-                if (link.weight === undefined) {
-                  link.weight = 0.5;
-                }
-              });
-              console.warn(`[Curation Backend] AI weight generation failed or returned empty. Applied default weight (0.5) to all links.`);
             }
           }
         } catch (e) {

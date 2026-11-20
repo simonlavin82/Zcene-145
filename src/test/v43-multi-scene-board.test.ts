@@ -37,6 +37,8 @@ import {
   normalizeZineImages,
   normalizeZineIntro,
   normalizeZineTitle,
+  SCENE_MULTI_SEED_MAX_DX,
+  SCENE_MULTI_SEED_CENTROID_MAX_D,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId, normalizeLabelId, normalizeGraphData, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList, getProjectDisplayTitle } from '../../services/artistCacheService';
 import { TOKEN_PRICING, computeBaseProjectTokenCost } from '../../shared/tokenEconomy';
@@ -4186,6 +4188,151 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
           finalScenes
         );
         expect(incrementalSingleSceneResult).toBe('scene-3');
+      });
+    });
+
+    describe('Phase B2.12: Multi-Root Centroid Guard, Editorial Compass & Saved-Scene Petal Pinning', () => {
+      it('allows wide multi-root co-roots up to ±360px when their centroid is within ±220px, and heals when centroid drifts > 220px', () => {
+        expect(SCENE_MULTI_SEED_MAX_DX).toBe(360);
+        expect(SCENE_MULTI_SEED_CENTROID_MAX_D).toBe(220);
+
+        const dualRootScene: ProjectScene = {
+          ...createEmptyProjectScene(0, 'The Jealous Sound::Hey Mercedes'),
+          seedIds: ['the-jealous-sound-us', 'hey-mercedes-us'],
+          status: 'ready',
+          graphData: {
+            nodes: [
+              { id: 'the-jealous-sound-us', label: 'The Jealous Sound', type: 'artist', group: 1, isSeed: true },
+              { id: 'hey-mercedes-us', label: 'Hey Mercedes', type: 'artist', group: 2, isSeed: true },
+              { id: 'knapsack-us', label: 'Knapsack', type: 'artist', group: 1, isSeed: false },
+            ],
+            links: [
+              { source: 'the-jealous-sound-us', target: 'knapsack-us', value: 1 },
+            ],
+          },
+        };
+
+        // Case A: Balanced wide multi-root (±310px symmetric around x=1000 -> centroid dx = 0 <= 220px): MUST preserve coordinates
+        const balancedWideLayout: CanvasNodeRef[] = [
+          { nodeId: 'scene-1::the-jealous-sound-us', x: 690, y: 1000, fx: 690, fy: 1000 },
+          { nodeId: 'scene-1::hey-mercedes-us', x: 1310, y: 1000, fx: 1310, fy: 1000 },
+          { nodeId: 'scene-1::knapsack-us', x: 1000, y: 920, fx: 1000, fy: 920 },
+        ];
+        const kept = buildCompositeCanvasGraph([dualRootScene], [], balancedWideLayout);
+        expect(kept.wasLayoutHealed).toBe(false);
+        expect(kept.nodes.find((n) => n.id === 'scene-1::the-jealous-sound-us')?.fx).toBe(690);
+        expect(kept.nodes.find((n) => n.id === 'scene-1::hey-mercedes-us')?.fx).toBe(1310);
+
+        // Case B: Shifted centroid (+270px from center.x=1000 -> > 220px even though individual seeds <= 360px): MUST heal
+        const driftedCentroidLayout: CanvasNodeRef[] = [
+          { nodeId: 'scene-1::the-jealous-sound-us', x: 1210, y: 1000, fx: 1210, fy: 1000 },
+          { nodeId: 'scene-1::hey-mercedes-us', x: 1330, y: 1000, fx: 1330, fy: 1000 },
+          { nodeId: 'scene-1::knapsack-us', x: 1120, y: 950, fx: 1120, fy: 950 },
+        ];
+        const healed = buildCompositeCanvasGraph([dualRootScene], [], driftedCentroidLayout);
+        expect(healed.wasLayoutHealed).toBe(true);
+      });
+
+      it('initializes unpinned nodes in Ring 0 Roots (0–55px), Ring 1 Peers/Shared Labels (95–175px) & Ring 2 Metadata (185–235px) via Editorial Compass', () => {
+        const scene: ProjectScene = {
+          ...createEmptyProjectScene(0, 'The Jealous Sound::Hey Mercedes'),
+          seedIds: ['the-jealous-sound-us', 'hey-mercedes-us'],
+          status: 'ready',
+          graphData: {
+            nodes: [
+              { id: 'the-jealous-sound-us', label: 'The Jealous Sound', type: 'artist', group: 1, isSeed: true },
+              { id: 'hey-mercedes-us', label: 'Hey Mercedes', type: 'artist', group: 2, isSeed: true },
+              { id: 'racquet-club-us', label: 'Racquet Club', type: 'artist', group: 1 },
+              { id: 'braid-us', label: 'Braid', type: 'artist', group: 2 },
+              { id: 'knapsack-us', label: 'Knapsack', type: 'artist', group: 1 },
+              { id: 'vagrant', label: 'Vagrant', type: 'label', group: 3 },
+              { id: 'emo', label: 'Emo', type: 'genre', group: 1 },
+              { id: 'united-states', label: 'United States', type: 'country', group: 1 },
+              { id: '2000', label: '2000', type: 'founded', group: 1 },
+            ],
+            links: [
+              { source: 'the-jealous-sound-us', target: 'racquet-club-us', value: 1 },
+              { source: 'hey-mercedes-us', target: 'braid-us', value: 1 },
+              { source: 'the-jealous-sound-us', target: 'knapsack-us', value: 1 },
+              { source: 'hey-mercedes-us', target: 'knapsack-us', value: 1 },
+              { source: 'racquet-club-us', target: 'vagrant', value: 1 },
+              { source: 'braid-us', target: 'vagrant', value: 1 },
+              { source: 'the-jealous-sound-us', target: 'emo', value: 1 },
+              { source: 'racquet-club-us', target: 'emo', value: 1 },
+              { source: 'hey-mercedes-us', target: '2000', value: 1 },
+              { source: 'braid-us', target: '2000', value: 1 },
+              { source: 'racquet-club-us', target: 'united-states', value: 1 },
+              { source: 'braid-us', target: 'united-states', value: 1 },
+            ],
+          },
+        };
+
+        const composite = buildCompositeCanvasGraph([scene], [], null);
+        const distFromCenter = (id: string) => {
+          const n = composite.nodes.find((node) => node.id === id)!;
+          return Math.hypot((n.x ?? 0) - 1000, (n.y ?? 0) - 1000);
+        };
+
+        // Ring 0 Roots (~55px) on opposite sides of center
+        const root1 = composite.nodes.find((node) => node.id === 'scene-1::the-jealous-sound-us')!;
+        const root2 = composite.nodes.find((node) => node.id === 'scene-1::hey-mercedes-us')!;
+        expect(distFromCenter('scene-1::the-jealous-sound-us')).toBeCloseTo(55, 0);
+        expect(distFromCenter('scene-1::hey-mercedes-us')).toBeCloseTo(55, 0);
+        expect(root1.x!).toBeLessThan(1000);
+        expect(root2.x!).toBeGreaterThan(1000);
+
+        // Ring 1 Peers & Shared Label placed outside Ring 0 in their respective pod sectors (and crossover near junction)
+        const pod0Peer = composite.nodes.find((node) => node.id === 'scene-1::racquet-club-us')!;
+        const pod1Peer = composite.nodes.find((node) => node.id === 'scene-1::braid-us')!;
+        const bridgePeer = composite.nodes.find((node) => node.id === 'scene-1::knapsack-us')!;
+        expect(pod0Peer.x!).toBeLessThan(root1.x!);
+        expect(pod1Peer.x!).toBeGreaterThan(root2.x!);
+        expect(Math.abs(bridgePeer.x! - 1000)).toBeLessThan(50);
+        expect(distFromCenter('scene-1::vagrant')).toBeGreaterThanOrEqual(90);
+        expect(distFromCenter('scene-1::vagrant')).toBeLessThanOrEqual(180);
+
+        // Ring 2 Contextual Metadata sits on the outer ring (>= 155px post-overlap)
+        expect(distFromCenter('scene-1::emo')).toBeGreaterThanOrEqual(155);
+        expect(distFromCenter('scene-1::united-states')).toBeGreaterThanOrEqual(155);
+        expect(distFromCenter('scene-1::2000')).toBeGreaterThanOrEqual(155);
+      });
+
+      it('pins remaining unpinned sprouted metadata petals after resolveSceneNodeOverlaps when restoring a saved scene layout', () => {
+        const scene: ProjectScene = {
+          ...createEmptyProjectScene(0, 'Korn'),
+          seedIds: ['korn-us'],
+          status: 'ready',
+          graphData: {
+            nodes: [
+              { id: 'korn-us', label: 'Korn', type: 'artist', group: 1, isSeed: true },
+              { id: 'deftones-us', label: 'Deftones', type: 'artist', group: 1 },
+              { id: 'nu-metal', label: 'Nu Metal', type: 'genre', group: 1 },
+              { id: '1993', label: '1993', type: 'founded', group: 1 },
+            ],
+            links: [
+              { source: 'korn-us', target: 'deftones-us', value: 1 },
+              { source: 'korn-us', target: 'nu-metal', value: 1 },
+              { source: 'korn-us', target: '1993', value: 1 },
+            ],
+          },
+        };
+
+        // Simulate onFork / artist-label-only saved layout where metadata petals are absent from savedLayout
+        const artistOnlySavedLayout: CanvasNodeRef[] = [
+          { nodeId: 'scene-1::korn-us', x: 1000, y: 1000, fx: 1000, fy: 1000 },
+          { nodeId: 'scene-1::deftones-us', x: 1120, y: 940, fx: 1120, fy: 940 },
+        ];
+
+        const composite = buildCompositeCanvasGraph([scene], [], artistOnlySavedLayout);
+        const genreNode = composite.nodes.find((n) => n.id === 'scene-1::nu-metal')!;
+        const foundedNode = composite.nodes.find((n) => n.id === 'scene-1::1993')!;
+
+        expect(genreNode.fx).toBeDefined();
+        expect(genreNode.fy).toBeDefined();
+        expect(genreNode.fx).toBe(genreNode.x);
+        expect(foundedNode.fx).toBeDefined();
+        expect(foundedNode.fy).toBeDefined();
+        expect(foundedNode.fx).toBe(foundedNode.x);
       });
     });
   });
