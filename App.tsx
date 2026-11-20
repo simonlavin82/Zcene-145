@@ -1853,14 +1853,20 @@ const App: React.FC = () => {
       const activeIdx = scenesRef.current.findIndex(s => (s.sceneId || s.id) === currentActiveId);
       if (activeIdx !== -1) {
         const activeScene = scenesRef.current[activeIdx];
+        const isCurated = (activeScene.graphData?.nodes?.length || 0) > 0;
         const nextSeedIds = toSeedArtistsArray(seedArtistsRef.current).map(s => normalizeArtistId(s)).filter(Boolean);
+        // Guard: A curated scene's topology is bound to its curatedSeedArtists.
+        // Never overwrite seedIds/seedArtistIds on a curated scene with uncurated draft input.
+        const preservedSeedIds = isCurated && (activeScene.seedIds?.length || activeScene.curatedSeedArtists)
+          ? (activeScene.seedIds?.length ? activeScene.seedIds : toSeedArtistsArray(activeScene.curatedSeedArtists).map(s => normalizeArtistId(s)))
+          : nextSeedIds;
         const updatedActiveScene = normalizeProjectScene({
           ...activeScene,
-          seedArtists: seedArtistsRef.current,
-          seedIds: nextSeedIds,
-          seedArtistIds: nextSeedIds,
+          seedArtists: isCurated ? (seedArtistsRef.current || activeScene.seedArtists) : seedArtistsRef.current,
+          seedIds: preservedSeedIds,
+          seedArtistIds: preservedSeedIds,
           discoveryFilters: discoveryFiltersRef.current || {},
-          status: (activeScene.graphData?.nodes?.length || 0) > 0 ? (activeScene.status || 'completed') : 'idle'
+          status: isCurated ? (activeScene.status || 'completed') : 'idle'
         }, activeIdx);
         scenesRef.current[activeIdx] = updatedActiveScene;
         setScenes([...scenesRef.current]);
@@ -6983,6 +6989,7 @@ const App: React.FC = () => {
         activeJobIdRef.current = activeJobId;
         setActiveJobId(activeJobId);
         setIsLoading(true);
+        isHydratingSessionRef.current = false;
         projectStatusRef.current = 'curating';
         setProjectStatus('curating');
         if (Array.isArray(rawNewData?.scenes) && rawNewData.scenes.length > 0) {
@@ -9048,9 +9055,21 @@ const App: React.FC = () => {
         isHydratingSessionRef.current = false;
 
         if ((scenesRef.current?.length ?? 0) > 1) {
-          const defaultSceneId = scenesRef.current[0]?.sceneId || scenesRef.current[0]?.id || 'scene-1';
+          const defaultScene = scenesRef.current[0];
+          const defaultSceneId = defaultScene?.sceneId || defaultScene?.id || 'scene-1';
           activeSceneIdRef.current = defaultSceneId;
           setActiveSceneId(defaultSceneId);
+          const defaultSeeds = toSeedArtistsString(defaultScene?.seedArtists || defaultScene?.curatedSeedArtists || '');
+          seedArtistsRef.current = defaultSeeds;
+          setSeedArtists(defaultSeeds);
+          const defaultFilters = defaultScene?.discoveryFilters || {};
+          discoveryFiltersRef.current = defaultFilters;
+          setDiscoveryFilters(defaultFilters);
+          const defaultCuratedFilters = defaultScene?.curatedDiscoveryFilters || (
+            (defaultScene?.graphData?.nodes?.length ?? 0) > 0 ? defaultFilters : {}
+          );
+          lastAppliedFiltersRef.current = defaultCuratedFilters;
+          setLastAppliedFilters(defaultCuratedFilters);
         }
 
         // Direct In-Memory Overarching Hydration: Pipe overarching editorial, archive, & bridges directly into React memory

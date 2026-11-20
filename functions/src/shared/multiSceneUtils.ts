@@ -292,6 +292,41 @@ export function isCanonicalSeedMatch(nodeIdOrLabel: string, seedList: string[]):
 }
 
 /**
+ * Resolves the effective seed list for a scene, preserving canonical disambiguated
+ * IDs (e.g. ["korn-us"]) when healthy, but safely falling back to curatedSeedArtists
+ * if seedIds is missing, empty, or contradictory (e.g. corrupted ["green-day"]).
+ */
+export function resolveSceneSeedList(scene: {
+  curatedSeedArtists?: string;
+  seedArtists?: string;
+  seedIds?: string[];
+  seedArtistIds?: string[];
+}): string[] {
+  const curatedSeeds = scene.curatedSeedArtists ? toSeedArtistsArray(scene.curatedSeedArtists) : [];
+  const candidateSeedIds = scene.seedIds?.length
+    ? scene.seedIds
+    : scene.seedArtistIds?.length
+      ? scene.seedArtistIds
+      : [];
+  const isCandidateConsistent =
+    curatedSeeds.length > 0 &&
+    candidateSeedIds.length > 0 &&
+    candidateSeedIds.every((id) => isCanonicalSeedMatch(id, curatedSeeds)) &&
+    curatedSeeds.every((seed) => isCanonicalSeedMatch(seed, candidateSeedIds));
+
+  if (isCandidateConsistent) {
+    return candidateSeedIds;
+  }
+  if (curatedSeeds.length > 0) {
+    return curatedSeeds;
+  }
+  if (candidateSeedIds.length > 0) {
+    return candidateSeedIds;
+  }
+  return toSeedArtistsArray(scene.seedArtists);
+}
+
+/**
  * Validates that a Zine editorial image URL is a valid, non-empty https:// URL.
  */
 export function validateZineImageUrl(raw: unknown): string | null {
@@ -1309,11 +1344,7 @@ export function buildCompositeCanvasGraph(
       scene.centerOffset && !isLegacyCenterOffset(scene.centerOffset, sceneIndex)
         ? scene.centerOffset
         : getSceneCenterOffset(sceneIndex);
-    const seedList = scene.seedIds?.length
-      ? scene.seedIds
-      : scene.seedArtistIds?.length
-        ? scene.seedArtistIds
-        : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+    const seedList = resolveSceneSeedList(scene);
 
     const rawNodes = scene.graphData?.nodes || [];
     const rawLinks = scene.graphData?.links || [];
@@ -1345,7 +1376,9 @@ export function buildCompositeCanvasGraph(
         (Boolean(rawNode.isSceneSeed) ||
           Boolean(rawNode.isSeed) ||
           isCanonicalSeedMatch(canonicalId, seedList) ||
-          (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false));
+          (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false) ||
+          (scene.curatedSeedArtists ? isCanonicalSeedMatch(canonicalId, toSeedArtistsArray(scene.curatedSeedArtists)) : false) ||
+          (rawNode.label && scene.curatedSeedArtists ? isCanonicalSeedMatch(rawNode.label, toSeedArtistsArray(scene.curatedSeedArtists)) : false));
       if (isSeedNode && !orderedSceneSeedIds.includes(canonicalId.toLowerCase())) {
         orderedSceneSeedIds.push(canonicalId.toLowerCase());
       }
@@ -1550,7 +1583,9 @@ export function buildCompositeCanvasGraph(
         (Boolean(rawNode.isSceneSeed) ||
           Boolean(rawNode.isSeed) ||
           isCanonicalSeedMatch(canonicalId, seedList) ||
-          (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false));
+          (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false) ||
+          (scene.curatedSeedArtists ? isCanonicalSeedMatch(canonicalId, toSeedArtistsArray(scene.curatedSeedArtists)) : false) ||
+          (rawNode.label && scene.curatedSeedArtists ? isCanonicalSeedMatch(rawNode.label, toSeedArtistsArray(scene.curatedSeedArtists)) : false));
 
       const savedRef = lookupSavedRef(canonicalId, namespacedId);
 
@@ -1757,11 +1792,7 @@ export function computeDeduplicatedActiveNodes(scenes: ProjectScene[]): string[]
 
   for (const scene of sortedScenes) {
     const nodes = scene?.graphData?.nodes || [];
-    const seedList = scene.seedIds?.length
-      ? scene.seedIds
-      : scene.seedArtistIds?.length
-        ? scene.seedArtistIds
-        : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+    const seedList = resolveSceneSeedList(scene);
 
     // 1. Scene Seed Artists first
     for (const node of nodes) {
@@ -1870,11 +1901,7 @@ export function buildCanonicalDeduplicatedNodesFromScenes(scenes: ProjectScene[]
 
   for (const scene of sortedScenes) {
     const nodes = scene?.graphData?.nodes || [];
-    const seedList = scene.seedIds?.length
-      ? scene.seedIds
-      : scene.seedArtistIds?.length
-        ? scene.seedArtistIds
-        : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+    const seedList = resolveSceneSeedList(scene);
 
     // 1. Scene Seed Artists first
     for (const rawNode of nodes) {

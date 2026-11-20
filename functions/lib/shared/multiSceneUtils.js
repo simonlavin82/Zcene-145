@@ -14,6 +14,7 @@ exports.normalizeCanonicalEntityId = normalizeCanonicalEntityId;
 exports.toSeedArtistsArray = toSeedArtistsArray;
 exports.toSeedArtistsString = toSeedArtistsString;
 exports.isCanonicalSeedMatch = isCanonicalSeedMatch;
+exports.resolveSceneSeedList = resolveSceneSeedList;
 exports.validateZineImageUrl = validateZineImageUrl;
 exports.resolveZineImageSlot = resolveZineImageSlot;
 exports.serializeZineImageEntry = serializeZineImageEntry;
@@ -324,6 +325,33 @@ function isCanonicalSeedMatch(nodeIdOrLabel, seedList) {
         return (targetNorm === seedNorm ||
             (targetBare && seedBare && targetBare === seedBare));
     });
+}
+/**
+ * Resolves the effective seed list for a scene, preserving canonical disambiguated
+ * IDs (e.g. ["korn-us"]) when healthy, but safely falling back to curatedSeedArtists
+ * if seedIds is missing, empty, or contradictory (e.g. corrupted ["green-day"]).
+ */
+function resolveSceneSeedList(scene) {
+    const curatedSeeds = scene.curatedSeedArtists ? toSeedArtistsArray(scene.curatedSeedArtists) : [];
+    const candidateSeedIds = scene.seedIds?.length
+        ? scene.seedIds
+        : scene.seedArtistIds?.length
+            ? scene.seedArtistIds
+            : [];
+    const isCandidateConsistent = curatedSeeds.length > 0 &&
+        candidateSeedIds.length > 0 &&
+        candidateSeedIds.every((id) => isCanonicalSeedMatch(id, curatedSeeds)) &&
+        curatedSeeds.every((seed) => isCanonicalSeedMatch(seed, candidateSeedIds));
+    if (isCandidateConsistent) {
+        return candidateSeedIds;
+    }
+    if (curatedSeeds.length > 0) {
+        return curatedSeeds;
+    }
+    if (candidateSeedIds.length > 0) {
+        return candidateSeedIds;
+    }
+    return toSeedArtistsArray(scene.seedArtists);
 }
 /**
  * Validates that a Zine editorial image URL is a valid, non-empty https:// URL.
@@ -1224,11 +1252,7 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
         const center = scene.centerOffset && !isLegacyCenterOffset(scene.centerOffset, sceneIndex)
             ? scene.centerOffset
             : getSceneCenterOffset(sceneIndex);
-        const seedList = scene.seedIds?.length
-            ? scene.seedIds
-            : scene.seedArtistIds?.length
-                ? scene.seedArtistIds
-                : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+        const seedList = resolveSceneSeedList(scene);
         const rawNodes = scene.graphData?.nodes || [];
         const rawLinks = scene.graphData?.links || [];
         // Coordinate Memory Migration: detect per-scene legacy (1600px stride) saved positions as a group.
@@ -1259,7 +1283,9 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
                 (Boolean(rawNode.isSceneSeed) ||
                     Boolean(rawNode.isSeed) ||
                     isCanonicalSeedMatch(canonicalId, seedList) ||
-                    (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false));
+                    (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false) ||
+                    (scene.curatedSeedArtists ? isCanonicalSeedMatch(canonicalId, toSeedArtistsArray(scene.curatedSeedArtists)) : false) ||
+                    (rawNode.label && scene.curatedSeedArtists ? isCanonicalSeedMatch(rawNode.label, toSeedArtistsArray(scene.curatedSeedArtists)) : false));
             if (isSeedNode && !orderedSceneSeedIds.includes(canonicalId.toLowerCase())) {
                 orderedSceneSeedIds.push(canonicalId.toLowerCase());
             }
@@ -1456,7 +1482,9 @@ function buildCompositeCanvasGraph(scenes, crossSceneLinks = [], savedLayout) {
                 (Boolean(rawNode.isSceneSeed) ||
                     Boolean(rawNode.isSeed) ||
                     isCanonicalSeedMatch(canonicalId, seedList) ||
-                    (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false));
+                    (rawNode.label ? isCanonicalSeedMatch(rawNode.label, seedList) : false) ||
+                    (scene.curatedSeedArtists ? isCanonicalSeedMatch(canonicalId, toSeedArtistsArray(scene.curatedSeedArtists)) : false) ||
+                    (rawNode.label && scene.curatedSeedArtists ? isCanonicalSeedMatch(rawNode.label, toSeedArtistsArray(scene.curatedSeedArtists)) : false));
             const savedRef = lookupSavedRef(canonicalId, namespacedId);
             const hasSavedCoords = savedRef &&
                 typeof savedRef.x === 'number' &&
@@ -1637,11 +1665,7 @@ function computeDeduplicatedActiveNodes(scenes) {
     const sortedScenes = [...scenes].sort((a, b) => (a.sceneIndex ?? 0) - (b.sceneIndex ?? 0));
     for (const scene of sortedScenes) {
         const nodes = scene?.graphData?.nodes || [];
-        const seedList = scene.seedIds?.length
-            ? scene.seedIds
-            : scene.seedArtistIds?.length
-                ? scene.seedArtistIds
-                : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+        const seedList = resolveSceneSeedList(scene);
         // 1. Scene Seed Artists first
         for (const node of nodes) {
             if (node.type !== 'artist')
@@ -1743,11 +1767,7 @@ function buildCanonicalDeduplicatedNodesFromScenes(scenes) {
     };
     for (const scene of sortedScenes) {
         const nodes = scene?.graphData?.nodes || [];
-        const seedList = scene.seedIds?.length
-            ? scene.seedIds
-            : scene.seedArtistIds?.length
-                ? scene.seedArtistIds
-                : toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+        const seedList = resolveSceneSeedList(scene);
         // 1. Scene Seed Artists first
         for (const rawNode of nodes) {
             if (rawNode.type !== 'artist' && rawNode.type)
