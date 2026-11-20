@@ -4366,6 +4366,209 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         expect(computeRestingLinkOpacity({ weight: 0.2 }, artistA, countryNode, degrees)).toBe(0.18);
         expect(computeRestingLinkOpacity({ weight: 0.1 }, artistA, foundedNode, degrees)).toBe(0.18);
       });
+
+      it('Fix 1 & 2: multiple 1-degree petals attached to Root Artist at (center.x, center.y) fan out cleanly at distinct angles with zero AABB overlap', () => {
+        const center = { x: 1000, y: 1000 };
+        const root: any = {
+          id: 'scene-1::green-day-us',
+          label: 'Green Day',
+          type: 'artist',
+          isSeed: true,
+          isSceneSeed: true,
+          sceneIndex: 0,
+          x: center.x,
+          y: center.y,
+          fx: center.x,
+          fy: center.y,
+        };
+        const petal1: any = {
+          id: 'scene-1::1987',
+          label: '1987',
+          type: 'founded',
+          sceneIndex: 0,
+          x: center.x,
+          y: center.y, // Exact same coordinate at centroid
+        };
+        const petal2: any = {
+          id: 'scene-1::punk-rock',
+          label: 'Punk Rock',
+          type: 'genre',
+          sceneIndex: 0,
+          x: center.x,
+          y: center.y, // Exact same coordinate at centroid
+        };
+        const petal3: any = {
+          id: 'scene-1::united-states',
+          label: 'United States',
+          type: 'country',
+          sceneIndex: 0,
+          x: center.x,
+          y: center.y, // Exact same coordinate at centroid
+        };
+
+        const links: any = [
+          { source: 'scene-1::green-day-us', target: 'scene-1::1987', weight: 0.1 },
+          { source: 'scene-1::green-day-us', target: 'scene-1::punk-rock', weight: 0.8 },
+          { source: 'scene-1::green-day-us', target: 'scene-1::united-states', weight: 0.2 },
+        ];
+
+        const resolved = resolveSceneNodeOverlaps([root, petal1, petal2, petal3], links);
+        const resRoot = resolved.find(n => n.id === root.id)!;
+        const resP1 = resolved.find(n => n.id === petal1.id)!;
+        const resP2 = resolved.find(n => n.id === petal2.id)!;
+        const resP3 = resolved.find(n => n.id === petal3.id)!;
+
+        // Root remains anchored at center
+        expect(resRoot.x).toBe(center.x);
+        expect(resRoot.y).toBe(center.y);
+
+        // Fix 2: Minimum tether radius for petals of a Root Artist is >= 78px
+        const distP1 = Math.hypot(resP1.x! - center.x, resP1.y! - center.y);
+        const distP2 = Math.hypot(resP2.x! - center.x, resP2.y! - center.y);
+        const distP3 = Math.hypot(resP3.x! - center.x, resP3.y! - center.y);
+        expect(distP1).toBeGreaterThanOrEqual(78);
+        expect(distP2).toBeGreaterThanOrEqual(78);
+        expect(distP3).toBeGreaterThanOrEqual(78);
+
+        // Fix 1: Petals fan out at distinct angular bearings (not all collapsed on 0 deg)
+        const angleP1 = Math.atan2(resP1.y! - center.y, resP1.x! - center.x);
+        const angleP2 = Math.atan2(resP2.y! - center.y, resP2.x! - center.x);
+        const angleP3 = Math.atan2(resP3.y! - center.y, resP3.x! - center.x);
+        expect(Math.abs(angleP1 - angleP2)).toBeGreaterThan(0.4);
+        expect(Math.abs(angleP2 - angleP3)).toBeGreaterThan(0.4);
+        expect(Math.abs(angleP1 - angleP3)).toBeGreaterThan(0.4);
+
+        // Zero AABB overlaps between all pairs
+        const padX = 10;
+        const padY = 8;
+        const nodesList = [resRoot, resP1, resP2, resP3];
+        for (let i = 0; i < nodesList.length; i++) {
+          for (let j = i + 1; j < nodesList.length; j++) {
+            const a = nodesList[i];
+            const b = nodesList[j];
+            const isSeedA = Boolean(a.isSeed || a.isSceneSeed);
+            const isSeedB = Boolean(b.isSeed || b.isSceneSeed);
+            const textWidthA = Math.max(28, (a.label || a.id).length * 7.2);
+            const textWidthB = Math.max(28, (b.label || b.id).length * 7.2);
+            const hxA = Math.max(isSeedA ? 18 : (a.type === 'artist' ? 16 : 14), textWidthA / 2) + padX + (isSeedA ? 6 : 0);
+            const hyA = 22 + padY;
+            const hxB = Math.max(isSeedB ? 18 : (b.type === 'artist' ? 16 : 14), textWidthB / 2) + padX + (isSeedB ? 6 : 0);
+            const hyB = 22 + padY;
+            const overlapX = (hxA + hxB) - Math.abs(b.x! - a.x!);
+            const overlapY = (hyA + hyB) - Math.abs(b.y! - a.y!);
+            const isClash = overlapX > 0 && overlapY > 0;
+            expect(isClash).toBe(false);
+          }
+        }
+      });
+
+      it('Fix 3: dense 51-node scene converges to 0 remaining AABB overlaps within 35 iterations while staying within territory bounds', () => {
+        const center = { x: 1000, y: 1000 };
+        const denseNodes: any[] = [];
+        const denseLinks: any[] = [];
+
+        // 1 Root Seed
+        denseNodes.push({
+          id: 'scene-1::green-day-us',
+          label: 'Green Day',
+          type: 'artist',
+          isSeed: true,
+          isSceneSeed: true,
+          sceneIndex: 0,
+          x: center.x,
+          y: center.y,
+          fx: center.x,
+          fy: center.y,
+        });
+
+        // 50 nodes arranged across 4 rings (modeled on Green Day with shared labels, peers, and metadata)
+        const peerAndLabelNames = [
+          'Blink-182', 'Sum 41', 'Simple Plan', 'The Offspring', 'Rancid', 'NOFX',
+          'Operation Ivy', 'AFI', 'Pennywise', 'Bad Religion', 'Descendents', 'Jawbreaker',
+          'Fall Out Boy', 'New Found Glory', 'Good Charlotte', 'Jimmy Eat World', 'Yellowcard',
+          'All Time Low', 'Paramore', 'My Chemical Romance', 'Rise Against', 'Anti-Flag',
+          'The Starting Line', 'Bayside', 'Saves The Day', 'Taking Back Sunday', 'Brand New',
+          'Alkaline Trio', 'The Lawrence Arms', 'Hot Water Music',
+          'Reprise', 'Lookout!', 'Epitaph', 'Fat Wreck Chords', 'Atlantic', 'MCA', 'DGC', 'Nitro', 'SST', 'Aquarius',
+          'Pop Punk', 'Punk Rock', 'Ska Punk', 'Emo', 'Skate Punk',
+          '1987', '1991', '1994', '1996', '1999'
+        ];
+
+        const ringSpecs = [
+          { r: 140, count: 4, offset: 0.0 },
+          { r: 240, count: 8, offset: 0.2 },
+          { r: 340, count: 14, offset: 0.1 },
+          { r: 430, count: 24, offset: 0.05 },
+        ];
+
+        let nameIdx = 0;
+        ringSpecs.forEach(({ r, count, offset }) => {
+          for (let i = 0; i < count; i++) {
+            const name = peerAndLabelNames[nameIdx];
+            nameIdx++;
+            const ang = i * (2 * Math.PI / count) + offset;
+            const ntype = nameIdx <= 30 ? 'artist' : (nameIdx <= 40 ? 'label' : 'genre');
+            const id = `scene-1::node-${nameIdx}`;
+            denseNodes.push({
+              id,
+              label: name,
+              type: ntype,
+              sceneIndex: 0,
+              x: center.x + r * Math.cos(ang),
+              y: center.y + r * Math.sin(ang),
+            });
+            denseLinks.push({
+              source: 'scene-1::green-day-us',
+              target: id,
+              weight: ntype === 'artist' ? 0.6 : 0.7,
+            });
+            // Shared labels and genres connect to multiple artists across the scene
+            if (ntype !== 'artist') {
+              const peerIdx = (nameIdx % 30) + 1;
+              denseLinks.push({
+                source: `scene-1::node-${peerIdx}`,
+                target: id,
+                weight: 0.7,
+              });
+            }
+          }
+        });
+
+        expect(denseNodes.length).toBe(51);
+
+        const resolved = resolveSceneNodeOverlaps(denseNodes, denseLinks);
+
+        // Assert all nodes are clamped within territory bounds
+        resolved.forEach(n => {
+          expect(Math.abs(n.x! - center.x)).toBeLessThanOrEqual(480);
+          expect(Math.abs(n.y! - center.y)).toBeLessThanOrEqual(750);
+        });
+
+        // Calculate remaining AABB overlaps (using >= 0.01px epsilon to guard against IEEE 754 precision)
+        const padX = 10;
+        const padY = 8;
+        let overlapCount = 0;
+        for (let i = 0; i < resolved.length; i++) {
+          for (let j = i + 1; j < resolved.length; j++) {
+            const a = resolved[i];
+            const b = resolved[j];
+            const isSeedA = Boolean(a.isSeed || a.isSceneSeed);
+            const isSeedB = Boolean(b.isSeed || b.isSceneSeed);
+            const textWidthA = Math.max(28, (a.label || a.id).length * 7.2);
+            const textWidthB = Math.max(28, (b.label || b.id).length * 7.2);
+            const hxA = Math.max(isSeedA ? 18 : (a.type === 'artist' ? 16 : 14), textWidthA / 2) + padX + (isSeedA ? 6 : 0);
+            const hyA = 22 + padY;
+            const hxB = Math.max(isSeedB ? 18 : (b.type === 'artist' ? 16 : 14), textWidthB / 2) + padX + (isSeedB ? 6 : 0);
+            const hyB = 22 + padY;
+            const overlapX = (hxA + hxB) - Math.abs(b.x! - a.x!);
+            const overlapY = (hyA + hyB) - Math.abs(b.y! - a.y!);
+            if (overlapX > 0.01 && overlapY > 0.01) {
+              overlapCount++;
+            }
+          }
+        }
+        expect(overlapCount).toBe(0);
+      });
     });
   });
 });

@@ -915,7 +915,7 @@ function getNodeDisplayLabel(node) {
 function resolveSceneNodeOverlaps(nodes, links = [], options) {
     if (!Array.isArray(nodes) || nodes.length <= 1)
         return nodes;
-    const maxIterations = options?.maxIterations ?? 15;
+    const maxIterations = options?.maxIterations ?? 35;
     const padX = options?.paddingX ?? 10;
     const padY = options?.paddingY ?? 8;
     const expansionFactor = options?.clusterExpansionFactor ?? 1.0;
@@ -991,15 +991,45 @@ function resolveSceneNodeOverlaps(nodes, links = [], options) {
                 }
             });
         }
+        // Group 1-degree petals by parent artist for balanced radial fanning
+        const parentToPetals = new Map();
+        sceneNodes.forEach(n => {
+            const parent = parentMap.get(n.id);
+            if (parent) {
+                if (!parentToPetals.has(parent.id))
+                    parentToPetals.set(parent.id, []);
+                parentToPetals.get(parent.id).push(n);
+            }
+        });
         // Initialize unplaced or zero-distance metadata petals to outward arc
         sceneNodes.forEach(n => {
             if (parentMap.has(n.id)) {
                 const parent = parentMap.get(n.id);
+                const isParentRoot = Boolean(parent.isSeed || parent.isSceneSeed);
+                const parentDistToCenter = Math.hypot((parent.x ?? center.x) - center.x, (parent.y ?? center.y) - center.y);
+                const isParentNearCenter = isParentRoot || parentDistToCenter < 15;
+                const targetR = isParentRoot ? 85 : 72;
                 const distToParent = Math.hypot((n.x ?? 0) - (parent.x ?? 0), (n.y ?? 0) - (parent.y ?? 0));
-                // If petal sits right on parent (< 45px), spawn it on outward arc relative to scene center
+                // If petal sits right on parent (< 45px), spawn it on outward arc relative to scene center or fanned out
                 if (distToParent < 45 || isNaN(n.x ?? NaN) || isNaN(n.y ?? NaN)) {
-                    const outAngle = Math.atan2((parent.y ?? center.y) - center.y, (parent.x ?? center.x) - center.x);
-                    const targetR = 72;
+                    let outAngle;
+                    if (isParentNearCenter) {
+                        // Fix 1: When parent is near center (Root), do NOT collapse onto angle 0.
+                        // Preserve petal's existing angle around parent if distinct offset (hypot > 5),
+                        // or evenly fan out petals across 360 degrees using their index among that parent's petals.
+                        if (distToParent > 5 && !isNaN(n.x ?? NaN) && !isNaN(n.y ?? NaN)) {
+                            outAngle = Math.atan2((n.y ?? 0) - (parent.y ?? 0), (n.x ?? 0) - (parent.x ?? 0));
+                        }
+                        else {
+                            const siblings = parentToPetals.get(parent.id) || [n];
+                            const petalIdx = siblings.findIndex(s => s.id === n.id);
+                            const parentPetalCount = Math.max(1, siblings.length);
+                            outAngle = ((petalIdx * 2 * Math.PI) / parentPetalCount) - (Math.PI / 4);
+                        }
+                    }
+                    else {
+                        outAngle = Math.atan2((parent.y ?? center.y) - center.y, (parent.x ?? center.x) - center.x);
+                    }
                     n.x = (parent.x ?? center.x) + targetR * Math.cos(outAngle);
                     n.y = (parent.y ?? center.y) + targetR * Math.sin(outAngle);
                     if (n.fx != null)
@@ -1015,13 +1045,15 @@ function resolveSceneNodeOverlaps(nodes, links = [], options) {
             const textWidth = Math.max(28, label.length * 7.2);
             const isSeed = Boolean(n.isSeed || n.isSceneSeed);
             const r = isSeed ? 18 : (n.type === 'artist' ? 16 : 14);
-            const hx = Math.max(r, textWidth / 2) + padX;
-            const hy = 22 + padY; // text is at y + 22, height ~16
+            // Fix 2: Give Root Artist nodes (+6px to hx) for 32px icon, r=22 halo, and y=27 label clearance
+            const seedClearance = isSeed ? 6 : 0;
+            const hx = Math.max(r, textWidth / 2) + padX + seedClearance;
+            const hy = 22 + padY; // text is at y + 22 (or 27 for root), height ~16
             return { hx, hy };
         };
         // Relaxation loop
         for (let iter = 0; iter < maxIterations; iter++) {
-            const damping = Math.pow(0.88, iter);
+            const damping = Math.pow(0.94, iter);
             let overlapCount = 0;
             for (let i = 0; i < sceneNodes.length; i++) {
                 for (let j = i + 1; j < sceneNodes.length; j++) {
@@ -1035,7 +1067,7 @@ function resolveSceneNodeOverlaps(nodes, links = [], options) {
                     const dy = B.y - A.y;
                     const overlapX = (boxA.hx + boxB.hx) - Math.abs(dx);
                     const overlapY = (boxA.hy + boxB.hy) - Math.abs(dy);
-                    if (overlapX > 0 && overlapY > 0) {
+                    if (overlapX > 0.01 && overlapY > 0.01) {
                         const isSeedA = Boolean(A.isSeed || A.isSceneSeed);
                         const isSeedB = Boolean(B.isSeed || B.isSceneSeed);
                         if (isSeedA && isSeedB)
@@ -1113,6 +1145,19 @@ function resolveSceneNodeOverlaps(nodes, links = [], options) {
                     }
                 }
             }
+            // Fix 3: Keep nodes clamped safely inside territory bounds:
+            sceneNodes.forEach(n => {
+                if (!Boolean(n.isSeed || n.isSceneSeed) && typeof n.x === 'number' && typeof n.y === 'number') {
+                    const clampedX = center.x + Math.max(-exports.SCENE_TERRITORY_MAX_DX, Math.min(exports.SCENE_TERRITORY_MAX_DX, n.x - center.x));
+                    const clampedY = center.y + Math.max(-exports.SCENE_TERRITORY_MAX_DY, Math.min(exports.SCENE_TERRITORY_MAX_DY, n.y - center.y));
+                    n.x = clampedX;
+                    n.y = clampedY;
+                    if (n.fx != null)
+                        n.fx = n.x;
+                    if (n.fy != null)
+                        n.fy = n.y;
+                }
+            });
             if (overlapCount === 0)
                 break;
         }
@@ -1125,7 +1170,11 @@ function rotatePetalAlongArc(petal, parent, pushX, pushY, pushDist) {
     const rx = (petal.x ?? px) - px;
     const ry = (petal.y ?? py) - py;
     const currentR = Math.hypot(rx, ry);
-    const tetherR = Math.max(62, Math.min(85, currentR || 72));
+    const isParentRoot = Boolean(parent.isSeed || parent.isSceneSeed);
+    const minR = isParentRoot ? 78 : 62;
+    const maxR = isParentRoot ? 95 : 85;
+    const defaultR = isParentRoot ? 85 : 72;
+    const tetherR = Math.max(minR, Math.min(maxR, currentR || defaultR));
     const currentTheta = Math.atan2(ry === 0 && rx === 0 ? 1 : ry, rx);
     // Tangent vector along orbit: (-sin(theta), cos(theta))
     const tx = -Math.sin(currentTheta);
