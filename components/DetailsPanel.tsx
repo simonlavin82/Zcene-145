@@ -1812,13 +1812,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         aria-label={`Copy member name ${cleanName}`}
                                                     >
                                                         <span>{typeof m === 'string' ? m : (m as any)?.name}</span>
-                                                        <span className="inline-flex items-center justify-center w-4 h-4 ml-1 flex-shrink-0">
-                                                            <span className={`material-symbols-outlined !text-[14px] transition-all duration-200 ${
-                                                                isMemberCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover/member:opacity-100'
-                                                            }`}>
-                                                                {isMemberCopied ? 'check' : 'content_copy'}
+                                                        {isMemberCopied && (
+                                                            <span className="material-symbols-outlined !text-[14px] text-primary ml-1 select-none flex-shrink-0 animate-in fade-in zoom-in-75 duration-150">
+                                                                check
                                                             </span>
-                                                        </span>
+                                                        )}
                                                     </button>
                                                     {idx < details.members.length - 1 && <span className="text-zinc-600 select-none"> • </span>}
                                                 </React.Fragment>
@@ -4431,7 +4429,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     placeholder="Search..."
                                     value={magazineSearchQuery}
                                     onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                    className={`w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.md.magazineSearch}`}
+                                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all py-2 pl-9 pr-8 text-sm"
                                 />
                                 <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
                                     {magazineSearchQuery && (
@@ -4440,7 +4438,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </div>
                             </div>
 
-                            <div className="relative shrink-0 w-[104px]">
+                            <div className="relative shrink-0 w-[90px]">
                                 <Select
                                     variant="md"
                                     value={magazineSortBy}
@@ -4458,7 +4456,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     type="button"
                                     data-testid="zine-edit-toggle-btn-mobile"
                                     onClick={() => setIsEditingZine((prev) => !prev)}
-                                    className={`h-10 px-3 shrink-0 flex items-center gap-1.5 ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
+                                    className={`h-10 !px-2.5 w-[88px] shrink-0 flex items-center justify-center !gap-1 leading-none ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
                                     title={isEditingZine ? 'Done Editing Zine' : 'Edit Zine Images'}
                                 >
                                     <span className="material-symbols-outlined !text-[18px]">
@@ -4468,7 +4466,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     {!isEditingZine && unillustratedSectionsCount > 0 && (
                                         <span
                                             data-testid="zine-edit-suggestion-badge"
-                                            className="h-5 min-w-[20px] px-1 rounded-lg flex items-center justify-center text-[9px] font-semibold border bg-zinc-900 text-white border-white/20"
+                                            className="h-[18px] min-w-[18px] px-1 rounded-md flex items-center justify-center text-[9px] font-semibold border bg-zinc-900 text-white border-white/20"
                                         >
                                             {unillustratedSectionsCount}
                                         </span>

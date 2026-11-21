@@ -3024,9 +3024,9 @@ describe('DetailsPanel', () => {
                 expect(memberBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('check');
                 expect(memberBtn.querySelector('.material-symbols-outlined')?.className).toContain('text-primary');
 
-                // Member 1 should remain in content_copy state
+                // Member 1 sits tight with zero resting copy icon element
                 const member1Btn = screen.getByLabelText('Copy member name James "Munky" Shaffer');
-                expect(member1Btn.querySelector('.material-symbols-outlined')?.textContent).toBe('content_copy');
+                expect(member1Btn.querySelector('.material-symbols-outlined')).toBeNull();
             });
 
             it('copies "<Artist Name> <Album Name>" when an Essential Listening album is tapped', async () => {
@@ -3066,7 +3066,7 @@ describe('DetailsPanel', () => {
                     fireEvent.click(albumBtn);
                 });
                 // Member checkmark should have reset, album checkmark active
-                expect(memberBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('content_copy');
+                expect(memberBtn.querySelector('.material-symbols-outlined')).toBeNull();
                 expect(albumBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('check');
 
                 // Advance by full 2s
@@ -3076,6 +3076,81 @@ describe('DetailsPanel', () => {
                 expect(albumBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('content_copy');
 
                 vi.useRealTimers();
+            });
+        });
+
+        describe('Mobile Zine Top Toolbar Geometry & Stability', () => {
+            const threeParagraphMarkdown = "Paragraph 1\n\nParagraph 2\n\nParagraph 3";
+            const baseZineScenes = [
+                {
+                    sceneId: 'scene-1',
+                    id: 'scene-1',
+                    name: 'Scene 1',
+                    title: 'Scene 1',
+                    seedArtists: 'Dashboard Confessional',
+                    rationale: threeParagraphMarkdown,
+                    graphData: {
+                        nodes: [{ id: 'scene-1::dc', label: 'Dashboard Confessional', type: 'artist' }],
+                        links: [],
+                    },
+                },
+            ];
+            const baseZineGraph = {
+                nodes: [{ id: 'scene-1::dc', label: 'Dashboard Confessional', type: 'artist' }],
+                links: [],
+                synthesisRationale: threeParagraphMarkdown,
+            } as any;
+
+            const baseProps = (overrides: Record<string, any> = {}) => ({
+                selectedNode: baseZineGraph.nodes[0],
+                activeNodes: baseZineGraph.nodes,
+                detailsCache: new Map(),
+                loadingNodeIds: new Set<string>(),
+                onTogglePinNode: () => {},
+                pinnedNodes: new Set<string>(),
+                onRefreshNode: () => {},
+                error: null,
+                systemError: null,
+                graphData: baseZineGraph,
+                libraryArtists: [],
+                seedArtists: ['Dashboard Confessional'],
+                onAddArtist: () => {},
+                isCollapsed: false,
+                onToggleCollapse: () => {},
+                isSmallScreen: true,
+                onNodeClick: () => {},
+                onNavigate: () => {},
+                isGlobalLoading: false,
+                onCancelGlobalLoading: () => {},
+                unreadCount: 0,
+                isActive: true,
+                isMagazineViewOpen: true,
+                onMagazineViewToggle: () => {},
+                chatHistories: new Map(),
+                onUpdateChatHistories: () => {},
+                onAddToStack: () => {},
+                scenes: baseZineScenes,
+                overarchingRationale: threeParagraphMarkdown,
+                user: { uid: 'owner-1' },
+                isGuest: false,
+                onUpdateZineImages: vi.fn(),
+                onUpdateZineTitle: vi.fn(),
+                onUpdateZineIntro: vi.fn(),
+                ...overrides,
+            });
+
+            it('maintains a stable w-[88px] width on mobile Edit/Done button across toggle states', () => {
+                render(<DetailsPanel {...baseProps()} />);
+
+                const mobileEditBtn = screen.getByTestId('zine-edit-toggle-btn-mobile');
+                expect(mobileEditBtn).toBeInTheDocument();
+                expect(mobileEditBtn.className).toContain('w-[88px]');
+                expect(mobileEditBtn).toHaveTextContent('Edit');
+
+                // Toggle to Done state
+                fireEvent.click(mobileEditBtn);
+                expect(mobileEditBtn.className).toContain('w-[88px]');
+                expect(mobileEditBtn).toHaveTextContent('Done');
             });
         });
     });
