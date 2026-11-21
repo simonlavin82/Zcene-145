@@ -3696,6 +3696,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         const containers = typeof document !== 'undefined'
             ? Array.from(document.querySelectorAll<HTMLElement>('#magazine-scroll-container'))
             : [];
+        if (magazineScrollContainerRef.current && !containers.includes(magazineScrollContainerRef.current)) {
+            containers.push(magazineScrollContainerRef.current);
+        }
         const primaryEl = typeof document !== 'undefined' ? document.getElementById('magazine-scroll-container') : null;
         if (primaryEl && !containers.includes(primaryEl)) {
             containers.push(primaryEl);
@@ -3853,6 +3856,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const hasOpenedMagazineRef = useRef(false);
     const lastScrolledNodeIdRef = useRef<string | null>(null);
     const isProgrammaticScrollRef = useRef(false);
+    const magazineScrollContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (!isMagazineViewOpen) {
@@ -3861,9 +3865,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             return;
         }
 
+        const container = magazineScrollContainerRef.current || (typeof document !== 'undefined' ? document.getElementById('magazine-scroll-container') : null);
+
         if (!hasOpenedMagazineRef.current) {
             hasOpenedMagazineRef.current = true;
-            const container = document.getElementById('magazine-scroll-container');
             if (container) {
                 container.scrollTop = 0;
             }
@@ -3874,7 +3879,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
 
         const selectedCanon = selectedNode ? stripSceneNamespace(selectedNode.canonicalId || selectedNode.id).toLowerCase() : null;
-        if (selectedNode && selectedCanon !== lastScrolledNodeIdRef.current) {
+        if (selectedNode) {
             // If the target artist is currently filtered out by a Zine search query, clear it so the card renders
             if (magazineSearchQuery.trim()) {
                 const isPresent = filteredAndSortedNodes.some(n => {
@@ -3896,34 +3901,44 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             // (~44px) so the sentinel stays below the boundary (big title renders).
             const SCROLL_PADDING = 40;
 
+            const safeEscape = (val: string) => {
+                return typeof CSS !== 'undefined' && typeof CSS.escape === 'function' ? CSS.escape(val) : val;
+            };
+
             const timeoutId = setTimeout(() => {
-                const container = document.getElementById('magazine-scroll-container');
+                const scrollEl = magazineScrollContainerRef.current || (typeof document !== 'undefined' ? document.getElementById('magazine-scroll-container') : null);
+                if (!scrollEl) return;
+
                 const rawId = selectedNode.id;
                 const canonId = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id);
                 const normId = normalizeArtistId(canonId);
 
-                const targetEl =
-                    document.getElementById(`magazine-card-${rawId}`) ||
-                    document.getElementById(`magazine-card-${canonId}`) ||
-                    document.getElementById(`magazine-card-${normId}`) ||
-                    document.querySelector(`[data-canonical-id="${canonId}"]`) ||
-                    document.querySelector(`[data-canonical-id="${normId}"]`) ||
-                    document.querySelector(`[data-node-id="${rawId}"]`) ||
-                    document.querySelector(`[data-node-id="${canonId}"]`);
+                const rawEsc = safeEscape(rawId);
+                const canonEsc = safeEscape(canonId);
+                const normEsc = safeEscape(normId);
 
-                if (container && targetEl) {
-                    const containerRect = container.getBoundingClientRect();
+                const targetEl =
+                    scrollEl.querySelector<HTMLElement>(`#magazine-card-${rawEsc}`) ||
+                    scrollEl.querySelector<HTMLElement>(`#magazine-card-${canonEsc}`) ||
+                    scrollEl.querySelector<HTMLElement>(`#magazine-card-${normEsc}`) ||
+                    scrollEl.querySelector<HTMLElement>(`[data-canonical-id="${canonId}" i]`) ||
+                    scrollEl.querySelector<HTMLElement>(`[data-canonical-id="${normId}" i]`) ||
+                    scrollEl.querySelector<HTMLElement>(`[data-node-id="${rawId}" i]`) ||
+                    scrollEl.querySelector<HTMLElement>(`[data-node-id="${canonId}" i]`) ||
+                    (typeof document !== 'undefined' ? (
+                        document.getElementById(`magazine-card-${rawId}`) ||
+                        document.getElementById(`magazine-card-${canonId}`) ||
+                        document.getElementById(`magazine-card-${normId}`)
+                    ) : null);
+
+                if (targetEl) {
+                    const containerRect = scrollEl.getBoundingClientRect();
                     const targetRect = targetEl.getBoundingClientRect();
-                    const relativeTop = targetRect.top - containerRect.top + container.scrollTop;
-                    // Scroll the card top to the container top, minus a small padding.
-                    // The floating mobile header (h-16) sits *above* the container in
-                    // the DOM, so containerRect.top already accounts for it — no
-                    // additional header offset subtraction is needed here.
+                    const relativeTop = targetRect.top - containerRect.top + scrollEl.scrollTop;
+                    const destination = Math.max(0, relativeTop - SCROLL_PADDING);
+
                     isProgrammaticScrollRef.current = true;
-                    container.scrollTo({ top: relativeTop - SCROLL_PADDING, behavior: 'smooth' });
-                    // Only commit the guard AFTER a scroll actually fires.
-                    // If the card doesn't exist (e.g. API failure), the guard stays
-                    // null/stale so the next state change can retry the scroll.
+                    scrollEl.scrollTo({ top: destination, behavior: 'smooth' });
                     lastScrolledNodeIdRef.current = canonId.toLowerCase();
                     setTimeout(() => {
                         isProgrammaticScrollRef.current = false;
@@ -4687,6 +4702,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     )}
 
                     <div
+                        ref={magazineScrollContainerRef}
                         id="magazine-scroll-container"
                         className={`${isStaticMockup ? 'overflow-hidden h-auto' : 'flex-grow relative min-h-0'} ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800 overflow-x-clip' : 'overflow-hidden'}`}
                         onScroll={isMagazineViewOpen ? handleScroll : undefined}

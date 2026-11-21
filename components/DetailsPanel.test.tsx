@@ -3259,6 +3259,94 @@ describe('DetailsPanel', () => {
                         vi.useRealTimers();
                     }
                 });
+
+                it('smoothly scrolls magazine container when re-clicking an already-visited or same-row artist after scrolling', async () => {
+                    vi.useFakeTimers();
+                    const originalScrollTo = Element.prototype.scrollTo;
+                    const scrollToSpy = vi.fn();
+                    Element.prototype.scrollTo = scrollToSpy;
+
+                    try {
+                        const bareNode1 = { id: 'korn-us', label: 'Korn', type: 'artist' as const };
+                        const bareNode2 = { id: 'deftones-us', label: 'Deftones', type: 'artist' as const };
+                        const namespacedNode1 = { id: 'scene-1::korn-us', canonicalId: 'korn-us', label: 'Korn', type: 'artist' as const };
+                        const namespacedNode2 = { id: 'scene-1::deftones-us', canonicalId: 'deftones-us', label: 'Deftones', type: 'artist' as const };
+
+                        const { rerender } = render(
+                            <DetailsPanel
+                                {...baseProps({
+                                    isMagazineViewOpen: true,
+                                    isSmallScreen: false,
+                                    activeNodes: [bareNode1, bareNode2],
+                                    selectedNode: namespacedNode1,
+                                })}
+                            />
+                        );
+
+                        // First navigation to Deftones
+                        rerender(
+                            <DetailsPanel
+                                {...baseProps({
+                                    isMagazineViewOpen: true,
+                                    isSmallScreen: false,
+                                    activeNodes: [bareNode1, bareNode2],
+                                    selectedNode: namespacedNode2,
+                                })}
+                            />
+                        );
+
+                        act(() => {
+                            vi.advanceTimersByTime(100);
+                        });
+
+                        expect(scrollToSpy).toHaveBeenCalledTimes(1);
+
+                        // User navigates away to Korn
+                        rerender(
+                            <DetailsPanel
+                                {...baseProps({
+                                    isMagazineViewOpen: true,
+                                    isSmallScreen: false,
+                                    activeNodes: [bareNode1, bareNode2],
+                                    selectedNode: namespacedNode1,
+                                })}
+                            />
+                        );
+
+                        act(() => {
+                            vi.advanceTimersByTime(100);
+                        });
+
+                        expect(scrollToSpy).toHaveBeenCalledTimes(2);
+
+                        // User re-clicks Deftones in Scene Circle (repeating same node without closing Zine)
+                        rerender(
+                            <DetailsPanel
+                                {...baseProps({
+                                    isMagazineViewOpen: true,
+                                    isSmallScreen: false,
+                                    activeNodes: [bareNode1, bareNode2],
+                                    selectedNode: namespacedNode2,
+                                })}
+                            />
+                        );
+
+                        act(() => {
+                            vi.advanceTimersByTime(100);
+                        });
+
+                        // Must invoke scrollTo again and NOT be blocked by any lingering latch
+                        expect(scrollToSpy).toHaveBeenCalledTimes(3);
+                        expect(scrollToSpy).toHaveBeenLastCalledWith(
+                            expect.objectContaining({
+                                behavior: 'smooth',
+                            })
+                        );
+                    } finally {
+                        Element.prototype.scrollTo = originalScrollTo;
+                        vi.useRealTimers();
+                    }
+                });
             });
         });
     });
