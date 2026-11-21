@@ -1077,12 +1077,12 @@ export const OVERARCHING_ZINE_SCHEMA = {
     overarchingRationale: {
       type: Type.STRING,
       description:
-        "A rich, 3-to-5 paragraph Master Overarching Zine Editorial in Markdown weaving together these distinct musical movements across eras, genres, geographies, and shared sonic lineage. NEVER use literal technical labels like 'Scene 1' or 'Scene 2' in the narrative prose, and NEVER use em-dashes (—) or long hyphens.",
+        "A rich Master Overarching Zine Editorial in Markdown weaving or contrasting these distinct musical movements across eras, genres, geographies, and sonic ethos. NEVER fabricate historical collaborations, tours, or label ties, NEVER use literal technical labels like 'Scene 1' or 'Scene 2', and NEVER use em-dashes (—) or long hyphens.",
     },
     crossSceneBridges: {
       type: Type.ARRAY,
       description:
-        "2 to 5 high-signal cross-scene connections linking a canonical artist/label in one Scene to a canonical artist/label in another Scene.",
+        "Up to 5 grounded cross-scene connections linking a canonical artist/label in one Scene to a distinct canonical artist/label in another Scene. Return 0 to 2 honest stylistic parallel/contrast bridges (or []) if the scenes have no genuine historical lineage—never fabricate ties.",
       items: {
         type: Type.OBJECT,
         properties: {
@@ -1094,15 +1094,15 @@ export const OVERARCHING_ZINE_SCHEMA = {
             type: Type.STRING,
             enum: ["identity", "sonic_lineage"],
             description:
-              "'identity' if the exact same artist/label appears in both scenes; 'sonic_lineage' if connecting two distinct artists/labels across scenes.",
+              "'identity' if the exact same artist/label appears in both scenes; 'sonic_lineage' if connecting two distinct artists/labels across scenes via verified historical lineage OR honest stylistic parallel/contrast.",
           },
           forwardContext: {
             type: Type.STRING,
-            description: "3-8 word directional predicate from source to target omitting both endpoint names (Rule 26).",
+            description: "3-8 word directional predicate from source to target omitting both endpoint names (Rule 26). Must reflect real lineage or honest stylistic parallel/contrast—never invented collabs or tours.",
           },
           inverseContext: {
             type: Type.STRING,
-            description: "3-8 word directional predicate from target to source omitting both endpoint names (Rule 26).",
+            description: "3-8 word directional predicate from target to source omitting both endpoint names (Rule 26). Must reflect real lineage or honest stylistic parallel/contrast—never invented collabs or tours.",
           },
           weight: { type: Type.NUMBER },
         },
@@ -1177,7 +1177,8 @@ export interface OverarchingQualityAssessment {
 export function assessOverarchingZineQuality(
   rationale: string,
   validAiBridges: CrossSceneLink[],
-  minSonicLineageBridges: number = 3
+  minSonicLineageBridges: number = 2,
+  minBoldEntities: number = 10
 ): OverarchingQualityAssessment {
   const clean = (rationale || "").trim();
   const wordCount = clean ? clean.split(/\s+/).filter(Boolean).length : 0;
@@ -1201,8 +1202,10 @@ export function assessOverarchingZineQuality(
   const reasons: string[] = [];
   if (wordCount < 280) reasons.push(`wordCount=${wordCount} (<280)`);
   if (bulletCount < 3) reasons.push(`bulletCount=${bulletCount} (<3)`);
-  if (boldEntityCount < 10) reasons.push(`boldEntityCount=${boldEntityCount} (<10)`);
-  if (sonicLineageBridgeCount < minSonicLineageBridges) {
+  if (boldEntityCount < minBoldEntities) {
+    reasons.push(`boldEntityCount=${boldEntityCount} (<${minBoldEntities})`);
+  }
+  if (minSonicLineageBridges > 0 && sonicLineageBridgeCount < minSonicLineageBridges) {
     reasons.push(`sonicLineageBridgeCount=${sonicLineageBridgeCount} (<${minSonicLineageBridges})`);
   }
 
@@ -1282,12 +1285,15 @@ export const generateOverarchingZineBackend = async (
   });
 
   let totalEntityCount = 0;
+  const allUniqueBareEntities = new Set<string>();
   const sceneEntityBareSets = sceneSummaries.map((s) => {
     totalEntityCount += s.validArtistAndLabelNodes.length;
     return new Set(
       s.validArtistAndLabelNodes.map((e) => {
         const norm = normalizeCanonicalEntityId(e.canonicalId);
-        return stripCountrySlug(norm) || norm;
+        const bare = stripCountrySlug(norm) || norm;
+        allUniqueBareEntities.add(bare);
+        return bare;
       })
     );
   });
@@ -1301,29 +1307,46 @@ export const generateOverarchingZineBackend = async (
       }
     }
   }
-  const effectiveMinSonicBridges = Math.min(3, distinctCrossScenePairCapacity);
+  // V45.9 Overlap-aware & roster-scaled quality floors:
+  // - Never force fabricated bridges when scenes share 0 deterministic entities (unrelated/clashing scenes).
+  // - When deterministic overlap exists, enforce >= 2 grounded bridges (protecting against coincidental major-label overlap
+  //   while still rejecting sparse 1-bridge Direct Hit regressions and encouraging 3-5 bridges in the prompt).
+  // - Scale bolded entity floor smoothly on sparse/niche rosters while keeping >= 10 on standard rosters.
+  const effectiveMinBoldEntities = Math.min(10, Math.max(4, Math.floor(allUniqueBareEntities.size * 0.5)));
+  const effectiveMinSonicBridges =
+    deterministicBridges.length === 0 ? 0 : Math.min(2, distinctCrossScenePairCapacity);
+  const wordTargetRange = scenes.length >= 4 ? "360 to 540" : "320 to 450";
+  const blockStructureGuidance =
+    scenes.length >= 4
+      ? "5 to 6 semantic blocks (4 to 5 narrative paragraphs followed by the final closing bullet block)"
+      : "4 semantic blocks for 2-scene boards (or 4 to 5 blocks for 3-scene boards)";
+  const boldTargetCount = Math.min(12, Math.max(effectiveMinBoldEntities + 2, 6));
 
-  const systemInstruction = `You are a late-night record curator — the kind of person who pulls an obscure 7" from a crate at 2am and traces how separate musical movements, eras, and scenes secretly wire into one another.
-Your task is to write the Overarching Zine Editorial (Master Multi-Scene Synthesis) for a multi-scene Zcene board containing ${scenes.length} distinct Scenes, AND identify 3 to 5 NEW high-signal 'sonic_lineage' cross-scene bridges linking DISTINCT artists or record labels across different Scenes.
+  const systemInstruction = `You are a late-night record curator — the kind of person who pulls an obscure 7" from a crate at 2am and illuminates how separate musical movements, eras, and scenes either connect through shared lineage or illuminate each other through sharp contrast.
+Your task is to write the Overarching Zine Editorial (Master Multi-Scene Synthesis) for a multi-scene Zcene board containing ${scenes.length} distinct Scenes, AND identify up to 5 grounded 'sonic_lineage' cross-scene bridges linking DISTINCT artists or record labels across different Scenes (aiming for 3 to 5 when genuine historical lineage exists, or 0 to 2 honest stylistic parallels/contrasts—or []—if the movements are historically unrelated).
+
+FACTUAL RESTRAINT & ANTI-FABRICATION (NON-NEGOTIABLE):
+- NEVER fabricate collaborations, tours, shared band members, record label signings, or direct historical influence between artists or scenes that did not actually interact.
+- ONLY cite artists and record labels that appear in the provided scene rosters (plus accurate genres, cities, eras, and movements).
+- If two scenes come from unrelated eras, geographies, or genres with zero historical overlap, NEVER force a fictional lineage. Instead, frame the editorial honestly through aesthetic contrast, sonic polarity, parallel DIY/independent ethos, or opposing cultural philosophies.
 
 FORMATTING & EDITORIAL RULES (Rule 24 & Rule 44 — non-negotiable):
-- LENGTH & 3-COLUMN MAGAZINE RHYTHM: Write 320 to 450 words in Markdown for 'overarchingRationale', structured as 4 semantic blocks for 2-scene boards (or 4 to 5 blocks for 3+ scenes) so Zcene's 3-column print layout balances evenly:
-  1. Block 1 (Paragraph 1): Hook and foundational movement arc establishing the opening constellation's ethos, geography, and underground imprint infrastructure.
-  2. Block 2 (Paragraph 2): Cross-scene pivot tracing the bridging artists, shared labels, and structural evolution between movements.
-  3. Block 3 (Paragraph 3, plus an optional 4th narrative paragraph on 3+ scene boards): The arrival/transformation chapter showing how the subsequent constellation(s) absorb, mutate, or push the lineage into new sonic territory.
-  4. Final Block (Closing Synthesis + 3 Bullets): A concise 1-sentence colon lead-in followed immediately (no blank line before bullets) by exactly 3 punchy Markdown bullet points ('* ...') distilling the shared label infrastructure, international/peer ripples, and overarching musical lineage.
-- ENTITY COVERAGE FLOOR: **Bold** at least 12 distinct artists, record labels, genres, and movements on first mention across ALL scenes (including secondary peers and key independent record labels from the provided rosters, not just the root artists).
-- Treat every Scene constellation as an integral chapter of a larger musical story: explain how the musical foundation of one movement evolves into, contrasts with, or cross-pollinates the other movements across eras, geographies, and sonic lineages.
-- NEGATIVE CONSTRAINT: NEVER use literal technical or UI labels such as "Scene 1", "Scene 2", "Scene 3", "Scene N", or temporary tab names in the narrative prose. Instead, refer to each constellation organically by its flagship seed artists, genres, regional undergrounds, and eras (e.g., "the East Bay punk explosion", "the Bakersfield Nu Metal vanguard", "Oxford's cerebral alternative movement"). The narrative prose must read as timeless music journalism even if a user renames their scene tabs later.
+- LENGTH & 3-COLUMN MAGAZINE RHYTHM: Write ${wordTargetRange} words in Markdown for 'overarchingRationale', structured as ${blockStructureGuidance} so Zcene's 3-column print layout balances evenly:
+  1. Block 1 (Paragraph 1): Hook and foundational movement arc establishing the opening constellation's ethos, geography, and imprint infrastructure.
+  2. Block 2 (Paragraph 2): Cross-scene pivot—either tracing real bridging artists, shared labels, and structural evolution where scenes intersect, OR articulating the stark sonic/cultural contrast where distant scenes diverge.
+  3. Block 3 (Paragraph 3, plus optional additional narrative paragraph(s) on 3+ scene boards): The counterpart/transformation chapter exploring how the subsequent constellation(s) either absorb and mutate the lineage or represent an opposing sonic pole.
+  4. Final Block (Closing Synthesis + 3 Bullets): A concise 1-sentence colon lead-in followed immediately (no blank line before bullets) by exactly 3 punchy Markdown bullet points ('* ...') distilling the label infrastructure, key artist peers, and overarching lineage or comparative contrast across the board.
+- ENTITY COVERAGE FLOOR: **Bold** at least ${boldTargetCount} distinct artists, record labels, genres, and movements on first mention across ALL scenes (drawing from secondary peers and independent labels in the provided rosters, not just the root artists).
+- NEGATIVE CONSTRAINT: NEVER use literal technical or UI labels such as "Scene 1", "Scene 2", "Scene 3", "Scene N", or temporary tab names in the narrative prose. Instead, refer to each constellation organically by its flagship seed artists, genres, regional undergrounds, and eras (e.g., "the East Bay punk explosion", "the Bakersfield Nu Metal vanguard", "Oxford's cerebral alternative movement").
 - NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation (commas, colons, or semicolons).
-- CROSS-SCENE BRIDGES QUOTA (CRITICAL): Deterministic 'identity' bridges (exact same artist/label appearing in both scenes) are ALREADY computed automatically and listed below. Do NOT waste your bridge slots repeating those identity pairs. You MUST return 3 to 5 NEW 'sonic_lineage' bridges where 'sourceCanonicalId' !== 'targetCanonicalId' and 'sourceSceneId' !== 'targetSceneId', referencing exact IDs from the provided scene rosters.
-- Each bridge's 'forwardContext' and 'inverseContext' MUST be a concise 3-to-8 word directional verb/prepositional predicate phrase OMITTING both endpoint names (Rule 26), e.g., "passed the melodic post-hardcore torch to" / "inherited the melodic post-hardcore blueprint from". Never output generic "is connected to".`;
+- CROSS-SCENE BRIDGES (GROUNDED & NON-DUPLICATIVE): Deterministic 'identity' bridges (exact same artist/label appearing in both scenes) are ALREADY computed automatically and listed below. Do NOT repeat those identity pairs. Return up to 5 NEW 'sonic_lineage' bridges where 'sourceCanonicalId' !== 'targetCanonicalId' and 'sourceSceneId' !== 'targetSceneId', referencing exact IDs from the provided rosters. Aim for 3 to 5 strong lineage bridges when scenes share real history; when scenes are historically unrelated, ONLY include honest stylistic parallel/contrast bridges (or return [] rather than inventing history).
+- Each bridge's 'forwardContext' and 'inverseContext' MUST be a concise 3-to-8 word directional verb/prepositional predicate phrase OMITTING both endpoint names (Rule 26)—using real lineage phrasing when historically true (e.g., "passed the melodic post-hardcore torch to" / "inherited the melodic post-hardcore blueprint from") OR honest contrast/parallel phrasing when scenes are unrelated (e.g., "contrasts warm analog soul devotion against" / "counters raw Nordic extremity with"). Never output generic "is connected to".`;
 
   const prompt = `Synthesize the Overarching Zine Editorial and Cross-Scene Bridges across these ${scenes.length} Scenes:
 
 ${JSON.stringify(sceneSummaries, null, 2)}
 
-Deterministic Shared-Entity Bridges Already Detected (already wired — do NOT repeat these pairs; return 3 to 5 NEW distinct 'sonic_lineage' bridges):
+Deterministic Shared-Entity Bridges Already Detected (already wired — do NOT repeat these pairs; return up to 5 grounded distinct 'sonic_lineage' bridges, or [] if the scenes are historically unrelated):
 ${JSON.stringify(
   deterministicBridges.map((b) => ({
     sourceSceneId: b.sourceSceneId,
@@ -1464,26 +1487,33 @@ ${JSON.stringify(
   let cleanRationale = sanitizeOverarchingRationale(rawResult?.overarchingRationale || "", scenes);
   let validAiBridges = buildValidAiBridges(rawResult?.crossSceneBridges);
 
-  // V45.8 Deterministic Quality Gate & Bounded Single Corrective Retry:
-  // Only engage retry when the multi-scene roster has enough distinct entities to satisfy the rubric.
+  // V45.8 / V45.9 Deterministic Quality Gate & Bounded Single Corrective Retry:
+  // Enforces editorial parity (length, 3-column bullet rhythm, roster-scaled bold entities)
+  // and overlap-aware bridge floors without ever pressuring fabricated history on unrelated scenes.
   if (rawResult && totalEntityCount >= 8 && distinctCrossScenePairCapacity >= 3) {
     const attempt1Assessment = assessOverarchingZineQuality(
       cleanRationale,
       validAiBridges,
-      effectiveMinSonicBridges
+      effectiveMinSonicBridges,
+      effectiveMinBoldEntities
     );
     if (!attempt1Assessment.passed) {
       console.warn(
         `[generateOverarchingZineBackend] Quality gate triggered single corrective retry (${attempt1Assessment.reasons.join(", ")}).`
       );
+      const bridgeRepairLine =
+        effectiveMinSonicBridges > 0
+          ? `- Return ${effectiveMinSonicBridges} to 5 NEW grounded 'sonic_lineage' bridges linking DISTINCT entities across different scenes (sourceCanonicalId !== targetCanonicalId; do NOT repeat already-detected identity bridges).`
+          : `- Keep 'crossSceneBridges' strictly grounded (0 to 2 honest stylistic parallel/contrast bridges, or [] if the scenes are historically unrelated).`;
       const repairPrompt = `${prompt}
 
 QUALITY GATE CORRECTION REQUIRED (Attempt 2):
 Your previous draft did not meet Zcene's editorial parity floor because: ${attempt1Assessment.reasons.join("; ")}.
-Please produce a complete, upgraded replacement that fixes EVERY failed criterion:
-- Ensure 'overarchingRationale' is 320 to 450 words (strictly >= 280 words) with 4 semantic blocks (4 to 5 for 3+ scenes), ending with a 1-sentence colon lead-in followed immediately by 3 Markdown bullets ('* ...').
-- Bold at least 12 distinct artists, record labels, genres, and movements across ALL scenes (including secondary peers and independent labels).
-- Return 3 to 5 NEW 'sonic_lineage' bridges linking DISTINCT entities across different scenes (sourceCanonicalId !== targetCanonicalId; do NOT repeat already-detected identity bridges).`;
+Please produce a complete, upgraded replacement that fixes the failed structural/parity criteria WITHOUT inventing facts:
+- Ensure 'overarchingRationale' is ${wordTargetRange} words (strictly >= 280 words) with ${blockStructureGuidance}, ending with a 1-sentence colon lead-in followed immediately by 3 Markdown bullets ('* ...').
+- Bold at least ${boldTargetCount} distinct artists, record labels, genres, and movements drawn strictly from the provided rosters across ALL scenes.
+${bridgeRepairLine}
+- ANTI-FABRICATION RULE: NEVER invent collaborations, tours, shared members, label ties, or historical influence. If scenes are historically unrelated, expand through rich comparative contrast of their real rosters, eras, and sonic ethos.`;
 
       try {
         const retryResult = await executeOverarchingSynthesis(
@@ -1498,12 +1528,13 @@ Please produce a complete, upgraded replacement that fixes EVERY failed criterio
           const attempt2Assessment = assessOverarchingZineQuality(
             retryRationale,
             retryBridges,
-            effectiveMinSonicBridges
+            effectiveMinSonicBridges,
+            effectiveMinBoldEntities
           );
 
           const scoreCandidate = (a: OverarchingQualityAssessment): [number, number, number] => [
             4 - a.reasons.length,
-            a.sonicLineageBridgeCount,
+            effectiveMinSonicBridges > 0 ? a.sonicLineageBridgeCount : 0,
             a.wordCount,
           ];
           const [c1, b1, w1] = scoreCandidate(attempt1Assessment);

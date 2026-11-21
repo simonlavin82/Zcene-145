@@ -265,6 +265,7 @@ const tokenEconomy_1 = require("../shared/tokenEconomy");
             { id: 'mogwai-gb', label: 'Mogwai', type: 'artist' },
             { id: 'slint-us', label: 'Slint', type: 'artist' },
             { id: 'tortoise-us', label: 'Tortoise', type: 'artist' },
+            { id: 'chemikal-underground', label: 'Chemikal Underground', type: 'label' },
             { id: 'rock-action', label: 'Rock Action', type: 'label' },
             { id: 'fatcat', label: 'FatCat', type: 'label' },
         ]);
@@ -361,6 +362,152 @@ const tokenEconomy_1 = require("../shared/tokenEconomy");
         (0, vitest_1.expect)(mockGenerateContent).toHaveBeenCalledTimes(2);
         (0, vitest_1.expect)(resFallback.overarchingRationale).toBe('Retained attempt 1 connecting **Spare Snare** and **Mogwai**.');
         (0, vitest_1.expect)(resFallback.crossSceneLinks.filter((l) => l.bridgeType === 'sonic_lineage')).toHaveLength(1);
+    });
+    (0, vitest_1.it)('passes unrelated 1960s Soul vs 1990s Norwegian Black Metal editorial with 0 bridges on Attempt 1 with zero corrective retry (V45.9)', async () => {
+        const buildScene = (idx, seed, nodes) => ({
+            ...(0, multiSceneUtils_1.createEmptyProjectScene)(idx, seed),
+            seedIds: [nodes[0].id],
+            status: 'ready',
+            synthesisRationale: `${seed} scene editorial overview.`,
+            graphData: {
+                nodes: nodes.map((n, i) => ({ ...n, group: i === 0 ? 1 : 2, isSeed: i === 0 })),
+                links: [],
+            },
+        });
+        const soulScene = buildScene(0, 'Otis Redding', [
+            { id: 'otis-redding-us', label: 'Otis Redding', type: 'artist' },
+            { id: 'sam-and-dave-us', label: 'Sam & Dave', type: 'artist' },
+            { id: 'booker-t-and-the-mgs-us', label: 'Booker T. & the M.G.\'s', type: 'artist' },
+            { id: 'carla-thomas-us', label: 'Carla Thomas', type: 'artist' },
+            { id: 'stax-records', label: 'Stax Records', type: 'label' },
+            { id: 'volt-records', label: 'Volt Records', type: 'label' },
+        ]);
+        const blackMetalScene = buildScene(1, 'Mayhem', [
+            { id: 'mayhem-no', label: 'Mayhem', type: 'artist' },
+            { id: 'darkthrone-no', label: 'Darkthrone', type: 'artist' },
+            { id: 'emperor-no', label: 'Emperor', type: 'artist' },
+            { id: 'immortal-no', label: 'Immortal', type: 'artist' },
+            { id: 'deathlike-silence-productions', label: 'Deathlike Silence Productions', type: 'label' },
+            { id: 'peaceville-records', label: 'Peaceville Records', type: 'label' },
+        ]);
+        const honestContrastRationale = 'Across three decades and an ocean of aesthetic distance, 1960s Memphis **Southern Soul** and 1990s **Norwegian Black Metal** share zero historical lineage, yet placing them side by side exposes two radical, uncompromising poles of regional music making. In Tennessee, **Otis Redding** and the house rhythm section **Booker T. & the M.G.\'s** turned **Stax Records** and sister imprint **Volt Records** into warm, sweat-soaked laboratories of communal groove, where **Sam & Dave** and **Carla Thomas** recorded live in an old movie theater with zero regard for glossy pop symmetry.\n\n' +
+            'Rather than tracing a fictional bridge where none exists, the true fascination lies in the stark sonic polarity between these two worlds. Where Memphis thrived on brass-driven catharsis, open-room warmth, and direct emotional generosity, Oslo and Bergen retreated into winter isolation, tape hiss, and deliberate alienation. Both movements rejected slick corporate polish in favor of hyper-local studios and fiercely independent distribution, proving that total artistic conviction can emerge from opposite emotional temperatures.\n\n' +
+            'In the frozen fjords of the early 1990s, **Mayhem** and **Darkthrone** dismantled heavy metal conventions through frostbitten tremolo picking and austere four-track fidelity. Alongside symphonic innovators **Emperor** and relentless peers **Immortal**, this underground crystallized around micro-imprints like **Deathlike Silence Productions** and UK allies **Peaceville Records**, weaponizing raw atmosphere to build a self-contained extreme-music subculture.\n\n' +
+            'Viewing these two unrelated constellations together highlights three enduring contrasts in underground music:\n' +
+            '* **Stax Records** and **Deathlike Silence Productions** both proved that small, fiercely regional labels can define an entire global genre without major-label interference.\n' +
+            '* Warm analog soul devotion led by **Otis Redding** stands in total sonic polarity to the austere, dissonant extremity of **Mayhem** and **Darkthrone**.\n' +
+            '* Both scenes demonstrate that geographic isolation and raw studio limitations forge timeless, unmistakable musical identities.';
+        mockGenerateContent.mockResolvedValueOnce({
+            text: JSON.stringify({
+                overarchingRationale: honestContrastRationale,
+                crossSceneBridges: [],
+            }),
+            usageMetadata: { promptTokenCount: 1100, candidatesTokenCount: 520, totalTokenCount: 1620 },
+        });
+        const res = await (0, curatorService_1.generateOverarchingZineBackend)([soulScene, blackMetalScene], {});
+        // Zero deterministic overlap -> effectiveMinSonicBridges = 0 -> passes Attempt 1 with ZERO retry!
+        (0, vitest_1.expect)(mockGenerateContent).toHaveBeenCalledTimes(1);
+        (0, vitest_1.expect)(res.crossSceneLinks).toEqual([]);
+        (0, vitest_1.expect)(res.overarchingRationale).toContain('**Otis Redding**');
+        (0, vitest_1.expect)(res.overarchingRationale).toContain('**Mayhem**');
+    });
+    (0, vitest_1.it)('scales boldEntityCount floor dynamically for sparse rosters via assessOverarchingZineQuality while keeping word & bullet floors (V45.9)', () => {
+        const sparseRosterRichEditorial = Array.from({ length: 4 }, (_, i) => `Block ${i + 1} explores how **Band Alpha**, **Band Beta**, and **Label One** carved out a stark underground aesthetic in the late eighties, while **Band Gamma**, **Band Delta**, and **Label Two** pursued a contrasting melodic path across regional tape networks, building independent communities from scratch through basement gigs, photocopied sleeves, hand-dubbed cassettes, and relentless regional touring without chasing commercial radio airplay or major label distribution deals across their formative years.`).join('\n\n') +
+            '\n\nThree parallel dynamics stand out across both movements:\n' +
+            '* **Label One** and **Label Two** sustained local scenes through small-run physical pressings.\n' +
+            '* **Band Alpha** and **Band Gamma** anchored distinct regional styles with uncompromising focus.\n' +
+            '* **Band Beta** and **Band Delta** expanded each scene\'s vocabulary without sacrificing DIY autonomy.';
+        // 6 unique bold entities: fails default minBoldEntities=10, passes dynamic sparse floor minBoldEntities=5
+        const defaultCheck = (0, curatorService_1.assessOverarchingZineQuality)(sparseRosterRichEditorial, [], 0);
+        (0, vitest_1.expect)(defaultCheck.passed).toBe(false);
+        (0, vitest_1.expect)(defaultCheck.boldEntityCount).toBe(6);
+        (0, vitest_1.expect)(defaultCheck.reasons).toEqual(['boldEntityCount=6 (<10)']);
+        const sparseCheck = (0, curatorService_1.assessOverarchingZineQuality)(sparseRosterRichEditorial, [], 0, 5);
+        (0, vitest_1.expect)(sparseCheck.passed).toBe(true);
+        (0, vitest_1.expect)(sparseCheck.reasons).toEqual([]);
+        // Still rejects < 280 words or < 3 bullets even with minBoldEntities=5 and minSonicLineageBridges=0
+        const tooShortCheck = (0, curatorService_1.assessOverarchingZineQuality)('**Band Alpha**, **Band Beta**, **Label One**, **Band Gamma**, **Band Delta**, **Label Two** short text.', [], 0, 5);
+        (0, vitest_1.expect)(tooShortCheck.passed).toBe(false);
+        (0, vitest_1.expect)(tooShortCheck.reasons.some((r) => r.startsWith('wordCount='))).toBe(true);
+        (0, vitest_1.expect)(tooShortCheck.reasons.some((r) => r.startsWith('bulletCount='))).toBe(true);
+    });
+    (0, vitest_1.it)('does not reward fabricated bridges in scoreCandidate tie-breaker when scenes have zero deterministic overlap (V45.9)', async () => {
+        const buildScene = (idx, seed, nodes) => ({
+            ...(0, multiSceneUtils_1.createEmptyProjectScene)(idx, seed),
+            seedIds: [nodes[0].id],
+            status: 'ready',
+            synthesisRationale: `${seed} scene editorial overview.`,
+            graphData: {
+                nodes: nodes.map((n, i) => ({ ...n, group: i === 0 ? 1 : 2, isSeed: i === 0 })),
+                links: [],
+            },
+        });
+        const sceneA = buildScene(0, 'Otis Redding', [
+            { id: 'otis-redding-us', label: 'Otis Redding', type: 'artist' },
+            { id: 'sam-and-dave-us', label: 'Sam & Dave', type: 'artist' },
+            { id: 'carla-thomas-us', label: 'Carla Thomas', type: 'artist' },
+            { id: 'stax-records', label: 'Stax Records', type: 'label' },
+        ]);
+        const sceneB = buildScene(1, 'Mayhem', [
+            { id: 'mayhem-no', label: 'Mayhem', type: 'artist' },
+            { id: 'darkthrone-no', label: 'Darkthrone', type: 'artist' },
+            { id: 'emperor-no', label: 'Emperor', type: 'artist' },
+            { id: 'deathlike-silence-productions', label: 'Deathlike Silence Productions', type: 'label' },
+        ]);
+        // Both Attempt 1 and Attempt 2 miss ONLY bulletCount (<3); Attempt 1 has 0 bridges & 315 words,
+        // while Attempt 2 has 305 words + 3 fabricated bridges. Attempt 1 MUST win!
+        const makeNoBulletEditorial = (extraWords) => `In Memphis, **Otis Redding**, **Sam & Dave**, **Carla Thomas**, and **Stax Records** built **Southern Soul**, while in Norway **Mayhem**, **Darkthrone**, **Emperor**, and **Deathlike Silence Productions** forged **Norwegian Black Metal**. ` +
+            Array.from({ length: extraWords }, (_, i) => `word${i}`).join(' ');
+        mockGenerateContent
+            .mockResolvedValueOnce({
+            text: JSON.stringify({
+                overarchingRationale: makeNoBulletEditorial(295),
+                crossSceneBridges: [],
+            }),
+            usageMetadata: { promptTokenCount: 900, candidatesTokenCount: 400, totalTokenCount: 1300 },
+        })
+            .mockResolvedValueOnce({
+            text: JSON.stringify({
+                overarchingRationale: makeNoBulletEditorial(280),
+                crossSceneBridges: [
+                    {
+                        sourceSceneId: 'scene-1',
+                        sourceCanonicalId: 'otis-redding-us',
+                        targetSceneId: 'scene-2',
+                        targetCanonicalId: 'mayhem-no',
+                        bridgeType: 'sonic_lineage',
+                        forwardContext: 'contrasts warm analog soul devotion against',
+                        inverseContext: 'counters raw Nordic extremity with',
+                        weight: 0.7,
+                    },
+                    {
+                        sourceSceneId: 'scene-1',
+                        sourceCanonicalId: 'stax-records',
+                        targetSceneId: 'scene-2',
+                        targetCanonicalId: 'deathlike-silence-productions',
+                        bridgeType: 'sonic_lineage',
+                        forwardContext: 'parallels fierce regional label independence with',
+                        inverseContext: 'parallels fierce regional label independence with',
+                        weight: 0.7,
+                    },
+                    {
+                        sourceSceneId: 'scene-1',
+                        sourceCanonicalId: 'sam-and-dave-us',
+                        targetSceneId: 'scene-2',
+                        targetCanonicalId: 'darkthrone-no',
+                        bridgeType: 'sonic_lineage',
+                        forwardContext: 'stands in stark sonic polarity to',
+                        inverseContext: 'stands in stark sonic polarity to',
+                        weight: 0.65,
+                    },
+                ],
+            }),
+            usageMetadata: { promptTokenCount: 1000, candidatesTokenCount: 450, totalTokenCount: 1450 },
+        });
+        const res = await (0, curatorService_1.generateOverarchingZineBackend)([sceneA, sceneB], {});
+        (0, vitest_1.expect)(mockGenerateContent).toHaveBeenCalledTimes(2);
+        // Attempt 1 retained (0 bridges, higher word count) rather than rewarding Attempt 2's 3 bridges!
+        (0, vitest_1.expect)(res.crossSceneLinks).toEqual([]);
     });
     (0, vitest_1.it)('injects full input parity via ISO-stripped artistSnippets lookup and 2400-char sceneEditorialSummary (V45.8)', async () => {
         const longRationale = 'A'.repeat(1800) + ' DISTINCTIVE_TAIL_MARKER_1850';
