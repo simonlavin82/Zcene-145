@@ -103,23 +103,53 @@ Checkbox.displayName = 'Checkbox';
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: 'primary' | 'secondary' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'pill';
+  size?: 'sm' | 'md' | 'toolbar' | 'pill';
+  /** Applies -4px optical edge trim on the icon side to offset glyph side-bearings (default: 'none'). */
+  iconPosition?: 'none' | 'left' | 'right';
   fullWidth?: boolean;
 }
+
+export const ButtonOpticalPadding: Record<
+  NonNullable<ButtonProps['size']>,
+  Record<NonNullable<ButtonProps['iconPosition']>, string>
+> = {
+  sm: {
+    none: 'px-3 gap-1.5',
+    left: 'pl-2.5 pr-3 gap-1.5',
+    right: 'pl-3 pr-2.5 gap-1.5',
+  },
+  md: {
+    none: 'px-6 gap-2',
+    left: 'pl-5 pr-6 gap-2',
+    right: 'pl-6 pr-5 gap-2',
+  },
+  toolbar: {
+    none: 'px-4 gap-1.5',
+    left: 'pl-3 pr-4 gap-1.5',
+    right: 'pl-4 pr-3 gap-1.5',
+  },
+  pill: {
+    none: 'px-4 gap-1.5',
+    left: 'pl-3 pr-4 gap-1.5',
+    right: 'pl-4 pr-3 gap-1.5',
+  },
+};
 
 export const Button: React.FC<ButtonProps> = ({
   variant = 'primary',
   size = 'md',
+  iconPosition = 'none',
   fullWidth = false,
   className = '',
   children,
   ...props
 }) => {
-  const base = 'font-medium transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 active:scale-95 shrink-0 leading-none';
+  const base = 'font-medium transition-all flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 active:scale-95 shrink-0 leading-none';
   const sizes: Record<NonNullable<ButtonProps['size']>, string> = {
-    sm: 'px-3 py-1.5 text-xs rounded-xl',
-    md: 'px-6 py-2 text-sm rounded-xl',
-    pill: 'px-4 py-1.5 text-xs rounded-full',
+    sm: 'py-1.5 text-xs rounded-xl',
+    md: 'py-2 text-sm rounded-xl',
+    toolbar: 'h-10 text-sm rounded-xl',
+    pill: 'py-1.5 text-xs rounded-full',
   };
   const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
     primary: 'bg-white text-brand-black hover:opacity-90',
@@ -129,7 +159,7 @@ export const Button: React.FC<ButtonProps> = ({
   };
   return (
     <button
-      className={`${base} ${sizes[size]} ${variants[variant]}${fullWidth ? ' w-full' : ''}${className ? ` ${className}` : ''}`}
+      className={`${base} ${sizes[size]} ${ButtonOpticalPadding[size][iconPosition]} ${variants[variant]}${fullWidth ? ' w-full' : ''}${className ? ` ${className}` : ''}`}
       {...props}
     >
       {children}
@@ -2074,6 +2104,35 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <p className="text-xs text-zinc-400 leading-relaxed">
                                         On mobile viewports, prefer the **Large** variant for primary actions to ensure a comfortable touch target (&gt;44px). Standard buttons should be used sparingly in dense mobile layouts.
                                     </p>
+                                </div>
+                            </div>
+
+                            {/* Toolbar Buttons & Optical Icon Padding */}
+                            <div className="p-8 bg-zinc-900/30 rounded-xl border border-zinc-800 space-y-6">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-800 pb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Toolbar Buttons &amp; Optical Icon Padding</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Height: h-10 (40px Input Parity)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Leading Icon: pl-3 pr-4 gap-1.5</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Trailing Icon: pl-4 pr-3 gap-1.5</span>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-zinc-400 max-w-3xl leading-relaxed">
+                                    Buttons sitting alongside <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">InputSizes.md</code> search inputs or <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">&lt;Select variant="md" /&gt;</code> dropdowns use <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">size="toolbar"</code> (<code className="text-zinc-300">h-10</code>) for exact baseline alignment. Because open-stroke icons (<code className="text-zinc-300">check</code>, <code className="text-zinc-300">edit</code>, <code className="text-zinc-300">close</code>) carry internal em-box side-bearing, pass <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">iconPosition="left"</code> or <code className="text-primary bg-zinc-950 px-1 py-0.5 rounded">"right"</code> to trim 4px from the icon edge. Mode toggles (<code className="text-zinc-300">Edit</code> / <code className="text-zinc-300">Done</code>) omit numeric badges and apply <code className="text-zinc-300">-ml-0.5</code> on the leading glyph when centered inside fixed-width mobile buttons (<code className="text-zinc-300">w-[88px]</code>).
+                                </p>
+                                <div className="flex flex-wrap items-center gap-3 bg-zinc-950 p-5 rounded-xl border border-zinc-800">
+                                    <Button variant="secondary" size="toolbar" iconPosition="left" className="min-w-[88px]">
+                                        <span className="material-symbols-outlined !text-[18px] -ml-0.5">edit</span>
+                                        <span>Edit</span>
+                                    </Button>
+                                    <Button variant="secondary" size="toolbar" iconPosition="left" className="min-w-[88px] !border-primary/70 !text-primary !bg-primary/10">
+                                        <span className="material-symbols-outlined !text-[18px] -ml-0.5">check</span>
+                                        <span>Done</span>
+                                    </Button>
+                                    <Button variant="primary" size="toolbar" iconPosition="right">
+                                        <span>Close</span>
+                                        <span className="material-symbols-outlined !text-[18px]">close</span>
+                                    </Button>
                                 </div>
                             </div>
 

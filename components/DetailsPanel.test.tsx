@@ -1550,10 +1550,8 @@ describe('DetailsPanel', () => {
             const editToggleBtn = screen.getByTestId('zine-edit-toggle-btn');
             const closeBtn = screen.getByTitle('Close Zine View');
             expect(editToggleBtn).toHaveTextContent('Edit');
-            expect(editToggleBtn).toHaveClass('h-9');
-            expect(editToggleBtn).toHaveClass('!px-5');
-            expect(closeBtn).toHaveClass('h-9');
-            expect(closeBtn).toHaveClass('!px-5');
+            expect(editToggleBtn).toHaveClass('h-10', 'pl-3', 'pr-4', 'gap-1.5');
+            expect(closeBtn).toHaveClass('h-10', 'pl-4', 'pr-3', 'gap-1.5');
             expect(screen.queryByTestId('zine-editorial-grid-overarching')).not.toBeInTheDocument();
             expect(screen.queryByText('+ Add Image URL')).not.toBeInTheDocument();
             expect(container.querySelector('.columns-1.md\\:columns-2.lg\\:columns-3')).toBeInTheDocument();
@@ -2191,10 +2189,10 @@ describe('DetailsPanel', () => {
                 });
             });
 
-            describe('Contextual Indicator Badge & 1-Click Search Chip Actions', () => {
-                it('displays the un-illustrated section badge on [ ✎ Edit (N) ], hides in Edit Mode, and hides when images are curated', () => {
+            describe('Toolbar Sizing, Optical Icon Padding & 1-Click Search Chip Actions', () => {
+                it('omits numeric badges on [ ✎ Edit ] / [ ✓ Done ] and applies Design System toolbar height & optical icon padding on desktop', () => {
                     const singleSceneCopy = "Chicago hardcore pioneers **Harm's Way** built mechanical juggernauts.";
-                    const { rerender } = render(
+                    render(
                         <DetailsPanel
                             {...baseProps({
                                 scenes: [{
@@ -2209,38 +2207,24 @@ describe('DetailsPanel', () => {
                         />
                     );
 
-                    // In reading mode with 0 curated images, badge displays 1
-                    const badge = screen.getByTestId('zine-edit-suggestion-badge');
-                    expect(badge).toBeInTheDocument();
-                    expect(badge).toHaveTextContent('1');
-                    expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveClass('h-9');
-                    expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveClass('!px-5');
-
-                    // Enter edit mode -> badge hides and button shows 'Done'
-                    fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+                    const editBtn = screen.getByTestId('zine-edit-toggle-btn');
                     expect(screen.queryByTestId('zine-edit-suggestion-badge')).not.toBeInTheDocument();
-                    expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveTextContent('Done');
+                    expect(editBtn).toHaveClass('h-10', 'pl-3', 'pr-4', 'gap-1.5', 'min-w-[88px]');
+                    expect(editBtn.querySelector('.material-symbols-outlined')).toHaveClass('-ml-0.5');
+                    expect(editBtn).toHaveTextContent('Edit');
 
-                    // Exit edit mode and rerender with a curated image
-                    fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
-                    rerender(
-                        <DetailsPanel
-                            {...baseProps({
-                                scenes: [{
-                                    id: 'scene-1',
-                                    sceneId: 'scene-1',
-                                    title: "Harm's Way",
-                                    synthesisRationale: singleSceneCopy,
-                                    zineImages: ['https://example.com/harms-way.jpg'],
-                                }],
-                                overarchingRationale: undefined,
-                            })}
-                        />
-                    );
+                    // Close button shares h-10 toolbar parity with trailing icon optical trim
+                    const closeBtn = screen.getByTitle('Close Zine View');
+                    expect(closeBtn).toHaveClass('h-10', 'pl-4', 'pr-3', 'gap-1.5');
+
+                    // Enter edit mode -> button shows 'Done' cleanly with no badge
+                    fireEvent.click(editBtn);
                     expect(screen.queryByTestId('zine-edit-suggestion-badge')).not.toBeInTheDocument();
+                    expect(editBtn).toHaveTextContent('Done');
+                    expect(editBtn.querySelector('.material-symbols-outlined')).toHaveClass('-ml-0.5');
                 });
 
-                it('calculates un-illustrated sections count across multi-scene overarching and scene sections', () => {
+                it('keeps Zine Edit toggle free of numeric badges across multi-scene overarching and scene sections', () => {
                     render(
                         <DetailsPanel
                             {...baseProps({
@@ -2266,10 +2250,8 @@ describe('DetailsPanel', () => {
                         />
                     );
 
-                    // Overarching + Scene 1 + Scene 2 = 3 un-illustrated sections
-                    const badge = screen.getByTestId('zine-edit-suggestion-badge');
-                    expect(badge).toBeInTheDocument();
-                    expect(badge).toHaveTextContent('3');
+                    expect(screen.queryByTestId('zine-edit-suggestion-badge')).not.toBeInTheDocument();
+                    expect(screen.getByTestId('zine-edit-toggle-btn')).toHaveTextContent('Edit');
                 });
 
                 it('launches Google Images udm=2, opens URL editor, and pre-fills editable caption upon chip click', () => {
@@ -3431,17 +3413,21 @@ describe('DetailsPanel', () => {
                 ...overrides,
             });
 
-            it('maintains a stable w-[88px] width on mobile Edit/Done button across toggle states', () => {
+            it('maintains a stable w-[88px] width, h-10 toolbar parity, optical icon padding, and zero badge on mobile Edit/Done toggle', () => {
                 render(<DetailsPanel {...baseProps()} />);
 
                 const mobileEditBtn = screen.getByTestId('zine-edit-toggle-btn-mobile');
                 expect(mobileEditBtn).toBeInTheDocument();
-                expect(mobileEditBtn.className).toContain('w-[88px]');
+                expect(mobileEditBtn).toHaveClass('w-[88px]', 'h-10', 'pl-3', 'pr-4', 'gap-1.5');
+                expect(mobileEditBtn.querySelector('.material-symbols-outlined')).toHaveClass('-ml-0.5');
+                expect(screen.queryByTestId('zine-edit-suggestion-badge')).not.toBeInTheDocument();
                 expect(mobileEditBtn).toHaveTextContent('Edit');
 
                 // Toggle to Done state
                 fireEvent.click(mobileEditBtn);
-                expect(mobileEditBtn.className).toContain('w-[88px]');
+                expect(mobileEditBtn).toHaveClass('w-[88px]', 'h-10', 'pl-3', 'pr-4', 'gap-1.5');
+                expect(mobileEditBtn.querySelector('.material-symbols-outlined')).toHaveClass('-ml-0.5');
+                expect(screen.queryByTestId('zine-edit-suggestion-badge')).not.toBeInTheDocument();
                 expect(mobileEditBtn).toHaveTextContent('Done');
             });
 

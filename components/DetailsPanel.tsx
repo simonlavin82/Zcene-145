@@ -4450,43 +4450,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         return Array.from(nodeMap.values());
     }, [activeNodes, graphData?.nodes, scenes]);
 
-    const unillustratedSectionsCount = useMemo(() => {
-        const hasCuratedImages = (images?: ZineEditorialImageEntry[]): boolean => {
-            if (!images || !Array.isArray(images)) return false;
-            return images.some((img) => Boolean(resolveZineImageSlot(img)?.url));
-        };
-
-        if (scenes.length <= 1) {
-            const singleScene = scenes[0];
-            const singleCopy = sanitizedRationaleText;
-            if (!singleCopy || !singleCopy.trim()) return 0;
-            const singleImages = singleScene?.zineImages;
-            return hasCuratedImages(singleImages) ? 0 : 1;
-        }
-
-        let count = 0;
-        // 1) Overarching section
-        if (sanitizedOverarchingRationale && sanitizedOverarchingRationale.trim()) {
-            if (!hasCuratedImages(overarchingZineImages)) {
-                count += 1;
-            }
-        }
-        // 2) Populated scene sections
-        for (const scene of scenes) {
-            const rawSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
-            const sceneRationale = sanitizeRationaleMarkdown(scene.synthesisRationale, scene.graphData?.nodes?.length);
-            const firstSeedNorm = rawSeeds[0] ? normalizeArtistId(rawSeeds[0]) : '';
-            const seedDetailsFallback = firstSeedNorm ? detailsCache.get(firstSeedNorm)?.summary : '';
-            const effectiveSceneCopy = sceneRationale || seedDetailsFallback || '';
-            if (effectiveSceneCopy && effectiveSceneCopy.trim()) {
-                if (!hasCuratedImages(scene.zineImages)) {
-                    count += 1;
-                }
-            }
-        }
-        return count;
-    }, [scenes, sanitizedRationaleText, sanitizedOverarchingRationale, overarchingZineImages, sanitizeRationaleMarkdown, detailsCache]);
-
     const renderZineMarkdown = useCallback((markdownContent: string) => (
         <Markdown
             components={{
@@ -4546,25 +4509,18 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             {canEditZine && (
                                 <Button
                                     variant="secondary"
-                                    size="md"
+                                    size="toolbar"
+                                    iconPosition="left"
                                     type="button"
                                     data-testid="zine-edit-toggle-btn-mobile"
                                     onClick={() => setIsEditingZine((prev) => !prev)}
-                                    className={`h-10 !px-2.5 w-[88px] shrink-0 flex items-center justify-center !gap-1 leading-none ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
+                                    className={`w-[88px] ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
                                     title={isEditingZine ? 'Done Editing Zine' : 'Edit Zine Images'}
                                 >
-                                    <span className="material-symbols-outlined !text-[18px]">
+                                    <span className="material-symbols-outlined !text-[18px] -ml-0.5">
                                         {isEditingZine ? 'check' : 'edit'}
                                     </span>
                                     <span>{isEditingZine ? 'Done' : 'Edit'}</span>
-                                    {!isEditingZine && unillustratedSectionsCount > 0 && (
-                                        <span
-                                            data-testid="zine-edit-suggestion-badge"
-                                            className="h-[18px] min-w-[18px] px-1 rounded-md flex items-center justify-center text-[9px] font-semibold border bg-zinc-900 text-white border-white/20"
-                                        >
-                                            {unillustratedSectionsCount}
-                                        </span>
-                                    )}
                                 </Button>
                             )}
                         </div>
@@ -4611,31 +4567,24 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     {canEditZine && (
                                         <Button
                                             variant="secondary"
-                                            size="md"
+                                            size="toolbar"
+                                            iconPosition="left"
                                             type="button"
                                             data-testid="zine-edit-toggle-btn"
                                             onClick={() => setIsEditingZine((prev) => !prev)}
-                                            className={`h-9 !px-5 flex items-center gap-1.5 ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
+                                            className={`min-w-[88px] ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
                                             title={isEditingZine ? 'Done Editing Zine' : 'Edit Zine Images'}
                                         >
-                                            <span className="material-symbols-outlined !text-[18px]">
+                                            <span className="material-symbols-outlined !text-[18px] -ml-0.5">
                                                 {isEditingZine ? 'check' : 'edit'}
                                             </span>
                                             <span>{isEditingZine ? 'Done' : 'Edit'}</span>
-                                            {!isEditingZine && unillustratedSectionsCount > 0 && (
-                                                <span
-                                                    data-testid="zine-edit-suggestion-badge"
-                                                    className="h-5 min-w-[20px] px-1 rounded-lg flex items-center justify-center text-[9px] font-semibold border bg-zinc-900 text-white border-white/20"
-                                                >
-                                                    {unillustratedSectionsCount}
-                                                </span>
-                                            )}
                                         </Button>
                                     )}
                                     <Button
                                         variant="primary"
-                                        size="md"
-                                        className="h-9 !px-5"
+                                        size="toolbar"
+                                        iconPosition="right"
                                         onClick={() => onMagazineViewToggle(false)}
                                         title="Close Zine View"
                                     >
