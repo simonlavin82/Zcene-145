@@ -1015,7 +1015,6 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
           const a = nodes[i];
           const b = nodes[j];
           if (a.sceneIndex !== b.sceneIndex) continue;
-          if ((a.isSeed || a.isSceneSeed) && (b.isSeed || b.isSceneSeed)) continue;
           const boxA = getBox(a);
           const boxB = getBox(b);
           const ox = boxA.hx + boxB.hx - Math.abs(b.x - a.x);

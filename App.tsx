@@ -8507,13 +8507,17 @@ const App: React.FC = () => {
             if (populatedScenesFromDoc.length >= 1) {
               g = buildCompositeCanvasGraph(populatedScenesFromDoc, crossSceneLinksRef.current || [], savedPositions);
               const healedLayout: CanvasNodeRef[] = (g.nodes || [])
-                .filter((n: any) => typeof n?.id === 'string' && typeof n?.x === 'number' && Number.isFinite(n.x) && typeof n?.y === 'number' && Number.isFinite(n.y))
+                .filter((n: any) =>
+                  typeof n?.id === 'string' &&
+                  typeof n?.fx === 'number' && Number.isFinite(n.fx) &&
+                  typeof n?.fy === 'number' && Number.isFinite(n.fy)
+                )
                 .map((n: any) => ({
                   nodeId: n.id,
-                  x: Math.round(n.x * 100) / 100,
-                  y: Math.round(n.y * 100) / 100,
-                  fx: typeof n.fx === 'number' && Number.isFinite(n.fx) ? Math.round(n.fx * 100) / 100 : null,
-                  fy: typeof n.fy === 'number' && Number.isFinite(n.fy) ? Math.round(n.fy * 100) / 100 : null,
+                  x: Math.round(n.fx * 100) / 100,
+                  y: Math.round(n.fy * 100) / 100,
+                  fx: Math.round(n.fx * 100) / 100,
+                  fy: Math.round(n.fy * 100) / 100,
                 }));
               const savedPosById = new Map<string, CanvasNodeRef>();
               for (const r of savedPositions) {
@@ -8526,8 +8530,8 @@ const App: React.FC = () => {
                 if (!prev || typeof prev.x !== 'number' || typeof prev.y !== 'number') return false;
                 return Math.abs((h.x ?? 0) - prev.x) > 1 || Math.abs((h.y ?? 0) - prev.y) > 1;
               });
-              if (healedLayout.length > 0 && (savedPositions.length > 0 || wasLayoutHealed)) {
-                lastSettledLayoutRef.current = JSON.stringify(healedLayout);
+              if ((healedLayout.length > 0 && savedPositions.length > 0) || wasLayoutHealed) {
+                lastSettledLayoutRef.current = healedLayout.length > 0 ? JSON.stringify(healedLayout) : '';
                 if (wasLayoutHealed && user && !isGuest && currentProjectId && !hasHealedProjectIdRef.current.has(currentProjectId)) {
                   hasHealedProjectIdRef.current.add(currentProjectId);
                   const healPayload: any = {
@@ -11154,6 +11158,10 @@ const App: React.FC = () => {
                     let forkLayout: CanvasNodeRef[] = [];
                     if (lastSettledLayoutRef.current) {
                       try { forkLayout = JSON.parse(lastSettledLayoutRef.current); } catch {}
+                    } else if (graphDataRef.current?.nodes?.length) {
+                      forkLayout = graphDataRef.current.nodes
+                        .filter((nd: any) => typeof nd.fx === 'number' && Number.isFinite(nd.fx) && typeof nd.fy === 'number' && Number.isFinite(nd.fy))
+                        .map((nd: any) => ({ nodeId: nd.id, x: nd.x ?? nd.fx, y: nd.y ?? nd.fy, fx: nd.fx, fy: nd.fy }));
                     }
                     const settledForkScenes = forkedScenes.filter(s => settledIds.has(s.sceneId || s.id));
                     const forkComposite = buildCompositeCanvasGraph(settledForkScenes, forkBridges, forkLayout);
@@ -11167,8 +11175,8 @@ const App: React.FC = () => {
                     );
                     const forkName = generateProjectTitleFromScenes(forkedScenes, detailsCacheRef.current as Map<string, any>);
                     const forkCanvasLayout = forkComposite.nodes
-                      .filter((nd: any) => (nd.type === 'artist' || nd.type === 'label') && typeof nd.x === 'number')
-                      .map((nd: any) => ({ nodeId: nd.id, x: nd.x, y: nd.y, fx: nd.fx ?? null, fy: nd.fy ?? null }));
+                      .filter((nd: any) => typeof nd.fx === 'number' && Number.isFinite(nd.fx) && typeof nd.fy === 'number' && Number.isFinite(nd.fy))
+                      .map((nd: any) => ({ nodeId: nd.id, x: nd.x, y: nd.y, fx: nd.fx, fy: nd.fy }));
                     const forkOverarching = settledForkScenes.length >= 2 ? (overarchingRationaleRef.current || '') : '';
                     const forkOverarchingTitle = settledForkScenes.length >= 2 ? (normalizeZineTitle(overarchingZineTitleRef.current) || '') : '';
                     const forkOverarchingIntro = settledForkScenes.length >= 2 ? (normalizeZineIntro(overarchingZineIntroRef.current) || '') : '';

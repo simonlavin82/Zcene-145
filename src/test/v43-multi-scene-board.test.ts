@@ -4238,7 +4238,7 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         expect(healed.wasLayoutHealed).toBe(true);
       });
 
-      it('initializes unpinned nodes in Ring 0 Roots (0–55px), Ring 1 Peers/Shared Labels (95–175px) & Ring 2 Metadata (185–235px) via Editorial Compass', () => {
+      it('initializes unpinned nodes in Ring 0 Roots (115–180px label-aware multi-root), Ring 1 Peers/Shared Labels & Ring 2 Metadata via Editorial Compass', () => {
         const scene: ProjectScene = {
           ...createEmptyProjectScene(0, 'The Jealous Sound::Hey Mercedes'),
           seedIds: ['the-jealous-sound-us', 'hey-mercedes-us'],
@@ -4278,11 +4278,13 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
           return Math.hypot((n.x ?? 0) - 1000, (n.y ?? 0) - 1000);
         };
 
-        // Ring 0 Roots (~55px) on opposite sides of center
+        // Ring 0 Roots (115–180px label-aware) on opposite sides of center with generous label clearance
         const root1 = composite.nodes.find((node) => node.id === 'scene-1::the-jealous-sound-us')!;
         const root2 = composite.nodes.find((node) => node.id === 'scene-1::hey-mercedes-us')!;
-        expect(distFromCenter('scene-1::the-jealous-sound-us')).toBeCloseTo(55, 0);
-        expect(distFromCenter('scene-1::hey-mercedes-us')).toBeCloseTo(55, 0);
+        expect(distFromCenter('scene-1::the-jealous-sound-us')).toBeGreaterThanOrEqual(115);
+        expect(distFromCenter('scene-1::the-jealous-sound-us')).toBeLessThanOrEqual(180);
+        expect(distFromCenter('scene-1::hey-mercedes-us')).toBeGreaterThanOrEqual(115);
+        expect(distFromCenter('scene-1::hey-mercedes-us')).toBeLessThanOrEqual(180);
         expect(root1.x!).toBeLessThan(1000);
         expect(root2.x!).toBeGreaterThan(1000);
 
@@ -4292,14 +4294,138 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
         const bridgePeer = composite.nodes.find((node) => node.id === 'scene-1::knapsack-us')!;
         expect(pod0Peer.x!).toBeLessThan(root1.x!);
         expect(pod1Peer.x!).toBeGreaterThan(root2.x!);
-        expect(Math.abs(bridgePeer.x! - 1000)).toBeLessThan(50);
-        expect(distFromCenter('scene-1::vagrant')).toBeGreaterThanOrEqual(90);
-        expect(distFromCenter('scene-1::vagrant')).toBeLessThanOrEqual(180);
+        expect(Math.abs(bridgePeer.x! - 1000)).toBeLessThan(80);
+        expect(distFromCenter('scene-1::vagrant')).toBeGreaterThanOrEqual(120);
+        expect(distFromCenter('scene-1::vagrant')).toBeLessThanOrEqual(340);
 
         // Ring 2 Contextual Metadata sits on the outer ring (>= 155px post-overlap)
         expect(distFromCenter('scene-1::emo')).toBeGreaterThanOrEqual(155);
         expect(distFromCenter('scene-1::united-states')).toBeGreaterThanOrEqual(155);
         expect(distFromCenter('scene-1::2000')).toBeGreaterThanOrEqual(155);
+      });
+
+      it('V45.22: gives dual-root multi-scene boards generous root separation (>= 220px, zero label overlap) and >= 70px vertical root clearance without inter-scene bleed', () => {
+        const scene1: ProjectScene = {
+          ...createEmptyProjectScene(0, 'The Jealous Sound::Hey Mercedes'),
+          seedIds: ['the-jealous-sound-us', 'hey-mercedes-us'],
+          status: 'ready',
+          graphData: {
+            nodes: [
+              { id: 'the-jealous-sound-us', label: 'The Jealous Sound', type: 'artist', group: 1, isSeed: true },
+              { id: 'hey-mercedes-us', label: 'Hey Mercedes', type: 'artist', group: 2, isSeed: true },
+              { id: 'no-knife-us', label: 'No Knife', type: 'artist', group: 3 },
+              { id: 'the-get-up-kids-us', label: 'The Get Up Kids', type: 'artist', group: 3 },
+              { id: 'desaparecidos-us', label: 'Desaparecidos', type: 'artist', group: 3 },
+              { id: 'knapsack-us', label: 'Knapsack', type: 'artist', group: 1 },
+              { id: 'braid-us', label: 'Braid', type: 'artist', group: 2 },
+            ],
+            links: [
+              { source: 'the-jealous-sound-us', target: 'hey-mercedes-us', value: 1 },
+              { source: 'the-jealous-sound-us', target: 'no-knife-us', value: 1 },
+              { source: 'hey-mercedes-us', target: 'no-knife-us', value: 1 },
+              { source: 'the-jealous-sound-us', target: 'the-get-up-kids-us', value: 1 },
+              { source: 'hey-mercedes-us', target: 'the-get-up-kids-us', value: 1 },
+              { source: 'the-jealous-sound-us', target: 'desaparecidos-us', value: 1 },
+              { source: 'hey-mercedes-us', target: 'desaparecidos-us', value: 1 },
+              { source: 'the-jealous-sound-us', target: 'knapsack-us', value: 1 },
+              { source: 'hey-mercedes-us', target: 'braid-us', value: 1 },
+            ],
+          },
+        };
+        const scene2: ProjectScene = {
+          ...createEmptyProjectScene(1, 'The City on Film'),
+          seedIds: ['the-city-on-film-us'],
+          status: 'ready',
+          graphData: {
+            nodes: [
+              { id: 'the-city-on-film-us', label: 'The City on Film', type: 'artist', group: 1, isSeed: true },
+              { id: 'braid-us', label: 'Braid', type: 'artist', group: 1 },
+            ],
+            links: [{ source: 'the-city-on-film-us', target: 'braid-us', value: 1 }],
+          },
+        };
+
+        const composite = buildCompositeCanvasGraph([scene1, scene2], [], null);
+        const root1 = composite.nodes.find((n) => n.id === 'scene-1::the-jealous-sound-us')!;
+        const root2 = composite.nodes.find((n) => n.id === 'scene-1::hey-mercedes-us')!;
+        expect(Math.abs(root2.x! - root1.x!)).toBeGreaterThanOrEqual(220);
+
+        const getBox = (n: any) => {
+          const textWidth = Math.max(30, (n.label || n.id).length * 7.5);
+          const isSeed = Boolean(n.isSeed || n.isSceneSeed);
+          const r = isSeed ? 18 : (n.type === 'artist' ? 16 : 14);
+          return { hx: Math.max(r, textWidth / 2) + 10 + (isSeed ? 6 : 0), hy: 30 + (isSeed ? 10 : 0) };
+        };
+
+        // Zero AABB overlap between the dual roots
+        const r1Box = getBox(root1);
+        const r2Box = getBox(root2);
+        expect(r1Box.hx + r2Box.hx - Math.abs(root2.x! - root1.x!)).toBeLessThanOrEqual(0);
+
+        // Every Scene 1 peer directly above/below a root clears vertically by >= 70px
+        const scene1Nodes = composite.nodes.filter((n) => n.sceneIndex === 0);
+        const scene2Nodes = composite.nodes.filter((n) => n.sceneIndex === 1);
+        for (const peer of scene1Nodes.filter((n) => !(n.isSeed || n.isSceneSeed))) {
+          const pBox = getBox(peer);
+          for (const root of [root1, root2]) {
+            const rBox = getBox(root);
+            if (Math.abs(peer.x! - root.x!) < rBox.hx + pBox.hx - 0.5) {
+              expect(Math.abs(peer.y! - root.y!)).toBeGreaterThanOrEqual(69.5);
+            }
+          }
+        }
+
+        // Strict territory containment across the 1050px horizontal stride
+        for (const n of scene1Nodes) {
+          expect(Math.abs(n.x! - 1000)).toBeLessThanOrEqual(480);
+        }
+        for (const n of scene2Nodes) {
+          expect(Math.abs(n.x! - 2050)).toBeLessThanOrEqual(480);
+        }
+      });
+
+      it('V45.22: does not promote explicitly unsettled (fx: null, fy: null) savedLayout entries into hard pins, while preserving settled (fx, fy) locks', () => {
+        const dualScene: ProjectScene = {
+          ...createEmptyProjectScene(0, 'The Jealous Sound::Hey Mercedes'),
+          seedIds: ['the-jealous-sound-us', 'hey-mercedes-us'],
+          status: 'ready',
+          graphData: {
+            nodes: [
+              { id: 'the-jealous-sound-us', label: 'The Jealous Sound', type: 'artist', group: 1, isSeed: true },
+              { id: 'hey-mercedes-us', label: 'Hey Mercedes', type: 'artist', group: 2, isSeed: true },
+              { id: '2000', label: '2000', type: 'founded', group: 1 },
+            ],
+            links: [{ source: 'the-jealous-sound-us', target: '2000', value: 1 }],
+          },
+        };
+
+        // Case A: Explicitly unpinned entries (fx: null, fy: null) must stay unpinned so D3 can settle
+        const unsettledLayout: CanvasNodeRef[] = [
+          { nodeId: 'scene-1::the-jealous-sound-us', x: 885, y: 1000, fx: null, fy: null },
+          { nodeId: 'scene-1::hey-mercedes-us', x: 1115, y: 1000, fx: null, fy: null },
+        ];
+        const unsettledComposite = buildCompositeCanvasGraph([dualScene], [], unsettledLayout);
+        const uRoot1 = unsettledComposite.nodes.find((n) => n.id === 'scene-1::the-jealous-sound-us')!;
+        const uRoot2 = unsettledComposite.nodes.find((n) => n.id === 'scene-1::hey-mercedes-us')!;
+        const uPetal = unsettledComposite.nodes.find((n) => n.id === 'scene-1::2000')!;
+        expect(uRoot1.fx).toBeUndefined();
+        expect(uRoot1.fy).toBeUndefined();
+        expect(uRoot2.fx).toBeUndefined();
+        expect(uRoot2.fy).toBeUndefined();
+        expect(uPetal.fx).toBeUndefined();
+
+        // Case B: Truly pinned entries (finite fx, fy) remain locked verbatim
+        const settledLayout: CanvasNodeRef[] = [
+          { nodeId: 'scene-1::the-jealous-sound-us', x: 850, y: 1030, fx: 850, fy: 1030 },
+          { nodeId: 'scene-1::hey-mercedes-us', x: 1160, y: 970, fx: 1160, fy: 970 },
+        ];
+        const settledComposite = buildCompositeCanvasGraph([dualScene], [], settledLayout);
+        const sRoot1 = settledComposite.nodes.find((n) => n.id === 'scene-1::the-jealous-sound-us')!;
+        const sRoot2 = settledComposite.nodes.find((n) => n.id === 'scene-1::hey-mercedes-us')!;
+        expect(sRoot1.fx).toBe(850);
+        expect(sRoot1.fy).toBe(1030);
+        expect(sRoot2.fx).toBe(1160);
+        expect(sRoot2.fy).toBe(970);
       });
 
       it('pins remaining unpinned sprouted metadata petals after resolveSceneNodeOverlaps when restoring a saved scene layout', () => {

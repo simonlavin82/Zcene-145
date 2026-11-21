@@ -1116,7 +1116,7 @@ export function resolveSceneNodeOverlaps(
         const isParentRoot = Boolean(parent.isSeed || parent.isSceneSeed);
         const parentDistToCenter = Math.hypot((parent.x ?? center.x) - center.x, (parent.y ?? center.y) - center.y);
         const isParentNearCenter = isParentRoot || parentDistToCenter < 15;
-        const targetR = isParentRoot ? 85 : 72;
+        const targetR = isParentRoot ? 84.5 : 72;
 
         const distToParent = Math.hypot((n.x ?? 0) - (parent.x ?? 0), (n.y ?? 0) - (parent.y ?? 0));
         // If petal sits right on parent (< 45px), spawn it on outward arc relative to scene center or fanned out
@@ -1152,10 +1152,10 @@ export function resolveSceneNodeOverlaps(
       const textWidth = Math.max(30, label.length * 7.5);
       const isSeed = Boolean(n.isSeed || n.isSceneSeed);
       const r = isSeed ? 18 : (n.type === 'artist' ? 16 : 14);
-      // Fix 2: Give Root Artist nodes (+6px to hx) for 32px icon, r=22 halo, and y=27 label clearance
+      // Fix 2: Give Root Artist nodes (+6px to hx, +10px to hy) for 32px icon, r=22 halo, and y=27 label clearance
       const seedClearance = isSeed ? 6 : 0;
       const hx = Math.max(r, textWidth / 2) + padX + seedClearance;
-      const hy = 22 + padY; // text is at y + 22 (or 27 for root), height ~16
+      const hy = 22 + padY + (isSeed ? 10 : 0); // 70px min vertical root-to-neighbor clearance (vs 60px peer-to-peer)
       return { hx, hy };
     };
 
@@ -1469,7 +1469,7 @@ function rotatePetalAlongArc(
   const minR = isParentRoot ? (isLabelPetal ? 85 : 78) : 62;
   const baseMaxR = isParentRoot ? (isLabelPetal ? 120 : 95) : 85;
   const maxR = allowRadialRelief ? baseMaxR + 35 : baseMaxR;
-  const defaultR = isParentRoot ? (isLabelPetal ? 100 : 85) : 72;
+  const defaultR = isParentRoot ? (isLabelPetal ? 100 : 84.5) : 72;
   let tetherR = Math.max(minR, Math.min(maxR, currentR || defaultR));
   if (allowRadialRelief) {
     tetherR = Math.min(maxR, tetherR + Math.min(18, pushDist * 0.5));
@@ -1636,17 +1636,23 @@ export function buildCompositeCanvasGraph(
       }
     }
 
-    if (!isSceneLayoutCorrupted && sceneSavedXs.length > 0) {
+    const hasPinnedSavedRef = rawNodes.some((rawNode) => {
+      if (!rawNode || !rawNode.id) return false;
+      const canon = stripSceneNamespace(rawNode.canonicalId || rawNode.id);
+      const ref = lookupSavedRef(canon, namespaceSceneNodeId(sceneId, canon));
+      return Boolean(ref && typeof ref.x === 'number' && ref.fx !== null && ref.fy !== null);
+    });
+    if (!isSceneLayoutCorrupted && hasPinnedSavedRef) {
       scenesWithValidSavedLayout.add(sceneId);
     }
 
     // Safe Tick-0 "Editorial Compass" Pre-Computation (Scene-Local Pod Sectors + Radial Rings):
     // Deterministically computes starting (x, y) offsets around `center` from rawLinks adjacency
     // to `orderedSceneSeedIds` (with `node.group` as tie-breaker):
-    //   • Ring 0 (0–55px): Root Artist(s)
-    //   • Ring 1 (95–175px): Peer Artists & Shared Labels (deg >= 2), grouped into their root's
-    //     angular wedge or the central crossover bridge junction
-    //   • Ring 2 (185–235px): Metadata (genre, country, founded, 1-degree label) aligned with parent angle
+    //   • Ring 0 (0px single-root; 115–180px label-aware multi-root): Root Artist(s)
+    //   • Ring 1 (105–171px single-root; 125–340px multi-root): Peer Artists & Shared Labels (deg >= 2),
+    //     grouped into their root's angular wedge or the central crossover bridge junction
+    //   • Ring 2 (185–235px single-root; 245–325px multi-root): Metadata (genre, country, founded, 1-degree label) aligned with parent angle
     const compassCoords = new Map<string, { x: number; y: number }>();
     {
       const canonNeighbors = new Map<string, Set<string>>();
@@ -1664,11 +1670,27 @@ export function buildCompositeCanvasGraph(
         canonDeg.set(rt, (canonDeg.get(rt) || 0) + 1);
       }
 
+      // Compute label-aware Ring 0 radius for multi-root scenes so co-root labels never collide
+      // while staying well inside SCENE_MULTI_SEED_MAX_DX (360px) and leaving ample peer room within ±480px.
+      let multiRootRadius = 115;
+      if (sceneSeedCount > 1) {
+        let maxRootHx = 65;
+        for (const sId of orderedSceneSeedIds) {
+          const rn = rawNodes.find((n: any) => n && stripSceneNamespace(n.canonicalId || n.id).toLowerCase() === sId);
+          const lbl = rn ? getNodeDisplayLabel(rn) : sId;
+          const hx = Math.max(18, Math.max(30, lbl.length * 7.5) / 2) + 16;
+          if (hx > maxRootHx) maxRootHx = hx;
+        }
+        const chordNeeded = maxRootHx * 2 + 28;
+        const chordFactor = 2 * Math.sin(Math.PI / sceneSeedCount);
+        multiRootRadius = Math.min(180, Math.max(115, Math.ceil(chordNeeded / chordFactor)));
+      }
+
       const seedAngles = new Map<string, number>();
       orderedSceneSeedIds.forEach((sId, k) => {
         const theta = sceneSeedCount <= 1 ? 0 : Math.PI + (2 * Math.PI * k) / sceneSeedCount;
         seedAngles.set(sId, theta);
-        const r = sceneSeedCount <= 1 ? 15 : 55;
+        const r = sceneSeedCount <= 1 ? 15 : multiRootRadius;
         compassCoords.set(sId, {
           x: center.x + (sceneSeedCount <= 1 ? 0 : Math.cos(theta) * r),
           y: center.y + (sceneSeedCount <= 1 ? 0 : Math.sin(theta) * r),
@@ -1701,10 +1723,12 @@ export function buildCompositeCanvasGraph(
           theta = (sceneLocalPeerIdx * 137.5 * Math.PI) / 180;
           radius = 105 + (sceneLocalPeerIdx % 4) * 22;
         } else if (touchedSeedIndices.length > 1 || (touchedSeedIndices.length === 0 && (rn.group || 1) > sceneSeedCount)) {
-          // Crossover Bridge actor: place in central junction between pods
+          // Crossover Bridge actor: place above/below central junction with clear vertical breathing room
           const bIdx = bridgeCounter++;
-          theta = Math.PI / 2 + (bIdx % 2 === 0 ? 1 : -1) * Math.ceil(bIdx / 2) * 0.42;
-          radius = 95 + (bIdx % 3) * 25;
+          const sideSign = bIdx % 2 === 0 ? 1 : -1;
+          const tier = Math.floor(bIdx / 2);
+          theta = sideSign * (Math.PI / 2) + (tier % 2 === 0 ? 1 : -1) * Math.ceil(tier / 2) * 0.36;
+          radius = 125 + (bIdx % 3) * 42;
         } else {
           const podIdx =
             touchedSeedIndices.length === 1
@@ -1716,7 +1740,7 @@ export function buildCompositeCanvasGraph(
           const wedgeHalfSpan = Math.min(Math.PI * 0.65, (Math.PI * 0.78) / sceneSeedCount);
           const slotOffset = pCount === 0 ? 0 : (pCount % 2 === 1 ? 1 : -1) * Math.ceil(pCount / 2) * 0.28;
           theta = baseAngle + Math.max(-wedgeHalfSpan, Math.min(wedgeHalfSpan, slotOffset));
-          radius = 110 + (pCount % 3) * 28;
+          radius = Math.min(340, multiRootRadius + 95 + (pCount % 3) * 38);
         }
 
         sceneLocalPeerIdx++;
@@ -1750,7 +1774,9 @@ export function buildCompositeCanvasGraph(
           parentCount > 0 && Math.hypot(sumX, sumY) > 1
             ? Math.atan2(sumY, sumX) + ((sceneLocalMetaIdx % 3) - 1) * 0.18
             : (sceneLocalMetaIdx * 137.5 * Math.PI) / 180;
-        const radius = 185 + (sceneLocalMetaIdx % 3) * 25;
+        const radius = sceneSeedCount > 1
+          ? 245 + (sceneLocalMetaIdx % 3) * 40
+          : 185 + (sceneLocalMetaIdx % 3) * 25;
         sceneLocalMetaIdx++;
         compassCoords.set(cId, {
           x: center.x + Math.cos(baseTheta) * radius,
@@ -1832,8 +1858,13 @@ export function buildCompositeCanvasGraph(
       if (isSavedInTerritory) {
         nodeClone.x = candSavedX!;
         nodeClone.y = candSavedY!;
-        nodeClone.fx = candSavedX!;
-        nodeClone.fy = candSavedY!;
+        // Preserve Coordinate Memory lock only for settled entries (fx/fy finite or legacy omitted),
+        // never promoting explicitly unsettled (fx: null, fy: null) Tick-0 positions into hard pins.
+        const isExplicitlyUnpinned = savedRef!.fx === null || savedRef!.fy === null;
+        if (!isExplicitlyUnpinned) {
+          nodeClone.fx = candSavedX!;
+          nodeClone.fy = candSavedY!;
+        }
       } else if (isRawInTerritory) {
         nodeClone.x = candRawX!;
         nodeClone.y = candRawY!;

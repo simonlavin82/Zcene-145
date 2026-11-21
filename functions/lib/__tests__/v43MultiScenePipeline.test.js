@@ -1027,6 +1027,99 @@ const tokenEconomy_1 = require("../shared/tokenEconomy");
             (0, vitest_1.expect)(links.find((l) => l.target === 'nu-metal' && l.source === 'korn-us')?.weight).toBe(0.8);
             (0, vitest_1.expect)(links.find((l) => l.target === 'epic')?.weight).toBe(0.7);
         });
+        (0, vitest_1.it)('V45.22: backend buildCompositeCanvasGraph gives dual-root scenes >= 220px root separation, >= 70px vertical root clearance, and strict ±480px territory containment', () => {
+            const scene1 = {
+                ...(0, multiSceneUtils_1.createEmptyProjectScene)(0, 'The Jealous Sound::Hey Mercedes'),
+                seedIds: ['the-jealous-sound-us', 'hey-mercedes-us'],
+                status: 'ready',
+                graphData: {
+                    nodes: [
+                        { id: 'the-jealous-sound-us', label: 'The Jealous Sound', type: 'artist', group: 1, isSeed: true },
+                        { id: 'hey-mercedes-us', label: 'Hey Mercedes', type: 'artist', group: 2, isSeed: true },
+                        { id: 'no-knife-us', label: 'No Knife', type: 'artist', group: 3 },
+                        { id: 'the-get-up-kids-us', label: 'The Get Up Kids', type: 'artist', group: 3 },
+                        { id: 'desaparecidos-us', label: 'Desaparecidos', type: 'artist', group: 3 },
+                        { id: 'knapsack-us', label: 'Knapsack', type: 'artist', group: 1 },
+                        { id: 'braid-us', label: 'Braid', type: 'artist', group: 2 },
+                    ],
+                    links: [
+                        { source: 'the-jealous-sound-us', target: 'hey-mercedes-us', value: 1 },
+                        { source: 'the-jealous-sound-us', target: 'no-knife-us', value: 1 },
+                        { source: 'hey-mercedes-us', target: 'no-knife-us', value: 1 },
+                        { source: 'the-jealous-sound-us', target: 'the-get-up-kids-us', value: 1 },
+                        { source: 'hey-mercedes-us', target: 'the-get-up-kids-us', value: 1 },
+                        { source: 'the-jealous-sound-us', target: 'desaparecidos-us', value: 1 },
+                        { source: 'hey-mercedes-us', target: 'desaparecidos-us', value: 1 },
+                        { source: 'the-jealous-sound-us', target: 'knapsack-us', value: 1 },
+                        { source: 'hey-mercedes-us', target: 'braid-us', value: 1 },
+                    ],
+                },
+            };
+            const scene2 = {
+                ...(0, multiSceneUtils_1.createEmptyProjectScene)(1, 'The City on Film'),
+                seedIds: ['the-city-on-film-us'],
+                status: 'ready',
+                graphData: {
+                    nodes: [
+                        { id: 'the-city-on-film-us', label: 'The City on Film', type: 'artist', group: 1, isSeed: true },
+                        { id: 'braid-us', label: 'Braid', type: 'artist', group: 1 },
+                    ],
+                    links: [{ source: 'the-city-on-film-us', target: 'braid-us', value: 1 }],
+                },
+            };
+            const composite = (0, multiSceneUtils_1.buildCompositeCanvasGraph)([scene1, scene2], [], null);
+            const root1 = composite.nodes.find((n) => n.id === 'scene-1::the-jealous-sound-us');
+            const root2 = composite.nodes.find((n) => n.id === 'scene-1::hey-mercedes-us');
+            (0, vitest_1.expect)(Math.abs(root2.x - root1.x)).toBeGreaterThanOrEqual(220);
+            const getBox = (n) => {
+                const textWidth = Math.max(30, (n.label || n.id).length * 7.5);
+                const isSeed = Boolean(n.isSeed || n.isSceneSeed);
+                const r = isSeed ? 18 : (n.type === 'artist' ? 16 : 14);
+                return { hx: Math.max(r, textWidth / 2) + 10 + (isSeed ? 6 : 0), hy: 30 + (isSeed ? 10 : 0) };
+            };
+            (0, vitest_1.expect)(getBox(root1).hx + getBox(root2).hx - Math.abs(root2.x - root1.x)).toBeLessThanOrEqual(0);
+            const scene1Nodes = composite.nodes.filter((n) => n.sceneIndex === 0);
+            const scene2Nodes = composite.nodes.filter((n) => n.sceneIndex === 1);
+            for (const peer of scene1Nodes.filter((n) => !(n.isSeed || n.isSceneSeed))) {
+                const pBox = getBox(peer);
+                for (const root of [root1, root2]) {
+                    const rBox = getBox(root);
+                    if (Math.abs(peer.x - root.x) < rBox.hx + pBox.hx - 0.5) {
+                        (0, vitest_1.expect)(Math.abs(peer.y - root.y)).toBeGreaterThanOrEqual(69.5);
+                    }
+                }
+            }
+            for (const n of scene1Nodes)
+                (0, vitest_1.expect)(Math.abs(n.x - 1000)).toBeLessThanOrEqual(480);
+            for (const n of scene2Nodes)
+                (0, vitest_1.expect)(Math.abs(n.x - 2050)).toBeLessThanOrEqual(480);
+        });
+        (0, vitest_1.it)('V45.22: backend buildCompositeCanvasGraph does not promote unsettled (fx: null, fy: null) savedLayout entries into hard pins', () => {
+            const dualScene = {
+                ...(0, multiSceneUtils_1.createEmptyProjectScene)(0, 'The Jealous Sound::Hey Mercedes'),
+                seedIds: ['the-jealous-sound-us', 'hey-mercedes-us'],
+                status: 'ready',
+                graphData: {
+                    nodes: [
+                        { id: 'the-jealous-sound-us', label: 'The Jealous Sound', type: 'artist', group: 1, isSeed: true },
+                        { id: 'hey-mercedes-us', label: 'Hey Mercedes', type: 'artist', group: 2, isSeed: true },
+                    ],
+                    links: [],
+                },
+            };
+            const unsettledComposite = (0, multiSceneUtils_1.buildCompositeCanvasGraph)([dualScene], [], [
+                { nodeId: 'scene-1::the-jealous-sound-us', x: 885, y: 1000, fx: null, fy: null },
+                { nodeId: 'scene-1::hey-mercedes-us', x: 1115, y: 1000, fx: null, fy: null },
+            ]);
+            (0, vitest_1.expect)(unsettledComposite.nodes.find((n) => n.id === 'scene-1::the-jealous-sound-us')?.fx).toBeUndefined();
+            (0, vitest_1.expect)(unsettledComposite.nodes.find((n) => n.id === 'scene-1::hey-mercedes-us')?.fx).toBeUndefined();
+            const settledComposite = (0, multiSceneUtils_1.buildCompositeCanvasGraph)([dualScene], [], [
+                { nodeId: 'scene-1::the-jealous-sound-us', x: 850, y: 1030, fx: 850, fy: 1030 },
+                { nodeId: 'scene-1::hey-mercedes-us', x: 1160, y: 970, fx: 1160, fy: 970 },
+            ]);
+            (0, vitest_1.expect)(settledComposite.nodes.find((n) => n.id === 'scene-1::the-jealous-sound-us')?.fx).toBe(850);
+            (0, vitest_1.expect)(settledComposite.nodes.find((n) => n.id === 'scene-1::hey-mercedes-us')?.fx).toBe(1160);
+        });
     });
 });
 //# sourceMappingURL=v43MultiScenePipeline.test.js.map
