@@ -4144,7 +4144,7 @@ const App: React.FC = () => {
       overarchingZineTitle: normalizeZineTitle(overarchingZineTitleRef.current) || '',
       overarchingZineIntro: normalizeZineIntro(overarchingZineIntroRef.current) || '',
       overarchingZineImages: normalizeZineImages(overarchingZineImagesRef.current) || [],
-      crossSceneLinks: JSON.stringify(crossSceneLinksRef.current || []),
+      crossSceneLinks: JSON.stringify(parseCrossSceneLinks(crossSceneLinksRef.current || [])),
       ...(overarchingHistoryRef.current && Object.keys(overarchingHistoryRef.current).length > 0
         ? { overarchingHistory: JSON.stringify(overarchingHistoryRef.current) }
         : {}),
@@ -8334,8 +8334,9 @@ const App: React.FC = () => {
               wasBridgesHealed = true;
             }
           }
-          crossSceneLinksRef.current = parsedCrossLinks;
-          setCrossSceneLinks(parsedCrossLinks);
+          const cleanCrossLinks = parseCrossSceneLinks(parsedCrossLinks);
+          crossSceneLinksRef.current = cleanCrossLinks;
+          setCrossSceneLinks(cleanCrossLinks);
         } catch (e) {
           console.warn('[ProjectLoader] Failed to parse crossSceneLinks:', e);
         }

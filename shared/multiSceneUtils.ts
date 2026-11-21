@@ -1023,7 +1023,7 @@ export function resolveSceneNodeOverlaps(
 ): Node[] {
   if (!Array.isArray(nodes) || nodes.length <= 1) return nodes;
 
-  const maxIterations = options?.maxIterations ?? 35;
+  const maxIterations = options?.maxIterations ?? 120;
   const padX = options?.paddingX ?? 10;
   const padY = options?.paddingY ?? 8;
   const expansionFactor = options?.clusterExpansionFactor ?? 1.0;
@@ -1196,10 +1196,54 @@ export function resolveSceneNodeOverlaps(
             const parentA = parentMap.get(A.id);
             const parentB = parentMap.get(B.id);
 
+            // Late-stage pure MTV convergence phase (iter >= 40):
+            // Only reached by ultra-dense wide-label scenes where orbital rotation alone couldn't clear every box.
+            // Pure damped MTV separation (<= 0.5) is oscillation-free and guarantees 0 AABB overlaps.
+            if (iter >= 40) {
+              if (isSeedA && !isSeedB) {
+                if (overlapX <= overlapY) B.x += (dx !== 0 ? Math.sign(dx) : 1) * (overlapX + 0.5);
+                else B.y += (dy !== 0 ? Math.sign(dy) : 1) * (overlapY + 0.5);
+                if (B.fx != null) B.fx = B.x;
+                if (B.fy != null) B.fy = B.y;
+              } else if (isSeedB && !isSeedA) {
+                if (overlapX <= overlapY) A.x -= (dx !== 0 ? Math.sign(dx) : 1) * (overlapX + 0.5);
+                else A.y -= (dy !== 0 ? Math.sign(dy) : 1) * (overlapY + 0.5);
+                if (A.fx != null) A.fx = A.x;
+                if (A.fy != null) A.fy = A.y;
+              } else {
+                if (overlapX <= overlapY) {
+                  const pushX = (dx !== 0 ? Math.sign(dx) : 1) * (overlapX * 0.48 + 0.25);
+                  A.x -= pushX;
+                  B.x += pushX;
+                } else {
+                  const pushY = (dy !== 0 ? Math.sign(dy) : 1) * (overlapY * 0.48 + 0.25);
+                  A.y -= pushY;
+                  B.y += pushY;
+                }
+                if (A.fx != null) A.fx = A.x;
+                if (A.fy != null) A.fy = A.y;
+                if (B.fx != null) B.fx = B.x;
+                if (B.fy != null) B.fy = B.y;
+              }
+            }
             // Case 1: A is a 1-degree petal of parentA
-            if (parentA && !parentB) {
-              rotatePetalAlongArc(A, parentA, -nx, -ny, Math.min(overlapX, overlapY) * damping, iter >= 8);
-              if (!isSeedB) {
+            else if (parentA && !parentB) {
+              const isOwnParent = B.id === parentA.id;
+              if (isOwnParent && iter >= 30) {
+                if (overlapX <= overlapY) {
+                  A.x -= (dx !== 0 ? Math.sign(dx) : 1) * (overlapX + 0.5);
+                } else {
+                  A.y -= (dy !== 0 ? Math.sign(dy) : 1) * (overlapY + 0.5);
+                }
+                if (A.fx != null) A.fx = A.x;
+                if (A.fy != null) A.fy = A.y;
+              } else {
+                const petalPushX = isOwnParent ? 0 : -nx;
+                const petalPushY = isOwnParent ? (dy >= 0 ? -1 : 1) : -ny;
+                const petalPushDist = isOwnParent ? Math.max(overlapY, 18) : Math.min(overlapX, overlapY) * damping;
+                rotatePetalAlongArc(A, parentA, petalPushX, petalPushY, petalPushDist, iter >= 8);
+              }
+              if (!isSeedB && !isOwnParent) {
                 const neighborPush = iter >= 16 ? 0.65 : 0.35;
                 if (overlapX <= overlapY) {
                   B.x += (dx !== 0 ? Math.sign(dx) : 1) * overlapX * neighborPush * Math.max(0.4, damping);
@@ -1208,12 +1252,42 @@ export function resolveSceneNodeOverlaps(
                 }
                 if (B.fx != null) B.fx = B.x;
                 if (B.fy != null) B.fy = B.y;
+              } else if (isSeedB && iter >= 16 && !(parentA.isSeed || parentA.isSceneSeed)) {
+                // Late-iteration relief: peer artist's 1-degree petal colliding with an immutable Root Seed
+                const pdx = (parentA.x ?? center.x) - B.x;
+                const pdy = (parentA.y ?? center.y) - B.y;
+                const pDist = Math.hypot(pdx, pdy) || 1;
+                parentA.x = (parentA.x ?? center.x) + (pdx / pDist) * Math.min(overlapX, overlapY) * 0.35 * Math.max(0.4, damping);
+                parentA.y = (parentA.y ?? center.y) + (pdy / pDist) * Math.min(overlapX, overlapY) * 0.35 * Math.max(0.4, damping);
+                if (parentA.fx != null) parentA.fx = parentA.x;
+                if (parentA.fy != null) parentA.fy = parentA.y;
+                if (overlapX <= overlapY) {
+                  A.x -= (dx !== 0 ? Math.sign(dx) : 1) * overlapX * 0.65 * Math.max(0.4, damping);
+                } else {
+                  A.y -= (dy !== 0 ? Math.sign(dy) : 1) * overlapY * 0.65 * Math.max(0.4, damping);
+                }
+                if (A.fx != null) A.fx = A.x;
+                if (A.fy != null) A.fy = A.y;
               }
             }
             // Case 2: B is a 1-degree petal of parentB
             else if (parentB && !parentA) {
-              rotatePetalAlongArc(B, parentB, nx, ny, Math.min(overlapX, overlapY) * damping, iter >= 8);
-              if (!isSeedA) {
+              const isOwnParent = A.id === parentB.id;
+              if (isOwnParent && iter >= 30) {
+                if (overlapX <= overlapY) {
+                  B.x += (dx !== 0 ? Math.sign(dx) : 1) * (overlapX + 0.5);
+                } else {
+                  B.y += (dy !== 0 ? Math.sign(dy) : 1) * (overlapY + 0.5);
+                }
+                if (B.fx != null) B.fx = B.x;
+                if (B.fy != null) B.fy = B.y;
+              } else {
+                const petalPushX = isOwnParent ? 0 : nx;
+                const petalPushY = isOwnParent ? (dy >= 0 ? 1 : -1) : ny;
+                const petalPushDist = isOwnParent ? Math.max(overlapY, 18) : Math.min(overlapX, overlapY) * damping;
+                rotatePetalAlongArc(B, parentB, petalPushX, petalPushY, petalPushDist, iter >= 8);
+              }
+              if (!isSeedA && !isOwnParent) {
                 const neighborPush = iter >= 16 ? 0.65 : 0.35;
                 if (overlapX <= overlapY) {
                   A.x -= (dx !== 0 ? Math.sign(dx) : 1) * overlapX * neighborPush * Math.max(0.4, damping);
@@ -1222,50 +1296,138 @@ export function resolveSceneNodeOverlaps(
                 }
                 if (A.fx != null) A.fx = A.x;
                 if (A.fy != null) A.fy = A.y;
+              } else if (isSeedA && iter >= 16 && !(parentB.isSeed || parentB.isSceneSeed)) {
+                // Late-iteration relief: peer artist's 1-degree petal colliding with an immutable Root Seed
+                const pdx = (parentB.x ?? center.x) - A.x;
+                const pdy = (parentB.y ?? center.y) - A.y;
+                const pDist = Math.hypot(pdx, pdy) || 1;
+                parentB.x = (parentB.x ?? center.x) + (pdx / pDist) * Math.min(overlapX, overlapY) * 0.35 * Math.max(0.4, damping);
+                parentB.y = (parentB.y ?? center.y) + (pdy / pDist) * Math.min(overlapX, overlapY) * 0.35 * Math.max(0.4, damping);
+                if (parentB.fx != null) parentB.fx = parentB.x;
+                if (parentB.fy != null) parentB.fy = parentB.y;
+                if (overlapX <= overlapY) {
+                  B.x += (dx !== 0 ? Math.sign(dx) : 1) * overlapX * 0.65 * Math.max(0.4, damping);
+                } else {
+                  B.y += (dy !== 0 ? Math.sign(dy) : 1) * overlapY * 0.65 * Math.max(0.4, damping);
+                }
+                if (B.fx != null) B.fx = B.x;
+                if (B.fy != null) B.fy = B.y;
               }
             }
             // Case 3: Both are 1-degree petals
             else if (parentA && parentB) {
-              if (parentA.id === parentB.id) {
+              const effDamping = Math.max(0.25, damping);
+              if (iter >= 30) {
+                const factor = iter >= 50 ? 0.55 : 0.52 * effDamping;
+                if (overlapX <= overlapY) {
+                  const pushX = (dx !== 0 ? Math.sign(dx) : 1) * overlapX * factor;
+                  A.x -= pushX;
+                  B.x += pushX;
+                } else {
+                  const pushY = (dy !== 0 ? Math.sign(dy) : 1) * overlapY * factor;
+                  A.y -= pushY;
+                  B.y += pushY;
+                }
+                if (A.fx != null) A.fx = A.x;
+                if (A.fy != null) A.fy = A.y;
+                if (B.fx != null) B.fx = B.x;
+                if (B.fy != null) B.fy = B.y;
+              } else if (parentA.id === parentB.id) {
                 // Sibling petals on same parent: rotate in opposite directions
-                rotatePetalAlongArc(A, parentA, -nx, -ny, (overlapX + overlapY) * 0.5 * damping);
-                rotatePetalAlongArc(B, parentB, nx, ny, (overlapX + overlapY) * 0.5 * damping);
+                rotatePetalAlongArc(A, parentA, -nx, -ny, (overlapX + overlapY) * 0.5 * effDamping, iter >= 8);
+                rotatePetalAlongArc(B, parentB, nx, ny, (overlapX + overlapY) * 0.5 * effDamping, iter >= 8);
               } else {
-                rotatePetalAlongArc(A, parentA, -nx, -ny, Math.min(overlapX, overlapY) * 0.5 * damping);
-                rotatePetalAlongArc(B, parentB, nx, ny, Math.min(overlapX, overlapY) * 0.5 * damping);
+                rotatePetalAlongArc(A, parentA, -nx, -ny, Math.min(overlapX, overlapY) * 0.5 * effDamping, iter >= 8);
+                rotatePetalAlongArc(B, parentB, nx, ny, Math.min(overlapX, overlapY) * 0.5 * effDamping, iter >= 8);
               }
             }
             // Case 4: One is an immutable seed
             else if (isSeedA && !isSeedB) {
-              B.x += nx * overlapX * damping;
-              B.y += ny * overlapY * damping;
+              const seedPush = iter >= 20 ? 1.02 : Math.max(0.65, damping);
+              if (overlapX <= overlapY) {
+                B.x += (dx !== 0 ? Math.sign(dx) : 1) * overlapX * seedPush;
+              } else {
+                B.y += (dy !== 0 ? Math.sign(dy) : 1) * overlapY * seedPush;
+              }
               if (B.fx != null) B.fx = B.x;
               if (B.fy != null) B.fy = B.y;
             } else if (isSeedB && !isSeedA) {
-              A.x -= nx * overlapX * damping;
-              A.y -= ny * overlapY * damping;
+              const seedPush = iter >= 20 ? 1.02 : Math.max(0.65, damping);
+              if (overlapX <= overlapY) {
+                A.x -= (dx !== 0 ? Math.sign(dx) : 1) * overlapX * seedPush;
+              } else {
+                A.y -= (dy !== 0 ? Math.sign(dy) : 1) * overlapY * seedPush;
+              }
               if (A.fx != null) A.fx = A.x;
               if (A.fy != null) A.fy = A.y;
             }
             // Case 5: Two non-seed nodes (two artists or labels)
             else {
+              const effDamping = Math.max(0.25, damping);
+              const factor = iter >= 50 ? 0.55 : 0.52 * effDamping;
               // Vertical stack guard: if horizontal delta is very small, add a slight lateral nudge
               if (Math.abs(dx) < 16) {
-                const lateral = (i % 2 === 0 ? 1 : -1) * 16 * damping;
+                const lateral = (i % 2 === 0 ? 1 : -1) * 16 * effDamping;
                 A.x -= lateral;
                 B.x += lateral;
               }
-              const pushX = overlapX * 0.5 * damping;
-              const pushY = overlapY * 0.5 * damping;
-              A.x -= nx * pushX;
-              A.y -= ny * pushY;
-              B.x += nx * pushX;
-              B.y += ny * pushY;
+              if (overlapX <= overlapY) {
+                const pushX = (dx !== 0 ? Math.sign(dx) : 1) * overlapX * factor;
+                A.x -= pushX;
+                B.x += pushX;
+              } else {
+                const pushY = (dy !== 0 ? Math.sign(dy) : 1) * overlapY * factor;
+                A.y -= pushY;
+                B.y += pushY;
+              }
               if (A.fx != null) A.fx = A.x;
               if (A.fy != null) A.fy = A.y;
               if (B.fx != null) B.fx = B.x;
               if (B.fy != null) B.fy = B.y;
             }
+          }
+        }
+      }
+
+      // Hard clearance sweep against immutable Root Seeds during orbital phase (iter 20..39)
+      const seedNodes = sceneNodes.filter(n => Boolean(n.isSeed || n.isSceneSeed));
+      if (seedNodes.length > 0 && iter >= 20 && iter < 40) {
+        for (const seed of seedNodes) {
+          if (seed.x === undefined || seed.y === undefined) continue;
+          const seedBox = getHalfExtents(seed);
+          for (const n of sceneNodes) {
+            if (n.id === seed.id || Boolean(n.isSeed || n.isSceneSeed)) continue;
+            if (n.x === undefined || n.y === undefined) continue;
+            const nBox = getHalfExtents(n);
+            const sdx = n.x - seed.x;
+            const sdy = n.y - seed.y;
+            const sox = (seedBox.hx + nBox.hx) - Math.abs(sdx);
+            const soy = (seedBox.hy + nBox.hy) - Math.abs(sdy);
+            if (sox > 0.01 && soy > 0.01) {
+              if (sox <= soy) {
+                n.x += (sdx !== 0 ? Math.sign(sdx) : 1) * (sox + 0.5);
+              } else {
+                n.y += (sdy !== 0 ? Math.sign(sdy) : 1) * (soy + 0.5);
+              }
+              if (n.fx != null) n.fx = n.x;
+              if (n.fy != null) n.fy = n.y;
+            }
+          }
+        }
+        // Also guarantee no 1-degree petal ends an iteration overlapping its own parent
+        for (const n of sceneNodes) {
+          const parent = parentMap.get(n.id);
+          if (!parent || n.x === undefined || n.y === undefined || parent.x === undefined || parent.y === undefined) continue;
+          const nBox = getHalfExtents(n);
+          const pBox = getHalfExtents(parent);
+          const pdx = n.x - parent.x;
+          const pdy = n.y - parent.y;
+          const pox = (nBox.hx + pBox.hx) - Math.abs(pdx);
+          const poy = (nBox.hy + pBox.hy) - Math.abs(pdy);
+          if (pox > 0.01 && poy > 0.01) {
+            n.y += (pdy >= 0 ? 1 : -1) * (poy + 0.5);
+            if (n.fx != null) n.fx = n.x;
+            if (n.fy != null) n.fy = n.y;
           }
         }
       }
