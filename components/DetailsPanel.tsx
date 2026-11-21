@@ -1878,19 +1878,25 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 );
                             })()}
 
-                            {details.discography && details.discography.length > 0 && (
+                            {((details.discography && details.discography.length > 0) || !isLabelNode) && (
                                 <div>
                                     <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-widest">
                                         {isLabelNode ? 'Key Catalog Releases' : 'Essential Listening'}
                                     </h4>
-                                    <div className="grid grid-cols-1 gap-2">
-                                        {details.discography.map((album, i) => (
-                                            <div key={i} className="flex justify-between items-baseline border-b border-zinc-800/50 pb-1">
-                                                <span className="text-zinc-200 px-0.5 tracking-normal text-sm">{album.albumName}</span>
-                                                <span className="text-zinc-500 flex-shrink-0 font-mono text-[10px]">{album.releaseYear}</span>
-                                            </div>
-                                        ))}
-                                    </div>
+                                    {details.discography && details.discography.length > 0 ? (
+                                        <div className="grid grid-cols-1 gap-2">
+                                            {details.discography.map((album, i) => (
+                                                <div key={i} className="flex justify-between items-baseline border-b border-zinc-800/50 pb-1">
+                                                    <span className="text-zinc-200 px-0.5 tracking-normal text-sm">{album.albumName}</span>
+                                                    <span className="text-zinc-500 flex-shrink-0 font-mono text-[10px]">{album.releaseYear}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <p className="text-xs text-zinc-500 italic leading-relaxed" data-testid="essential-listening-empty">
+                                            No verified releases found in the digital catalog. Explore via YouTube or Bandcamp below.
+                                        </p>
+                                    )}
                                 </div>
                             )}
 

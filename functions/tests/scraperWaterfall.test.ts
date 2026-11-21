@@ -1,9 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   scrapeImageUrlBackend,
   reconcileDiscographyWithITunes,
   cleanCollectionTitle,
-  evaluateGenreDistanceScore
+  evaluateGenreDistanceScore,
+  selectBestArtistArtwork
 } from '../src/services/curatorService';
 
 describe('Rule 38: 4-Tier Asset Disambiguation Waterfall (scrapeImageUrlBackend)', { timeout: 15000 }, () => {
@@ -348,6 +349,192 @@ describe('Rule 38: 4-Tier Asset Disambiguation Waterfall (scrapeImageUrlBackend)
       expect(gameface.imageUrl).toMatch(/^https:\/\/.*600x600bb\.jpg$/);
       expect(gameface.itunesArtistId).toBe(19547255);
       expect(gameface.reconciledDiscography.length).toBeGreaterThanOrEqual(2);
+    });
+  });
+
+  describe('V45.10 Studio-Album Artwork Priority, Spacing-Collapsed Fallback & iTunes 403/429 Backoff', () => {
+    it('selectBestArtistArtwork selects Adult Themes for Voice over Crank: High Voltage OST even when Crank OST is index 0', () => {
+      const mikePattonAlbums = [
+        {
+          wrapperType: 'collection',
+          artistId: 2987396,
+          collectionName: 'Crank: High Voltage (Original Motion Picture Soundtrack)',
+          primaryGenreName: 'Soundtrack',
+          releaseDate: '2009-04-07T07:00:00Z',
+          trackCount: 32,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/Music/crank/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 2987396,
+          collectionName: 'The Place Beyond the Pines (Original Motion Picture Soundtrack)',
+          primaryGenreName: 'Soundtrack',
+          releaseDate: '2013-01-01T08:00:00Z',
+          trackCount: 17,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/Music/pines/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 2987396,
+          collectionName: 'Adult Themes for Voice',
+          primaryGenreName: 'Rock',
+          releaseDate: '1997-04-22T07:00:00Z',
+          trackCount: 34,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/Music/adult-themes/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 2987396,
+          collectionName: 'Mondo cane',
+          primaryGenreName: 'Alternative',
+          releaseDate: '2010-05-04T07:00:00Z',
+          trackCount: 11,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/Music/mondo-cane/100x100bb.jpg',
+        },
+      ];
+
+      const reconciled = [
+        { albumName: 'Adult Themes for Voice', releaseYear: '1997' },
+        { albumName: 'Pranzo Oltranzista', releaseYear: '1997' },
+        { albumName: 'Mondo cane', releaseYear: '2010' },
+      ];
+
+      const selected = selectBestArtistArtwork(mikePattonAlbums, reconciled);
+      expect(selected).toBe('https://is1-ssl.mzstatic.com/image/thumb/Music/adult-themes/600x600bb.jpg');
+    });
+
+    it('selectBestArtistArtwork deprioritizes Greatest Hits / Live / Single behind studio LPs, and falls back to soundtrack if only soundtracks exist', () => {
+      const mixedAlbums = [
+        {
+          wrapperType: 'collection',
+          collectionName: 'Greatest Hits',
+          primaryGenreName: 'Rock',
+          trackCount: 18,
+          artworkUrl100: 'https://example.com/greatest/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          collectionName: 'Live at the Fillmore',
+          primaryGenreName: 'Rock',
+          trackCount: 14,
+          artworkUrl100: 'https://example.com/live/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          collectionName: 'Lead Track - Single',
+          primaryGenreName: 'Rock',
+          trackCount: 1,
+          artworkUrl100: 'https://example.com/single/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          collectionName: 'Core Studio Record',
+          primaryGenreName: 'Rock',
+          trackCount: 11,
+          artworkUrl100: 'https://example.com/studio/100x100bb.jpg',
+        },
+      ];
+
+      expect(selectBestArtistArtwork(mixedAlbums, [])).toBe('https://example.com/studio/600x600bb.jpg');
+
+      const soundtrackOnlyAlbums = [
+        {
+          wrapperType: 'collection',
+          collectionName: 'Noir Film (Original Motion Picture Soundtrack)',
+          primaryGenreName: 'Soundtrack',
+          trackCount: 16,
+          artworkUrl100: 'https://example.com/ost-only/100x100bb.jpg',
+        },
+      ];
+
+      expect(selectBestArtistArtwork(soundtrackOnlyAlbums, [])).toBe('https://example.com/ost-only/600x600bb.jpg');
+    });
+
+    it('recovers spacing-collapsed LungLeg (artistId 2893998) when spaced query returns 0 hits, and recovers from transient HTTP 429 via retry', async () => {
+      let lookupAttempts = 0;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        // Spaced "Lung Leg" returns 0 hits -> triggers spacing-collapsed "LungLeg" fallback
+        if (url.includes('term=Lung%20Leg&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({ resultCount: 0, results: [] }),
+          } as any;
+        }
+        if (url.includes('term=LungLeg&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              resultCount: 1,
+              results: [
+                {
+                  wrapperType: 'artist',
+                  artistId: 2893998,
+                  artistName: 'Lung Leg',
+                  primaryGenreName: 'Alternative',
+                },
+              ],
+            }),
+          } as any;
+        }
+        // Lookup simulates transient HTTP 429 on attempt 1, then HTTP 200 on retry
+        if (url.includes('lookup?id=2893998&entity=album')) {
+          lookupAttempts++;
+          if (lookupAttempts === 1) {
+            return { ok: false, status: 429, json: async () => ({}) } as any;
+          }
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              resultCount: 3,
+              results: [
+                { wrapperType: 'artist', artistId: 2893998, artistName: 'Lung Leg' },
+                {
+                  wrapperType: 'collection',
+                  artistId: 2893998,
+                  collectionName: 'Girls (feat. Essential Logic) - Single',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2025-10-24T07:00:00Z',
+                  trackCount: 1,
+                  artworkUrl100: 'https://example.com/girls-single/100x100bb.jpg',
+                },
+                {
+                  wrapperType: 'collection',
+                  artistId: 2893998,
+                  collectionName: 'Maid to Minx',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '1999-05-11T07:00:00Z',
+                  trackCount: 15,
+                  artworkUrl100: 'https://example.com/maid-to-minx/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ resultCount: 0, results: [] }) } as any;
+      });
+
+      try {
+        const result = await scrapeImageUrlBackend(
+          'Lung Leg',
+          'artist',
+          'Indie Rock',
+          'Lung Leg was a 1990s Scottish indie rock band from Glasgow.',
+          'Glasgow, United Kingdom',
+          [{ albumName: 'Maid to Minx', releaseYear: '1997' }],
+          'gb'
+        );
+
+        expect(lookupAttempts).toBe(2);
+        expect(result.itunesArtistId).toBe(2893998);
+        expect(result.imageUrl).toBe('https://example.com/maid-to-minx/600x600bb.jpg');
+        expect(result.reconciledDiscography.some((d) => d.albumName === 'Maid to Minx')).toBe(true);
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
   });
 });

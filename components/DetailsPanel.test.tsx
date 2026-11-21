@@ -2673,6 +2673,92 @@ describe('DetailsPanel', () => {
             expect(screen.queryByText('Scene Circle')).not.toBeInTheDocument();
         });
     });
+
+    describe('V45.10 Essential Listening Empty State', () => {
+        it('renders Essential Listening heading, intentional empty message, and Artist Catalog links when an Artist card has discography: []', async () => {
+            const mockNode = { id: 'lung-leg-gb', type: 'artist', label: 'Lung Leg' };
+            const mockDetails = {
+                summary: 'Glasgow 1990s DIY indie rock band.',
+                details: { artist: 'Lung Leg', genre: 'Indie Rock', origin: 'Glasgow, United Kingdom', founded: '1994' },
+                discography: [],
+                links: [],
+            };
+
+            render(
+                <NodeDetailsCard
+                    node={mockNode as any}
+                    details={mockDetails as any}
+                    isLoading={false}
+                    isGlobalLoading={false}
+                    graphData={{ nodes: [], links: [] } as any}
+                    libraryArtists={[]}
+                    seedArtists={[]}
+                    onAddArtist={() => {}}
+                    isSmallScreen={false}
+                    onClose={() => {}}
+                    onNodeClick={() => {}}
+                    onNavigate={() => {}}
+                    chatHistory={[]}
+                    onSendMessage={() => {}}
+                    isChatLoading={false}
+                    chatMode="instant"
+                    onChatModeChange={() => {}}
+                    liveMessageCount={0}
+                    isInStack={false}
+                    onToggleStack={() => {}}
+                    stack={[]}
+                />
+            );
+
+            expect(screen.getByText('Essential Listening')).toBeInTheDocument();
+            const emptyState = screen.getByTestId('essential-listening-empty');
+            expect(emptyState).toHaveTextContent(
+                'No verified releases found in the digital catalog. Explore via YouTube or Bandcamp below.'
+            );
+            expect(emptyState.textContent).not.toContain('—');
+            expect(await screen.findByText('YouTube')).toBeInTheDocument();
+            expect(await screen.findByText('Bandcamp')).toBeInTheDocument();
+        });
+
+        it('omits Key Catalog Releases when a Label card has discography: []', () => {
+            const mockNode = { id: 'vesuvius', type: 'label', label: 'Vesuvius' };
+            const mockDetails = {
+                summary: 'Independent Glasgow record label.',
+                details: { artist: 'Vesuvius', genre: 'Indie Rock', origin: 'Glasgow, United Kingdom', founded: '1995' },
+                discography: [],
+                links: [],
+            };
+
+            render(
+                <NodeDetailsCard
+                    node={mockNode as any}
+                    details={mockDetails as any}
+                    isLoading={false}
+                    isGlobalLoading={false}
+                    graphData={{ nodes: [], links: [] } as any}
+                    libraryArtists={[]}
+                    seedArtists={[]}
+                    onAddArtist={() => {}}
+                    isSmallScreen={false}
+                    onClose={() => {}}
+                    onNodeClick={() => {}}
+                    onNavigate={() => {}}
+                    chatHistory={[]}
+                    onSendMessage={() => {}}
+                    isChatLoading={false}
+                    chatMode="instant"
+                    onChatModeChange={() => {}}
+                    liveMessageCount={0}
+                    isInStack={false}
+                    onToggleStack={() => {}}
+                    stack={[]}
+                />
+            );
+
+            expect(screen.queryByText('Key Catalog Releases')).not.toBeInTheDocument();
+            expect(screen.queryByTestId('essential-listening-empty')).not.toBeInTheDocument();
+        });
+    });
 });
 
 
