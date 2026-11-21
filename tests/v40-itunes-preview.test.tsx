@@ -858,5 +858,115 @@ describe('Architecture V40: Instant 30-Second iTunes Audio Previews', () => {
       audioController.stop();
       playSpy.mockRestore();
     });
+
+    it('renders w-7 h-7 circular yellow SVG progress ring, updates tabular-nums countdown on timeupdate, swaps to pause on hover, and retains ring while paused', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [
+            {
+              wrapperType: 'track',
+              kind: 'song',
+              artistId: 2568989,
+              collectionId: 1485042718,
+              trackName: 'Change of Ideas',
+              collectionName: 'No Control',
+              previewUrl: 'https://audio-ssl.itunes.apple.com/no-control.m4a',
+            },
+          ],
+        }),
+      });
+      global.fetch = fetchMock;
+
+      let activeAudioEl: HTMLAudioElement | null = null;
+      const originalAudio = window.Audio;
+      window.Audio = vi.fn().mockImplementation(function(src: string) {
+        const el = document.createElement('audio');
+        el.src = src;
+        Object.defineProperty(el, 'duration', { value: 30, configurable: true });
+        vi.spyOn(el, 'play').mockImplementation(async function() {
+          Object.defineProperty(el, 'paused', { value: false, configurable: true });
+          el.dispatchEvent(new Event('play'));
+        });
+        vi.spyOn(el, 'pause').mockImplementation(function() {
+          Object.defineProperty(el, 'paused', { value: true, configurable: true });
+          el.dispatchEvent(new Event('pause'));
+        });
+        activeAudioEl = el;
+        return el;
+      }) as any;
+
+      try {
+        render(
+          <AlbumAudioPreviewButton
+            nodeId="bad-religion-us"
+            albumIndex={0}
+            artistName="Bad Religion"
+            albumName="No Control"
+            itunesArtistId={2568989}
+            itunesCollectionId={1485042718}
+          />
+        );
+
+        const albumBtn = screen.getByTestId('album-preview-btn-0');
+        expect(albumBtn.className).toContain('w-7');
+        expect(albumBtn.className).toContain('h-7');
+        expect(albumBtn.className).toContain('group/album-play');
+        expect(screen.queryByTestId('album-preview-ring-0')).toBeNull();
+
+        // Click to start playing
+        await act(async () => {
+          albumBtn.click();
+          await new Promise((r) => setTimeout(r, 20));
+        });
+
+        const ring = screen.getByTestId('album-preview-ring-0');
+        const countdown = screen.getByTestId('album-preview-countdown-0');
+        const pauseIcon = screen.getByTestId('album-preview-pause-icon-0');
+
+        expect(ring.getAttribute('class')).toContain('stroke-primary');
+        expect(countdown.className).toContain('tabular-nums');
+        expect(countdown.className).toContain('text-[9px]');
+        expect(countdown.className).toContain('group-hover/album-play:hidden');
+        expect(pauseIcon.getAttribute('class')).toContain('hidden');
+        expect(pauseIcon.getAttribute('class')).toContain('group-hover/album-play:block');
+        expect(countdown.textContent).toBe('30');
+
+        const circumference = 2 * Math.PI * 13.5;
+
+        // Advance playback to 12.4s and dispatch timeupdate
+        await act(async () => {
+          if (activeAudioEl) {
+            Object.defineProperty(activeAudioEl, 'currentTime', { value: 12.4, configurable: true });
+            activeAudioEl.dispatchEvent(new Event('timeupdate'));
+          }
+        });
+
+        expect(screen.getByTestId('album-preview-countdown-0').textContent).toBe('18');
+        const updatedOffset = Number(screen.getByTestId('album-preview-ring-0').getAttribute('stroke-dashoffset'));
+        expect(updatedOffset).toBeCloseTo(circumference * (1 - 12.4 / 30), 2);
+
+        // Pause mid-track: ring stays visible at paused offset, countdown hides
+        await act(async () => {
+          albumBtn.click();
+        });
+        expect(screen.queryByTestId('album-preview-countdown-0')).toBeNull();
+        expect(screen.getByTestId('album-preview-ring-0')).toBeDefined();
+        expect(Number(screen.getByTestId('album-preview-ring-0').getAttribute('stroke-dashoffset'))).toBeCloseTo(
+          circumference * (1 - 12.4 / 30),
+          2
+        );
+
+        // Switching to Hero track clears the album ring cleanly
+        await act(async () => {
+          audioController.play('bad-religion-us', 'https://audio-ssl.itunes.apple.com/hero.m4a');
+        });
+        expect(screen.queryByTestId('album-preview-ring-0')).toBeNull();
+      } finally {
+        audioController.stop();
+        window.Audio = originalAudio;
+      }
+    });
   });
 });

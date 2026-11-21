@@ -511,6 +511,8 @@ export const AlbumAudioPreviewButton: React.FC<AlbumAudioPreviewButtonProps> = (
   const [preview, setPreview] = useState<AudioPreviewResult | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
+  const [currentTime, setCurrentTime] = useState(0);
+  const [duration, setDuration] = useState(30);
   const [isUnavailable, setIsUnavailable] = useState<boolean>(() =>
     isAlbumPreviewConfirmedUnavailable({
       nodeId,
@@ -531,6 +533,8 @@ export const AlbumAudioPreviewButton: React.FC<AlbumAudioPreviewButtonProps> = (
     abortControllerRef.current = null;
     setPreview(null);
     setIsLoading(false);
+    setCurrentTime(0);
+    setDuration(30);
     setNeedsGestureRetry(false);
     hasForceRefreshedRef.current = false;
     setIsUnavailable(
@@ -544,11 +548,18 @@ export const AlbumAudioPreviewButton: React.FC<AlbumAudioPreviewButtonProps> = (
     );
   }, [nodeId, albumIndex, artistName, albumName, itunesCollectionId, countryIso]);
 
-  // Subscribe to global singleton playback state
+  // Subscribe to global singleton playback state (including progress/remaining time)
   useEffect(() => {
     setIsPlaying(audioController.isTrackPlaying(trackId));
-    const unsubscribe = audioController.subscribe((activeId, activePlaying) => {
-      setIsPlaying(activeId === trackId && activePlaying);
+    const unsubscribe = audioController.subscribe((activeId, activePlaying, time, dur) => {
+      if (activeId === trackId) {
+        setIsPlaying(activePlaying);
+        setCurrentTime(time);
+        if (dur > 0) setDuration(dur);
+      } else {
+        setIsPlaying(false);
+        setCurrentTime(0);
+      }
     });
     return unsubscribe;
   }, [trackId]);
@@ -704,6 +715,13 @@ export const AlbumAudioPreviewButton: React.FC<AlbumAudioPreviewButtonProps> = (
             ? `Play preview: ${preview.previewTrackName}`
             : `Play 30s preview for ${albumName}`;
 
+  const progress = duration > 0 ? Math.min(currentTime / duration, 1) : 0;
+  const ringRadius = 13.5;
+  const ringCircumference = 2 * Math.PI * ringRadius;
+  const strokeDashoffset = ringCircumference - progress * ringCircumference;
+  const remainingSeconds = Math.max(1, Math.ceil(duration - currentTime));
+  const showProgressRing = !isUnavailable && !isLoading && (isPlaying || currentTime > 0);
+
   return (
     <button
       type="button"
@@ -713,28 +731,88 @@ export const AlbumAudioPreviewButton: React.FC<AlbumAudioPreviewButtonProps> = (
       aria-pressed={isPlaying}
       title={titleText}
       data-testid={`album-preview-btn-${albumIndex}`}
-      className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-150 focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
+      className={`group/album-play relative w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 transition-transform duration-150 focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
         isUnavailable
-          ? 'bg-zinc-900/40 border border-zinc-800/60 text-zinc-600 opacity-35 cursor-not-allowed'
+          ? 'text-zinc-600 opacity-35 cursor-not-allowed'
           : isLoading
-            ? 'bg-zinc-800/80 border border-primary/40 text-primary animate-pulse cursor-wait'
+            ? 'text-primary animate-pulse cursor-wait'
             : isPlaying
-              ? 'bg-primary/20 border border-primary/60 text-primary cursor-pointer hover:bg-primary/30 active:scale-95'
-              : 'bg-zinc-900/80 border border-zinc-700/60 text-zinc-400 hover:text-primary hover:border-primary/50 hover:bg-zinc-800 cursor-pointer active:scale-95'
+              ? 'text-primary cursor-pointer hover:scale-105 active:scale-95'
+              : 'text-zinc-400 hover:text-primary cursor-pointer hover:scale-105 active:scale-95'
       } ${className}`}
     >
-      {isLoading ? (
-        <span className="w-2.5 h-2.5 rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
-      ) : isPlaying ? (
-        <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 16 16" aria-hidden="true">
-          <rect x="3" y="2.5" width="3.5" height="11" rx="0.8" />
-          <rect x="9.5" y="2.5" width="3.5" height="11" rx="0.8" />
-        </svg>
-      ) : (
-        <svg className="w-2.5 h-2.5 fill-current translate-x-[0.5px]" viewBox="0 0 16 16" aria-hidden="true">
-          <polygon points="4,2.5 13.5,8 4,13.5" />
-        </svg>
-      )}
+      {/* Concentric SVG Disk + Yellow Countdown Progress Ring (Parity with Hero AudioPreviewPlayer) */}
+      <svg className="w-7 h-7 pointer-events-none" viewBox="0 0 32 32" aria-hidden="true">
+        <circle
+          cx="16"
+          cy="16"
+          r={ringRadius}
+          className={`transition-colors duration-150 ${
+            isUnavailable
+              ? 'fill-zinc-900/40 stroke-zinc-800/60'
+              : isLoading
+                ? 'fill-zinc-800/80 stroke-primary/40'
+                : isPlaying
+                  ? 'fill-black/75 stroke-primary/35'
+                  : currentTime > 0
+                    ? 'fill-black/60 stroke-primary/25'
+                    : 'fill-zinc-900/80 stroke-zinc-700/60 group-hover/album-play:fill-zinc-800 group-hover/album-play:stroke-primary/50'
+          }`}
+          strokeWidth="1.25"
+        />
+        {showProgressRing && (
+          <>
+            <circle
+              cx="16"
+              cy="16"
+              r={ringRadius}
+              className="stroke-white/10 fill-none"
+              strokeWidth="2.25"
+            />
+            <circle
+              cx="16"
+              cy="16"
+              r={ringRadius}
+              data-testid={`album-preview-ring-${albumIndex}`}
+              className="stroke-primary fill-none transition-[stroke-dashoffset] duration-150 ease-linear"
+              strokeWidth="2.25"
+              strokeDasharray={ringCircumference}
+              strokeDashoffset={strokeDashoffset}
+              strokeLinecap="round"
+              transform="rotate(-90 16 16)"
+            />
+          </>
+        )}
+      </svg>
+
+      {/* Center Action: Spinner (loading) | Countdown w/ Hover Pause Swap (playing) | Play Triangle (idle/paused) */}
+      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        {isLoading ? (
+          <span className="w-2.5 h-2.5 rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
+        ) : isPlaying ? (
+          <>
+            <span
+              data-testid={`album-preview-countdown-${albumIndex}`}
+              className="font-mono text-[9px] font-bold tabular-nums text-primary tracking-tight leading-none select-none group-hover/album-play:hidden"
+            >
+              {remainingSeconds}
+            </span>
+            <svg
+              data-testid={`album-preview-pause-icon-${albumIndex}`}
+              className="hidden group-hover/album-play:block w-2.5 h-2.5 fill-current"
+              viewBox="0 0 16 16"
+              aria-hidden="true"
+            >
+              <rect x="3" y="2.5" width="3.5" height="11" rx="0.8" />
+              <rect x="9.5" y="2.5" width="3.5" height="11" rx="0.8" />
+            </svg>
+          </>
+        ) : (
+          <svg className="w-2.5 h-2.5 fill-current translate-x-[0.5px]" viewBox="0 0 16 16" aria-hidden="true">
+            <polygon points="4,2.5 13.5,8 4,13.5" />
+          </svg>
+        )}
+      </div>
     </button>
   );
 };

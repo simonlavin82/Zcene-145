@@ -3141,19 +3141,24 @@ describe('DetailsPanel', () => {
                     expect(copyBtn.contains(playBtn)).toBe(false);
                     expect(playBtn.contains(copyBtn)).toBe(false);
 
-                    // Clicking Play must NOT copy to clipboard
+                    // Clicking Play must NOT copy to clipboard, and renders circular countdown ring
                     await act(async () => {
                         fireEvent.click(playBtn);
                         await new Promise((r) => setTimeout(r, 20));
                     });
                     expect(writeTextMock).not.toHaveBeenCalled();
                     expect(audioController.getCurrentTrackId()).toBe('korn-us::album::0');
+                    expect(screen.getByTestId('album-preview-ring-0')).toBeInTheDocument();
+                    expect(screen.getByTestId('album-preview-countdown-0')).toHaveTextContent('30');
 
-                    // Clicking Copy copies "<Artist> <Album>" without breaking playback
+                    // Clicking Copy while actively playing copies "<Artist> <Album>" without disturbing playback or countdown
                     await act(async () => {
                         fireEvent.click(copyBtn);
                     });
                     expect(writeTextMock).toHaveBeenCalledWith('Korn Life Is Peachy');
+                    expect(copyBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('check');
+                    expect(audioController.getCurrentTrackId()).toBe('korn-us::album::0');
+                    expect(screen.getByTestId('album-preview-countdown-0')).toHaveTextContent('30');
 
                     // Label cards must omit AlbumAudioPreviewButton on Key Catalog Releases
                     rerender(
