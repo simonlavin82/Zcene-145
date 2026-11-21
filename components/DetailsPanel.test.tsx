@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUrl, extractBlockArtistChips, buildGoogleImagesSearchUrl, estimateEditorialBlockHeight, partitionBlockIndicesIntoThreeColumns, partitionBlocksIntoThreeColumns, ZineEditorialHeading } from './DetailsPanel';
+import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUrl, extractBlockArtistChips, buildGoogleImagesSearchUrl, estimateEditorialBlockHeight, partitionBlockIndicesIntoThreeColumns, partitionBlocksIntoThreeColumns, ZineEditorialHeading, ZineIntroNote } from './DetailsPanel';
 import { streamNodeChat } from '../services/geminiService';
 
 vi.mock('react-markdown', () => ({
@@ -2757,6 +2757,326 @@ describe('DetailsPanel', () => {
 
             expect(screen.queryByText('Key Catalog Releases')).not.toBeInTheDocument();
             expect(screen.queryByTestId('essential-listening-empty')).not.toBeInTheDocument();
+        });
+    });
+
+    describe('V45.12 UI Polish & One-Tap Copy Interaction Suite', () => {
+        beforeEach(() => {
+            vi.clearAllMocks();
+            if (!navigator.clipboard) {
+                Object.assign(navigator, {
+                    clipboard: {
+                        writeText: vi.fn().mockResolvedValue(undefined),
+                    },
+                });
+            } else {
+                vi.spyOn(navigator.clipboard, 'writeText').mockResolvedValue(undefined);
+            }
+        });
+
+        describe('Zine Edit Mode Inline Clear Buttons', () => {
+            const threeParagraphMarkdown = "Paragraph 1\n\nParagraph 2\n\nParagraph 3";
+            const baseZineScenes = [
+                {
+                    sceneId: 'scene-1',
+                    id: 'scene-1',
+                    name: 'Scene 1',
+                    title: 'Scene 1',
+                    seedArtists: 'Dashboard Confessional',
+                    rationale: threeParagraphMarkdown,
+                    graphData: {
+                        nodes: [{ id: 'scene-1::dc', label: 'Dashboard Confessional', type: 'artist' }],
+                        links: [],
+                    },
+                },
+            ];
+            const baseZineGraph = {
+                nodes: [{ id: 'scene-1::dc', label: 'Dashboard Confessional', type: 'artist' }],
+                links: [],
+                synthesisRationale: threeParagraphMarkdown,
+            } as any;
+
+            const baseProps = (overrides: Record<string, any> = {}) => ({
+                selectedNode: baseZineGraph.nodes[0],
+                activeNodes: baseZineGraph.nodes,
+                detailsCache: new Map(),
+                loadingNodeIds: new Set<string>(),
+                onTogglePinNode: () => {},
+                pinnedNodes: new Set<string>(),
+                onRefreshNode: () => {},
+                error: null,
+                systemError: null,
+                graphData: baseZineGraph,
+                libraryArtists: [],
+                seedArtists: ['Dashboard Confessional'],
+                onAddArtist: () => {},
+                isCollapsed: false,
+                onToggleCollapse: () => {},
+                isSmallScreen: false,
+                onNodeClick: () => {},
+                onNavigate: () => {},
+                isGlobalLoading: false,
+                onCancelGlobalLoading: () => {},
+                unreadCount: 0,
+                isActive: true,
+                isMagazineViewOpen: true,
+                onMagazineViewToggle: () => {},
+                chatHistories: new Map(),
+                onUpdateChatHistories: () => {},
+                onAddToStack: () => {},
+                scenes: baseZineScenes,
+                overarchingRationale: threeParagraphMarkdown,
+                user: { uid: 'owner-1' },
+                isGuest: false,
+                onUpdateZineImages: vi.fn(),
+                onUpdateZineTitle: vi.fn(),
+                onUpdateZineIntro: vi.fn(),
+                ...overrides,
+            });
+
+            it('renders clear (×) button on Photo Slot URL and Caption inputs when non-empty and clears values on tap', () => {
+                render(<DetailsPanel {...baseProps()} />);
+
+                // Enter edit mode
+                const editToggle = screen.getByTestId('zine-edit-toggle-btn');
+                fireEvent.click(editToggle);
+
+                // Open photo slot 0 editor
+                const addPhotoBtn = screen.getByTestId('zine-slot-add-scene-1-0');
+                fireEvent.click(addPhotoBtn);
+
+                const urlInput = screen.getByTestId('zine-slot-input-scene-1-0') as HTMLInputElement;
+                const captionInput = screen.getByTestId('zine-slot-caption-input-scene-1-0') as HTMLInputElement;
+
+                // Initially empty - clear buttons not present
+                expect(screen.queryByLabelText('Clear image URL')).not.toBeInTheDocument();
+                expect(screen.queryByLabelText('Clear caption')).not.toBeInTheDocument();
+
+                // Type URL
+                fireEvent.change(urlInput, { target: { value: 'https://images.unsplash.com/photo.jpg' } });
+                const clearUrlBtn = screen.getByLabelText('Clear image URL');
+                expect(clearUrlBtn).toBeInTheDocument();
+
+                // Clear URL
+                fireEvent.click(clearUrlBtn);
+                expect(urlInput.value).toBe('');
+                expect(screen.queryByLabelText('Clear image URL')).not.toBeInTheDocument();
+
+                // Type Caption
+                fireEvent.change(captionInput, { target: { value: 'Press Photo' } });
+                const clearCaptionBtn = screen.getByLabelText('Clear caption');
+                expect(clearCaptionBtn).toBeInTheDocument();
+
+                // Clear Caption
+                fireEvent.click(clearCaptionBtn);
+                expect(captionInput.value).toBe('');
+                expect(screen.queryByLabelText('Clear caption')).not.toBeInTheDocument();
+            });
+
+            it('renders clear (×) button on Headline input and resets draft title on tap', () => {
+                render(<DetailsPanel {...baseProps()} />);
+
+                // Enter edit mode
+                fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+
+                // Open headline editor
+                const editTitleBtn = screen.getByTestId('zine-heading-edit-btn-scene-1');
+                fireEvent.click(editTitleBtn);
+
+                const headlineInput = screen.getByTestId('zine-heading-input-scene-1') as HTMLInputElement;
+                expect(headlineInput.value).not.toBe('');
+
+                const clearHeadlineBtn = screen.getByLabelText('Clear headline');
+                expect(clearHeadlineBtn).toBeInTheDocument();
+
+                fireEvent.click(clearHeadlineBtn);
+                expect(headlineInput.value).toBe('');
+                expect(screen.queryByLabelText('Clear headline')).not.toBeInTheDocument();
+            });
+        });
+
+        describe('Curator Note Dual Access Dictation & Teardown Lifecycle', () => {
+            it('cleanly hides mic button when SpeechRecognition is not supported in window', () => {
+                const originalSpeech = (window as any).SpeechRecognition;
+                const originalWebkit = (window as any).webkitSpeechRecognition;
+                delete (window as any).SpeechRecognition;
+                delete (window as any).webkitSpeechRecognition;
+
+                render(<ZineIntroNote sectionKey="scene-1" isEditingZine={true} onSaveIntro={vi.fn()} />);
+                fireEvent.click(screen.getByTestId('zine-intro-add-scene-1'));
+
+                expect(screen.queryByLabelText(/dictation/i)).not.toBeInTheDocument();
+
+                (window as any).SpeechRecognition = originalSpeech;
+                (window as any).webkitSpeechRecognition = originalWebkit;
+            });
+
+            it('supports dictation, appends transcripts, clamps to 600 chars, and tears down on Cancel', () => {
+                const stopSpy = vi.fn();
+                const startSpy = vi.fn();
+                let resultCallback: any = null;
+
+                class MockSpeechRecognition {
+                    start = startSpy;
+                    stop = stopSpy;
+                    lang = '';
+                    set onresult(cb: any) { resultCallback = cb; }
+                    set onerror(cb: any) {}
+                    set onend(cb: any) {}
+                }
+                (window as any).SpeechRecognition = MockSpeechRecognition;
+
+                render(<ZineIntroNote sectionKey="scene-1" isEditingZine={true} onSaveIntro={vi.fn()} />);
+                fireEvent.click(screen.getByTestId('zine-intro-add-scene-1'));
+
+                const dictationBtn = screen.getByLabelText('Start dictation');
+                expect(dictationBtn).toBeInTheDocument();
+
+                // Start dictation
+                fireEvent.click(dictationBtn);
+                expect(startSpy).toHaveBeenCalledTimes(1);
+
+                // Simulate speech result 1
+                act(() => {
+                    resultCallback?.({ results: [[{ transcript: 'This is the first sentence.' }]] });
+                });
+                const textarea = screen.getByTestId('zine-intro-input-scene-1') as HTMLTextAreaElement;
+                expect(textarea.value).toBe('This is the first sentence.');
+
+                // Simulate speech result 2 (appending)
+                act(() => {
+                    resultCallback?.({ results: [[{ transcript: 'And the second.' }]] });
+                });
+                expect(textarea.value).toBe('This is the first sentence. And the second.');
+
+                // Clear note via ×
+                const clearBtn = screen.getByLabelText('Clear note');
+                fireEvent.click(clearBtn);
+                expect(textarea.value).toBe('');
+
+                // Overflow speech result (>600 chars)
+                act(() => {
+                    resultCallback?.({ results: [[{ transcript: 'A'.repeat(700) }]] });
+                });
+                expect(textarea.value.length).toBe(600);
+
+                // Cancel stops recognition
+                const cancelBtn = screen.getByTestId('zine-intro-cancel-scene-1');
+                fireEvent.click(cancelBtn);
+                expect(stopSpy).toHaveBeenCalled();
+
+                delete (window as any).SpeechRecognition;
+            });
+        });
+
+        describe('Deep Cuts One-Tap Copy-to-Clipboard', () => {
+            const baseCardProps = (detailsOverride: any = {}) => ({
+                node: { id: 'korn-us', type: 'artist', label: 'Korn' } as any,
+                details: {
+                    summary: 'Pioneers of nu metal from Bakersfield, CA.',
+                    details: { artist: 'Korn', genre: 'Nu Metal', origin: 'Bakersfield, CA', founded: '1993' },
+                    members: [
+                        'Jonathan Davis (Lead Vocals, Bagpipes)',
+                        'James "Munky" Shaffer (Guitars, Backing Vocals)',
+                    ],
+                    discography: [
+                        { albumName: 'Life Is Peachy', releaseYear: '1996' },
+                        { albumName: 'Follow The Leader', releaseYear: '1998' },
+                    ],
+                    links: [],
+                    ...detailsOverride,
+                } as any,
+                isLoading: false,
+                isGlobalLoading: false,
+                graphData: { nodes: [], links: [] } as any,
+                libraryArtists: [],
+                seedArtists: ['Korn'],
+                onAddArtist: () => {},
+                isSmallScreen: false,
+                onClose: () => {},
+                onNodeClick: () => {},
+                onNavigate: () => {},
+                chatHistory: [],
+                onSendMessage: () => {},
+                isChatLoading: false,
+                chatMode: 'instant' as const,
+                onChatModeChange: () => {},
+                liveMessageCount: 0,
+                isInStack: false,
+                onToggleStack: () => {},
+                stack: [],
+            });
+
+            it('copies clean member name stripping (...) annotations on tap and flashes yellow checkmark', async () => {
+                render(<NodeDetailsCard {...baseCardProps()} />);
+
+                const memberBtn = screen.getByLabelText('Copy member name Jonathan Davis');
+                expect(memberBtn).toBeInTheDocument();
+                expect(memberBtn).toHaveTextContent('Jonathan Davis (Lead Vocals, Bagpipes)');
+
+                // Click member 0
+                await act(async () => {
+                    fireEvent.click(memberBtn);
+                });
+
+                expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Jonathan Davis');
+                // Yellow checkmark icon should appear
+                expect(memberBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('check');
+                expect(memberBtn.querySelector('.material-symbols-outlined')?.className).toContain('text-primary');
+
+                // Member 1 should remain in content_copy state
+                const member1Btn = screen.getByLabelText('Copy member name James "Munky" Shaffer');
+                expect(member1Btn.querySelector('.material-symbols-outlined')?.textContent).toBe('content_copy');
+            });
+
+            it('copies "<Artist Name> <Album Name>" when an Essential Listening album is tapped', async () => {
+                render(<NodeDetailsCard {...baseCardProps()} />);
+
+                const albumBtn = screen.getByLabelText('Copy album Life Is Peachy');
+                expect(albumBtn).toBeInTheDocument();
+
+                await act(async () => {
+                    fireEvent.click(albumBtn);
+                });
+
+                expect(navigator.clipboard.writeText).toHaveBeenCalledWith('Korn Life Is Peachy');
+                expect(albumBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('check');
+                expect(albumBtn.querySelector('.material-symbols-outlined')?.className).toContain('text-primary');
+            });
+
+            it('resets timeout when switching between copied items rapidly without memory leaks', async () => {
+                vi.useFakeTimers();
+                render(<NodeDetailsCard {...baseCardProps()} />);
+
+                const memberBtn = screen.getByLabelText('Copy member name Jonathan Davis');
+                const albumBtn = screen.getByLabelText('Copy album Life Is Peachy');
+
+                // Click member
+                await act(async () => {
+                    fireEvent.click(memberBtn);
+                });
+                expect(memberBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('check');
+
+                // Fast forward 1s, then click album
+                act(() => {
+                    vi.advanceTimersByTime(1000);
+                });
+
+                await act(async () => {
+                    fireEvent.click(albumBtn);
+                });
+                // Member checkmark should have reset, album checkmark active
+                expect(memberBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('content_copy');
+                expect(albumBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('check');
+
+                // Advance by full 2s
+                act(() => {
+                    vi.advanceTimersByTime(2000);
+                });
+                expect(albumBtn.querySelector('.material-symbols-outlined')?.textContent).toBe('content_copy');
+
+                vi.useRealTimers();
+            });
         });
     });
 });

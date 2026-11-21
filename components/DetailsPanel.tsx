@@ -974,7 +974,36 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const [isListening, setIsListening] = useState(false);
     const [imageTier, setImageTier] = useState<'source' | 'placeholder'>('source');
     const [imgLoaded, setImgLoaded] = useState(false);
-    const [isIdCopied, setIsIdCopied] = useState(false);
+    const [copiedKey, setCopiedKey] = useState<string | null>(null);
+    const copyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    const copyWithFeedback = useCallback(async (
+        key: string,
+        textToCopy: string,
+        analyticsData?: { event: string; params: Record<string, any> }
+    ) => {
+        try {
+            await navigator.clipboard.writeText(textToCopy);
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+            setCopiedKey(key);
+            copyTimeoutRef.current = setTimeout(() => {
+                setCopiedKey(null);
+            }, 2000);
+            if (analyticsData) {
+                analyticsService.track(analyticsData.event, analyticsData.params);
+            }
+        } catch (err) {
+            console.error('Failed to copy to clipboard', err);
+        }
+    }, []);
+
+    useEffect(() => {
+        return () => {
+            if (copyTimeoutRef.current) clearTimeout(copyTimeoutRef.current);
+        };
+    }, []);
+
+    const isIdCopied = copiedKey === 'title';
     const [isHeaderStuck, setIsHeaderStuck] = useState(isStaticMockup ? false : true);
     const imgRef = useRef<HTMLImageElement>(null);
 
@@ -1314,17 +1343,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
 
-    const handleCopyId = async (e: React.MouseEvent) => {
+    const handleCopyId = (e: React.MouseEvent) => {
         e.stopPropagation();
-        try {
-            const displayName = getArtistDisplayName(details, node);
-            await navigator.clipboard.writeText(displayName);
-            setIsIdCopied(true);
-            setTimeout(() => setIsIdCopied(false), 2000);
-            analyticsService.track('Node ID Copied', { node_id: node.id });
-        } catch (err) {
-            console.error("Failed to copy ID", err);
-        }
+        const displayName = getArtistDisplayName(details, node);
+        copyWithFeedback('title', displayName, { event: 'Node ID Copied', params: { node_id: node.id } });
     };
 
     const links = useMemo(() => {
@@ -1770,7 +1792,39 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             {!isLabelNode && details.members && details.members.length > 0 && (
                                 <div>
                                     <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-widest">Members</h4>
-                                    <p className="text-sm text-zinc-400">{details.members.join(' • ')}</p>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        {details.members.map((m, idx) => {
+                                            const cleanName = (typeof m === 'string' ? m : ((m as any)?.name || '')).replace(/\s*\(.*?\)/g, '').trim();
+                                            const isMemberCopied = copiedKey === `member:${idx}`;
+                                            return (
+                                                <React.Fragment key={idx}>
+                                                    <button
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            copyWithFeedback(`member:${idx}`, cleanName, {
+                                                                event: 'Member Name Copied',
+                                                                params: { node_id: node.id, member: cleanName }
+                                                            });
+                                                        }}
+                                                        className="inline-flex items-center text-left hover:text-white transition-colors cursor-pointer group/member py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                                        title={`Click to copy "${cleanName}"`}
+                                                        aria-label={`Copy member name ${cleanName}`}
+                                                    >
+                                                        <span>{typeof m === 'string' ? m : (m as any)?.name}</span>
+                                                        <span className="inline-flex items-center justify-center w-4 h-4 ml-1 flex-shrink-0">
+                                                            <span className={`material-symbols-outlined !text-[14px] transition-all duration-200 ${
+                                                                isMemberCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover/member:opacity-100'
+                                                            }`}>
+                                                                {isMemberCopied ? 'check' : 'content_copy'}
+                                                            </span>
+                                                        </span>
+                                                    </button>
+                                                    {idx < details.members.length - 1 && <span className="text-zinc-600 select-none"> • </span>}
+                                                </React.Fragment>
+                                            );
+                                        })}
+                                    </p>
                                 </div>
                             )}
 
@@ -1885,12 +1939,39 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     </h4>
                                     {details.discography && details.discography.length > 0 ? (
                                         <div className="grid grid-cols-1 gap-2">
-                                            {details.discography.map((album, i) => (
-                                                <div key={i} className="flex justify-between items-baseline border-b border-zinc-800/50 pb-1">
-                                                    <span className="text-zinc-200 px-0.5 tracking-normal text-sm">{album.albumName}</span>
-                                                    <span className="text-zinc-500 flex-shrink-0 font-mono text-[10px]">{album.releaseYear}</span>
-                                                </div>
-                                            ))}
+                                            {details.discography.map((album, i) => {
+                                                const isAlbumCopied = copiedKey === `album:${i}`;
+                                                const displayName = getArtistDisplayName(details, node);
+                                                const copyString = `${displayName} ${album.albumName}`.trim();
+                                                return (
+                                                    <button
+                                                        key={i}
+                                                        type="button"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            copyWithFeedback(`album:${i}`, copyString, {
+                                                                event: 'Album Copied',
+                                                                params: { node_id: node.id, album: album.albumName }
+                                                            });
+                                                        }}
+                                                        className="group/album w-full flex justify-between items-center border-b border-zinc-800/50 py-1.5 px-1 -mx-1 rounded-lg hover:bg-zinc-800/40 transition-colors text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                                        title={`Click to copy "${copyString}"`}
+                                                        aria-label={`Copy album ${album.albumName}`}
+                                                    >
+                                                        <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                                                            <span className="text-zinc-200 group-hover/album:text-white px-0.5 tracking-normal text-sm truncate">
+                                                                {album.albumName}
+                                                            </span>
+                                                            <span className={`material-symbols-outlined !text-[15px] flex-shrink-0 transition-all duration-200 ${
+                                                                isAlbumCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover/album:opacity-100'
+                                                            }`}>
+                                                                {isAlbumCopied ? 'check' : 'content_copy'}
+                                                            </span>
+                                                        </div>
+                                                        <span className="text-zinc-500 flex-shrink-0 font-mono text-[10px]">{album.releaseYear}</span>
+                                                    </button>
+                                                );
+                                            })}
                                         </div>
                                     ) : (
                                         <p className="text-xs text-zinc-500 italic leading-relaxed" data-testid="essential-listening-empty">
@@ -2528,17 +2609,33 @@ export const ZineEditorialHeading: React.FC<ZineEditorialHeadingProps> = ({
                         {draftTitle.length}/120
                     </span>
                 </div>
-                <input
-                    ref={inputRef}
-                    autoFocus
-                    type="text"
-                    maxLength={120}
-                    data-testid={`zine-heading-input-${sectionKey}`}
-                    placeholder={`Default: ${defaultTitle}`}
-                    value={draftTitle}
-                    onChange={(e) => setDraftTitle(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 text-white font-bold text-lg lg:text-2xl p-3 placeholder:text-zinc-600 focus:ring-1 focus:ring-primary focus:outline-none"
-                />
+                <div className="relative">
+                    <input
+                        ref={inputRef}
+                        autoFocus
+                        type="text"
+                        maxLength={120}
+                        data-testid={`zine-heading-input-${sectionKey}`}
+                        placeholder={`Default: ${defaultTitle}`}
+                        value={draftTitle}
+                        onChange={(e) => setDraftTitle(e.target.value)}
+                        className="w-full rounded-xl border border-zinc-700 bg-zinc-950 text-white font-bold text-lg lg:text-2xl p-3 pr-12 placeholder:text-zinc-600 focus:ring-1 focus:ring-primary focus:outline-none"
+                    />
+                    {draftTitle && (
+                        <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                                setDraftTitle('');
+                                inputRef.current?.focus();
+                            }}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                            aria-label="Clear headline"
+                        >
+                            <span className="material-symbols-outlined !text-[20px]">close</span>
+                        </button>
+                    )}
+                </div>
                 <div className="flex items-center justify-between flex-wrap gap-2 pt-1">
                     <span className="text-[11px] text-zinc-500">
                         Default: <strong className="text-zinc-400">{defaultTitle}</strong>
@@ -2625,14 +2722,14 @@ export const ZineEditorialHeading: React.FC<ZineEditorialHeadingProps> = ({
     );
 };
 
-interface ZineIntroNoteProps {
+export interface ZineIntroNoteProps {
     sectionKey: string;
     intro?: string;
     isEditingZine: boolean;
     onSaveIntro?: (intro: string | null) => void;
 }
 
-const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
+export const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
     sectionKey,
     intro,
     isEditingZine,
@@ -2641,9 +2738,55 @@ const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
     const cleanIntro = normalizeZineIntro(intro) || '';
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [draftIntro, setDraftIntro] = useState(cleanIntro);
+    const [isListening, setIsListening] = useState(false);
+    const recognitionRef = useRef<any>(null);
+
+    const handleDictation = () => {
+        const SpeechRecognition = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+        if (!SpeechRecognition) return;
+        if (isListening) {
+            if (recognitionRef.current) {
+                try { recognitionRef.current.stop(); } catch (_) {}
+            }
+            setIsListening(false);
+            return;
+        }
+        try {
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'en-US';
+            recognitionRef.current = recognition;
+            setIsListening(true);
+            recognition.start();
+            recognition.onresult = (event: any) => {
+                const transcript = event.results?.[0]?.[0]?.transcript || '';
+                if (transcript) {
+                    setDraftIntro((prev) => {
+                        const combined = prev.trim() ? `${prev.trim()} ${transcript}` : transcript;
+                        return combined.slice(0, 600);
+                    });
+                }
+            };
+            recognition.onerror = () => setIsListening(false);
+            recognition.onend = () => setIsListening(false);
+        } catch (_) {
+            setIsListening(false);
+        }
+    };
+
+    useEffect(() => {
+        return () => {
+            if (recognitionRef.current) {
+                try { recognitionRef.current.stop(); } catch (_) {}
+            }
+        };
+    }, []);
 
     useEffect(() => {
         if (!isEditingZine) {
+            if (recognitionRef.current) {
+                try { recognitionRef.current.stop(); } catch (_) {}
+            }
+            setIsListening(false);
             setIsEditorOpen(false);
         }
     }, [isEditingZine]);
@@ -2666,6 +2809,10 @@ const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (recognitionRef.current) {
+            try { recognitionRef.current.stop(); } catch (_) {}
+            setIsListening(false);
+        }
         const normalized = normalizeZineIntro(draftIntro) || null;
         setIsEditorOpen(false);
         onSaveIntro(normalized);
@@ -2686,16 +2833,43 @@ const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
                         {draftIntro.length}/600
                     </span>
                 </div>
-                <textarea
-                    autoFocus
-                    rows={2}
-                    maxLength={600}
-                    data-testid={`zine-intro-input-${sectionKey}`}
-                    placeholder="Optional dedication or curator's intro note below the title..."
-                    value={draftIntro}
-                    onChange={(e) => setDraftIntro(e.target.value)}
-                    className="w-full rounded-xl border border-zinc-700 bg-zinc-950 text-white text-sm p-3 placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none resize-y"
-                />
+                <div className="relative">
+                    <textarea
+                        autoFocus
+                        rows={2}
+                        maxLength={600}
+                        data-testid={`zine-intro-input-${sectionKey}`}
+                        placeholder="Optional dedication or curator's intro note below the title..."
+                        value={draftIntro}
+                        onChange={(e) => setDraftIntro(e.target.value)}
+                        className="w-full rounded-xl border border-zinc-700 bg-zinc-950 text-white text-sm p-3 pr-20 placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none resize-y"
+                    />
+                    <div className="absolute right-2 bottom-3 flex items-center gap-1">
+                        {typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) && (
+                            <button
+                                type="button"
+                                onClick={handleDictation}
+                                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${isListening ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`}
+                                title={isListening ? 'Stop listening' : 'Dictate note'}
+                                aria-label={isListening ? 'Stop dictation' : 'Start dictation'}
+                            >
+                                <span className="material-symbols-outlined !text-[20px]">mic</span>
+                            </button>
+                        )}
+                        {draftIntro && (
+                            <button
+                                type="button"
+                                onMouseDown={(e) => e.preventDefault()}
+                                onClick={() => setDraftIntro('')}
+                                className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                                title="Clear note"
+                                aria-label="Clear note"
+                            >
+                                <span className="material-symbols-outlined !text-[18px]">close</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
                 <div className="flex items-center justify-end gap-2">
                     <Button
                         type="button"
@@ -2703,6 +2877,10 @@ const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
                         size="sm"
                         data-testid={`zine-intro-cancel-${sectionKey}`}
                         onClick={() => {
+                            if (recognitionRef.current) {
+                                try { recognitionRef.current.stop(); } catch (_) {}
+                                setIsListening(false);
+                            }
                             setIsEditorOpen(false);
                             setDraftIntro(cleanIntro);
                         }}
@@ -2716,6 +2894,10 @@ const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
                             size="sm"
                             data-testid={`zine-intro-remove-${sectionKey}`}
                             onClick={() => {
+                                if (recognitionRef.current) {
+                                    try { recognitionRef.current.stop(); } catch (_) {}
+                                    setIsListening(false);
+                                }
                                 setIsEditorOpen(false);
                                 setDraftIntro('');
                                 onSaveIntro(null);
@@ -2950,28 +3132,60 @@ const ZineColumnImageSlot: React.FC<ZineColumnImageSlotProps> = ({
                         ))}
                     </div>
                 )}
-                <Input
-                    ref={urlInputRef}
-                    variant="md"
-                    type="url"
-                    autoFocus
-                    data-testid={`zine-slot-input-${sectionKey}-${slotIndex}`}
-                    placeholder="https://example.com/press-photo.jpg"
-                    value={draftUrl}
-                    onChange={(e) => {
-                        setDraftUrl(e.target.value);
-                        if (validationError) setValidationError(null);
-                    }}
-                />
-                <Input
-                    variant="md"
-                    type="text"
-                    maxLength={140}
-                    data-testid={`zine-slot-caption-input-${sectionKey}-${slotIndex}`}
-                    placeholder="Optional caption (e.g. American Football)"
-                    value={draftCaption}
-                    onChange={(e) => setDraftCaption(e.target.value)}
-                />
+                <div className="relative">
+                    <Input
+                        ref={urlInputRef}
+                        variant="md"
+                        type="url"
+                        autoFocus
+                        className="pr-10"
+                        data-testid={`zine-slot-input-${sectionKey}-${slotIndex}`}
+                        placeholder="https://example.com/press-photo.jpg"
+                        value={draftUrl}
+                        onChange={(e) => {
+                            setDraftUrl(e.target.value);
+                            if (validationError) setValidationError(null);
+                        }}
+                    />
+                    {draftUrl && (
+                        <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                                setDraftUrl('');
+                                if (validationError) setValidationError(null);
+                                urlInputRef.current?.focus();
+                            }}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                            aria-label="Clear image URL"
+                        >
+                            <span className="material-symbols-outlined !text-[18px]">close</span>
+                        </button>
+                    )}
+                </div>
+                <div className="relative">
+                    <Input
+                        variant="md"
+                        type="text"
+                        maxLength={140}
+                        className="pr-10"
+                        data-testid={`zine-slot-caption-input-${sectionKey}-${slotIndex}`}
+                        placeholder="Optional caption (e.g. American Football)"
+                        value={draftCaption}
+                        onChange={(e) => setDraftCaption(e.target.value)}
+                    />
+                    {draftCaption && (
+                        <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => setDraftCaption('')}
+                            className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                            aria-label="Clear caption"
+                        >
+                            <span className="material-symbols-outlined !text-[18px]">close</span>
+                        </button>
+                    )}
+                </div>
                 {validationError && (
                     <p
                         data-testid={`zine-slot-error-${sectionKey}-${slotIndex}`}
