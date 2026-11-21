@@ -1,12 +1,12 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
 # V45.1 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 18 test suites (459 unit/integration tests).
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 22 test suites (496 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
-# Run entire full-stack regression test suite (18 test files, 459 tests)
+# Run entire full-stack regression test suite (22 test files, 496 offline deterministic tests)
 npm test
 
 # Run backend pipeline tests
@@ -18,11 +18,14 @@ cd functions && npx vitest run tests/v29-gates.test.ts
 # Run V37 3-Tier Anchor System, Rule 8, Rule 40 & Rule 41 tests
 cd functions && npx vitest run tests/v30-anchors.test.ts
 
-# Run JIT Asset Healer & circuit breaker tests
-cd functions && npx vitest run tests/healOrphanedAsset.test.ts
+# Run Bio Scannability & Grounding Sanitization tests
+npx vitest run functions/tests/bioScannabilityAndGrounding.test.ts
 
-# Run iTunes 4-tier scraper waterfall tests (Taxonomic distance, discography reconciliation & Tier 4 quarantine)
-cd functions && npx vitest run tests/scraperWaterfall.test.ts
+# Run offline iTunes 4-tier scraper unit tests (artwork priority, spacing fallback, 403/429 retry & discography reconciliation)
+npx vitest run functions/tests/scraperWaterfall.unit.test.ts
+
+# Run live iTunes API smoke tests (opt-in, hits live Apple iTunes endpoints — excluded from deploy:safe)
+npm run test:live-itunes
 
 # Run frontend core tests
 npx vitest run tests/v15-core.test.tsx
