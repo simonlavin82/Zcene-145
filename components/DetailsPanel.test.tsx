@@ -3230,83 +3230,139 @@ describe('DetailsPanel', () => {
             });
         });
 
-        describe('V45.17 Audio Lifecycle Cleanup (Node Switch & Zine Close)', () => {
-            it('stops active album preview when switching viewed artist in panel mode or closing Zine View', () => {
+        describe('V45.20 Continuous Audio Playback Across Deep Cuts Flips & Lifecycle Stops', () => {
+            const nodeA = { id: 'bad-religion-us', type: 'artist', label: 'Bad Religion' } as any;
+            const nodeB = { id: 'nofx-us', type: 'artist', label: 'NOFX' } as any;
+            const labelNode = { id: 'epitaph-records', type: 'label', label: 'Epitaph Records' } as any;
+            const detailsCache = new Map<string, any>([
+                ['bad-religion-us', {
+                    summary: 'Melodic hardcore punk pioneers from Los Angeles.',
+                    details: { artist: 'Bad Religion', genre: 'Punk Rock', style: 'Melodic', origin: 'Los Angeles, USA', founded: '1980' },
+                    discography: [{ albumName: 'No Control', releaseYear: '1989', itunesCollectionId: 1485042718 }],
+                    links: [],
+                }],
+                ['nofx-us', {
+                    summary: 'Skate punk veterans from Los Angeles.',
+                    details: { artist: 'NOFX', genre: 'Punk Rock', style: 'Melodic', origin: 'Los Angeles, USA', founded: '1983' },
+                    discography: [{ albumName: 'Punk in Drublic', releaseYear: '1994', itunesCollectionId: 1485049999 }],
+                    links: [],
+                }],
+                ['epitaph-records', {
+                    summary: 'Independent punk rock record label founded by Brett Gurewitz.',
+                    details: { artist: 'Epitaph Records', genre: 'Punk Rock', origin: 'Los Angeles, USA', founded: '1980' },
+                    discography: [],
+                    links: [],
+                }],
+            ]);
+
+            const panelProps = (overrides: Record<string, any> = {}) => ({
+                activeNodes: [nodeA, nodeB, labelNode],
+                selectedNode: nodeA,
+                detailsCache,
+                loadingNodeIds: new Set<string>(),
+                isGlobalLoading: false,
+                graphData: { nodes: [nodeA, nodeB, labelNode], links: [] } as any,
+                libraryArtists: [],
+                seedArtists: ['Bad Religion'],
+                onAddArtist: () => {},
+                isSmallScreen: false,
+                onClose: () => {},
+                onNodeClick: () => {},
+                onNavigate: () => {},
+                chatHistories: new Map(),
+                onUpdateChatHistories: () => {},
+                pinnedNodes: new Set<string>(),
+                onTogglePinNode: () => {},
+                isCollapsed: false,
+                onToggleCollapse: () => {},
+                isMagazineViewOpen: false,
+                onMagazineViewToggle: () => {},
+                onAddToStack: () => {},
+                stack: [],
+                ...overrides,
+            });
+
+            it('keeps active Hero and Essential Listening previews playing across Deep Cuts card flips and replaces cleanly on new selection', () => {
                 stopGlobalAudio();
                 const playSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(async function(this: any) {
                     Object.defineProperty(this, 'paused', { value: false, configurable: true });
                     this.dispatchEvent(new Event('play'));
                 });
 
-                const nodeA = { id: 'bad-religion-us', type: 'artist', label: 'Bad Religion' } as any;
-                const nodeB = { id: 'nofx-us', type: 'artist', label: 'NOFX' } as any;
-                const detailsCache = new Map<string, any>([
-                    ['bad-religion-us', {
-                        summary: 'Melodic hardcore punk pioneers from Los Angeles.',
-                        details: { artist: 'Bad Religion', genre: 'Punk Rock', style: 'Melodic', origin: 'Los Angeles, USA', founded: '1980' },
-                        discography: [{ albumName: 'No Control', releaseYear: '1989', itunesCollectionId: 1485042718 }],
-                        links: [],
-                    }],
-                    ['nofx-us', {
-                        summary: 'Skate punk veterans from Los Angeles.',
-                        details: { artist: 'NOFX', genre: 'Punk Rock', style: 'Melodic', origin: 'Los Angeles, USA', founded: '1983' },
-                        discography: [{ albumName: 'Punk in Drublic', releaseYear: '1994', itunesCollectionId: 1485049999 }],
-                        links: [],
-                    }],
-                ]);
-
-                const panelProps = (overrides: Record<string, any> = {}) => ({
-                    activeNodes: [nodeA, nodeB],
-                    selectedNode: nodeA,
-                    detailsCache,
-                    loadingNodeIds: new Set<string>(),
-                    isGlobalLoading: false,
-                    graphData: { nodes: [nodeA, nodeB], links: [] } as any,
-                    libraryArtists: [],
-                    seedArtists: ['Bad Religion'],
-                    onAddArtist: () => {},
-                    isSmallScreen: false,
-                    onClose: () => {},
-                    onNodeClick: () => {},
-                    onNavigate: () => {},
-                    chatHistories: new Map(),
-                    onUpdateChatHistories: () => {},
-                    pinnedNodes: new Set<string>(),
-                    onTogglePinNode: () => {},
-                    isCollapsed: false,
-                    onToggleCollapse: () => {},
-                    isMagazineViewOpen: false,
-                    onMagazineViewToggle: () => {},
-                    onAddToStack: () => {},
-                    stack: [],
-                    ...overrides,
-                });
-
                 try {
                     const { rerender } = render(<DetailsPanel {...panelProps({ selectedNode: nodeA, isMagazineViewOpen: false })} />);
 
-                    // Start playing album 0 of nodeA
+                    // 1. Hero preview on nodeA stays playing when flipping to nodeB and to a Label card
+                    act(() => {
+                        audioController.play('bad-religion-us', 'https://audio-ssl.itunes.apple.com/were-only-gonna-die.m4a');
+                    });
+                    expect(audioController.getCurrentTrackId()).toBe('bad-religion-us');
+
+                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeB, isMagazineViewOpen: false })} />);
+                    expect(audioController.getCurrentTrackId()).toBe('bad-religion-us');
+                    expect(audioController.isTrackPlaying('bad-religion-us')).toBe(true);
+
+                    rerender(<DetailsPanel {...panelProps({ selectedNode: labelNode, isMagazineViewOpen: false })} />);
+                    expect(audioController.getCurrentTrackId()).toBe('bad-religion-us');
+                    expect(audioController.isTrackPlaying('bad-religion-us')).toBe(true);
+
+                    // 2. Essential Listening album preview on nodeA stays playing when flipping to nodeB
+                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeA, isMagazineViewOpen: false })} />);
                     act(() => {
                         audioController.play('bad-religion-us::album::0', 'https://audio-ssl.itunes.apple.com/no-control.m4a');
                     });
                     expect(audioController.getCurrentTrackId()).toBe('bad-religion-us::album::0');
 
-                    // Re-render on the same nodeA -> prefix match MUST preserve album playback
-                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeA, isMagazineViewOpen: false })} />);
-                    expect(audioController.getCurrentTrackId()).toBe('bad-religion-us::album::0');
-
-                    // Switch to nodeB -> MUST stop nodeA's album playback
                     rerender(<DetailsPanel {...panelProps({ selectedNode: nodeB, isMagazineViewOpen: false })} />);
-                    expect(audioController.getCurrentTrackId()).toBeNull();
+                    expect(audioController.getCurrentTrackId()).toBe('bad-religion-us::album::0');
+                    expect(audioController.isTrackPlaying('bad-religion-us::album::0')).toBe(true);
 
-                    // Open Zine View, play album on nodeB, then close Zine View -> MUST stop playback
-                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeB, isMagazineViewOpen: true })} />);
+                    // 3. Starting another track on nodeB replaces nodeA's track (single active audio)
                     act(() => {
                         audioController.play('nofx-us::album::0', 'https://audio-ssl.itunes.apple.com/punk-in-drublic.m4a');
                     });
                     expect(audioController.getCurrentTrackId()).toBe('nofx-us::album::0');
+                    expect(audioController.isTrackPlaying('bad-religion-us::album::0')).toBe(false);
+                    expect(audioController.isTrackPlaying('nofx-us::album::0')).toBe(true);
+                } finally {
+                    stopGlobalAudio();
+                    playSpy.mockRestore();
+                }
+            });
 
-                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeB, isMagazineViewOpen: false })} />);
+            it('stops active audio cleanly when collapsing Deep Cuts, closing Zine View, or unmounting DetailsPanel', () => {
+                stopGlobalAudio();
+                const playSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(async function(this: any) {
+                    Object.defineProperty(this, 'paused', { value: false, configurable: true });
+                    this.dispatchEvent(new Event('play'));
+                });
+
+                try {
+                    const { rerender, unmount } = render(<DetailsPanel {...panelProps({ selectedNode: nodeA, isMagazineViewOpen: false })} />);
+
+                    // 1. Collapsing Deep Cuts stops active audio
+                    act(() => {
+                        audioController.play('bad-religion-us::album::0', 'https://audio-ssl.itunes.apple.com/no-control.m4a');
+                    });
+                    expect(audioController.getCurrentTrackId()).toBe('bad-religion-us::album::0');
+                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeA, isCollapsed: true, isMagazineViewOpen: false })} />);
+                    expect(audioController.getCurrentTrackId()).toBeNull();
+
+                    // 2. Closing Zine View stops active audio
+                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeB, isCollapsed: false, isMagazineViewOpen: true })} />);
+                    act(() => {
+                        audioController.play('nofx-us::album::0', 'https://audio-ssl.itunes.apple.com/punk-in-drublic.m4a');
+                    });
+                    expect(audioController.getCurrentTrackId()).toBe('nofx-us::album::0');
+                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeB, isCollapsed: false, isMagazineViewOpen: false })} />);
+                    expect(audioController.getCurrentTrackId()).toBeNull();
+
+                    // 3. Unmounting DetailsPanel stops active audio even if playing a track
+                    act(() => {
+                        audioController.play('bad-religion-us', 'https://audio-ssl.itunes.apple.com/were-only-gonna-die.m4a');
+                    });
+                    expect(audioController.getCurrentTrackId()).toBe('bad-religion-us');
+                    unmount();
                     expect(audioController.getCurrentTrackId()).toBeNull();
                 } finally {
                     stopGlobalAudio();

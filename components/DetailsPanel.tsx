@@ -3724,6 +3724,13 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         prevIsMagazineViewOpenRef.current = isMagazineViewOpen;
     }, [isMagazineViewOpen]);
 
+    // Auto-stop preview audio whenever DetailsPanel unmounts (e.g., leaving project)
+    useEffect(() => {
+        return () => {
+            stopGlobalAudio();
+        };
+    }, []);
+
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         if (!isProgrammaticScrollRef.current) {
             lastScrolledNodeIdRef.current = null;
@@ -4332,18 +4339,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [filteredAndSortedNodes.length, viewedIndex]);
 
-    // Stop active audio preview when switching viewed node in panel mode
-    useEffect(() => {
-        if (!isMagazineViewOpen && viewedNode?.id) {
-            const currentAudioTrack = audioController.getCurrentTrackId();
-            const belongsToViewedNode =
-                currentAudioTrack === viewedNode.id ||
-                (currentAudioTrack?.startsWith(`${viewedNode.id}::album::`) ?? false);
-            if (currentAudioTrack && !belongsToViewedNode) {
-                stopGlobalAudio();
-            }
-        }
-    }, [viewedNode?.id, isMagazineViewOpen]);
+    // Active audio previews continue playing across Deep Cuts card flips (V45.20)
+    // and stop cleanly on new playback selection, Zine close, panel collapse, unmount, or zcene:stop-audio.
 
     const viewedNodeDetails = viewedNode
         ? (detailsCache.get(viewedNode.id) || detailsCache.get(viewedNode.id.toLowerCase()) || detailsCache.get(normalizeArtistId(viewedNode.id)) || null)
