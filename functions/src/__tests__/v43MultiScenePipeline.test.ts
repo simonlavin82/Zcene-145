@@ -18,6 +18,7 @@ vi.mock('@google/genai', async (importOriginal) => {
 
 import {
   OVERARCHING_ZINE_SCHEMA,
+  assessOverarchingZineQuality,
   generateOverarchingZineBackend,
   generateSemanticLinkWeights,
   UsageCollector,
@@ -159,6 +160,308 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
     // V45.1: sanitizeOverarchingRationale scrubs literal 'Scene 1 and Scene 2' to seed names
     expect(res.overarchingRationale).toBe('Fallback Flash synthesis connecting Sense Field and Jimmy Eat World.');
     expect(usageCollector.push).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects sparse 247-word / 0-bullet / 1-bridge Direct Hit output and passes rich 330-word / 3-bullet / 4-bridge editorial via assessOverarchingZineQuality (V45.8)', () => {
+    const sparseRationale =
+      'The 1990s British music press was largely obsessed with London pop royalty, but a much noisier revolution was quietly brewing on four-track cassette recorders in Scotland. Trace the origins of this ecosystem to Dundee, where **Spare Snare** forged a definitive **lo-fi** sound. They actively rejected studio polish in favor of analog tape saturation and angular guitar work. This militant **DIY ethos** laid a gritty foundation that would soon infect the broader regional underground, championing unvarnished authenticity over commercial sheen.\n\n' +
+      'Map this fierce independence westward to Glasgow, where the local scene was exploding with bands trading abrasive pop melodies and fuzz pedals. At the center of this nexus stood **The Delgados**, a band that combined delicate chamber pop with jagged guitars while single-handedly sustaining the community through their own label, **Chemikal Underground**. This imprint became the essential launchpad for the **indie rock** vanguard, providing a crucial platform for the intimate, late-night storytelling of **Arab Strap** and setting the stage for a dramatic sonic shift.\n\n' +
+      'From within this exact infrastructure, a new paradigm emerged that rejected the traditional frontman entirely. **Mogwai** absorbed the local punk spirit and weaponized it, drawing heavy inspiration from American innovators like **Slint** and **Tortoise**. By prioritizing visceral volume and cinematic pacing over conventional pop structures, they shifted the regional sound away from scratchy vocal hooks and toward monumental instrumental crescendos. This marked the birth of a formidable **post-rock** explosion, proving that silence and tectonic dynamics could carry as much emotional weight as any lyric.';
+
+    const sparseBridges: CrossSceneLink[] = [
+      {
+        id: 'scene-1::chemikal-underground--scene-2::rock-action',
+        sourceSceneId: 'scene-1',
+        targetSceneId: 'scene-2',
+        sourceNodeId: 'scene-1::chemikal-underground',
+        targetNodeId: 'scene-2::rock-action',
+        sourceCanonicalId: 'chemikal-underground',
+        targetCanonicalId: 'rock-action',
+        bridgeType: 'sonic_lineage',
+        forwardContext: 'inspired the artist-run ethos of',
+        inverseContext: 'built upon the independent blueprint of',
+        weight: 0.8,
+      },
+      // Same-endpoint bridge mislabeled as sonic_lineage must NOT count toward sonic_lineage floor
+      {
+        id: 'scene-1::mogwai-gb--scene-2::mogwai-gb',
+        sourceSceneId: 'scene-1',
+        targetSceneId: 'scene-2',
+        sourceNodeId: 'scene-1::mogwai-gb',
+        targetNodeId: 'scene-2::mogwai-gb',
+        sourceCanonicalId: 'mogwai-gb',
+        targetCanonicalId: 'mogwai-gb',
+        bridgeType: 'sonic_lineage',
+        forwardContext: 'bridges both constellations with',
+        inverseContext: 'bridges both constellations with',
+        weight: 1,
+      },
+    ];
+
+    const sparseAssessment = assessOverarchingZineQuality(sparseRationale, sparseBridges, 3);
+    expect(sparseAssessment.passed).toBe(false);
+    expect(sparseAssessment.wordCount).toBeLessThan(280);
+    expect(sparseAssessment.bulletCount).toBe(0);
+    expect(sparseAssessment.sonicLineageBridgeCount).toBe(1);
+    expect(sparseAssessment.reasons.some((r) => r.startsWith('wordCount='))).toBe(true);
+    expect(sparseAssessment.reasons.some((r) => r.startsWith('bulletCount='))).toBe(true);
+    expect(sparseAssessment.reasons.some((r) => r.startsWith('sonicLineageBridgeCount='))).toBe(true);
+
+    const richRationale =
+      'The 1990s British music press was largely obsessed with the glitz of London pop royalty, but a much noisier revolution was quietly brewing on four-track cassette recorders in Scotland. In Dundee, acts like **Spare Snare** forged a definitive **lo-fi** sound by actively rejecting studio polish in favor of analog tape saturation. This militant **DIY ethos** found a vital early home on regional labels like **Chute**, documenting the raw energy of an East Coast **indie rock** underground that was about to echo far beyond its local borders.\n\n' +
+      'Map this gritty independence westward to Glasgow, and the musical architecture shifts from abrasive slacker hooks into a highly organized, self-sustaining community. Bands like **Urusei Yatsura** drenched their pop melodies in walls of fuzz, while **The Delgados** single-handedly sustained the local ecosystem by launching **Chemikal Underground**. This imprint became the essential nerve center for the European independent landscape, creating a space where the jagged chamber pop of its founders could coexist with the brutal, late-night storytelling and stark drum loops of **Arab Strap**.\n\n' +
+      'Simultaneously, a tectonic shift in underground guitar music was occurring globally, characterized by the rejection of the traditional frontman in favor of visceral volume and cinematic pacing. American innovators like **Slint** and **Tortoise** had already dismantled conventional verse-chorus rock structures via pioneering imprints like **Touch and Go** and **Thrill Jockey**. Absorbing this tension, Glasgow\'s own **Mogwai** weaponized the quiet-to-deafening dynamic template, effectively bridging the local punk spirit with monumental **post-rock** soundscapes.\n\n' +
+      'This evolution from four-track noise pop to expansive instrumental grandeur reveals a shared, uncompromising musical lineage:\n' +
+      '* The foundational DIY grit of the Scottish indie scene evolved directly into the infrastructural backbone of forward-thinking experimental labels like **Rock Action** and **FatCat**.\n' +
+      '* The rejection of polished Britpop aesthetics paved the way for emotionally devastating, orchestral subterranean rock mastered by international peers like **Godspeed You! Black Emperor** and **Sigur Rós**.\n' +
+      '* Shared independent labels transformed the region from a hub for razor-sharp art-punk into a global launchpad for cinematic, non-verbal storytelling.';
+
+    const richBridges: CrossSceneLink[] = [
+      {
+        id: 'scene-1::the-delgados-gb--scene-2::chemikal-underground',
+        sourceSceneId: 'scene-1',
+        targetSceneId: 'scene-2',
+        sourceNodeId: 'scene-1::the-delgados-gb',
+        targetNodeId: 'scene-2::chemikal-underground',
+        sourceCanonicalId: 'the-delgados-gb',
+        targetCanonicalId: 'chemikal-underground',
+        bridgeType: 'sonic_lineage',
+        forwardContext: 'founded and actively managed the roster of',
+        inverseContext: 'was launched as an artist-run label by',
+        weight: 0.95,
+      },
+      {
+        id: 'scene-2::mogwai-gb--scene-1::chemikal-underground',
+        sourceSceneId: 'scene-2',
+        targetSceneId: 'scene-1',
+        sourceNodeId: 'scene-2::mogwai-gb',
+        targetNodeId: 'scene-1::chemikal-underground',
+        sourceCanonicalId: 'mogwai-gb',
+        targetCanonicalId: 'chemikal-underground',
+        bridgeType: 'sonic_lineage',
+        forwardContext: 'released early formative sonic masterworks on',
+        inverseContext: 'championed the early instrumental breakthroughs of',
+        weight: 0.9,
+      },
+      {
+        id: 'scene-1::arab-strap-gb--scene-2::mogwai-gb',
+        sourceSceneId: 'scene-1',
+        targetSceneId: 'scene-2',
+        sourceNodeId: 'scene-1::arab-strap-gb',
+        targetNodeId: 'scene-2::mogwai-gb',
+        sourceCanonicalId: 'arab-strap-gb',
+        targetCanonicalId: 'mogwai-gb',
+        bridgeType: 'sonic_lineage',
+        forwardContext: 'shared deep Glasgow underground ties with',
+        inverseContext: 'shared deep Glasgow underground ties with',
+        weight: 0.85,
+      },
+      {
+        id: 'scene-1::the-delgados-gb--scene-2::mogwai-gb',
+        sourceSceneId: 'scene-1',
+        targetSceneId: 'scene-2',
+        sourceNodeId: 'scene-1::the-delgados-gb',
+        targetNodeId: 'scene-2::mogwai-gb',
+        sourceCanonicalId: 'the-delgados-gb',
+        targetCanonicalId: 'mogwai-gb',
+        bridgeType: 'sonic_lineage',
+        forwardContext: 'championed and released early singles for',
+        inverseContext: 'found crucial early label backing from',
+        weight: 0.85,
+      },
+    ];
+
+    const richAssessment = assessOverarchingZineQuality(richRationale, richBridges, 3);
+    expect(richAssessment.passed).toBe(true);
+    expect(richAssessment.wordCount).toBeGreaterThanOrEqual(280);
+    expect(richAssessment.bulletCount).toBe(3);
+    expect(richAssessment.boldEntityCount).toBeGreaterThanOrEqual(10);
+    expect(richAssessment.sonicLineageBridgeCount).toBe(4);
+    expect(richAssessment.reasons).toEqual([]);
+  });
+
+  it('triggers a single corrective retry on sparse Step 3B output, selects the richer candidate, and falls back cleanly if retry fails (V45.8)', async () => {
+    const buildRichScene = (idx: number, seed: string, nodes: Array<{ id: string; label: string; type: 'artist' | 'label' }>): ProjectScene => ({
+      ...createEmptyProjectScene(idx, seed),
+      seedIds: [nodes[0].id],
+      status: 'ready',
+      synthesisRationale: `${seed} scene editorial overview.`,
+      graphData: {
+        nodes: nodes.map((n, i) => ({ ...n, group: i === 0 ? 1 : 2, isSeed: i === 0 })),
+        links: [],
+      },
+    });
+
+    const scene1 = buildRichScene(0, 'Spare Snare', [
+      { id: 'spare-snare-gb', label: 'Spare Snare', type: 'artist' },
+      { id: 'the-delgados-gb', label: 'The Delgados', type: 'artist' },
+      { id: 'arab-strap-gb', label: 'Arab Strap', type: 'artist' },
+      { id: 'urusei-yatsura-gb', label: 'Urusei Yatsura', type: 'artist' },
+      { id: 'chemikal-underground', label: 'Chemikal Underground', type: 'label' },
+    ]);
+    const scene2 = buildRichScene(1, 'Mogwai', [
+      { id: 'mogwai-gb', label: 'Mogwai', type: 'artist' },
+      { id: 'slint-us', label: 'Slint', type: 'artist' },
+      { id: 'tortoise-us', label: 'Tortoise', type: 'artist' },
+      { id: 'rock-action', label: 'Rock Action', type: 'label' },
+      { id: 'fatcat', label: 'FatCat', type: 'label' },
+    ]);
+
+    const upgradedRationale =
+      Array.from({ length: 3 }, (_, p) =>
+        `Paragraph ${p + 1} traces how **Spare Snare**, **The Delgados**, **Chemikal Underground**, and **Arab Strap** built an uncompromising Scottish **lo-fi** and **indie rock** infrastructure that directly empowered **Mogwai**, **Slint**, **Tortoise**, **Rock Action**, **FatCat**, and **Urusei Yatsura** to reshape **post-rock** dynamics across the 1990s underground with ferocious tape saturation, towering orchestral crescendos, and fearless independent distribution that rejected major label gloss in favor of raw regional solidarity and bold sonic experimentation across every release.`
+      ).join('\n\n') +
+      '\n\nThis arc reveals three lasting pillars:\n' +
+      '* Independent labels like **Chemikal Underground** and **Rock Action** anchored artist-run autonomy.\n' +
+      '* Regional peers **The Delgados** and **Arab Strap** bridged vocal songcraft into stark atmosphere.\n' +
+      '* Instrumental architects **Mogwai**, **Slint**, and **Tortoise** turned dynamics into pure narrative weight.';
+
+    // Case 1: Attempt 1 is sparse -> retry succeeds with upgraded output -> upgraded output selected
+    mockGenerateContent
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          overarchingRationale: 'Short **Spare Snare** and **Mogwai** summary without bullets.',
+          crossSceneBridges: [
+            {
+              sourceSceneId: 'scene-1',
+              sourceCanonicalId: 'chemikal-underground',
+              targetSceneId: 'scene-2',
+              targetCanonicalId: 'rock-action',
+              bridgeType: 'sonic_lineage',
+              forwardContext: 'inspired the artist-run ethos of',
+              inverseContext: 'built upon the label ethos of',
+              weight: 0.8,
+            },
+          ],
+        }),
+        usageMetadata: { promptTokenCount: 1000, candidatesTokenCount: 200, totalTokenCount: 1200 },
+      })
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          overarchingRationale: upgradedRationale,
+          crossSceneBridges: [
+            {
+              sourceSceneId: 'scene-1',
+              sourceCanonicalId: 'chemikal-underground',
+              targetSceneId: 'scene-2',
+              targetCanonicalId: 'rock-action',
+              bridgeType: 'sonic_lineage',
+              forwardContext: 'inspired the artist-run ethos of',
+              inverseContext: 'built upon the label ethos of',
+              weight: 0.9,
+            },
+            {
+              sourceSceneId: 'scene-1',
+              sourceCanonicalId: 'the-delgados-gb',
+              targetSceneId: 'scene-2',
+              targetCanonicalId: 'mogwai-gb',
+              bridgeType: 'sonic_lineage',
+              forwardContext: 'championed and released early singles for',
+              inverseContext: 'found crucial early label backing from',
+              weight: 0.88,
+            },
+            {
+              sourceSceneId: 'scene-1',
+              sourceCanonicalId: 'arab-strap-gb',
+              targetSceneId: 'scene-2',
+              targetCanonicalId: 'mogwai-gb',
+              bridgeType: 'sonic_lineage',
+              forwardContext: 'shared deep Glasgow underground ties with',
+              inverseContext: 'shared deep Glasgow underground ties with',
+              weight: 0.85,
+            },
+          ],
+        }),
+        usageMetadata: { promptTokenCount: 1200, candidatesTokenCount: 600, totalTokenCount: 1800 },
+      });
+
+    const res = await generateOverarchingZineBackend([scene1, scene2], {});
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    expect(res.overarchingRationale).toContain('This arc reveals three lasting pillars:');
+    expect(res.crossSceneLinks.filter((l) => l.bridgeType === 'sonic_lineage')).toHaveLength(3);
+
+    // Case 2: Attempt 1 is sparse -> retry throws -> gracefully retains Attempt 1 without failing
+    vi.clearAllMocks();
+    mockGenerateContent
+      .mockResolvedValueOnce({
+        text: JSON.stringify({
+          overarchingRationale: 'Retained attempt 1 connecting **Spare Snare** and **Mogwai**.',
+          crossSceneBridges: [
+            {
+              sourceSceneId: 'scene-1',
+              sourceCanonicalId: 'chemikal-underground',
+              targetSceneId: 'scene-2',
+              targetCanonicalId: 'rock-action',
+              bridgeType: 'sonic_lineage',
+              forwardContext: 'inspired the artist-run ethos of',
+              inverseContext: 'built upon the label ethos of',
+              weight: 0.8,
+            },
+          ],
+        }),
+        usageMetadata: { promptTokenCount: 1000, candidatesTokenCount: 150, totalTokenCount: 1150 },
+      })
+      .mockRejectedValueOnce(new Error('504 RETRY_TIMEOUT'));
+
+    const resFallback = await generateOverarchingZineBackend([scene1, scene2], {});
+    expect(mockGenerateContent).toHaveBeenCalledTimes(2);
+    expect(resFallback.overarchingRationale).toBe('Retained attempt 1 connecting **Spare Snare** and **Mogwai**.');
+    expect(resFallback.crossSceneLinks.filter((l) => l.bridgeType === 'sonic_lineage')).toHaveLength(1);
+  });
+
+  it('injects full input parity via ISO-stripped artistSnippets lookup and 2400-char sceneEditorialSummary (V45.8)', async () => {
+    const longRationale = 'A'.repeat(1800) + ' DISTINCTIVE_TAIL_MARKER_1850';
+    const scene1: ProjectScene = {
+      ...createEmptyProjectScene(0, 'Spare Snare'),
+      seedIds: ['spare-snare-gb'],
+      status: 'ready',
+      synthesisRationale: longRationale,
+      artistSnippets: {
+        'spare-snare': 'Dundee four-track lo-fi pioneers who rejected studio polish.',
+        'Chemikal Underground': 'Glasgow artist-run nerve center founded by The Delgados.',
+      },
+      graphData: {
+        nodes: [
+          { id: 'spare-snare-gb', label: 'Spare Snare', type: 'artist', group: 1, isSeed: true },
+          { id: 'chemikal-underground', label: 'Chemikal Underground', type: 'label', group: 2, isSeed: false },
+        ],
+        links: [],
+      },
+    };
+    const scene2: ProjectScene = {
+      ...createEmptyProjectScene(1, 'Mogwai'),
+      seedIds: ['mogwai-gb'],
+      status: 'ready',
+      synthesisRationale: 'Mogwai short editorial.',
+      artistSnippets: {
+        mogwai: 'Glasgow post-rock architects of quiet-to-deafening crescendos.',
+      },
+      graphData: {
+        nodes: [
+          { id: 'mogwai-gb', label: 'Mogwai', type: 'artist', group: 1, isSeed: true },
+        ],
+        links: [],
+      },
+    };
+
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        overarchingRationale: 'Parity verified between **Spare Snare** and **Mogwai**.',
+        crossSceneBridges: [],
+      }),
+      usageMetadata: { promptTokenCount: 800, candidatesTokenCount: 100, totalTokenCount: 900 },
+    });
+
+    await generateOverarchingZineBackend([scene1, scene2], {});
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+
+    const promptArg = mockGenerateContent.mock.calls[0][0].contents as string;
+    // 2400-char sceneEditorialSummary preserves content well beyond the old 900-char cutoff
+    expect(promptArg).toContain('DISTINCTIVE_TAIL_MARKER_1850');
+    // ISO-stripped bare key ('spare-snare' -> 'spare-snare-gb', 'mogwai' -> 'mogwai-gb') and label key ('Chemikal Underground') resolve into bioSnippet
+    expect(promptArg).toContain('Dundee four-track lo-fi pioneers who rejected studio polish.');
+    expect(promptArg).toContain('Glasgow artist-run nerve center founded by The Delgados.');
+    expect(promptArg).toContain('Glasgow post-rock architects of quiet-to-deafening crescendos.');
   });
 
   it('maintains strict per-scene token pricing (5T Single-Seed / 10T Complex) and freezes existing scenes when adding Scene 2', () => {

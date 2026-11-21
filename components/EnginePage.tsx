@@ -381,8 +381,8 @@ const DiscoveryFlowDiagram: React.FC = () => (
                             <li>
                                 <span className="text-primary font-medium">3. Scene Zine &amp; Step 3B Overarching Multi-Scene Zine ([Rules 24, 40, 44, 45])</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
-                                    <li>Synthesizes Scene narrative in 2 AM record curator voice (zero em-dashes), weaving active Tier 2 &amp; Tier 3 anchors.</li>
-                                    <li><span className="text-zinc-300">Intermediate Hop Step 3B Bypass:</span> Intermediate hops ($k &lt; N$) strictly bypass Overarching Zine synthesis. On final hop $N$, runs <code>generateOverarchingZineBackend</code> (<code>3.1 Pro high</code>, 90s timeout failover to <code>3.6 Flash low</code>) to synthesize <code>overarchingRationale</code> and <code>crossSceneLinks</code> across all scenes.</li>
+                                    <li>Synthesizes Scene narrative in 2 AM record curator voice (zero em-dashes), weaving active Tier 2 &amp; Tier 3 anchors and persisting ISO-matched <code>artistSnippets</code> to global <code>/artists</code> cache for Direct Hit parity.</li>
+                                    <li><span className="text-zinc-300">Intermediate Hop Step 3B Bypass &amp; Quality-Retry Gate (V45.8):</span> Intermediate hops ($k &lt; N$) strictly bypass Overarching Zine synthesis. On final hop $N$ (or Direct Hit <code>overarching_only</code>), runs <code>generateOverarchingZineBackend</code> (<code>3.1 Pro high</code>, 90s timeout failover to <code>3.6 Flash low</code>) with 2,400-char scene context, locked 3-column editorial rubric + 3–5 distinct <code>sonic_lineage</code> bridges, and deterministic <code>assessOverarchingZineQuality</code> bounded single corrective retry.</li>
                                 </ul>
                             </li>
                             <li>

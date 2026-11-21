@@ -1,6 +1,6 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act, cleanup } from '@testing-library/react';
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import '@testing-library/jest-dom';
 import {
   buildCompositeCanvasGraph,
@@ -67,8 +67,8 @@ vi.mock('../../services/firebase', () => ({
 }));
 
 vi.mock('firebase/functions', () => ({
-  getFunctions: vi.fn(() => ({})),
-  httpsCallable: vi.fn((_fns: any, name: string) => {
+  getFunctions: () => ({}),
+  httpsCallable: (_fns: any, name: string) => {
     return async (payload: any) => {
       callableCalls.push({ name, payload });
       const handler = callableHandlers.get(name);
@@ -77,7 +77,7 @@ vi.mock('firebase/functions', () => ({
       }
       return handler(payload);
     };
-  }),
+  },
 }));
 
 vi.mock('lottie-react', () => ({
@@ -355,7 +355,36 @@ async function flushMicrotasks(rounds = 6) {
   }
 }
 
-async function waitForSync<T>(fn: () => T, maxSteps = 20): Promise<T> {
+function isInActiveView(el: Element): boolean {
+  return !el.closest('.pointer-events-none');
+}
+
+function findButtonsByText(pattern: RegExp, onlyEnabled = false): HTMLButtonElement[] {
+  const btns = Array.from(document.querySelectorAll('button')) as HTMLButtonElement[];
+  return btns.filter((b) => isInActiveView(b) && pattern.test(b.textContent || '') && (!onlyEnabled || !b.disabled));
+}
+
+function getButtonByText(pattern: RegExp, onlyEnabled = false): HTMLButtonElement {
+  const matches = findButtonsByText(pattern, onlyEnabled);
+  if (matches.length === 0) {
+    const allTexts = Array.from(document.querySelectorAll('button'))
+      .filter(isInActiveView)
+      .map((b) => `${b.disabled ? '[disabled] ' : ''}${(b.textContent || '').trim().slice(0, 40)}`)
+      .filter(Boolean)
+      .slice(0, 25);
+    const formText = document.querySelector('[data-testid="validation-confirm-button"]')?.closest('form')?.textContent?.slice(0, 200) || '';
+    throw new Error(`No ${onlyEnabled ? 'enabled ' : ''}button matching ${pattern} in active view. Available buttons: ${allTexts.join(' | ')}${formText ? ` | ModalForm: ${formText}` : ''} | Callables: ${callableCalls.map((c) => c.name).join(',')}`);
+  }
+  return matches[0];
+}
+
+function getActiveElementByTestId(testId: string): HTMLElement {
+  const matches = screen.getAllByTestId(testId).filter(isInActiveView);
+  if (matches.length === 0) throw new Error(`No active element with testId="${testId}"`);
+  return matches[0];
+}
+
+async function waitForSync<T>(fn: () => T, maxSteps = 15): Promise<T> {
   let lastErr: any;
   for (let i = 0; i < maxSteps; i++) {
     try {
@@ -364,14 +393,44 @@ async function waitForSync<T>(fn: () => T, maxSteps = 20): Promise<T> {
       lastErr = e;
       await act(async () => {
         await Promise.resolve();
-        await vi.advanceTimersByTimeAsync(50);
+        await vi.advanceTimersByTimeAsync(100);
       });
     }
   }
   throw lastErr;
 }
 
+async function addSeedArtist(name: string) {
+  const inputs = screen.getAllByPlaceholderText(/Add artist/i).filter(isInActiveView);
+  const artistInput = inputs[0] || screen.getAllByPlaceholderText(/Add artist/i)[0];
+  fireEvent.change(artistInput, { target: { value: name } });
+  await flushMicrotasks(2);
+  const addBtns = screen.getAllByTestId('curate-button').filter(isInActiveView);
+  const enabledAdd = addBtns.find((b) => !(b as HTMLButtonElement).disabled) || addBtns[0];
+  fireEvent.click(enabledAdd);
+  await flushMicrotasks(4);
+}
+
+async function confirmAndClickOverwriteExisting() {
+  const checkbox = await waitForSync(() => screen.getByLabelText(/I understand that overwriting/i));
+  fireEvent.click(checkbox);
+  await flushMicrotasks(2);
+  const overwriteBtn = await waitForSync(() => getButtonByText(/Overwrite Existing/i, true));
+  fireEvent.click(overwriteBtn);
+  await flushMicrotasks(6);
+}
+
 describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout: 15000 }, () => {
+  beforeAll(async () => {
+    // Preload all React.lazy views in App.tsx so <React.Suspense> never stalls under fake timers
+    await Promise.all([
+      import('../../components/DesignSystem'),
+      import('../../components/EnginePage'),
+      import('../../components/UsageAnalyticsPage'),
+      import('../../components/TrashPage'),
+    ]);
+  });
+
   beforeEach(() => {
     vi.useFakeTimers({
       toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date'],
@@ -413,17 +472,41 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
       bottom: 700,
       x: 0,
       y: 0,
-      toJSON: () => { },
+      toJSON: () => {},
     })) as any;
 
-    global.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ playable: true, results: [] }),
+    global.fetch = vi.fn().mockImplementation(async (input: any) => {
+      const url = typeof input === 'string' ? input : String(input?.url || '');
+      const artistMatch = url.match(/\/api\/artist\/([^/?#]+)/);
+      if (artistMatch) {
+        const id = decodeURIComponent(artistMatch[1]);
+        const docData = harness.getRawDoc(`artists/${id}`);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => (docData ? docData : { found: false }),
+        };
+      }
+      const labelMatch = url.match(/\/api\/label\/([^/?#]+)/);
+      if (labelMatch) {
+        const id = decodeURIComponent(labelMatch[1]);
+        const docData = harness.getRawDoc(`labels/${id}`);
+        return {
+          ok: true,
+          status: 200,
+          json: async () => (docData ? docData : { found: false }),
+        };
+      }
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({ playable: true, results: [] }),
+      };
     }) as any;
 
     // Default pre-flight validator callable
     callableHandlers.set('validateSeedOriginCallable', async (payload: any) => {
-      const q = String(payload?.artistName || payload?.query || '').trim();
+      const q = String(payload?.seed || payload?.artistName || payload?.query || '').trim();
       const norm = q.toLowerCase().replace(/[^a-z0-9]+/g, '-');
       const isMogwai = norm.includes('mogwai');
       const isJealous = norm.includes('jealous');
@@ -570,22 +653,19 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
     await flushMicrotasks(10);
 
     // Switch to ROOTS tab on mobile if needed
-    const rootsTabs = screen.queryAllByRole('button', { name: /^Roots/i });
+    const rootsTabs = findButtonsByText(/^Roots/i);
     if (rootsTabs.length > 0) {
       fireEvent.click(rootsTabs[0]);
       await flushMicrotasks(4);
     }
 
     // Click + Add Scene
-    const addSceneBtn = await waitForSync(() => screen.getAllByTestId('add-scene-button')[0]);
+    const addSceneBtn = await waitForSync(() => getActiveElementByTestId('add-scene-button'));
     fireEvent.click(addSceneBtn);
     await flushMicrotasks(4);
 
     // Type "Mogwai" into Add artist input and commit
-    const artistInput = screen.getAllByPlaceholderText(/Add artist/i)[0];
-    fireEvent.change(artistInput, { target: { value: 'Mogwai' } });
-    fireEvent.keyDown(artistInput, { key: 'Enter', code: 'Enter' });
-    await flushMicrotasks(4);
+    await addSeedArtist('Mogwai');
 
     // Wait 5s so the 3s Autosave timer fires on proj-orig
     await act(async () => {
@@ -601,25 +681,21 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
     expect(origScenesAfterWait[0].seedArtists).toBe('Spare Snare');
 
     // Click Update Zcene -> Save as New Zcene
-    const updateBtn = screen.getAllByRole('button', { name: /Update Zcene/i })[0];
+    const updateBtn = await waitForSync(() => getButtonByText(/Update Zcene/i, true));
     fireEvent.click(updateBtn);
     await flushMicrotasks(4);
 
-    const forkBtn = await waitForSync(() => screen.getAllByRole('button', { name: /Save as New Zcene/i })[0]);
+    const forkBtn = await waitForSync(() => getButtonByText(/Save as New Zcene/i, true));
     fireEvent.click(forkBtn);
     await flushMicrotasks(6);
 
     // Confirm Token Spend modal
-    const confirmSpendBtn = await waitForSync(() => screen.getAllByRole('button', { name: /Confirm & Spend|Confirm \(Admin\)/i })[0]);
+    const confirmSpendBtn = await waitForSync(() => getButtonByText(/Confirm & Spend|Confirm \(Admin\)/i, true));
     fireEvent.click(confirmSpendBtn);
     await flushMicrotasks(8);
 
     // Confirm Artist Validation modal
-    const confirmGenBtn = await waitForSync(() => {
-      const btn = screen.getAllByRole('button', { name: /Confirm & Generate/i })[0];
-      expect(btn).not.toBeDisabled();
-      return btn;
-    });
+    const confirmGenBtn = await waitForSync(() => getButtonByText(/Confirm & Generate/i, true));
     fireEvent.click(confirmGenBtn);
     await flushMicrotasks(10);
 
@@ -692,28 +768,20 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
     await flushMicrotasks(10);
 
     // + Add Scene -> Mogwai
-    fireEvent.click(await waitForSync(() => screen.getAllByTestId('add-scene-button')[0]));
+    fireEvent.click(await waitForSync(() => getActiveElementByTestId('add-scene-button')));
     await flushMicrotasks(4);
 
-    const artistInput = screen.getAllByPlaceholderText(/Add artist/i)[0];
-    fireEvent.change(artistInput, { target: { value: 'Mogwai' } });
-    fireEvent.keyDown(artistInput, { key: 'Enter', code: 'Enter' });
-    await flushMicrotasks(4);
+    await addSeedArtist('Mogwai');
 
     // Update Zcene -> Overwrite Existing
-    fireEvent.click(screen.getAllByRole('button', { name: /Update Zcene/i })[0]);
+    fireEvent.click(await waitForSync(() => getButtonByText(/Update Zcene/i, true)));
     await flushMicrotasks(4);
-    fireEvent.click(await waitForSync(() => screen.getAllByRole('button', { name: /Overwrite Existing/i })[0]));
-    await flushMicrotasks(6);
+    await confirmAndClickOverwriteExisting();
 
-    fireEvent.click(await waitForSync(() => screen.getAllByRole('button', { name: /Confirm & Spend|Confirm \(Admin\)/i })[0]));
+    fireEvent.click(await waitForSync(() => getButtonByText(/Confirm & Spend|Confirm \(Admin\)/i, true)));
     await flushMicrotasks(8);
 
-    const confirmGenBtn = await waitForSync(() => {
-      const btn = screen.getAllByRole('button', { name: /Confirm & Generate/i })[0];
-      expect(btn).not.toBeDisabled();
-      return btn;
-    });
+    const confirmGenBtn = await waitForSync(() => getButtonByText(/Confirm & Generate/i, true));
     fireEvent.click(confirmGenBtn);
     await flushMicrotasks(10);
 
@@ -739,9 +807,17 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
     await flushMicrotasks(6);
 
     // Switch Scene 1 -> Scene 2 -> Scene 1
-    fireEvent.click(await waitForSync(() => screen.getAllByRole('button', { name: /Scene 2/i })[0]));
+    fireEvent.click(await waitForSync(() => {
+      const matches = screen.getAllByText(/^Scene 2$/i).filter(isInActiveView);
+      if (matches.length === 0) throw new Error('Scene 2 tab not found in active view');
+      return matches[0];
+    }));
     await flushMicrotasks(4);
-    fireEvent.click(await waitForSync(() => screen.getAllByRole('button', { name: /Scene 1/i })[0]));
+    fireEvent.click(await waitForSync(() => {
+      const matches = screen.getAllByText(/^Scene 1$/i).filter(isInActiveView);
+      if (matches.length === 0) throw new Error('Scene 1 tab not found in active view');
+      return matches[0];
+    }));
     await flushMicrotasks(4);
 
     // Verify Scene 1 kept its original seedIds and frozen coordinates
@@ -755,7 +831,7 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
     expect(spareSnareCoord.y).toBe(1000);
 
     // Update Zcene button must be disabled (no false dirty badge)
-    const updateAfter = screen.getAllByRole('button', { name: /Update Zcene/i })[0];
+    const updateAfter = getButtonByText(/Update Zcene/i);
     expect(updateAfter).toBeDisabled();
   });
 
@@ -798,30 +874,22 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
     render(<App />);
     await flushMicrotasks(10);
 
-    const rootsTabs = screen.queryAllByRole('button', { name: /^Roots/i });
+    const rootsTabs = findButtonsByText(/^Roots/i);
     if (rootsTabs.length > 0) {
       fireEvent.click(rootsTabs[0]);
       await flushMicrotasks(4);
     }
 
-    fireEvent.click(await waitForSync(() => screen.getAllByTestId('add-scene-button')[0]));
+    fireEvent.click(await waitForSync(() => getActiveElementByTestId('add-scene-button')));
     await flushMicrotasks(4);
-    const artistInput = screen.getAllByPlaceholderText(/Add artist/i)[0];
-    fireEvent.change(artistInput, { target: { value: 'Mogwai' } });
-    fireEvent.keyDown(artistInput, { key: 'Enter', code: 'Enter' });
-    await flushMicrotasks(4);
+    await addSeedArtist('Mogwai');
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Update Zcene/i })[0]);
+    fireEvent.click(await waitForSync(() => getButtonByText(/Update Zcene/i, true)));
     await flushMicrotasks(4);
-    fireEvent.click(await waitForSync(() => screen.getAllByRole('button', { name: /Overwrite Existing/i })[0]));
-    await flushMicrotasks(6);
-    fireEvent.click(await waitForSync(() => screen.getAllByRole('button', { name: /Confirm & Spend|Confirm \(Admin\)/i })[0]));
+    await confirmAndClickOverwriteExisting();
+    fireEvent.click(await waitForSync(() => getButtonByText(/Confirm & Spend|Confirm \(Admin\)/i, true)));
     await flushMicrotasks(8);
-    const confirmGenBtn = await waitForSync(() => {
-      const btn = screen.getAllByRole('button', { name: /Confirm & Generate/i })[0];
-      expect(btn).not.toBeDisabled();
-      return btn;
-    });
+    const confirmGenBtn = await waitForSync(() => getButtonByText(/Confirm & Generate/i, true));
     fireEvent.click(confirmGenBtn);
 
     // Advance 2.5s so callable rejects with simulated mobile network drop
@@ -888,25 +956,19 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
     await flushMicrotasks(8);
 
     // 3. Click + Create for Project B
-    const createBtn = await waitForSync(() => screen.getAllByRole('button', { name: /Create/i })[0]);
+    const createBtn = await waitForSync(() => getButtonByText(/Create/i, true));
     fireEvent.click(createBtn);
     await flushMicrotasks(8);
 
     // 4. Enter "The Jealous Sound" and trigger curation
-    const artistInput = await waitForSync(() => screen.getAllByPlaceholderText(/Add artist/i)[0]);
-    fireEvent.change(artistInput, { target: { value: 'The Jealous Sound' } });
-    fireEvent.keyDown(artistInput, { key: 'Enter', code: 'Enter' });
-    await flushMicrotasks(4);
+    await waitForSync(() => screen.getAllByPlaceholderText(/Add artist/i)[0]);
+    await addSeedArtist('The Jealous Sound');
 
-    fireEvent.click(screen.getAllByRole('button', { name: /Create Zcene/i })[0]);
+    fireEvent.click(await waitForSync(() => getButtonByText(/Create Zcene/i, true)));
     await flushMicrotasks(6);
-    fireEvent.click(await waitForSync(() => screen.getAllByRole('button', { name: /Confirm & Spend|Confirm \(Admin\)/i })[0]));
+    fireEvent.click(await waitForSync(() => getButtonByText(/Confirm & Spend|Confirm \(Admin\)/i, true)));
     await flushMicrotasks(8);
-    const confirmGenBtn = await waitForSync(() => {
-      const btn = screen.getAllByRole('button', { name: /Confirm & Generate/i })[0];
-      expect(btn).not.toBeDisabled();
-      return btn;
-    });
+    const confirmGenBtn = await waitForSync(() => getButtonByText(/Confirm & Generate/i, true));
     fireEvent.click(confirmGenBtn);
     await flushMicrotasks(10);
 

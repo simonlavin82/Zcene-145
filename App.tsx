@@ -4437,6 +4437,18 @@ const App: React.FC = () => {
     const humanSeedString = humanSeedNames.join('::');
     const humanSceneTitle = humanSeedNames.join(', ');
 
+    const directHitSnippets: Record<string, string> = {
+      ...(data?.artistSnippets && typeof data.artistSnippets === 'object' ? data.artistSnippets : {}),
+    };
+    for (const n of (normalizedGraph.nodes || [])) {
+      if ((n as any)?.narrativeSnippet && typeof (n as any).narrativeSnippet === 'string' && (n as any).narrativeSnippet.trim()) {
+        const rawNodeId = stripSceneNamespace((n as any).canonicalId || n.id || '');
+        const normNodeId = normalizeArtistId(rawNodeId);
+        if (rawNodeId && !directHitSnippets[rawNodeId]) directHitSnippets[rawNodeId] = (n as any).narrativeSnippet;
+        if (normNodeId && !directHitSnippets[normNodeId]) directHitSnippets[normNodeId] = (n as any).narrativeSnippet;
+      }
+    }
+
     const updatedScene: ProjectScene = normalizeProjectScene({
       ...currentScenesList[targetSceneIdx],
       id: targetSceneId,
@@ -4452,6 +4464,7 @@ const App: React.FC = () => {
       curatedDiscoveryFilters: discoveryFiltersRef.current || {},
       graphData: normalizedGraph,
       synthesisRationale: normalizedGraph.synthesisRationale || rationaleVal || '',
+      artistSnippets: directHitSnippets,
       activeNodes: sceneActiveNodeIds,
       centerOffset: getSceneCenterOffset(targetSceneIdx),
       status: 'completed',
@@ -4699,6 +4712,17 @@ const App: React.FC = () => {
           idx = previewScenes.length;
           previewScenes.push(normalizeProjectScene({ ...createEmptyScene(idx), id: targetSceneId, sceneId: targetSceneId }, idx));
         }
+        const previewSnippets: Record<string, string> = {
+          ...(directHitCacheDocData?.artistSnippets && typeof directHitCacheDocData.artistSnippets === 'object' ? directHitCacheDocData.artistSnippets : {}),
+        };
+        for (const n of (normG.nodes || [])) {
+          if ((n as any)?.narrativeSnippet && typeof (n as any).narrativeSnippet === 'string' && (n as any).narrativeSnippet.trim()) {
+            const rawNodeId = stripSceneNamespace((n as any).canonicalId || n.id || '');
+            const normNodeId = normalizeArtistId(rawNodeId);
+            if (rawNodeId && !previewSnippets[rawNodeId]) previewSnippets[rawNodeId] = (n as any).narrativeSnippet;
+            if (normNodeId && !previewSnippets[normNodeId]) previewSnippets[normNodeId] = (n as any).narrativeSnippet;
+          }
+        }
         previewScenes[idx] = normalizeProjectScene({
           ...previewScenes[idx],
           id: targetSceneId,
@@ -4712,6 +4736,7 @@ const App: React.FC = () => {
           discoveryFilters: discoveryFiltersRef.current || {},
           graphData: normG,
           synthesisRationale: rationaleVal,
+          artistSnippets: previewSnippets,
           activeNodes: normG.nodes.filter((n: any) => n.type === 'artist' || n.type === 'label').map((n: any) => n.id),
           centerOffset: getSceneCenterOffset(idx),
           status: 'completed',

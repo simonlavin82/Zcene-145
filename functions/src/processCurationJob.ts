@@ -513,8 +513,20 @@ export const processCurationJob = onDocumentCreated({
               }
 
               if (parsedGraph?.nodes?.length >= 2 && isFullyQualifiedEntityProfile(cachedDetails, false, null, { requireMembersAndPeers: true })) {
+                const hydratedDirectHitSnippets: Record<string, string> = {
+                  ...(sCache.artistSnippets && typeof sCache.artistSnippets === 'object' ? sCache.artistSnippets : {}),
+                };
+                for (const node of (parsedGraph.nodes || [])) {
+                  if (node?.narrativeSnippet && typeof node.narrativeSnippet === 'string' && node.narrativeSnippet.trim()) {
+                    const rawNodeId = stripSceneNamespace(node.canonicalId || node.id || '');
+                    const normNodeId = normalizeArtistId(rawNodeId);
+                    if (rawNodeId && !hydratedDirectHitSnippets[rawNodeId]) hydratedDirectHitSnippets[rawNodeId] = node.narrativeSnippet;
+                    if (normNodeId && !hydratedDirectHitSnippets[normNodeId]) hydratedDirectHitSnippets[normNodeId] = node.narrativeSnippet;
+                  }
+                }
                 s.graphData = parsedGraph;
                 s.synthesisRationale = sCache.synthesisRationale || parsedGraph.synthesisRationale || "";
+                s.artistSnippets = hydratedDirectHitSnippets;
                 s.status = "ready";
                 s.pathway = "direct_hit";
                 s.curatedSeedArtists = s.seedArtists;
@@ -1537,13 +1549,23 @@ export const processCurationJob = onDocumentCreated({
                 }
               });
               finalGraph.nodes.forEach((n: any) => {
-                const snippetObj = rootBreakdownPayload.artistSnippets.find((s: any) =>
-                  normalizeArtistId(s.id) === normalizeArtistId(n.id) ||
-                  s.id.toLowerCase() === n.id.toLowerCase()
-                );
+                const nodeNorm = normalizeArtistId(n.id);
+                const nodeBare = stripCountrySlug(nodeNorm);
+                const nodeLabelNorm = n.label ? normalizeArtistId(n.label) : '';
+                const snippetObj = rootBreakdownPayload.artistSnippets.find((s: any) => {
+                  const sNorm = normalizeArtistId(s.id);
+                  const sBare = stripCountrySlug(sNorm);
+                  return (
+                    sNorm === nodeNorm ||
+                    (nodeBare && sBare === nodeBare) ||
+                    (nodeLabelNorm && sNorm === nodeLabelNorm) ||
+                    s.id.toLowerCase() === n.id.toLowerCase()
+                  );
+                });
                 if (snippetObj && snippetObj.snippet) {
                   n.narrativeSnippet = snippetObj.snippet;
                   sceneArtistSnippetsMap[n.id] = snippetObj.snippet;
+                  sceneArtistSnippetsMap[nodeNorm] = snippetObj.snippet;
                 }
               });
             }
@@ -2575,6 +2597,7 @@ export const processCurationJob = onDocumentCreated({
               detailsCache: finalRecDetails, // Save as structured object!
               filters: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? inputPayload.filters || null : null,
               synthesisRationale: (matchingSeedNorm && hasValidRationale && !isComplexGeneration) ? finalGraph.synthesisRationale : null,
+              artistSnippets: (matchingSeedNorm && !isLabel && !isComplexGeneration && Object.keys(sceneArtistSnippetsMap).length > 0) ? sceneArtistSnippetsMap : null,
               cacheVersion: 4,
               createdAt: FieldValue.serverTimestamp(),
               updatedAt: FieldValue.serverTimestamp(),
@@ -2641,6 +2664,9 @@ export const processCurationJob = onDocumentCreated({
                   updatePayload.filters = inputPayload.filters || null;
                   if (hasValidRationale) {
                     updatePayload.synthesisRationale = finalGraph.synthesisRationale;
+                  }
+                  if (Object.keys(sceneArtistSnippetsMap).length > 0) {
+                    updatePayload.artistSnippets = sceneArtistSnippetsMap;
                   }
                 }
               }

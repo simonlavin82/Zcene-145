@@ -445,8 +445,22 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 cachedDetails = match ? match[1] : (Array.isArray(cachedDetails[0]) ? cachedDetails[0][1] : cachedDetails[0]);
                             }
                             if (parsedGraph?.nodes?.length >= 2 && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(cachedDetails, false, null, { requireMembersAndPeers: true })) {
+                                const hydratedDirectHitSnippets = {
+                                    ...(sCache.artistSnippets && typeof sCache.artistSnippets === 'object' ? sCache.artistSnippets : {}),
+                                };
+                                for (const node of (parsedGraph.nodes || [])) {
+                                    if (node?.narrativeSnippet && typeof node.narrativeSnippet === 'string' && node.narrativeSnippet.trim()) {
+                                        const rawNodeId = (0, multiSceneUtils_1.stripSceneNamespace)(node.canonicalId || node.id || '');
+                                        const normNodeId = (0, curatorService_1.normalizeArtistId)(rawNodeId);
+                                        if (rawNodeId && !hydratedDirectHitSnippets[rawNodeId])
+                                            hydratedDirectHitSnippets[rawNodeId] = node.narrativeSnippet;
+                                        if (normNodeId && !hydratedDirectHitSnippets[normNodeId])
+                                            hydratedDirectHitSnippets[normNodeId] = node.narrativeSnippet;
+                                    }
+                                }
                                 s.graphData = parsedGraph;
                                 s.synthesisRationale = sCache.synthesisRationale || parsedGraph.synthesisRationale || "";
+                                s.artistSnippets = hydratedDirectHitSnippets;
                                 s.status = "ready";
                                 s.pathway = "direct_hit";
                                 s.curatedSeedArtists = s.seedArtists;
@@ -1390,11 +1404,21 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 }
                             });
                             finalGraph.nodes.forEach((n) => {
-                                const snippetObj = rootBreakdownPayload.artistSnippets.find((s) => (0, curatorService_1.normalizeArtistId)(s.id) === (0, curatorService_1.normalizeArtistId)(n.id) ||
-                                    s.id.toLowerCase() === n.id.toLowerCase());
+                                const nodeNorm = (0, curatorService_1.normalizeArtistId)(n.id);
+                                const nodeBare = (0, isoCountries_1.stripCountrySlug)(nodeNorm);
+                                const nodeLabelNorm = n.label ? (0, curatorService_1.normalizeArtistId)(n.label) : '';
+                                const snippetObj = rootBreakdownPayload.artistSnippets.find((s) => {
+                                    const sNorm = (0, curatorService_1.normalizeArtistId)(s.id);
+                                    const sBare = (0, isoCountries_1.stripCountrySlug)(sNorm);
+                                    return (sNorm === nodeNorm ||
+                                        (nodeBare && sBare === nodeBare) ||
+                                        (nodeLabelNorm && sNorm === nodeLabelNorm) ||
+                                        s.id.toLowerCase() === n.id.toLowerCase());
+                                });
                                 if (snippetObj && snippetObj.snippet) {
                                     n.narrativeSnippet = snippetObj.snippet;
                                     sceneArtistSnippetsMap[n.id] = snippetObj.snippet;
+                                    sceneArtistSnippetsMap[nodeNorm] = snippetObj.snippet;
                                 }
                             });
                         }
@@ -2347,6 +2371,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             detailsCache: finalRecDetails, // Save as structured object!
                             filters: (matchingSeedNorm && !isLabel && !isComplexGeneration) ? inputPayload.filters || null : null,
                             synthesisRationale: (matchingSeedNorm && hasValidRationale && !isComplexGeneration) ? finalGraph.synthesisRationale : null,
+                            artistSnippets: (matchingSeedNorm && !isLabel && !isComplexGeneration && Object.keys(sceneArtistSnippetsMap).length > 0) ? sceneArtistSnippetsMap : null,
                             cacheVersion: 4,
                             createdAt: firestore_2.FieldValue.serverTimestamp(),
                             updatedAt: firestore_2.FieldValue.serverTimestamp(),
@@ -2411,6 +2436,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                     updatePayload.filters = inputPayload.filters || null;
                                     if (hasValidRationale) {
                                         updatePayload.synthesisRationale = finalGraph.synthesisRationale;
+                                    }
+                                    if (Object.keys(sceneArtistSnippetsMap).length > 0) {
+                                        updatePayload.artistSnippets = sceneArtistSnippetsMap;
                                     }
                                 }
                             }
