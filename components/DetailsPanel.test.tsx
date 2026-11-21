@@ -3166,6 +3166,100 @@ describe('DetailsPanel', () => {
                 expect(mobileEditBtn.className).toContain('w-[88px]');
                 expect(mobileEditBtn).toHaveTextContent('Done');
             });
+
+            describe('v45.15 — Zine View Scene Circle Scroll & Sticky Header Integrity', () => {
+                it('renders heading as relative and NOT sticky top-0 when isHeaderStuck is false in full-screen mode', () => {
+                    const node = { id: 'lung-leg-gb', label: 'Lung Leg', type: 'artist' as const };
+                    render(
+                        <NodeDetailsCard
+                            node={node}
+                            details={{ summary: 'Summary', details: { artist: 'Lung Leg' } } as any}
+                            isLoading={false}
+                            isGlobalLoading={false}
+                            graphData={{ nodes: [node], links: [] } as any}
+                            libraryArtists={[]}
+                            seedArtists={['Lung Leg']}
+                            onAddArtist={() => {}}
+                            isSmallScreen={false}
+                            onClose={() => {}}
+                            onNodeClick={() => {}}
+                            onNavigate={() => {}}
+                            chatHistory={[]}
+                            onSendMessage={() => {}}
+                            isChatLoading={false}
+                            chatMode="instant"
+                            onChatModeChange={() => {}}
+                            liveMessageCount={0}
+                            isInStack={false}
+                            onToggleStack={() => {}}
+                            stack={[]}
+                            isFullScreenMode={true}
+                        />
+                    );
+
+                    const cardHeading = screen.getByRole('heading', { level: 3 });
+                    const headingWrapper = cardHeading.closest('.z-40');
+                    expect(headingWrapper).not.toBeNull();
+                    expect(headingWrapper?.className).toContain('relative');
+                    expect(headingWrapper?.className).not.toContain('sticky top-0');
+                });
+
+                it('smoothly scrolls #magazine-scroll-container when selectedNode has a multi-scene namespaced ID matching a bare card', async () => {
+                    vi.useFakeTimers();
+                    const originalScrollTo = Element.prototype.scrollTo;
+                    const scrollToSpy = vi.fn();
+                    Element.prototype.scrollTo = scrollToSpy;
+
+                    try {
+                        const bareNode1 = { id: 'bis-gb', label: 'Bis', type: 'artist' as const };
+                        const bareNode2 = { id: 'lung-leg-gb', label: 'Lung Leg', type: 'artist' as const };
+                        const namespacedNode1 = { id: 'scene-1::bis-gb', canonicalId: 'bis-gb', label: 'Bis', type: 'artist' as const };
+                        const namespacedNode2 = { id: 'scene-1::lung-leg-gb', canonicalId: 'lung-leg-gb', label: 'Lung Leg', type: 'artist' as const };
+
+                        const { rerender } = render(
+                            <DetailsPanel
+                                {...baseProps({
+                                    isMagazineViewOpen: true,
+                                    isSmallScreen: false,
+                                    activeNodes: [bareNode1, bareNode2],
+                                    selectedNode: namespacedNode1,
+                                })}
+                            />
+                        );
+
+                        // Card DOM element must have rendered with data-canonical-id
+                        const targetCard = document.getElementById('magazine-card-lung-leg-gb');
+                        expect(targetCard).toBeInTheDocument();
+                        expect(targetCard?.getAttribute('data-canonical-id')).toBe('lung-leg-gb');
+
+                        // Now select namespacedNode2 (as happens when clicking Scene Circle chip)
+                        rerender(
+                            <DetailsPanel
+                                {...baseProps({
+                                    isMagazineViewOpen: true,
+                                    isSmallScreen: false,
+                                    activeNodes: [bareNode1, bareNode2],
+                                    selectedNode: namespacedNode2,
+                                })}
+                            />
+                        );
+
+                        // Advance beyond SCROLL_DELAY (50ms on desktop)
+                        act(() => {
+                            vi.advanceTimersByTime(100);
+                        });
+
+                        expect(scrollToSpy).toHaveBeenCalledWith(
+                            expect.objectContaining({
+                                behavior: 'smooth',
+                            })
+                        );
+                    } finally {
+                        Element.prototype.scrollTo = originalScrollTo;
+                        vi.useRealTimers();
+                    }
+                });
+            });
         });
     });
 });

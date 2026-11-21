@@ -1448,9 +1448,9 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 <div ref={sentinelRef} className="w-full h-[1px] -mt-[1px] pointer-events-none" />
                 {/* 2. Artist Name & Pills */}
                 <div
-                    className={`transition-all duration-300 flex-shrink-0 sticky z-40 w-full ${isFullScreenMode
-                        ? isHeaderStuck ? 'top-2' : 'top-0'
-                        : `top-0 border-b ${isHeaderStuck ? 'border-zinc-800/50 bg-zinc-900' : 'border-transparent bg-transparent'}`
+                    className={`transition-all duration-300 flex-shrink-0 z-40 w-full ${isFullScreenMode
+                        ? isHeaderStuck ? 'sticky top-2' : 'relative'
+                        : `sticky top-0 border-b ${isHeaderStuck ? 'border-zinc-800/50 bg-zinc-900' : 'border-transparent bg-transparent'}`
                         }`}
                 >
                     <div className={`transition-all duration-300 ${isFullScreenMode
@@ -3678,6 +3678,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     }, [isCollapsed]);
 
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        if (!isProgrammaticScrollRef.current) {
+            lastScrolledNodeIdRef.current = null;
+        }
         if (e.currentTarget.scrollTop > 500) {
             setShowScrollTop(true);
         } else {
@@ -3849,6 +3852,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
     const hasOpenedMagazineRef = useRef(false);
     const lastScrolledNodeIdRef = useRef<string | null>(null);
+    const isProgrammaticScrollRef = useRef(false);
 
     useEffect(() => {
         if (!isMagazineViewOpen) {
@@ -3864,12 +3868,24 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 container.scrollTop = 0;
             }
             if (selectedNode) {
-                lastScrolledNodeIdRef.current = selectedNode.id;
+                lastScrolledNodeIdRef.current = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id).toLowerCase();
             }
             return;
         }
 
-        if (selectedNode && selectedNode.id !== lastScrolledNodeIdRef.current) {
+        const selectedCanon = selectedNode ? stripSceneNamespace(selectedNode.canonicalId || selectedNode.id).toLowerCase() : null;
+        if (selectedNode && selectedCanon !== lastScrolledNodeIdRef.current) {
+            // If the target artist is currently filtered out by a Zine search query, clear it so the card renders
+            if (magazineSearchQuery.trim()) {
+                const isPresent = filteredAndSortedNodes.some(n => {
+                    const nCanon = stripSceneNamespace(n.canonicalId || n.id).toLowerCase();
+                    return nCanon === selectedCanon || normalizeArtistId(nCanon) === normalizeArtistId(selectedCanon || '');
+                });
+                if (!isPresent) {
+                    setMagazineSearchQuery('');
+                }
+            }
+
             // On mobile a 300ms tab-switch animation (duration-300) runs concurrently
             // with this scroll. Wait for it to fully settle before measuring bounding
             // rects. On desktop there is no tab animation, 50ms is sufficient.
@@ -3882,7 +3898,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
             const timeoutId = setTimeout(() => {
                 const container = document.getElementById('magazine-scroll-container');
-                const targetEl = document.getElementById(`magazine-card-${selectedNode.id}`);
+                const rawId = selectedNode.id;
+                const canonId = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id);
+                const normId = normalizeArtistId(canonId);
+
+                const targetEl =
+                    document.getElementById(`magazine-card-${rawId}`) ||
+                    document.getElementById(`magazine-card-${canonId}`) ||
+                    document.getElementById(`magazine-card-${normId}`) ||
+                    document.querySelector(`[data-canonical-id="${canonId}"]`) ||
+                    document.querySelector(`[data-canonical-id="${normId}"]`) ||
+                    document.querySelector(`[data-node-id="${rawId}"]`) ||
+                    document.querySelector(`[data-node-id="${canonId}"]`);
+
                 if (container && targetEl) {
                     const containerRect = container.getBoundingClientRect();
                     const targetRect = targetEl.getBoundingClientRect();
@@ -3891,11 +3919,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     // The floating mobile header (h-16) sits *above* the container in
                     // the DOM, so containerRect.top already accounts for it — no
                     // additional header offset subtraction is needed here.
+                    isProgrammaticScrollRef.current = true;
                     container.scrollTo({ top: relativeTop - SCROLL_PADDING, behavior: 'smooth' });
                     // Only commit the guard AFTER a scroll actually fires.
                     // If the card doesn't exist (e.g. API failure), the guard stays
                     // null/stale so the next state change can retry the scroll.
-                    lastScrolledNodeIdRef.current = selectedNode.id;
+                    lastScrolledNodeIdRef.current = canonId.toLowerCase();
+                    setTimeout(() => {
+                        isProgrammaticScrollRef.current = false;
+                    }, 600);
                 }
             }, SCROLL_DELAY);
             return () => clearTimeout(timeoutId);
@@ -4658,8 +4690,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         id="magazine-scroll-container"
                         className={`${isStaticMockup ? 'overflow-hidden h-auto' : 'flex-grow relative min-h-0'} ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800 overflow-x-clip' : 'overflow-hidden'}`}
                         onScroll={isMagazineViewOpen ? handleScroll : undefined}
+                        onWheel={isMagazineViewOpen ? () => { lastScrolledNodeIdRef.current = null; } : undefined}
                         onTouchStart={handleTouchStart}
-                        onTouchMove={handleTouchMove}
+                        onTouchMove={isMagazineViewOpen ? () => { lastScrolledNodeIdRef.current = null; } : handleTouchMove}
                         onTouchEnd={handleTouchEnd}
                         style={isMagazineViewOpen ? { touchAction: 'pan-y', overscrollBehaviorY: 'auto', overflowAnchor: 'none' } : {}}
                     >
@@ -4887,7 +4920,12 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     return filteredAndSortedNodes.map((node) => {
                                         const details = detailsCache.get(node.id) || detailsCache.get(node.id.toLowerCase()) || detailsCache.get(normalizeArtistId(node.id)) || null;
                                         const isRichData = details && details.imageUrl && details.summary.length > 200;
-                                        const isHero = isMagazineViewOpen && (node.id === selectedNode?.id || (isRichData && node.type === 'artist'));
+                                        const nodeCanonId = stripSceneNamespace(node.canonicalId || node.id);
+                                        const selectedCanonId = selectedNode ? stripSceneNamespace(selectedNode.canonicalId || selectedNode.id) : null;
+                                        const isHero = isMagazineViewOpen && (
+                                            (selectedCanonId && nodeCanonId.toLowerCase() === selectedCanonId.toLowerCase()) ||
+                                            (isRichData && node.type === 'artist')
+                                        );
                                         const pinSequenceIndex = pinnedArray.findIndex((id: any) => typeof id === 'string' && id.toLowerCase() === node.id.toLowerCase());
                                         const pinSequence = pinSequenceIndex !== -1 ? pinSequenceIndex + 1 : undefined;
 
@@ -4895,6 +4933,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             <div
                                                 key={node.id}
                                                 id={`magazine-card-${node.id}`}
+                                                data-node-id={node.id}
+                                                data-canonical-id={nodeCanonId}
                                                 className={`${renderMode === 'magazine'
                                                     ? 'inline-block w-full max-w-2xl text-left'
                                                     : `w-full ${isStaticMockup ? 'h-auto' : 'h-full'} flex-shrink-0 overflow-hidden`}`}
