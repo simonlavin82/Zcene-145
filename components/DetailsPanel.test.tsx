@@ -3077,6 +3077,20 @@ describe('DetailsPanel', () => {
 
                 vi.useRealTimers();
             });
+
+            it('applies inset focus-visible styling on member and album copy buttons with no raw focus:ring', () => {
+                render(<NodeDetailsCard {...baseCardProps()} />);
+                const memberBtn = screen.getByLabelText('Copy member name Jonathan Davis');
+                const albumBtn = screen.getByLabelText('Copy album Life Is Peachy');
+
+                expect(memberBtn.className).toContain('focus-visible:ring-inset');
+                expect(memberBtn.className).toContain('focus-visible:ring-primary/50');
+                expect(memberBtn.className).not.toMatch(/(^|\s)focus:ring-1(\s|$)/);
+
+                expect(albumBtn.className).toContain('focus-visible:ring-inset');
+                expect(albumBtn.className).toContain('focus-visible:ring-primary/50');
+                expect(albumBtn.className).not.toMatch(/(^|\s)focus:ring-1(\s|$)/);
+            });
         });
 
         describe('Mobile Zine Top Toolbar Geometry & Stability', () => {

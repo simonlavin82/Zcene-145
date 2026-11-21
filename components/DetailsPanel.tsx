@@ -1807,7 +1807,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                                 params: { node_id: node.id, member: cleanName }
                                                             });
                                                         }}
-                                                        className="inline-flex items-center text-left hover:text-white transition-colors cursor-pointer group/member py-0.5 rounded focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                                        className="inline-flex items-center text-left hover:text-white transition-colors cursor-pointer group/member py-0.5 rounded focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset"
                                                         title={`Click to copy "${cleanName}"`}
                                                         aria-label={`Copy member name ${cleanName}`}
                                                     >
@@ -1952,7 +1952,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                                 params: { node_id: node.id, album: album.albumName }
                                                             });
                                                         }}
-                                                        className="group/album w-full flex justify-between items-center border-b border-zinc-800/50 py-1.5 px-1 -mx-1 rounded-lg hover:bg-zinc-800/40 transition-colors text-left cursor-pointer focus:outline-none focus:ring-1 focus:ring-primary/50"
+                                                        className="group/album w-full flex justify-between items-center border-b border-zinc-800/50 py-1.5 px-1 -mx-1 rounded-lg hover:bg-zinc-800/40 transition-colors text-left cursor-pointer focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset"
                                                         title={`Click to copy "${copyString}"`}
                                                         aria-label={`Copy album ${album.albumName}`}
                                                     >
