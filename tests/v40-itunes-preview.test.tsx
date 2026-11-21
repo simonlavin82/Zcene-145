@@ -969,4 +969,164 @@ describe('Architecture V40: Instant 30-Second iTunes Audio Previews', () => {
       }
     });
   });
+
+  describe('Part 6: V45.19 Hero Artwork ↔ Album Audio Preview Alignment', () => {
+    beforeEach(() => {
+      clearPreviewMemoryCacheForTests();
+      stopGlobalAudio();
+    });
+
+    afterEach(() => {
+      clearPreviewMemoryCacheForTests();
+      stopGlobalAudio();
+    });
+
+    it('resolves hero preview via heroCollectionId lookup and warms albumPreviewCache for Essential Listening row 0 (0 extra fetches)', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [
+            { wrapperType: 'collection', collectionId: 1485311309, collectionName: 'How Could Hell Be Any Worse?' },
+            {
+              wrapperType: 'track',
+              kind: 'song',
+              artistId: 150160,
+              collectionId: 1485311309,
+              trackName: "We're Only Gonna Die",
+              collectionName: 'How Could Hell Be Any Worse?',
+              previewUrl: 'https://audio-ssl.itunes.apple.com/were-only-gonna-die.m4a',
+            },
+          ],
+        }),
+      });
+      global.fetch = fetchMock;
+
+      const playSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(async function(this: any) {
+        Object.defineProperty(this, 'paused', { value: false, configurable: true });
+        this.dispatchEvent(new Event('play'));
+      });
+
+      try {
+        render(
+          <div>
+            <AudioPreviewPlayer
+              nodeId="bad-religion-us"
+              artistName="Bad Religion"
+              itunesArtistId={150160}
+              heroCollectionId={1485311309}
+              heroAlbumName="How Could Hell Be Any Worse?"
+            />
+            <AlbumAudioPreviewButton
+              nodeId="bad-religion-us"
+              albumIndex={0}
+              artistName="Bad Religion"
+              albumName="How Could Hell Be Any Worse?"
+              itunesArtistId={150160}
+              itunesCollectionId={1485311309}
+            />
+          </div>
+        );
+
+        await act(async () => {
+          await new Promise((r) => setTimeout(r, 25));
+        });
+
+        // Must have queried the displayed hero album's collectionId, NOT artistId
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(fetchMock.mock.calls[0][0]).toBe('https://itunes.apple.com/lookup?id=1485311309&entity=song&limit=5');
+        expect(screen.getByRole('button', { name: /Play 30s Audio Preview: We're Only Gonna Die/i })).toBeDefined();
+
+        // Clicking Essential Listening row 0 hits the warmed albumPreviewCache with ZERO extra network requests
+        const row0Btn = screen.getByTestId('album-preview-btn-0');
+        await act(async () => {
+          row0Btn.click();
+          await new Promise((r) => setTimeout(r, 15));
+        });
+
+        expect(fetchMock).toHaveBeenCalledTimes(1);
+        expect(audioController.getCurrentTrackId()).toBe('bad-religion-us::album::0');
+      } finally {
+        audioController.stop();
+        playSpy.mockRestore();
+      }
+    });
+
+    it('cleanly falls back to artist-level top track preview when heroCollectionId has 0 previewable tracks', async () => {
+      const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('id=1485311309&entity=song')) {
+          return { ok: true, status: 200, json: async () => ({ results: [{ wrapperType: 'collection', collectionId: 1485311309 }] }) };
+        }
+        if (url.includes('id=150160&entity=song&limit=1')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [{
+                wrapperType: 'track',
+                kind: 'song',
+                artistId: 150160,
+                trackName: 'Infected',
+                previewUrl: 'https://audio-ssl.itunes.apple.com/infected.m4a',
+              }],
+            }),
+          };
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) };
+      });
+      global.fetch = fetchMock;
+
+      render(
+        <AudioPreviewPlayer
+          nodeId="bad-religion-us"
+          artistName="Bad Religion"
+          itunesArtistId={150160}
+          heroCollectionId={1485311309}
+          heroAlbumName="How Could Hell Be Any Worse?"
+        />
+      );
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 25));
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://itunes.apple.com/lookup?id=1485311309&entity=song&limit=5');
+      expect(fetchMock.mock.calls[1][0]).toBe('https://itunes.apple.com/lookup?id=150160&entity=song&limit=1');
+      expect(screen.getByRole('button', { name: /Play 30s Audio Preview: Infected/i })).toBeDefined();
+    });
+
+    it('preserves direct artist-level lookup for legacy cached artists lacking heroCollectionId', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [{
+            wrapperType: 'track',
+            kind: 'song',
+            artistId: 150160,
+            trackName: 'Infected',
+            previewUrl: 'https://audio-ssl.itunes.apple.com/infected.m4a',
+          }],
+        }),
+      });
+      global.fetch = fetchMock;
+
+      render(
+        <AudioPreviewPlayer
+          nodeId="bad-religion-us"
+          artistName="Bad Religion"
+          itunesArtistId={150160}
+        />
+      );
+
+      await act(async () => {
+        await new Promise((r) => setTimeout(r, 25));
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://itunes.apple.com/lookup?id=150160&entity=song&limit=1');
+      expect(screen.getByRole('button', { name: /Play 30s Audio Preview: Infected/i })).toBeDefined();
+    });
+  });
 });

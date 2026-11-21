@@ -181,6 +181,8 @@ export interface AudioPreviewPlayerProps {
   previewUrl?: string | null;
   previewTrackName?: string | null;
   itunesArtistId?: number | null;
+  heroCollectionId?: number | null;
+  heroAlbumName?: string | null;
   onPreviewResolved?: (resolved: { previewUrl: string; previewTrackName: string; itunesArtistId?: number }) => void;
   className?: string;
 }
@@ -191,6 +193,8 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
   previewUrl: initialPreviewUrl,
   previewTrackName: initialTrackName,
   itunesArtistId,
+  heroCollectionId,
+  heroAlbumName,
   onPreviewResolved,
   className = '',
 }) => {
@@ -236,16 +240,45 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
     setIsLoading(false);
     hasForceRefreshedRef.current = false;
     pendingPlayRef.current = false;
-  }, [nodeId, initialPreviewUrl, initialTrackName, itunesArtistId]);
+  }, [nodeId, initialPreviewUrl, initialTrackName, itunesArtistId, heroCollectionId]);
+
+  const resolveHeroPreview = useCallback(async (signal?: AbortSignal, forceRefresh: boolean = false): Promise<AudioPreviewResult | null> => {
+    const countryIso = extractTrailingCountryIso(nodeId);
+    const numericCollectionId = Number(heroCollectionId);
+    const numericArtistId = Number(itunesArtistId);
+
+    if (numericCollectionId > 0 && !isNaN(numericCollectionId)) {
+      const albumRes = await resolveAlbumAudioPreview({
+        nodeId,
+        artistName: artistName || '',
+        albumName: heroAlbumName || '',
+        itunesArtistId: numericArtistId > 0 ? numericArtistId : undefined,
+        itunesCollectionId: numericCollectionId,
+        signal,
+        countryIso,
+        forceRefresh,
+      });
+      if (albumRes?.previewUrl || signal?.aborted) {
+        return albumRes;
+      }
+    }
+
+    if (numericArtistId > 0 && !isNaN(numericArtistId)) {
+      return resolveArtistAudioPreview(numericArtistId, signal, countryIso, forceRefresh);
+    }
+
+    return null;
+  }, [nodeId, artistName, heroAlbumName, heroCollectionId, itunesArtistId]);
 
   const playTrack = useCallback((trackPreviewUrl: string) => {
     audioController.play(nodeId, trackPreviewUrl, (mediaErr) => {
       const numericId = Number(itunesArtistId);
-      if (numericId > 0 && !hasForceRefreshedRef.current) {
+      const numericCollectionId = Number(heroCollectionId);
+      if ((numericId > 0 || numericCollectionId > 0) && !hasForceRefreshedRef.current) {
         hasForceRefreshedRef.current = true;
         console.log(`[AudioPreviewPlayer] Playback error for ${nodeId} (iTunes ID: ${numericId}). Auto self-healing with fresh iTunes preview...`);
         setIsLoading(true);
-        resolveArtistAudioPreview(numericId, undefined, extractTrailingCountryIso(nodeId), true)
+        resolveHeroPreview(undefined, true)
           .then(freshRes => {
             setIsLoading(false);
             if (freshRes?.previewUrl) {
@@ -269,14 +302,15 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
         console.warn('[GlobalAudioController] Audio playback error:', mediaErr);
       }
     });
-  }, [nodeId, itunesArtistId]);
+  }, [nodeId, itunesArtistId, heroCollectionId, resolveHeroPreview]);
 
-  // On-demand fetch if previewUrl is missing but verified itunesArtistId exists
+  // On-demand fetch if previewUrl is missing and verified heroCollectionId or itunesArtistId exists
   useEffect(() => {
     if (preview?.previewUrl || hasResolved) return;
 
     const numericId = Number(itunesArtistId);
-    if (!numericId || numericId <= 0) {
+    const numericCollectionId = Number(heroCollectionId);
+    if ((!numericId || numericId <= 0) && (!numericCollectionId || numericCollectionId <= 0)) {
       // Do not lock hasResolved = true prematurely while details is still loading
       return;
     }
@@ -287,7 +321,7 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
 
     setIsLoading(true);
 
-    resolveArtistAudioPreview(numericId, ac.signal, extractTrailingCountryIso(nodeId))
+    resolveHeroPreview(ac.signal, false)
       .then(res => {
         if (!ac.signal.aborted) {
           setHasResolved(true);
@@ -316,7 +350,7 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
     return () => {
       ac.abort();
     };
-  }, [nodeId, itunesArtistId, hasResolved, preview?.previewUrl, playTrack]);
+  }, [nodeId, itunesArtistId, heroCollectionId, hasResolved, preview?.previewUrl, playTrack, resolveHeroPreview]);
 
   // Stop playback on node switch or unmount
   useEffect(() => {

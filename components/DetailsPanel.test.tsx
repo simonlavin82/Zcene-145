@@ -3177,6 +3177,57 @@ describe('DetailsPanel', () => {
                     global.fetch = originalFetch;
                 }
             });
+
+            it('aligns artwork-overlaid hero AudioPreviewPlayer with verified discography[0].itunesCollectionId (V45.19)', async () => {
+                clearPreviewMemoryCacheForTests();
+                stopGlobalAudio();
+
+                const fetchMock = vi.fn().mockResolvedValue({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        results: [{
+                            wrapperType: 'track',
+                            kind: 'song',
+                            artistId: 150160,
+                            collectionId: 1485311309,
+                            trackName: "We're Only Gonna Die",
+                            collectionName: 'How Could Hell Be Any Worse?',
+                            previewUrl: 'https://audio-ssl.itunes.apple.com/were-only-gonna-die.m4a',
+                        }],
+                    }),
+                });
+                const originalFetch = global.fetch;
+                global.fetch = fetchMock as any;
+
+                try {
+                    render(
+                        <NodeDetailsCard
+                            {...baseCardProps({
+                                imageUrl: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/e6/ab/77/e6ab7777-b0bb-de27-c389-7d38a914743d/0045778670062.png/600x600bb.jpg',
+                                itunesArtistId: 150160,
+                                details: { artist: 'Bad Religion', genre: 'Punk Rock', style: 'Melodic', origin: 'Los Angeles, USA', founded: '1980' },
+                                discography: [
+                                    { albumName: 'How Could Hell Be Any Worse?', releaseYear: '1982', itunesCollectionId: 1485311309 },
+                                    { albumName: 'Stranger Than Fiction', releaseYear: '1994', itunesCollectionId: 1485011728 },
+                                ],
+                            })}
+                            node={{ id: 'bad-religion-us', type: 'artist', label: 'Bad Religion' } as any}
+                        />
+                    );
+
+                    await waitFor(() => {
+                        expect(fetchMock).toHaveBeenCalledTimes(1);
+                    });
+
+                    expect(fetchMock.mock.calls[0][0]).toBe('https://itunes.apple.com/lookup?id=1485311309&entity=song&limit=5');
+                    expect(await screen.findByRole('button', { name: /Play 30s Audio Preview: We're Only Gonna Die/i })).toBeInTheDocument();
+                } finally {
+                    stopGlobalAudio();
+                    clearPreviewMemoryCacheForTests();
+                    global.fetch = originalFetch;
+                }
+            });
         });
 
         describe('V45.17 Audio Lifecycle Cleanup (Node Switch & Zine Close)', () => {
