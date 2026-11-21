@@ -3,7 +3,12 @@
  * Zero-token, on-demand client streaming overlaid on artist artwork in Deep Cuts and Magazine View.
  */
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { resolveArtistAudioPreview, AudioPreviewResult } from '../services/itunesPreviewService';
+import {
+  resolveArtistAudioPreview,
+  resolveAlbumAudioPreview,
+  isAlbumPreviewConfirmedUnavailable,
+  AudioPreviewResult,
+} from '../services/itunesPreviewService';
 import { extractTrailingCountryIso } from '../shared/isoCountries';
 
 // ─── SINGLETON GLOBAL AUDIO MANAGER ──────────────────────────────────────────
@@ -473,6 +478,264 @@ export const AudioPreviewPlayer: React.FC<AudioPreviewPlayerProps> = ({
         </span>
       </div>
     </div>
+  );
+};
+
+export interface AlbumAudioPreviewButtonProps {
+  nodeId: string;
+  albumIndex: number;
+  artistName: string;
+  albumName: string;
+  itunesArtistId?: number | null;
+  itunesCollectionId?: number | null;
+  className?: string;
+}
+
+/**
+ * Architecture V45.17: Compact, strictly on-click JIT 30-second audio preview button
+ * for Essential Listening album rows. Coordinates single active playback through the
+ * singleton GlobalAudioController using namespaced track IDs (`${nodeId}::album::${albumIndex}`).
+ */
+export const AlbumAudioPreviewButton: React.FC<AlbumAudioPreviewButtonProps> = ({
+  nodeId,
+  albumIndex,
+  artistName,
+  albumName,
+  itunesArtistId,
+  itunesCollectionId,
+  className = '',
+}) => {
+  const trackId = `${nodeId}::album::${albumIndex}`;
+  const countryIso = extractTrailingCountryIso(nodeId);
+
+  const [preview, setPreview] = useState<AudioPreviewResult | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isUnavailable, setIsUnavailable] = useState<boolean>(() =>
+    isAlbumPreviewConfirmedUnavailable({
+      nodeId,
+      artistName,
+      albumName,
+      itunesCollectionId,
+      countryIso,
+    })
+  );
+  const [needsGestureRetry, setNeedsGestureRetry] = useState(false);
+
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const hasForceRefreshedRef = useRef(false);
+
+  // Reset local state when artist/album identity changes
+  useEffect(() => {
+    abortControllerRef.current?.abort();
+    abortControllerRef.current = null;
+    setPreview(null);
+    setIsLoading(false);
+    setNeedsGestureRetry(false);
+    hasForceRefreshedRef.current = false;
+    setIsUnavailable(
+      isAlbumPreviewConfirmedUnavailable({
+        nodeId,
+        artistName,
+        albumName,
+        itunesCollectionId,
+        countryIso,
+      })
+    );
+  }, [nodeId, albumIndex, artistName, albumName, itunesCollectionId, countryIso]);
+
+  // Subscribe to global singleton playback state
+  useEffect(() => {
+    setIsPlaying(audioController.isTrackPlaying(trackId));
+    const unsubscribe = audioController.subscribe((activeId, activePlaying) => {
+      setIsPlaying(activeId === trackId && activePlaying);
+    });
+    return unsubscribe;
+  }, [trackId]);
+
+  // Abort in-flight lookup & stop playback if this album row unmounts while active
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+      if (audioController.getCurrentTrackId() === trackId) {
+        audioController.stop();
+      }
+    };
+  }, [trackId]);
+
+  const playAlbumPreviewUrl = useCallback(
+    (previewUrl: string) => {
+      setNeedsGestureRetry(false);
+      audioController.play(trackId, previewUrl, (mediaErr) => {
+        if (mediaErr?.name === 'NotAllowedError') {
+          // iOS Safari async gesture expiry: keep resolved preview cached so the next tap plays synchronously
+          setNeedsGestureRetry(true);
+          return;
+        }
+        if (!hasForceRefreshedRef.current) {
+          hasForceRefreshedRef.current = true;
+          setIsLoading(true);
+          resolveAlbumAudioPreview({
+            nodeId,
+            artistName,
+            albumName,
+            itunesArtistId,
+            itunesCollectionId,
+            countryIso,
+            forceRefresh: true,
+          })
+            .then((fresh) => {
+              setIsLoading(false);
+              if (fresh?.previewUrl) {
+                setPreview(fresh);
+                audioController.play(trackId, fresh.previewUrl, (retryErr) => {
+                  if (retryErr?.name === 'NotAllowedError') {
+                    setNeedsGestureRetry(true);
+                  }
+                });
+              } else if (
+                isAlbumPreviewConfirmedUnavailable({
+                  nodeId,
+                  artistName,
+                  albumName,
+                  itunesCollectionId,
+                  countryIso,
+                })
+              ) {
+                setIsUnavailable(true);
+              }
+            })
+            .catch(() => {
+              setIsLoading(false);
+            });
+        }
+      });
+    },
+    [trackId, nodeId, artistName, albumName, itunesArtistId, itunesCollectionId, countryIso]
+  );
+
+  const handleTogglePlay = useCallback(
+    async (e: React.MouseEvent<HTMLButtonElement>) => {
+      e.stopPropagation();
+      if (isUnavailable || isLoading) return;
+
+      if (isPlaying) {
+        audioController.pause();
+        return;
+      }
+
+      if (preview?.previewUrl) {
+        playAlbumPreviewUrl(preview.previewUrl);
+        return;
+      }
+
+      abortControllerRef.current?.abort();
+      const ac = new AbortController();
+      abortControllerRef.current = ac;
+      setIsLoading(true);
+      setNeedsGestureRetry(false);
+
+      try {
+        const resolved = await resolveAlbumAudioPreview({
+          nodeId,
+          artistName,
+          albumName,
+          itunesArtistId,
+          itunesCollectionId,
+          signal: ac.signal,
+          countryIso,
+        });
+
+        if (ac.signal.aborted) return;
+        setIsLoading(false);
+
+        if (resolved?.previewUrl) {
+          setPreview(resolved);
+          playAlbumPreviewUrl(resolved.previewUrl);
+        } else if (
+          isAlbumPreviewConfirmedUnavailable({
+            nodeId,
+            artistName,
+            albumName,
+            itunesCollectionId,
+            countryIso,
+          })
+        ) {
+          setIsUnavailable(true);
+        }
+      } catch {
+        if (!ac.signal.aborted) {
+          setIsLoading(false);
+        }
+      }
+    },
+    [
+      isUnavailable,
+      isLoading,
+      isPlaying,
+      preview?.previewUrl,
+      playAlbumPreviewUrl,
+      nodeId,
+      artistName,
+      albumName,
+      itunesArtistId,
+      itunesCollectionId,
+      countryIso,
+    ]
+  );
+
+  const ariaLabel = isUnavailable
+    ? `No audio preview available for ${albumName}`
+    : isLoading
+      ? `Loading audio preview for ${albumName}`
+      : isPlaying
+        ? `Pause preview for ${albumName}`
+        : `Play 30s preview for ${albumName}`;
+
+  const titleText = isUnavailable
+    ? 'No preview available'
+    : isLoading
+      ? 'Loading preview...'
+      : isPlaying
+        ? `Pause: ${preview?.previewTrackName || albumName}`
+        : needsGestureRetry
+          ? 'Tap again to play preview'
+          : preview?.previewTrackName
+            ? `Play preview: ${preview.previewTrackName}`
+            : `Play 30s preview for ${albumName}`;
+
+  return (
+    <button
+      type="button"
+      onClick={handleTogglePlay}
+      disabled={isUnavailable}
+      aria-label={ariaLabel}
+      aria-pressed={isPlaying}
+      title={titleText}
+      data-testid={`album-preview-btn-${albumIndex}`}
+      className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 transition-all duration-150 focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset ${
+        isUnavailable
+          ? 'bg-zinc-900/40 border border-zinc-800/60 text-zinc-600 opacity-35 cursor-not-allowed'
+          : isLoading
+            ? 'bg-zinc-800/80 border border-primary/40 text-primary animate-pulse cursor-wait'
+            : isPlaying
+              ? 'bg-primary/20 border border-primary/60 text-primary cursor-pointer hover:bg-primary/30 active:scale-95'
+              : 'bg-zinc-900/80 border border-zinc-700/60 text-zinc-400 hover:text-primary hover:border-primary/50 hover:bg-zinc-800 cursor-pointer active:scale-95'
+      } ${className}`}
+    >
+      {isLoading ? (
+        <span className="w-2.5 h-2.5 rounded-full border-2 border-primary/40 border-t-primary animate-spin" />
+      ) : isPlaying ? (
+        <svg className="w-2.5 h-2.5 fill-current" viewBox="0 0 16 16" aria-hidden="true">
+          <rect x="3" y="2.5" width="3.5" height="11" rx="0.8" />
+          <rect x="9.5" y="2.5" width="3.5" height="11" rx="0.8" />
+        </svg>
+      ) : (
+        <svg className="w-2.5 h-2.5 fill-current translate-x-[0.5px]" viewBox="0 0 16 16" aria-hidden="true">
+          <polygon points="4,2.5 13.5,8 4,13.5" />
+        </svg>
+      )}
+    </button>
   );
 };
 

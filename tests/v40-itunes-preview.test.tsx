@@ -4,10 +4,14 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { isFullyQualifiedEntityProfile } from '../services/cacheQualification';
 import { 
   resolveArtistAudioPreview, 
+  resolveAlbumAudioPreview,
+  isAlbumPreviewConfirmedUnavailable,
+  clearPreviewMemoryCacheForTests,
   primePreviewCache 
 } from '../services/itunesPreviewService';
 import { 
   AudioPreviewPlayer, 
+  AlbumAudioPreviewButton,
   audioController, 
   stopGlobalAudio 
 } from '../components/AudioPreviewPlayer';
@@ -472,6 +476,387 @@ describe('Architecture V40: Instant 30-Second iTunes Audio Previews', () => {
       // Verify stable discovery order is preserved within label group (Revelation precedes Triple B)
       expect(sorted[3].id).toBe('revelation-records');
       expect(sorted[4].id).toBe('triple-b-records');
+    });
+  });
+
+  describe('Part 5: V45.17 JIT Per-Album Essential Listening Audio Previews', () => {
+    beforeEach(() => {
+      clearPreviewMemoryCacheForTests();
+      stopGlobalAudio();
+    });
+
+    afterEach(() => {
+      clearPreviewMemoryCacheForTests();
+      stopGlobalAudio();
+    });
+
+    it('Path 1: resolves album preview via exact itunesCollectionId lookup and caches in session memory', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [
+            { wrapperType: 'collection', collectionId: 1485042718, collectionName: 'No Control' },
+            {
+              wrapperType: 'track',
+              kind: 'song',
+              artistId: 2568989,
+              collectionId: 1485042718,
+              trackName: 'Change of Ideas',
+              collectionName: 'No Control',
+              previewUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/change-of-ideas.m4a',
+            },
+          ],
+        }),
+      });
+      global.fetch = fetchMock;
+
+      const res = await resolveAlbumAudioPreview({
+        nodeId: 'bad-religion-us',
+        artistName: 'Bad Religion',
+        albumName: 'No Control',
+        itunesArtistId: 2568989,
+        itunesCollectionId: 1485042718,
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toBe('https://itunes.apple.com/lookup?id=1485042718&entity=song&limit=5');
+      expect(res).toEqual(expect.objectContaining({
+        previewUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/change-of-ideas.m4a',
+        previewTrackName: 'Change of Ideas',
+        collectionName: 'No Control',
+        itunesArtistId: 2568989,
+        itunesCollectionId: 1485042718,
+      }));
+
+      // Second call hits session memory cache with zero network requests
+      const cached = await resolveAlbumAudioPreview({
+        nodeId: 'bad-religion-us',
+        artistName: 'Bad Religion',
+        albumName: 'No Control',
+        itunesArtistId: 2568989,
+        itunesCollectionId: 1485042718,
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(cached).toEqual(res);
+    });
+
+    it('Path 2A: legacy fallback search enforces strict artistId + normalized collectionName matching', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [
+            // Impostor cover band track — wrong artistId
+            {
+              wrapperType: 'track',
+              kind: 'song',
+              artistId: 999999,
+              artistName: 'Bad Religion Tribute Band',
+              collectionName: 'Stranger Than Fiction',
+              trackName: 'Infected (Tribute)',
+              previewUrl: 'https://audio-ssl.itunes.apple.com/impostor.m4a',
+            },
+            // Same artist, wrong album
+            {
+              wrapperType: 'track',
+              kind: 'song',
+              artistId: 2568989,
+              artistName: 'Bad Religion',
+              collectionName: 'Christmas Songs',
+              trackName: 'Hark! The Herald Angels Sing',
+              previewUrl: 'https://audio-ssl.itunes.apple.com/christmas.m4a',
+            },
+            // Exact artistId + matching album with edition suffix
+            {
+              wrapperType: 'track',
+              kind: 'song',
+              artistId: 2568989,
+              artistName: 'Bad Religion',
+              collectionName: 'Stranger Than Fiction (Remastered)',
+              trackName: 'Infected',
+              collectionId: 158100111,
+              previewUrl: 'https://audio-ssl.itunes.apple.com/infected.m4a',
+            },
+          ],
+        }),
+      });
+      global.fetch = fetchMock;
+
+      const res = await resolveAlbumAudioPreview({
+        nodeId: 'bad-religion-us',
+        artistName: 'Bad Religion',
+        albumName: 'Stranger Than Fiction',
+        itunesArtistId: 2568989,
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(fetchMock.mock.calls[0][0]).toContain('https://itunes.apple.com/search?term=');
+      expect(fetchMock.mock.calls[0][0]).toContain('&entity=song&limit=15');
+      expect(res?.previewUrl).toBe('https://audio-ssl.itunes.apple.com/infected.m4a');
+      expect(res?.previewTrackName).toBe('Infected');
+    });
+
+    it('Path 2B: lazily queries and caches artist entity=album catalog when direct search misses, reusing cache for subsequent albums', async () => {
+      const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('/search?term=')) {
+          return { ok: true, status: 200, json: async () => ({ results: [] }) };
+        }
+        if (url.includes('/lookup?id=2568989&entity=album&limit=200')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 2568989, artistName: 'Bad Religion' },
+                { wrapperType: 'collection', artistId: 2568989, collectionId: 1111, collectionName: 'Suffer (Remastered)' },
+                { wrapperType: 'collection', artistId: 2568989, collectionId: 2222, collectionName: 'Generator' },
+              ],
+            }),
+          };
+        }
+        if (url.includes('/lookup?id=1111&entity=song&limit=5')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'track', kind: 'song', artistId: 2568989, collectionId: 1111, trackName: 'You Are (The Government)', previewUrl: 'https://audio-ssl.itunes.apple.com/suffer.m4a' },
+              ],
+            }),
+          };
+        }
+        if (url.includes('/lookup?id=2222&entity=song&limit=5')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'track', kind: 'song', artistId: 2568989, collectionId: 2222, trackName: 'Generator', previewUrl: 'https://audio-ssl.itunes.apple.com/generator.m4a' },
+              ],
+            }),
+          };
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) };
+      });
+      global.fetch = fetchMock;
+
+      const suffer = await resolveAlbumAudioPreview({
+        nodeId: 'bad-religion-us',
+        artistName: 'Bad Religion',
+        albumName: 'Suffer',
+        itunesArtistId: 2568989,
+      });
+      expect(suffer?.previewUrl).toBe('https://audio-ssl.itunes.apple.com/suffer.m4a');
+
+      const generator = await resolveAlbumAudioPreview({
+        nodeId: 'bad-religion-us',
+        artistName: 'Bad Religion',
+        albumName: 'Generator',
+        itunesArtistId: 2568989,
+      });
+      expect(generator?.previewUrl).toBe('https://audio-ssl.itunes.apple.com/generator.m4a');
+
+      // entity=album catalog lookup must have fired ONLY ONCE across both albums
+      const catalogCalls = fetchMock.mock.calls.filter(([u]) => String(u).includes('entity=album&limit=200'));
+      expect(catalogCalls.length).toBe(1);
+    });
+
+    it('negative-caches null ONLY on HTTP 200 with 0 tracks and NEVER on HTTP 429/403 rate limits', async () => {
+      // Transient 429 must NOT negative-cache
+      const rateLimitMock = vi.fn().mockResolvedValue({ ok: false, status: 429, json: async () => ({}) });
+      global.fetch = rateLimitMock;
+
+      const throttled = await resolveAlbumAudioPreview({
+        nodeId: 'bad-religion-us',
+        artistName: 'Bad Religion',
+        albumName: 'No Control',
+        itunesCollectionId: 777777,
+      });
+      expect(throttled).toBeNull();
+      expect(isAlbumPreviewConfirmedUnavailable({
+        nodeId: 'bad-religion-us',
+        artistName: 'Bad Religion',
+        albumName: 'No Control',
+        itunesCollectionId: 777777,
+      })).toBe(false);
+
+      // Confirmed HTTP 200 with 0 tracks MUST negative-cache
+      const emptyOkMock = vi.fn().mockResolvedValue({ ok: true, status: 200, json: async () => ({ results: [] }) });
+      global.fetch = emptyOkMock;
+
+      const missing = await resolveAlbumAudioPreview({
+        nodeId: 'bad-religion-us',
+        artistName: 'Bad Religion',
+        albumName: 'No Control',
+        itunesCollectionId: 777777,
+      });
+      expect(missing).toBeNull();
+      expect(emptyOkMock).toHaveBeenCalledTimes(1);
+      expect(isAlbumPreviewConfirmedUnavailable({
+        nodeId: 'bad-religion-us',
+        artistName: 'Bad Religion',
+        albumName: 'No Control',
+        itunesCollectionId: 777777,
+      })).toBe(true);
+
+      // Re-query hits negative cache with zero network calls
+      await resolveAlbumAudioPreview({
+        nodeId: 'bad-religion-us',
+        artistName: 'Bad Religion',
+        albumName: 'No Control',
+        itunesCollectionId: 777777,
+      });
+      expect(emptyOkMock).toHaveBeenCalledTimes(1);
+    });
+
+    it('AlbumAudioPreviewButton makes zero network calls on mount, fetches strictly on click, and coordinates single active audio with Hero AudioPreviewPlayer', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [
+            {
+              wrapperType: 'track',
+              kind: 'song',
+              artistId: 2568989,
+              collectionId: 1485042718,
+              trackName: 'Change of Ideas',
+              collectionName: 'No Control',
+              previewUrl: 'https://audio-ssl.itunes.apple.com/no-control.m4a',
+            },
+          ],
+        }),
+      });
+      global.fetch = fetchMock;
+
+      const playSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(async function(this: any) {
+        Object.defineProperty(this, 'paused', { value: false, configurable: true });
+        this.dispatchEvent(new Event('play'));
+      });
+      const pauseSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'pause').mockImplementation(function(this: any) {
+        Object.defineProperty(this, 'paused', { value: true, configurable: true });
+        this.dispatchEvent(new Event('pause'));
+      });
+
+      render(
+        <div>
+          <AudioPreviewPlayer
+            nodeId="bad-religion-us"
+            artistName="Bad Religion"
+            previewUrl="https://audio-ssl.itunes.apple.com/hero-top-track.m4a"
+            previewTrackName="American Jesus"
+            itunesArtistId={2568989}
+          />
+          <AlbumAudioPreviewButton
+            nodeId="bad-religion-us"
+            albumIndex={0}
+            artistName="Bad Religion"
+            albumName="No Control"
+            itunesArtistId={2568989}
+            itunesCollectionId={1485042718}
+          />
+        </div>
+      );
+
+      // Zero fetches on mount for AlbumAudioPreviewButton
+      expect(fetchMock).not.toHaveBeenCalled();
+
+      // 1. Start Hero preview
+      const heroBtn = screen.getByRole('button', { name: /Play 30s Audio Preview: American Jesus/i });
+      await act(async () => {
+        heroBtn.click();
+      });
+      expect(audioController.getCurrentTrackId()).toBe('bad-religion-us');
+      expect(audioController.isTrackPlaying('bad-religion-us')).toBe(true);
+
+      // 2. Click Album play button -> JIT fetches and hands off single active audio from Hero to Album
+      const albumBtn = screen.getByRole('button', { name: /Play 30s preview for No Control/i });
+      await act(async () => {
+        albumBtn.click();
+        await new Promise((r) => setTimeout(r, 20));
+      });
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(audioController.getCurrentTrackId()).toBe('bad-religion-us::album::0');
+      expect(audioController.isTrackPlaying('bad-religion-us::album::0')).toBe(true);
+      expect(audioController.isTrackPlaying('bad-religion-us')).toBe(false);
+
+      // 3. Click Hero play button again -> stops album and resumes Hero
+      const heroResumeBtn = screen.getByRole('button', { name: /Play 30s Audio Preview: American Jesus/i });
+      await act(async () => {
+        heroResumeBtn.click();
+      });
+      expect(audioController.getCurrentTrackId()).toBe('bad-religion-us');
+      expect(audioController.isTrackPlaying('bad-religion-us::album::0')).toBe(false);
+
+      audioController.stop();
+      playSpy.mockRestore();
+      pauseSpy.mockRestore();
+    });
+
+    it('handles iOS Safari NotAllowedError gracefully by keeping preview cached for synchronous retry', async () => {
+      const fetchMock = vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: async () => ({
+          results: [
+            {
+              wrapperType: 'track',
+              kind: 'song',
+              artistId: 2568989,
+              collectionId: 9090,
+              trackName: 'We Are Only Gonna Die',
+              previewUrl: 'https://audio-ssl.itunes.apple.com/how-could-hell.m4a',
+            },
+          ],
+        }),
+      });
+      global.fetch = fetchMock;
+
+      let callCount = 0;
+      const playSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(async function(this: any) {
+        callCount++;
+        if (callCount === 1) {
+          const err = new Error('Playback not allowed by user agent');
+          err.name = 'NotAllowedError';
+          throw err;
+        }
+        Object.defineProperty(this, 'paused', { value: false, configurable: true });
+        this.dispatchEvent(new Event('play'));
+      });
+
+      render(
+        <AlbumAudioPreviewButton
+          nodeId="bad-religion-us"
+          albumIndex={0}
+          artistName="Bad Religion"
+          albumName="How Could Hell Be Any Worse?"
+          itunesArtistId={2568989}
+          itunesCollectionId={9090}
+        />
+      );
+
+      const albumBtn = screen.getByRole('button', { name: /Play 30s preview for How Could Hell Be Any Worse\?/i });
+
+      // First click hits NotAllowedError after async fetch; button must NOT become disabled/unavailable
+      await act(async () => {
+        albumBtn.click();
+        await new Promise((r) => setTimeout(r, 20));
+      });
+      expect((albumBtn as HTMLButtonElement).disabled).toBe(false);
+      expect(albumBtn.getAttribute('title')).toBe('Tap again to play preview');
+
+      // Second click plays synchronously using cached URL without re-fetching
+      await act(async () => {
+        albumBtn.click();
+        await new Promise((r) => setTimeout(r, 10));
+      });
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      expect(audioController.isTrackPlaying('bad-religion-us::album::0')).toBe(true);
+
+      audioController.stop();
+      playSpy.mockRestore();
     });
   });
 });

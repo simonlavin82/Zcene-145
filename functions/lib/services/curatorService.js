@@ -2899,6 +2899,7 @@ const ITUNES_RETRY_DELAY_RANGES_MS = [
     [2500, 3500],
 ];
 const SOUNDTRACK_ALBUM_RE = /\b(original motion picture soundtrack|motion picture soundtrack|original soundtrack|original score|film score|soundtrack|o\.?s\.?t\.?)\b/i;
+const HOLIDAY_ALBUM_RE = /\b(christmas|x-?mas|holiday|yuletide|noel)\b/i;
 const SECONDARY_RELEASE_RE = /\b(greatest hits|the best of|best of|anthology|compilation|rarities|b-sides|live at|live in|unplugged|remixes|remix)\b|\s*-\s*single\b|\(single\)/i;
 /**
  * Shared rate-limit-resilient iTunes JSON fetch helper (V45.10).
@@ -2962,13 +2963,18 @@ const selectBestArtistArtwork = (itunesAlbums, reconciledDiscography = []) => {
         if (isSoundtrack) {
             score -= 80;
         }
+        // 2b. Deprioritize holiday / seasonal albums (e.g., Christmas Songs) when core studio albums exist
+        const isHoliday = genre.toLowerCase() === 'holiday' || HOLIDAY_ALBUM_RE.test(rawTitle);
+        if (isHoliday) {
+            score -= 55;
+        }
         // 3. Deprioritize compilations, live albums, remixes, and singles
         const isSecondary = SECONDARY_RELEASE_RE.test(rawTitle) || (trackCount > 0 && trackCount <= 3);
         if (isSecondary) {
             score -= 35;
         }
         // 4. Full studio LP bonus
-        if (!isSoundtrack && !isSecondary && trackCount >= 6) {
+        if (!isSoundtrack && !isHoliday && !isSecondary && trackCount >= 6) {
             score += 15;
         }
         return { alb, score, idx };
@@ -3040,13 +3046,15 @@ const reconcileDiscographyWithITunes = (llmDiscography, itunesAlbums, cleanArtis
             continue;
         seenNorms.add(normTitle);
         const year = alb.releaseDate ? String(new Date(alb.releaseDate).getFullYear()) : undefined;
+        const numericCollectionId = Number(alb.collectionId);
         validItunesCollections.push({
             rawTitle,
             cleanTitle,
             normTitle,
             year,
             trackCount: alb.trackCount || 0,
-            releaseDate: alb.releaseDate
+            releaseDate: alb.releaseDate,
+            collectionId: numericCollectionId > 0 && !isNaN(numericCollectionId) ? numericCollectionId : undefined
         });
     }
     const reconciled = [];
@@ -3067,7 +3075,8 @@ const reconcileDiscographyWithITunes = (llmDiscography, itunesAlbums, cleanArtis
             if (matchedItunes) {
                 reconciled.push({
                     albumName: matchedItunes.cleanTitle || matchedItunes.rawTitle,
-                    releaseYear: matchedItunes.year || item.releaseYear || ''
+                    releaseYear: matchedItunes.year || item.releaseYear || '',
+                    ...(matchedItunes.collectionId ? { itunesCollectionId: matchedItunes.collectionId } : {})
                 });
                 matchedItunesNorms.add(matchedItunes.normTitle);
             }
@@ -3091,7 +3100,8 @@ const reconcileDiscographyWithITunes = (llmDiscography, itunesAlbums, cleanArtis
             if (!matchedItunesNorms.has(alb.normTitle)) {
                 reconciled.push({
                     albumName: alb.cleanTitle || alb.rawTitle,
-                    releaseYear: alb.year || ''
+                    releaseYear: alb.year || '',
+                    ...(alb.collectionId ? { itunesCollectionId: alb.collectionId } : {})
                 });
                 matchedItunesNorms.add(alb.normTitle);
             }

@@ -82,6 +82,7 @@ export interface NodeDetails {
   discography?: Array<{
     albumName: string;
     releaseYear: string;
+    itunesCollectionId?: number;
     previewUrl?: string | null;
   }>;
   recommendationReason?: string;

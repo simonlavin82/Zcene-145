@@ -266,4 +266,107 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
       }
     });
   });
+
+  describe('V45.17 Rule 38 itunesCollectionId Stamping & Holiday Artwork Penalty', () => {
+    it('reconcileDiscographyWithITunes stamps optional itunesCollectionId on matched and backfilled releases, and omits it when absent', () => {
+      const mockITunesAlbums = [
+        {
+          wrapperType: 'collection',
+          collectionId: 1485042718,
+          collectionName: 'No Control',
+          releaseDate: '1989-11-02T08:00:00Z',
+          trackCount: 15,
+        },
+        {
+          wrapperType: 'collection',
+          collectionId: 1485042900,
+          collectionName: 'Suffer (Remastered)',
+          releaseDate: '1988-09-08T07:00:00Z',
+          trackCount: 15,
+        },
+        {
+          wrapperType: 'collection',
+          collectionName: 'Against the Grain', // No collectionId provided
+          releaseDate: '1990-11-23T08:00:00Z',
+          trackCount: 17,
+        },
+      ];
+
+      const llmInput = [
+        { albumName: 'No Control', releaseYear: '1989' },
+      ];
+
+      const reconciled = reconcileDiscographyWithITunes(llmInput, mockITunesAlbums, 'Bad Religion');
+
+      const noControl = reconciled.find((r) => r.albumName === 'No Control');
+      const suffer = reconciled.find((r) => r.albumName === 'Suffer');
+      const against = reconciled.find((r) => r.albumName === 'Against the Grain');
+
+      expect(noControl?.itunesCollectionId).toBe(1485042718);
+      expect(suffer?.itunesCollectionId).toBe(1485042900);
+      expect(against).toBeDefined();
+      expect('itunesCollectionId' in (against || {})).toBe(false);
+    });
+
+    it('selectBestArtistArtwork penalizes holiday/seasonal albums (Christmas Songs) even without reconciledDiscography while preserving holiday-only fallback', () => {
+      const badReligionAlbums = [
+        {
+          wrapperType: 'collection',
+          artistId: 2568989,
+          collectionId: 1485077777,
+          collectionName: 'Christmas Songs',
+          primaryGenreName: 'Holiday',
+          releaseDate: '2013-10-29T07:00:00Z',
+          trackCount: 9,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/christmas/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 2568989,
+          collectionId: 1485042700,
+          collectionName: 'How Could Hell Be Any Worse?',
+          primaryGenreName: 'Punk',
+          releaseDate: '1982-01-19T08:00:00Z',
+          trackCount: 14,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/how-could-hell/100x100bb.jpg',
+        },
+      ];
+
+      // Even with empty reconciledDiscography and Christmas Songs at index 0, studio LP MUST win
+      expect(selectBestArtistArtwork(badReligionAlbums, [])).toBe(
+        'https://is1-ssl.mzstatic.com/image/thumb/how-could-hell/600x600bb.jpg'
+      );
+
+      // Holiday title marker with non-Holiday genre (e.g., Punk) must also be penalized
+      const punkTaggedXmas = [
+        {
+          wrapperType: 'collection',
+          collectionName: 'A Punk Xmas Special',
+          primaryGenreName: 'Punk',
+          trackCount: 10,
+          artworkUrl100: 'https://example.com/xmas/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          collectionName: 'No Control',
+          primaryGenreName: 'Punk',
+          trackCount: 15,
+          artworkUrl100: 'https://example.com/no-control/100x100bb.jpg',
+        },
+      ];
+      expect(selectBestArtistArtwork(punkTaggedXmas, [])).toBe('https://example.com/no-control/600x600bb.jpg');
+
+      // Graceful fallback: if an artist ONLY has holiday releases, still return its cover
+      const holidayOnlyAlbums = [
+        {
+          wrapperType: 'collection',
+          collectionName: 'Yuletide Noel Classics',
+          primaryGenreName: 'Holiday',
+          trackCount: 12,
+          artworkUrl100: 'https://example.com/yuletide/100x100bb.jpg',
+        },
+      ];
+      expect(selectBestArtistArtwork(holidayOnlyAlbums, [])).toBe('https://example.com/yuletide/600x600bb.jpg');
+    });
+  });
 });

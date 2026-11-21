@@ -1,6 +1,8 @@
 import React from 'react';
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
 import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUrl, extractBlockArtistChips, buildGoogleImagesSearchUrl, estimateEditorialBlockHeight, partitionBlockIndicesIntoThreeColumns, partitionBlocksIntoThreeColumns, ZineEditorialHeading, ZineIntroNote } from './DetailsPanel';
+import { audioController, stopGlobalAudio } from './AudioPreviewPlayer';
+import { clearPreviewMemoryCacheForTests } from '../services/itunesPreviewService';
 import { streamNodeChat } from '../services/geminiService';
 
 vi.mock('react-markdown', () => ({
@@ -3090,6 +3092,170 @@ describe('DetailsPanel', () => {
                 expect(albumBtn.className).toContain('focus-visible:ring-inset');
                 expect(albumBtn.className).toContain('focus-visible:ring-primary/50');
                 expect(albumBtn.className).not.toMatch(/(^|\s)focus:ring-1(\s|$)/);
+            });
+
+            it('renders sibling Play/Pause button on Artist Essential Listening rows with zero conflict against one-tap copy, and omits it on Labels', async () => {
+                clearPreviewMemoryCacheForTests();
+                stopGlobalAudio();
+                const writeTextMock = navigator.clipboard.writeText as ReturnType<typeof vi.fn>;
+                writeTextMock.mockClear();
+
+                const fetchMock = vi.fn().mockResolvedValue({
+                    ok: true,
+                    status: 200,
+                    json: async () => ({
+                        results: [{
+                            wrapperType: 'track',
+                            kind: 'song',
+                            artistId: 12345,
+                            collectionId: 55501,
+                            trackName: 'Chi',
+                            collectionName: 'Life Is Peachy',
+                            previewUrl: 'https://audio-ssl.itunes.apple.com/chi.m4a',
+                        }],
+                    }),
+                });
+                const originalFetch = global.fetch;
+                global.fetch = fetchMock as any;
+
+                const playSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(async function(this: any) {
+                    Object.defineProperty(this, 'paused', { value: false, configurable: true });
+                    this.dispatchEvent(new Event('play'));
+                });
+
+                try {
+                    const { rerender } = render(
+                        <NodeDetailsCard
+                            {...baseCardProps({
+                                itunesArtistId: 12345,
+                                discography: [
+                                    { albumName: 'Life Is Peachy', releaseYear: '1996', itunesCollectionId: 55501 },
+                                ],
+                            })}
+                        />
+                    );
+
+                    const playBtn = screen.getByRole('button', { name: /Play 30s preview for Life Is Peachy/i });
+                    const copyBtn = screen.getByLabelText('Copy album Life Is Peachy');
+                    // Sibling buttons — never nested
+                    expect(copyBtn.contains(playBtn)).toBe(false);
+                    expect(playBtn.contains(copyBtn)).toBe(false);
+
+                    // Clicking Play must NOT copy to clipboard
+                    await act(async () => {
+                        fireEvent.click(playBtn);
+                        await new Promise((r) => setTimeout(r, 20));
+                    });
+                    expect(writeTextMock).not.toHaveBeenCalled();
+                    expect(audioController.getCurrentTrackId()).toBe('korn-us::album::0');
+
+                    // Clicking Copy copies "<Artist> <Album>" without breaking playback
+                    await act(async () => {
+                        fireEvent.click(copyBtn);
+                    });
+                    expect(writeTextMock).toHaveBeenCalledWith('Korn Life Is Peachy');
+
+                    // Label cards must omit AlbumAudioPreviewButton on Key Catalog Releases
+                    rerender(
+                        <NodeDetailsCard
+                            {...baseCardProps({
+                                discography: [{ albumName: 'Step 2 Rhythm', releaseYear: '2013' }],
+                            })}
+                            node={{ id: 'triple-b-records', type: 'label', label: 'Triple B Records' } as any}
+                        />
+                    );
+                    expect(screen.queryByTestId('album-preview-btn-0')).toBeNull();
+                } finally {
+                    stopGlobalAudio();
+                    clearPreviewMemoryCacheForTests();
+                    playSpy.mockRestore();
+                    global.fetch = originalFetch;
+                }
+            });
+        });
+
+        describe('V45.17 Audio Lifecycle Cleanup (Node Switch & Zine Close)', () => {
+            it('stops active album preview when switching viewed artist in panel mode or closing Zine View', () => {
+                stopGlobalAudio();
+                const playSpy = vi.spyOn(window.HTMLMediaElement.prototype, 'play').mockImplementation(async function(this: any) {
+                    Object.defineProperty(this, 'paused', { value: false, configurable: true });
+                    this.dispatchEvent(new Event('play'));
+                });
+
+                const nodeA = { id: 'bad-religion-us', type: 'artist', label: 'Bad Religion' } as any;
+                const nodeB = { id: 'nofx-us', type: 'artist', label: 'NOFX' } as any;
+                const detailsCache = new Map<string, any>([
+                    ['bad-religion-us', {
+                        summary: 'Melodic hardcore punk pioneers from Los Angeles.',
+                        details: { artist: 'Bad Religion', genre: 'Punk Rock', style: 'Melodic', origin: 'Los Angeles, USA', founded: '1980' },
+                        discography: [{ albumName: 'No Control', releaseYear: '1989', itunesCollectionId: 1485042718 }],
+                        links: [],
+                    }],
+                    ['nofx-us', {
+                        summary: 'Skate punk veterans from Los Angeles.',
+                        details: { artist: 'NOFX', genre: 'Punk Rock', style: 'Melodic', origin: 'Los Angeles, USA', founded: '1983' },
+                        discography: [{ albumName: 'Punk in Drublic', releaseYear: '1994', itunesCollectionId: 1485049999 }],
+                        links: [],
+                    }],
+                ]);
+
+                const panelProps = (overrides: Record<string, any> = {}) => ({
+                    activeNodes: [nodeA, nodeB],
+                    selectedNode: nodeA,
+                    detailsCache,
+                    loadingNodeIds: new Set<string>(),
+                    isGlobalLoading: false,
+                    graphData: { nodes: [nodeA, nodeB], links: [] } as any,
+                    libraryArtists: [],
+                    seedArtists: ['Bad Religion'],
+                    onAddArtist: () => {},
+                    isSmallScreen: false,
+                    onClose: () => {},
+                    onNodeClick: () => {},
+                    onNavigate: () => {},
+                    chatHistories: new Map(),
+                    onUpdateChatHistories: () => {},
+                    pinnedNodes: new Set<string>(),
+                    onTogglePinNode: () => {},
+                    isCollapsed: false,
+                    onToggleCollapse: () => {},
+                    isMagazineViewOpen: false,
+                    onMagazineViewToggle: () => {},
+                    onAddToStack: () => {},
+                    stack: [],
+                    ...overrides,
+                });
+
+                try {
+                    const { rerender } = render(<DetailsPanel {...panelProps({ selectedNode: nodeA, isMagazineViewOpen: false })} />);
+
+                    // Start playing album 0 of nodeA
+                    act(() => {
+                        audioController.play('bad-religion-us::album::0', 'https://audio-ssl.itunes.apple.com/no-control.m4a');
+                    });
+                    expect(audioController.getCurrentTrackId()).toBe('bad-religion-us::album::0');
+
+                    // Re-render on the same nodeA -> prefix match MUST preserve album playback
+                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeA, isMagazineViewOpen: false })} />);
+                    expect(audioController.getCurrentTrackId()).toBe('bad-religion-us::album::0');
+
+                    // Switch to nodeB -> MUST stop nodeA's album playback
+                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeB, isMagazineViewOpen: false })} />);
+                    expect(audioController.getCurrentTrackId()).toBeNull();
+
+                    // Open Zine View, play album on nodeB, then close Zine View -> MUST stop playback
+                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeB, isMagazineViewOpen: true })} />);
+                    act(() => {
+                        audioController.play('nofx-us::album::0', 'https://audio-ssl.itunes.apple.com/punk-in-drublic.m4a');
+                    });
+                    expect(audioController.getCurrentTrackId()).toBe('nofx-us::album::0');
+
+                    rerender(<DetailsPanel {...panelProps({ selectedNode: nodeB, isMagazineViewOpen: false })} />);
+                    expect(audioController.getCurrentTrackId()).toBeNull();
+                } finally {
+                    stopGlobalAudio();
+                    playSpy.mockRestore();
+                }
             });
         });
 

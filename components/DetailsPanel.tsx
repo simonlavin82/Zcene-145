@@ -17,7 +17,7 @@ import { formatSystemTimestamp, extractInitials } from '../utils/formatters';
 import { Select, Input, InputSizes, LayoutSizes, Button } from './DesignSystem';
 import { Flame, Pin } from 'lucide-react';
 import { useDominantColor } from '../hooks/useDominantColor';
-import { AudioPreviewPlayer, stopGlobalAudio, audioController } from './AudioPreviewPlayer';
+import { AudioPreviewPlayer, AlbumAudioPreviewButton, stopGlobalAudio, audioController } from './AudioPreviewPlayer';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
 export const getArtistDisplayName = (details: any, node: any): string => {
@@ -732,6 +732,17 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
     const isLocked = useMemo(() => {
         return !!(details && details.summary && details.summary.trim().length > 5 && !details._isSentinel);
     }, [details]);
+
+    // Stop any Essential Listening album preview belonging to this card when switching cards or unmounting
+    useEffect(() => {
+        const albumPrefix = `${node.id}::album::`;
+        return () => {
+            const currentTrack = audioController.getCurrentTrackId();
+            if (currentTrack && currentTrack.startsWith(albumPrefix)) {
+                audioController.stop();
+            }
+        };
+    }, [node.id]);
 
     const isArtistNode = node.type === 'artist';
     const isLabelNode = node.type === 'label';
@@ -1942,32 +1953,46 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                 const displayName = getArtistDisplayName(details, node);
                                                 const copyString = `${displayName} ${album.albumName}`.trim();
                                                 return (
-                                                    <button
+                                                    <div
                                                         key={i}
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            copyWithFeedback(`album:${i}`, copyString, {
-                                                                event: 'Album Copied',
-                                                                params: { node_id: node.id, album: album.albumName }
-                                                            });
-                                                        }}
-                                                        className="group/album w-full flex justify-between items-center border-b border-zinc-800/50 py-1.5 px-1 -mx-1 rounded-lg hover:bg-zinc-800/40 transition-colors text-left cursor-pointer focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset"
-                                                        title={`Click to copy "${copyString}"`}
-                                                        aria-label={`Copy album ${album.albumName}`}
+                                                        className="group/album w-full flex items-center gap-2 border-b border-zinc-800/50 py-1.5 px-1 -mx-1 rounded-lg hover:bg-zinc-800/40 transition-colors"
                                                     >
-                                                        <div className="flex items-center gap-1.5 min-w-0 pr-2">
-                                                            <span className="text-zinc-200 group-hover/album:text-white px-0.5 tracking-normal text-sm truncate">
-                                                                {album.albumName}
-                                                            </span>
-                                                            <span className={`material-symbols-outlined !text-[15px] flex-shrink-0 transition-all duration-200 ${
-                                                                isAlbumCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover/album:opacity-100'
-                                                            }`}>
-                                                                {isAlbumCopied ? 'check' : 'content_copy'}
-                                                            </span>
-                                                        </div>
-                                                        <span className="text-zinc-500 flex-shrink-0 font-mono text-[10px]">{album.releaseYear}</span>
-                                                    </button>
+                                                        {!isLabelNode && (
+                                                            <AlbumAudioPreviewButton
+                                                                nodeId={node.id}
+                                                                albumIndex={i}
+                                                                artistName={displayName}
+                                                                albumName={album.albumName}
+                                                                itunesArtistId={details.itunesArtistId}
+                                                                itunesCollectionId={album.itunesCollectionId}
+                                                            />
+                                                        )}
+                                                        <button
+                                                            type="button"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                copyWithFeedback(`album:${i}`, copyString, {
+                                                                    event: 'Album Copied',
+                                                                    params: { node_id: node.id, album: album.albumName }
+                                                                });
+                                                            }}
+                                                            className="flex-1 min-w-0 flex justify-between items-center text-left cursor-pointer rounded focus:outline-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary/50 focus-visible:ring-inset"
+                                                            title={`Click to copy "${copyString}"`}
+                                                            aria-label={`Copy album ${album.albumName}`}
+                                                        >
+                                                            <div className="flex items-center gap-1.5 min-w-0 pr-2">
+                                                                <span className="text-zinc-200 group-hover/album:text-white px-0.5 tracking-normal text-sm truncate">
+                                                                    {album.albumName}
+                                                                </span>
+                                                                <span className={`material-symbols-outlined !text-[15px] flex-shrink-0 transition-all duration-200 ${
+                                                                    isAlbumCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover/album:opacity-100'
+                                                                }`}>
+                                                                    {isAlbumCopied ? 'check' : 'content_copy'}
+                                                                </span>
+                                                            </div>
+                                                            <span className="text-zinc-500 flex-shrink-0 font-mono text-[10px]">{album.releaseYear}</span>
+                                                        </button>
+                                                    </div>
                                                 );
                                             })}
                                         </div>
@@ -3677,6 +3702,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [isCollapsed]);
 
+    // Auto-stop preview audio whenever Zine / Magazine View is closed
+    const prevIsMagazineViewOpenRef = useRef(isMagazineViewOpen);
+    useEffect(() => {
+        if (prevIsMagazineViewOpenRef.current && !isMagazineViewOpen) {
+            stopGlobalAudio();
+        }
+        prevIsMagazineViewOpenRef.current = isMagazineViewOpen;
+    }, [isMagazineViewOpen]);
+
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         if (!isProgrammaticScrollRef.current) {
             lastScrolledNodeIdRef.current = null;
@@ -4289,7 +4323,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     useEffect(() => {
         if (!isMagazineViewOpen && viewedNode?.id) {
             const currentAudioTrack = audioController.getCurrentTrackId();
-            if (currentAudioTrack && currentAudioTrack !== viewedNode.id) {
+            const belongsToViewedNode =
+                currentAudioTrack === viewedNode.id ||
+                (currentAudioTrack?.startsWith(`${viewedNode.id}::album::`) ?? false);
+            if (currentAudioTrack && !belongsToViewedNode) {
                 stopGlobalAudio();
             }
         }
