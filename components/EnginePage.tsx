@@ -1029,8 +1029,8 @@ VISUAL STORYTELLING HIERARCHY (Phase B2.13):
 
 COLLISION RESOLUTION (resolveSceneNodeOverlaps):
 - Deterministic post-physics AABB bounding box collision resolution (W = 7.5px/char + 22px + padding, min half-width >= 30px, H = 24px)
-- Mass Hierarchy: Roots (mass = ∞, immovable), Artists (mass = 6.7), Satellites (1° iterative tethered arc rotation preserving radial distance r ∈ [62px, 85px]; Root Record Label petals expand to r ∈ [85px, 120px], default 100px; atan2(0,0) root fanning prevents angle collapse for centered roots <15px)
-- Convergence Loop: 35 iterations max; 0.01px epsilon guard; terminates early as soon as overlap count reaches 0; flushes live SVG DOM transforms on simulation.on('end')
+- Mass Hierarchy: Roots (mass = ∞, immovable), Artists (mass = 6.7), Satellites (1° iterative tethered arc rotation preserving radial distance r ∈ [62px, 85px]; Root Record Label petals expand to r ∈ [85px, 120px], default 100px; Case 1/2 radial relief on iter >= 8 expands maxR by +35px with 0.35–0.5 * damping non-seed neighbor nudge; atan2(0,0) root fanning prevents angle collapse for centered roots <15px)
+- Convergence Loop: 35 iterations max; 0.01px epsilon guard; terminates early as soon as overlap count reaches 0; flushes live SVG DOM transforms on simulation.on('end'); ProjectLoader auto-heal guarded by hasHealedProjectIdRef + isSavingDocRef
 
 LOCKED SEMANTIC TOPOLOGY & ZERO READ-ONLY WRITES (Rule 21):
 - D3 node drag gestures permanently disabled; mobile panning unobstructed; wasAllPinnedAtStartRef skips overlap & Firestore writes on pinned loads/toggles while keeping attemptInitialCentering() active. Client invocations lock a 180,000ms (180s) socket timeout on executeCurationPipeline.`} 

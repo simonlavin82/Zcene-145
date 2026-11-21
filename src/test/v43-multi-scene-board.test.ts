@@ -14,6 +14,7 @@ import {
   buildCanonicalDeduplicatedNodesFromScenes,
   parseProjectScenes,
   parseCrossSceneLinks,
+  canonicalizeCrossSceneLinks,
   toSeedArtistsArray,
   toSeedArtistsString,
   normalizeProjectScene,
@@ -4831,6 +4832,135 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(appSrc).toContain('const isInFlightSetupLock = isHydratingSessionRef.current || isPreFlightCheckingRef.current;');
       expect(appSrc).toContain('if ((isHydratingSessionRef.current || isSavingDocRef.current) && !isCriticalUpdate)');
       expect(appSrc).toContain('setTimeout(() => { isSavingDocRef.current = false; }, 1000);');
+    });
+
+    it('V45.6 Fix 1: canonicalizeCrossSceneLinks normalized output matches parseCrossSceneLinks (zero false wasBridgesHealed loop)', () => {
+      const scenes: any[] = [
+        {
+          sceneId: 'scene-1',
+          id: 'scene-1',
+          curatedSeedArtists: 'Spare Snare',
+          graphData: { nodes: [{ id: 'scene-1::the-delgados-gb', canonicalId: 'the-delgados-gb' }], links: [] },
+        },
+        {
+          sceneId: 'scene-2',
+          id: 'scene-2',
+          curatedSeedArtists: 'Mogwai',
+          graphData: { nodes: [{ id: 'scene-2::the-delgados-gb', canonicalId: 'the-delgados-gb' }], links: [] },
+        },
+      ];
+      const rawBridges = parseCrossSceneLinks([
+        {
+          id: 'scene-1::the-delgados-gb--scene-2::the-delgados-gb',
+          sourceSceneId: 'scene-1',
+          targetSceneId: 'scene-2',
+          sourceNodeId: 'scene-1::the-delgados-gb',
+          targetNodeId: 'scene-2::the-delgados-gb',
+          sourceCanonicalId: 'the-delgados-gb',
+          targetCanonicalId: 'the-delgados-gb',
+          bridgeType: 'identity',
+          forwardContext: 'bridges both constellations as a shared anchor with',
+          inverseContext: 'bridges both constellations as a shared anchor with',
+          weight: 1,
+        },
+      ]);
+      const canonicalized = canonicalizeCrossSceneLinks(rawBridges, scenes);
+      expect(JSON.stringify(parseCrossSceneLinks(canonicalized))).toBe(JSON.stringify(rawBridges));
+
+      const appSrc = fs.readFileSync(path.resolve(__dirname, '../../App.tsx'), 'utf-8');
+      expect(appSrc).toContain('JSON.stringify(rawParsed) !== JSON.stringify(parseCrossSceneLinks(parsedCrossLinks))');
+      expect(appSrc).toContain('const hasHealedProjectIdRef = useRef<Set<string>>(new Set());');
+      expect(appSrc).toContain('!hasHealedProjectIdRef.current.has(currentProjectId)');
+    });
+
+    it('V45.6 Fix 3: resolveSceneNodeOverlaps achieves 0 AABB overlaps on trapped 1-degree petal pairs from zef4BH79FKxycGAeCjzM', () => {
+      const nodes: any[] = [
+        // Scene 1: Radar (1-deg petal of Prolapse) vs Chemikal Underground (shared label)
+        { id: 'scene-1::spare-snare-gb', label: 'Spare Snare', type: 'artist', isSeed: true, isSceneSeed: true, sceneIndex: 0, x: 1000, y: 1000, fx: 1000, fy: 1000 },
+        { id: 'scene-1::prolapse-gb', label: 'Prolapse', type: 'artist', sceneIndex: 0, x: 960, y: 900 },
+        { id: 'scene-1::radar', label: 'Radar', type: 'label', sceneIndex: 0, x: 979.88, y: 851.99 },
+        { id: 'scene-1::chemikal-underground', label: 'Chemikal Underground', type: 'label', sceneIndex: 0, x: 1043.76, y: 848.6 },
+        { id: 'scene-1::the-delgados-gb', label: 'The Delgados', type: 'artist', sceneIndex: 0, x: 870.84, y: 1074.63 },
+        { id: 'scene-1::the-beta-band-gb', label: 'The Beta Band', type: 'artist', sceneIndex: 0, x: 800, y: 1160 },
+        { id: 'scene-1::folktronica', label: 'Folktronica', type: 'genre', sceneIndex: 0, x: 829.26, y: 1099.91 },
+        // Scene 2: Domino Recording Company vs Tortoise, Mono vs Monotreme, Iceland vs 1994
+        { id: 'scene-2::mogwai-gb', label: 'Mogwai', type: 'artist', isSeed: true, isSceneSeed: true, sceneIndex: 1, x: 2050, y: 1000, fx: 2050, fy: 1000 },
+        { id: 'scene-2::ganger-gb', label: 'Ganger', type: 'artist', sceneIndex: 1, x: 2040, y: 1120 },
+        { id: 'scene-2::domino', label: 'Domino Recording Company', type: 'label', sceneIndex: 1, x: 2060.04, y: 1056.38 },
+        { id: 'scene-2::tortoise-us', label: 'Tortoise', type: 'artist', sceneIndex: 1, x: 2128.5, y: 1059.68 },
+        { id: 'scene-2::65daysofstatic-gb', label: '65daysofstatic', type: 'artist', sceneIndex: 1, x: 2150, y: 960 },
+        { id: 'scene-2::monotreme', label: 'Monotreme', type: 'label', sceneIndex: 1, x: 2099.61, y: 913.87 },
+        { id: 'scene-2::mono-jp', label: 'Mono', type: 'artist', sceneIndex: 1, x: 2095.52, y: 893.26 },
+        { id: 'scene-2::sigur-ros-is', label: 'Sigur Rós', type: 'artist', sceneIndex: 1, x: 1940, y: 1140 },
+        { id: 'scene-2::iceland', label: 'Iceland', type: 'country', sceneIndex: 1, x: 1985.55, y: 1188.12 },
+        { id: 'scene-2::1994', label: '1994', type: 'founded', sceneIndex: 1, x: 1983.84, y: 1206.13 },
+      ];
+      const links: any[] = [
+        { source: 'scene-1::prolapse-gb', target: 'scene-1::radar' },
+        { source: 'scene-1::the-delgados-gb', target: 'scene-1::chemikal-underground' },
+        { source: 'scene-1::spare-snare-gb', target: 'scene-1::chemikal-underground' },
+        { source: 'scene-1::the-beta-band-gb', target: 'scene-1::folktronica' },
+        { source: 'scene-2::ganger-gb', target: 'scene-2::domino' },
+        { source: 'scene-2::65daysofstatic-gb', target: 'scene-2::monotreme' },
+        { source: 'scene-2::sigur-ros-is', target: 'scene-2::iceland' },
+        { source: 'scene-2::sigur-ros-is', target: 'scene-2::1994' },
+        { source: 'scene-2::mogwai-gb', target: 'scene-2::1994' },
+      ];
+
+      const resolved = resolveSceneNodeOverlaps(nodes, links);
+      const getBox = (n: any) => {
+        const textWidth = Math.max(30, (n.label || n.id).length * 7.5);
+        const isSeed = Boolean(n.isSeed || n.isSceneSeed);
+        const r = isSeed ? 18 : (n.type === 'artist' ? 16 : 14);
+        return { hx: Math.max(r, textWidth / 2) + 10 + (isSeed ? 6 : 0), hy: 30 };
+      };
+      const collidingPairs = [
+        ['scene-1::radar', 'scene-1::chemikal-underground'],
+        ['scene-1::the-delgados-gb', 'scene-1::folktronica'],
+        ['scene-2::mono-jp', 'scene-2::monotreme'],
+        ['scene-2::domino', 'scene-2::tortoise-us'],
+        ['scene-2::iceland', 'scene-2::1994'],
+      ];
+      for (const [idA, idB] of collidingPairs) {
+        const a = resolved.find(n => n.id === idA)!;
+        const b = resolved.find(n => n.id === idB)!;
+        const boxA = getBox(a);
+        const boxB = getBox(b);
+        const ox = (boxA.hx + boxB.hx) - Math.abs(b.x! - a.x!);
+        const oy = (boxA.hy + boxB.hy) - Math.abs(b.y! - a.y!);
+        expect(ox > 0.5 && oy > 0.5).toBe(false);
+      }
+    });
+
+    it('V45.6 Fix 2: recognizes prior curated scenes auto-title in isAutoGeneratedProjectTitle and syncs projectNameRef on fork', () => {
+      const scenes: any[] = [
+        {
+          sceneId: 'scene-1',
+          id: 'scene-1',
+          seedArtists: 'Spare Snare',
+          curatedSeedArtists: 'Spare Snare',
+          graphData: { nodes: [{ id: 'spare-snare-gb', label: 'Spare Snare', type: 'artist', isSeed: true }], links: [] },
+        },
+        {
+          sceneId: 'scene-2',
+          id: 'scene-2',
+          seedArtists: 'Mogwai',
+          curatedSeedArtists: '',
+          graphData: { nodes: [], links: [] },
+        },
+      ];
+      expect(isAutoGeneratedProjectTitle('Spare Snare', scenes)).toBe(true);
+      expect(isAutoGeneratedProjectTitle('My Custom Scottish Mix', scenes)).toBe(false);
+
+      const appSrc = fs.readFileSync(path.resolve(__dirname, '../../App.tsx'), 'utf-8');
+      expect(appSrc).toContain('projectNameRef.current = forkName;');
+      expect(appSrc).toContain('const liveProjectName = projectNameRef.current || projectName;');
+    });
+
+    it('V45.6 Fix 4: background autosave preserves only curated scenes so draft Scene 2 never pollutes original project', () => {
+      const appSrc = fs.readFileSync(path.resolve(__dirname, '../../App.tsx'), 'utf-8');
+      expect(appSrc).toContain('buildBaseProjectPayload({ preserveCuratedScenesOnly: projectStatus !== \'curating\' })');
+      expect(appSrc).toContain('(options?.preserveCuratedScenesOnly && curatedScenes.length > 0) ? curatedScenes : scenesRef.current');
     });
   });
 });

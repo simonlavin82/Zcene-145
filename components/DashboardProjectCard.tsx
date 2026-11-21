@@ -155,7 +155,7 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                   <span className="text-[9px] uppercase tracking-wide text-amber-300 font-bold px-1.5 py-0.5 bg-amber-950/60 rounded-md border border-amber-500/40 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
                     {daysLeft} {daysLeft === 1 ? 'DAY' : 'DAYS'} LEFT
                   </span>
-                ) : project.status === 'curating' || project.status === 'pending' || (project.status !== 'failed' && project.status !== 'completed' && project.seedArtists) ? (
+                ) : project.status === 'curating' || project.status === 'pending' || Boolean(project.activeJobId) ? (
                   <span className="text-[9px] uppercase tracking-wider text-amber-500/80 font-bold px-1.5 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse backdrop-blur-sm w-fit mt-0.5">
                     Mapping...
                   </span>
