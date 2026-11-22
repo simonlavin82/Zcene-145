@@ -8,7 +8,11 @@
 5. IDs must follow a strict alphanumeric pattern.
 6. Token Wallet balances (`users/{uid}.tokenBalance`) and transactions (`users/{uid}/tokenTransactions`) are strictly server-authoritative and write-locked against client mutation in `firestore.rules`.
 7. Settlement dual-writes of `apiUsage` and `costUsd` are strictly isolated to settlement transactions (`['spend_live_synthesis', 'spend_direct_hit']`), protecting pre-flight rows from cost inflation.
-8. Workspace deletions strictly follow a 2-Stage 30-Day Trash lifecycle (`status: 'trashed'`, `purgeAt: trashedAt + 30d`). Permanent deletion transitions to `status: 'deleted'`, nullifying heavy topology blobs while permanently preserving financial telemetry headers (`tokensSpent`, `apiUsage`, `anchorResolution`). Hard `deleteDoc` is permanently write-locked.
+8. Workspace deletions strictly follow a 2-Stage 30-Day Trash lifecycle (`status: 'trashed'`, `purgeAt: trashedAt + 30d`). Permanent deletion transitions to `status: 'deleted'`, nullifying heavy topology blobs while permanently preserving financial telemetry headers (`tokensSpent`, `apiUsage`, `deepWebApiUsage`, `anchorResolution`). Hard `deleteDoc` is permanently write-locked.
+9. `curationJobs/{jobId}` is strictly write-locked against client `create` and `update` in `firestore.rules`; only Cloud Functions (Admin SDK) can create or advance curation job state.
+10. Per-user 1-at-a-time curation concurrency is enforced uniformly (including Admin) via server-owned `curationLocks/{userId}` (`allow get: if isOwner(userId) || isAdmin(); allow list, write: if false;`) with automatic stale-lock recovery and refund via `reapStaleCurationJobs` (`every 5 minutes`).
+11. All backend mutation/proxy endpoints require verified Firebase Auth (`requireAuthenticatedCaller` on `healOrphanedAsset` and `simulateStripeTopUpCallable`; Firebase Bearer ID token verification on `server.js` `POST /api/artist/scrape-video-id`), and `adminGrantTokens` is strictly gated on `caller.isAdmin` (`ADMIN_UID + ADMIN_EMAIL + email_verified === true`).
+12. Firebase App Check (`ReCaptchaEnterpriseProvider`) is initialized on the client via `VITE_RECAPTCHA_SITE_KEY` and wired across all 8 `onCall` Cloud Functions via `ENFORCE_APP_CHECK` (Monitor Mode default `false` prior to enforcement cutover). Simulated top-ups are controlled by a single server env kill-switch (`ALLOW_SIMULATED_TOPUP === "true"`).
 
 ## The "Dirty Dozen" Payloads
 
@@ -86,3 +90,18 @@
 **Attempt**: Client attempts to update pre-flight transaction receipts or mutate `apiUsage` / `costUsd` telemetry.
 **Payload**: `updateDoc(doc(db, 'users/my_uid/tokenTransactions', 'preflight_tx'), { costUsd: 1.50 })`
 **Expectation**: PERMISSION_DENIED (token transaction documents are immutable and write-locked; Cloud Functions strictly isolate dual-writes to settlement types `['spend_live_synthesis', 'spend_direct_hit']`).
+
+### 16. Forged Curation Job / Concurrency Lock Bypass
+**Attempt**: Client attempts to directly write a fake `curationJobs/{jobId}` or delete/overwrite `curationLocks/{uid}` to bypass token settlement or run parallel curations.
+**Payload**: `setDoc(doc(db, 'curationJobs', 'fake_job'), { status: 'pending' })` or `deleteDoc(doc(db, 'curationLocks', 'my_uid'))`
+**Expectation**: PERMISSION_DENIED (`curationJobs` create/update and `curationLocks` list/write are strictly `if false` in `firestore.rules`).
+
+### 17. Unauthenticated Global Asset Mutation or Proxy Scraping
+**Attempt**: Unauthenticated caller attempts to update `/artists/{cacheKey}` / `/labels/{cacheKey}` or invoke `healOrphanedAsset` / `POST /api/artist/scrape-video-id`.
+**Payload**: `updateDoc(doc(db, 'artists', 'fugazi-us'), { summary: 'spam' })` or unauthenticated `POST /api/artist/scrape-video-id`
+**Expectation**: PERMISSION_DENIED / `401 Unauthorized` (parenthesized `isSignedIn() && (...)` precedence in `firestore.rules`; `requireAuthenticatedCaller` in Cloud Functions; `verifyIdToken` in `server.js`).
+
+### 18. Non-Admin Support Credit Abuse or Disabled Simulation Top-Up
+**Attempt**: Standard user invokes `adminGrantTokens`, or any user invokes `simulateStripeTopUpCallable` after `ALLOW_SIMULATED_TOPUP` is disabled for live Stripe launch.
+**Payload**: `adminGrantTokens({ email: 'me@example.com', amount: 500 })` or `simulateStripeTopUpCallable({ quantity: 50, waiverAccepted: true })` with `ALLOW_SIMULATED_TOPUP !== "true"`
+**Expectation**: `permission-denied` (`adminGrantTokens` strictly checks `caller.isAdmin`; `simulateStripeTopUpCallable` strictly checks `process.env.ALLOW_SIMULATED_TOPUP === "true"`).

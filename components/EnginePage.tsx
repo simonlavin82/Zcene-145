@@ -249,7 +249,7 @@ export const ARCHITECTURE_RULES = [
     { 
         id: 43, 
         title: "Prepaid Token Economy, 2-Stage Trash & Immutable Discovery Ledger", 
-        desc: "Zcene enforces a server-authoritative prepaid Token Economy on users/{uid} (tokenBalance, tokenTransactions; 1T = £0.10 / ~$0.13 USD), write-locked against client mutation in firestore.rules. Standard users top up via <SimulatedStripeModal> (£5=50T, £10=100T, £15=150T) and spend value-based tokens strictly per Scene: 5T Single-Root Scene, 10T Complex Scene, 3T Deep Connections (account-wide {uid}_global_deepweb_pass, no TTL). Upfront multi-scene curations charge a dynamic aggregate batch total (5T–50T: 5T per Single-Root scene, 10T per Multi-Root / anchored scene) with a single bundled 1T pre-flight fee (bundledSeedsLabel) credited against final settlement (0 extra user tokens for Overarching Zine synthesis on Scene >= 2 Direct Hits). Cloud Functions settlement dual-writes exact apiUsage and costUsd strictly to settlement transactions (['spend_live_synthesis', 'spend_direct_hit']), protecting pre-flight rows. Workspace deletions follow a 2-Stage 30-Day Trash lifecycle: Stage 1 preserves 100% of graphData/scenes/canvasLayout for 0T user restoration; Stage 2 compacts heavy blobs to null upon permanent purge while preserving telemetry headers. On load, The Discovery Ledger automatically reconciles tokenTransactions against projects, reconstituting historical deleted runs as [ARCHIVED] so Executive P&L KPI cards and unified activity tables retain 100% lifetime accuracy." 
+        desc: "Zcene enforces a server-authoritative prepaid Token Economy on users/{uid} (tokenBalance, tokenTransactions; 1T = £0.10 / ~$0.13 USD), write-locked against client mutation in firestore.rules. Standard users top up via <SimulatedStripeModal> (£5=50T, £10=100T Popular, £15=150T, or flexible custom whole-token quantities from 50T to 1,000T gated by ALLOW_SIMULATED_TOPUP === 'true' and mandatory UK/EU immediate digital delivery waiver) while Admins issue support credits via server-verified adminGrantTokens (logging immutable admin_grant receipts without inflating lifetimeTokensPurchased). Users spend value-based tokens strictly per Scene: 5T Single-Root Scene, 10T Complex Scene, 3T Deep Connections (account-wide {uid}_global_deepweb_pass, no TTL). Upfront multi-scene curations charge a dynamic aggregate batch total (5T–50T: 5T per Single-Root scene, 10T per Multi-Root / anchored scene) with a single bundled 1T pre-flight fee (bundledSeedsLabel) credited against final settlement (0 extra user tokens for Overarching Zine synthesis on Scene >= 2 Direct Hits). Cloud Functions settlement dual-writes exact apiUsage and costUsd strictly to settlement transactions (['spend_live_synthesis', 'spend_direct_hit']), protecting pre-flight rows. Workspace deletions follow a 2-Stage 30-Day Trash lifecycle: Stage 1 preserves 100% of graphData/scenes/canvasLayout for 0T user restoration; Stage 2 compacts heavy blobs to null upon permanent purge while preserving telemetry headers. On load, The Discovery Ledger automatically reconciles tokenTransactions against projects, reconstituting historical deleted runs as [ARCHIVED] so Executive P&L KPI cards and unified activity tables retain 100% lifetime accuracy." 
     },
     { 
         id: 44, 
@@ -260,6 +260,16 @@ export const ARCHITECTURE_RULES = [
         id: 45, 
         title: "Upfront Multi-Scene Batch Curation, Worker Phase 1 Deferral & Chained Baton Handoff (\"Cup of Tea\" Pipeline)", 
         desc: "Enables upfront configuration of 1–5 independent scenes (1–5 Root Artists per scene) before initial project creation. Column 2 sets deferPhase1ToWorker: true and returns HTTP 200 OK in <1.5s, deferring LLM topology generation to Column 3 to eliminate HTTP gateway timeouts. The background worker executes sequential chained hops (job_1 -> job_2 -> ... -> job_N with isChainedHop: true), minting the next job document upon scene completion without client round-trips. Step 0 pre-hydrates cached artist and label profiles across all batch scenes at job start, stripping scene-k:: prefixes to canonicalKey to populate existingProjectDetailsMap and prevent client hydration request storms upon completion. Step 3B Overarching Multi-Scene Zine synthesis strictly bypasses intermediate hops (k < N) and executes exclusively on the final hop across the completed multi-scene constellation. Telemetry dual-writes of apiUsage and costUsd are strictly isolated to settlement transactions (['spend_live_synthesis', 'spend_direct_hit']), protecting pre-flight rows. Upon final completion, activeSceneId deterministically defaults to 'scene-1', centering the camera on Scene 1 (1000, 1000) and Card #1 in passive rest state post-D3 zoom init." 
+    },
+    {
+        id: 46,
+        title: "Pre-Launch Security Rules, Uniform 1-at-a-Time Concurrency Lock, Stale-Job Reaper & App Check Readiness",
+        desc: "Hardens firestore.rules (curationJobs client create/update blocked, parenthesized isSignedIn() && (...) precedence on /artists and /labels, users/{uid} clientWritableUserKeys() allowlist + lastTopUpAt null guard, server-owned project telemetry guards including deepWebApiUsage, and Admin-write-only curationLocks/{uid}), enforces Firebase Auth on healOrphanedAsset and server.js POST /api/artist/scrape-video-id (plus UID + email + email_verified admin alignment), caps all users uniformly (including Admin) to 1 active curating Zcene via atomic curationLocks/{uid} transactions with 5-minute reapStaleCurationJobs + inline recovery auto-refunds, and initializes Firebase App Check (ReCaptchaEnterpriseProvider) in Monitor Mode (ENFORCE_APP_CHECK=false) across all 8 onCall Cloud Functions."
+    },
+    {
+        id: 47,
+        title: "Admin Token Grants, Flexible Beta Top-Ups, UK/EU Legal Waiver & Zine Save as PDF Print Engine",
+        desc: "Adds server-verified adminGrantTokens (strict caller.isAdmin gate, getUserByEmail resolution, atomic tokenBalance increment preserving lifetimeTokensPurchased, immutable admin_grant receipt, Admin-only UsageAnalyticsPage card), upgrades simulateStripeTopUpCallable for authenticated beta users via the ALLOW_SIMULATED_TOPUP === 'true' kill-switch with [50, 100, 150] presets (min 50T / £5.00, max 1,000T at £0.10/T), required UK/EU 14-day immediate digital delivery waiver + /terms legal page (GlobalWall exempted, 30-day GDPR wind-down clause), spinnerless number inputs, pinned modal error banners outside <ModalBody>, and native window.print() Zine Save as PDF (formatZinePrintDocumentTitle -> 'Zcene - <Title>.pdf', @layer base @media print unlocking all 6 viewport/scroll traps for clean light editorial multi-page PDF output including Deep Cuts)."
     }
 ];
 
@@ -429,7 +439,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <span className="material-symbols-outlined text-primary text-base">gavel</span>
                     <span>Rules Ledger</span>
                 </div>
-                <span className="text-[10px] font-mono text-primary uppercase font-bold tracking-wider">45 Laws</span>
+                <span className="text-[10px] font-mono text-primary uppercase font-bold tracking-wider">47 Laws</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {ARCHITECTURE_RULES.map(rule => (
@@ -794,7 +804,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V45.1 Full-Stack Regression Runbook
+                    V47.1 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -950,7 +960,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         ))}
                     </nav>
                     <div className="mt-8 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono pl-2">
-                        Zcene V45.1 Blueprint<br/>
+                        Zcene V47.1 Blueprint<br/>
                         100% Anti-Regression
                     </div>
                 </aside>
@@ -964,7 +974,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V45.1 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.1 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -1054,7 +1064,7 @@ LOCKED SEMANTIC TOPOLOGY & ZERO READ-ONLY WRITES (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V45.1 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.1 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

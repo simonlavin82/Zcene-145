@@ -545,7 +545,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
   });
 
   describe('Part 5: Architecture & Master Blueprint Parity Gate', () => {
-    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V45', () => {
+    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V47.1', () => {
       const truthPath = path.resolve(__dirname, '../architecture_truth.md');
       const truthContent = fs.readFileSync(truthPath, 'utf8');
 
@@ -555,17 +555,23 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       const runbookPath = path.resolve(__dirname, '../docs/backend-regression-runbook.ts');
       const runbookContent = fs.readFileSync(runbookPath, 'utf8');
 
-      // Check V45.1 headers & badges (45 Laws)
-      expect(truthContent).toContain('V45.1 — 45 Laws');
-      expect(engineContent).toContain('Zcene V45.1 Blueprint');
-      expect(engineContent).toContain('V45.1 Locked');
-      expect(engineContent).toContain('45 Laws');
-      expect(engineContent).toContain('V45.1 Full-Stack Regression Runbook');
-      expect(runbookContent).toContain('# V45.1 Regression Suite (Full-Stack)');
+      // Check V47.1 headers & badges (47 Laws)
+      expect(truthContent).toContain('V47.1 — 47 Laws');
+      expect(engineContent).toContain('Zcene V47.1 Blueprint');
+      expect(engineContent).toContain('V47.1 Locked');
+      expect(engineContent).toContain('47 Laws');
+      expect(engineContent).toContain('V47.1 Full-Stack Regression Runbook');
+      expect(runbookContent).toContain('# V47.1 Regression Suite (Full-Stack)');
+      expect(runbookContent).toContain('27 test suites (565 unit/integration tests)');
+      expect(runbookContent).toContain('npx vitest run tests/v47-zine-print-pdf.test.tsx');
       expect(runbookContent).toContain('cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts');
       expect(runbookContent).toContain('npx vitest run src/test/v43-multi-scene-board.test.ts');
       expect(truthContent).toContain('### 45. Upfront Multi-Scene Batch Curation, Worker Phase 1 Deferral & Chained Baton Handoff ("Cup of Tea" Pipeline)');
+      expect(truthContent).toContain('### 46. Pre-Launch Security Rules, Uniform 1-at-a-Time Concurrency Lock, Stale-Job Reaper & App Check Readiness');
+      expect(truthContent).toContain('### 47. Admin Token Grants, Flexible Beta Top-Ups, UK/EU Legal Waiver & Zine Save as PDF Print Engine');
       expect(engineContent).toContain('Upfront Multi-Scene Batch Curation, Worker Phase 1 Deferral & Chained Baton Handoff');
+      expect(engineContent).toContain('Pre-Launch Security Rules, Uniform 1-at-a-Time Concurrency Lock, Stale-Job Reaper & App Check Readiness');
+      expect(engineContent).toContain('Admin Token Grants, Flexible Beta Top-Ups, UK/EU Legal Waiver & Zine Save as PDF Print Engine');
 
       // Check V43 Purge Protocol alignment (Tier 1 /artists & /labels and tokenTransactions preserved)
       const purgeTargetsSlice = runbookContent.split('### Purge Targets:')[1]?.split('### Strictly Preserved:')[0] || '';

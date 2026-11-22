@@ -533,9 +533,10 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(screen.getByText(/\$0\.0000 Direct Hit/i)).toBeInTheDocument();
   });
 
-  it('synchronizes BACKEND_REGRESSION_RUNBOOK heading with Architecture V45.1', () => {
-    expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V45.1 Regression Suite (Full-Stack)');
+  it('synchronizes BACKEND_REGRESSION_RUNBOOK heading with Architecture V47.1', () => {
+    expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V47.1 Regression Suite (Full-Stack)');
     expect(BACKEND_REGRESSION_RUNBOOK).toContain('cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts');
+    expect(BACKEND_REGRESSION_RUNBOOK).not.toContain('# V45.1 Regression Suite (Full-Stack)');
     expect(BACKEND_REGRESSION_RUNBOOK).not.toContain('# V45 Regression Suite (Full-Stack)');
     expect(BACKEND_REGRESSION_RUNBOOK).not.toContain('# V44 Regression Suite');
     expect(BACKEND_REGRESSION_RUNBOOK).not.toContain('# V43 Regression Suite');

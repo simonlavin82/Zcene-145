@@ -302,7 +302,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
         { id: 'choose-artists', title: 'Choosing artists' },
         { id: 'getting-around', title: 'Getting around' },
         { id: 'digging-details', title: 'Digging for details' },
-        { id: 'magazine-view', title: 'Magazine View' },
+        { id: 'magazine-view', title: 'Zine View & Save as PDF' },
         { id: 'curating-stack', title: 'Curating your Stack' },
         { id: 'sharing-settings', title: 'Sharing & Settings' },
         { id: 'private-persistent', title: 'Private & Persistent' },
@@ -503,23 +503,23 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         </div>
                     </HelpSection>
 
-                    <HelpSection id="magazine-view" title="Immersive Magazine View">
+                    <HelpSection id="magazine-view" title="Zine View & Save as PDF">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
                             <div className="space-y-8">
                                 <p className="text-zinc-400 text-base leading-relaxed">
-                                    For deep analysis, use <strong>Magazine View</strong>. It expands your Deep Cuts queue into a full-window responsive grid.
+                                    For deep editorial reading, open <strong>Zine View</strong> on desktop or mobile. It expands your scene essays (including multi-scene Overarching Zines) and Deep Cuts into a full-window music publication you can customize with headlines, Curator&apos;s Notes, and curated photos.
                                 </p>
-                                <div className="p-6 bg-primary/10 border border-primary/20 rounded-xl">
-                                    <h5 className="text-white font-medium mb-3 flex items-center gap-3">
+                                <div className="p-6 bg-primary/10 border border-primary/20 rounded-xl space-y-3">
+                                    <h5 className="text-white font-medium flex items-center gap-3">
                                         <span className="material-symbols-outlined text-primary">auto_stories</span>
-                                        How to trigger
+                                        How to open &amp; Save as PDF
                                     </h5>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Click the "Magazine" icon in the Deep Cuts header (Desktop only). This allows you to read multiple artist profiles simultaneously like a digital music publication.
+                                        Click the floating <strong>Zine</strong> button in the Deep Cuts panel to enter Zine View. Click <strong>Save as PDF</strong> in the Zine toolbar (available to both owners and shared link viewers) to export a clean, ink-friendly multi-page PDF featuring your full editorial essay and Deep Cuts artist &amp; label profiles.
                                     </p>
                                 </div>
                             </div>
-                            <MockUIContainer title="Full-screen Grid">
+                            <MockUIContainer title="Editorial Zine & PDF Export">
                                 <MagazineViewMock />
                             </MockUIContainer>
                         </div>
@@ -677,7 +677,14 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 Prepaid Token Packs & Instant Digital Delivery
                             </h4>
                             <p className="text-sm text-zinc-400 leading-relaxed">
-                                Tokens are purchased in flexible bundles: <strong>Starter Crate (£5 for 50T)</strong>, <strong>Scene Explorer (£10 for 100T)</strong>, or <strong>Deep Archive (£15 for 150T)</strong>. Tokens are credited instantly and permanently to your authenticated Google account upon purchase.
+                                Tokens are purchased in flexible bundles: <strong>Starter Crate (£5 for 50T)</strong>, <strong>Scene Explorer (£10 for 100T)</strong>, or <strong>Deep Archive (£15 for 150T)</strong>, or any custom whole-token amount from <strong>50T (£5.00 minimum)</strong> up to 1,000T at £0.10 per token. Tokens are credited instantly and permanently to your authenticated Google account upon accepting the UK/EU immediate digital delivery waiver in our{' '}
+                                <button
+                                    type="button"
+                                    onClick={() => onNavigate(View.Terms)}
+                                    className="text-primary hover:underline font-medium cursor-pointer"
+                                >
+                                    Terms of Service
+                                </button>.
                             </p>
                         </div>
 
@@ -718,10 +725,10 @@ const HelpPage: React.FC<HelpPageProps> = ({
                              <div className="p-8 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-4">
                                 <h4 className="text-primary font-medium text-lg flex items-center gap-3">
                                     <span className="material-symbols-outlined !text-xl">bolt</span>
-                                    Fetching Details
+                                    Fetching Details &amp; 1-at-a-Time Curation Lock
                                 </h4>
                                 <p className="text-base text-zinc-400 leading-relaxed">
-                                    Zcene fetches entity data one-by-one to ensure high precision. If it takes a few moments, the AI is working to synthesize a high-quality summary.
+                                    Zcene curates one active project per account at a time to protect your token balance and guarantee clean synthesis. If a background curation ever stalls, our automated recovery service clears the lock and refunds spent settlement tokens automatically.
                                 </p>
                              </div>
                         </div>

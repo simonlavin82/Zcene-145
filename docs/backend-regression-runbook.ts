@@ -1,12 +1,12 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V45.1 Regression Suite (Full-Stack)
+# V47.1 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 26 test suites (561 unit/integration tests).
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 27 test suites (565 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
-# Run entire full-stack regression test suite (26 test files, 561 offline deterministic tests)
+# Run entire full-stack regression test suite (27 test files, 565 offline deterministic tests)
 npm test
 
 # Run backend pipeline tests
@@ -82,11 +82,14 @@ npx vitest run tests/v46-phase1-security-audit.test.tsx
 # Run V46.0 Phase 1 backend atomic 1-at-a-time curation lock, stale-job auto-refund & multi-scene refund tests
 npx vitest run functions/tests/curationLockAndRefund.test.ts
 
-# Run V46.1 Phase 2 backend adminGrantTokens & flexible simulation top-up tests
+# Run V46.1–V46.3 Phase 2 backend adminGrantTokens & env-gated flexible simulation top-up tests (min 50T / £5.00)
 npx vitest run functions/tests/phase2AdminGrantAndTopUp.test.ts
 
-# Run V46.1 Phase 2 frontend Admin Token Grant UI, flexible top-up modal & Terms/waiver legal tests
+# Run V46.1–V46.3 Phase 2 frontend Admin Token Grant UI, flexible top-up modal (pinned errors, spinnerless inputs) & Terms/waiver legal tests
 npx vitest run tests/v46_1-phase2-admin-grant-topup-legal.test.tsx
+
+# Run V47.0–V47.1 Phase 3 Zine Save as PDF button, temporary PDF filename, @layer base @media print & Deep Cuts print pagination tests
+npx vitest run tests/v47-zine-print-pdf.test.tsx
 
 # Or run with UI for visual tracing:
 npx vitest --ui
@@ -124,10 +127,19 @@ npx vitest --ui
     *   *Assertion (Chained Worker Baton Handoffs & Intermediate Hop Step 3B Bypass):* Asserts that sequential chained hops (\`job_1 -> ... -> job_N\` with \`isChainedHop: true\`) execute without client coordination, bypassing Overarching Zine synthesis until the final hop across the completed constellation.
     *   *Assertion (Step 0 Direct Hit & Peer Profile Hydration):* Asserts that cached entities across all batch scenes are pre-hydrated into \`existingProjectDetailsMap\` with stripped \`canonicalKey\`s to eliminate client request storms upon completion.
     *   *Assertion (Settlement Dual-Write Isolation & Deterministic Scene 1 Centering):* Asserts that \`apiUsage\` and \`costUsd\` dual-writes are strictly isolated to settlement rows (\`['spend_live_synthesis', 'spend_direct_hit']\`), and upon batch completion, \`activeSceneId\` defaults to \`'scene-1'\` centering the camera on Scene 1 \`(1000, 1000)\` post-D3 zoom init.
+8.  **Phase 1 Pre-Launch Security Guardrails, Uniform 1-at-a-Time Lock & App Check Readiness (\`v46.0\`):**
+    *   *Assertion (Firestore Rules & Endpoint Gating):* Validates \`curationJobs\` client write lockdown, parenthesized \`isSignedIn() && (...)\` update precedence on \`/artists\` and \`/labels\`, \`users/{uid}\` \`clientWritableUserKeys()\` allowlist, \`curationLocks/{uid}\` Admin-write-only rule, Firebase Auth on \`healOrphanedAsset\` and \`server.js\` \`/api/artist/scrape-video-id\`, and \`ReCaptchaEnterpriseProvider\` App Check Monitor Mode across all 8 \`onCall\` functions.
+    *   *Assertion (Uniform Concurrency Lock & Stale-Job Auto-Refund):* Validates atomic \`curationLocks/{uid}\` acquisition (including Admin), \`ACTIVE_CURATION_IN_PROGRESS\` error translation & Dashboard CTA lock, and 5-minute \`reapStaleCurationJobs\` / inline recovery auto-refunds across single-scene and multi-scene failures.
+9.  **Phase 2 Admin Token Grant, Flexible Beta Top-Ups & Legal Waiver (\`v46.1–v46.3\`):**
+    *   *Assertion (Server-Verified Support Credits):* Validates \`adminGrantTokens\` strict \`caller.isAdmin\` gate, \`getUserByEmail\` resolution, atomic \`tokenBalance\` increment (preserving \`lifetimeTokensPurchased\`), immutable \`admin_grant\` ledger receipt, and Admin-only UI card in \`UsageAnalyticsPage\`.
+    *   *Assertion (Flexible Top-Up UX & UK/EU Legal Guardrails):* Validates \`[50, 100, 150]\` presets (\`min: 50T / £5.00\`, \`max: 1000T\`, \`£0.10/T\`), \`ALLOW_SIMULATED_TOPUP === "true"\` kill-switch for authenticated beta users, required UK/EU 14-day waiver checkbox, \`/terms\` page (\`GlobalWall\` exempted), spinnerless number inputs, and pinned modal error banners outside \`<ModalBody>\`.
+10. **Phase 3 Zine Save as PDF & Light Editorial \`@media print\` Engine (\`v47.0–v47.1\`):**
+    *   *Assertion (PDF Filename & Toolbar Controls):* Validates \`formatZinePrintDocumentTitle\` (\`Zcene - <Title>\`), Desktop/Mobile Save as PDF buttons for both owners and shared \`/z/:id\` viewers, and temporary \`document.title\` swap/restoration around \`window.print()\`.
+    *   *Assertion (Multi-Page Print Pagination & Deep Cuts):* Validates \`@layer base { @media print }\` unlocking all 6 nested viewport/fixed/scroll traps (without Tailwind \`!fixed\`/\`!h-screen\` cascade conflicts on \`GraphPage\`'s desktop magazine \`<aside>\`), light editorial palette, and Deep Cuts artist/label profile visibility in print DOM.
 
-## Database Purge Runbook Protocol (V45.1 Multi-Scene Architecture)
+## Database Purge Runbook Protocol (V47.1 Multi-Scene Architecture)
 
-Note: The V45.1 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V45.1 operations.
+Note: The V47.1 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V47.1 operations.
 
 When rolling out structural schema migrations, Tier 1 Global Assets (\`/artists\` and \`/labels\`) remain canonical and 100% unchanged. Legacy purge automation (\`scripts/execute_v43_purge.cjs\`) is retained for emergency reset procedures only, while **strictly preserving Tier 1 \`/artists\` and \`/labels\`**, user wallets, and financial ledgers.
 
