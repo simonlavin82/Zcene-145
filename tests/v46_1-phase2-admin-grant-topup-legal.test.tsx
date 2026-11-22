@@ -127,7 +127,7 @@ describe('Phase 2 (v46.1): Admin Token Grant UI, Flexible Simulation Top-Up Moda
     });
   });
 
-  it('shows friendly message in SimulatedStripeModal when non-admin hits permission-denied in Simulation Mode', async () => {
+  it('shows pinned friendly error banner outside scrollable ModalBody when SimulatedStripeModal hits permission-denied', async () => {
     mockHttpsCallable.mockReturnValue(
       vi.fn().mockRejectedValue({ code: 'functions/permission-denied', message: 'Simulated token top-ups are disabled.' })
     );
@@ -144,7 +144,10 @@ describe('Phase 2 (v46.1): Admin Token Grant UI, Flexible Simulation Top-Up Moda
     fireEvent.click(screen.getByTestId('stripe-confirm-button'));
 
     await waitFor(() => {
-      expect(screen.getByText(/Live card checkout is coming soon/i)).toBeInTheDocument();
+      const errorBanner = screen.getByTestId('stripe-error-banner');
+      expect(errorBanner).toHaveTextContent(/Live card checkout is coming soon/i);
+      const modalBody = screen.getByTestId('simulated-stripe-modal-body');
+      expect(modalBody.contains(errorBanner)).toBe(false);
     });
   });
 

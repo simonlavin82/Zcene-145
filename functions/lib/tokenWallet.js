@@ -188,10 +188,10 @@ exports.adminGrantTokens = (0, https_1.onCall)({
 });
 /**
  * Core handler for Simulated Stripe Checkout Top-Up (Phase 2 Flexible Quantity + Legacy Tier Compat).
- * Strictly gated behind caller.isAdmin && process.env.ALLOW_SIMULATED_TOPUP === "true".
+ * Gated behind Firebase Authentication (requireAuthenticatedCaller) and process.env.ALLOW_SIMULATED_TOPUP === "true".
  */
 async function executeSimulatedStripeTopUp(caller, data) {
-    if (!caller.isAdmin || process.env.ALLOW_SIMULATED_TOPUP !== "true") {
+    if (process.env.ALLOW_SIMULATED_TOPUP !== "true") {
         throw new https_1.HttpsError("permission-denied", "Simulated token top-ups are disabled in this environment.");
     }
     let tokensToCredit;

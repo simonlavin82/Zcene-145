@@ -99,9 +99,14 @@ describe('Phase 1 Pre-Launch Security Rules, Endpoint Gating, Concurrency UX & A
   });
 
   describe('2. Dev/Unauthenticated Endpoint Gating & Admin Alignment', () => {
-    it('gates simulateStripeTopUpCallable behind caller.isAdmin and ALLOW_SIMULATED_TOPUP === "true"', () => {
+    it('gates simulateStripeTopUpCallable behind requireAuthenticatedCaller and ALLOW_SIMULATED_TOPUP === "true"', () => {
       const tokenWalletSrc = readRepoFile('functions/src/tokenWallet.ts');
-      expect(tokenWalletSrc).toContain('if (!caller.isAdmin || process.env.ALLOW_SIMULATED_TOPUP !== "true")');
+      const callableSlice = tokenWalletSrc.slice(
+        tokenWalletSrc.indexOf('export const simulateStripeTopUpCallable = onCall('),
+        tokenWalletSrc.indexOf('export const simulateStripeTopUpCallable = onCall(') + 400
+      );
+      expect(callableSlice).toContain('requireAuthenticatedCaller(request)');
+      expect(tokenWalletSrc).toContain('if (process.env.ALLOW_SIMULATED_TOPUP !== "true")');
       expect(tokenWalletSrc).toContain('Simulated token top-ups are disabled in this environment.');
     });
 

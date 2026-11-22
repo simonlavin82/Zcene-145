@@ -251,16 +251,40 @@ describe('Phase 2 Backend: adminGrantTokens & Flexible Simulated Top-Up', () => 
   });
 
   describe('simulateStripeTopUpCallable (executeSimulatedStripeTopUp)', () => {
-    it('blocks non-admin callers and blocks even admin when ALLOW_SIMULATED_TOPUP !== "true"', async () => {
-      process.env.ALLOW_SIMULATED_TOPUP = 'true';
+    it('blocks all callers when ALLOW_SIMULATED_TOPUP !== "true" and allows authenticated beta users when enabled', async () => {
+      delete process.env.ALLOW_SIMULATED_TOPUP;
       await expect(
         executeSimulatedStripeTopUp(standardCaller, { quantity: 100, waiverAccepted: true })
       ).rejects.toMatchObject({ code: 'permission-denied' });
 
-      delete process.env.ALLOW_SIMULATED_TOPUP;
       await expect(
         executeSimulatedStripeTopUp(adminCaller, { quantity: 100, waiverAccepted: true })
       ).rejects.toMatchObject({ code: 'permission-denied' });
+
+      process.env.ALLOW_SIMULATED_TOPUP = 'true';
+      store.set(`users/${standardCaller.uid}`, {
+        email: standardCaller.email,
+        tokenBalance: 5,
+        lifetimeTokensPurchased: 0,
+        lifetimeTokensSpent: 0,
+      });
+
+      const betaRes = await executeSimulatedStripeTopUp(standardCaller, {
+        quantity: 50,
+        waiverAccepted: true,
+      });
+
+      expect(betaRes).toMatchObject({
+        success: true,
+        mode: 'simulated',
+        currency: 'GBP',
+        tokenBalance: 55,
+        addedTokens: 50,
+        quantity: 50,
+        amountGbp: 5,
+      });
+      expect(store.get(`users/${standardCaller.uid}`)?.tokenBalance).toBe(55);
+      expect(store.get(`users/${standardCaller.uid}`)?.lifetimeTokensPurchased).toBe(50);
     });
 
     it('enforces min 50 integer quantity and required waiverAccepted === true for flexible top-ups', async () => {

@@ -846,7 +846,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
       const code = String(err?.code || '');
       const msg = String(err?.message || '');
       if (code.includes('permission-denied') || msg.toLowerCase().includes('disabled')) {
-        setErrorMsg('Live card checkout is coming soon. Token top-ups are currently restricted to admin beta simulation.');
+        setErrorMsg('Live card checkout is coming soon. Simulated token top-ups are currently disabled.');
       } else {
         setErrorMsg(msg || 'Unable to process simulated top-up. Please try again.');
       }
@@ -998,13 +998,18 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
               </a>.
             </span>
           </label>
+        </ModalBody>
 
-          {errorMsg && (
-            <div className="text-xs text-rose-400 bg-rose-950/30 border border-rose-800/50 rounded-lg p-2.5">
+        {errorMsg && (
+          <div className="shrink-0 px-4 sm:px-5 py-2.5 border-t border-zinc-800/80 bg-background-dark">
+            <div
+              data-testid="stripe-error-banner"
+              className="text-xs text-rose-400 bg-rose-950/30 border border-rose-800/50 rounded-lg p-2.5"
+            >
               {errorMsg}
             </div>
-          )}
-        </ModalBody>
+          </div>
+        )}
 
         <ModalFooter className="shrink-0">
           <button
@@ -1170,7 +1175,7 @@ export const TokenConfirmationDialog: React.FC<{
   return (
     <ModalBackdrop className="z-[130]" onClick={() => !isBusy && onClose()}>
       <ModalContainer data-testid="token-gate-modal">
-        <ModalHeader>
+        <ModalHeader className="shrink-0">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">
               {isAdmin ? 'verified_user' : !hasSufficientBalance ? 'account_balance_wallet' : 'bolt'}
@@ -1189,7 +1194,10 @@ export const TokenConfirmationDialog: React.FC<{
           </button>
         </ModalHeader>
 
-        <div className="p-5 space-y-4 text-sm text-zinc-400">
+        <ModalBody
+          data-testid="token-gate-modal-body"
+          className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-5 space-y-4 text-sm text-zinc-400"
+        >
           {isAdmin ? (
             <>
               <div className="flex items-center justify-between bg-emerald-950/30 border border-emerald-500/30 rounded-xl px-3.5 py-2">
@@ -1368,13 +1376,20 @@ export const TokenConfirmationDialog: React.FC<{
               )}
             </>
           )}
+        </ModalBody>
 
-          {error && (
-            <p className="text-red-400 text-xs mt-2 font-medium">{error}</p>
-          )}
-        </div>
+        {error && (
+          <div className="shrink-0 px-5 py-2.5 border-t border-zinc-800/80 bg-background-dark">
+            <p
+              data-testid="token-gate-error-banner"
+              className="text-red-400 text-xs font-medium bg-red-950/30 border border-red-800/50 rounded-lg p-2.5"
+            >
+              {error}
+            </p>
+          </div>
+        )}
 
-        <ModalFooter>
+        <ModalFooter className="shrink-0">
           {onBack ? (
             <button
               type="button"
@@ -2240,6 +2255,7 @@ export function ConsolidatedValidationModal({
   const [isSubmitting, setIsSubmitting] = React.useState<boolean>(false);
   const [verificationError, setVerificationError] = React.useState<string | null>(null);
   const [needsTopUpForEscape, setNeedsTopUpForEscape] = React.useState<boolean>(false);
+  const bouncerErrorRef = React.useRef<HTMLDivElement | null>(null);
 
   React.useEffect(() => {
     setLocalSeeds(seeds);
@@ -2248,6 +2264,12 @@ export function ConsolidatedValidationModal({
     setNeedsTopUpForEscape(false);
     setIsVerifying(false);
   }, [seeds]);
+
+  React.useEffect(() => {
+    if (verificationError && bouncerErrorRef.current && typeof bouncerErrorRef.current.scrollIntoView === 'function') {
+      bouncerErrorRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [verificationError]);
 
   if (!isOpen) return null;
 
@@ -2376,7 +2398,11 @@ export function ConsolidatedValidationModal({
       </div>
 
       {verificationError && (
-        <div data-testid="bouncer-error" className="flex items-center justify-between gap-2 text-rose-400 text-xs bg-rose-950/40 border border-rose-800/50 rounded-lg p-2">
+        <div
+          ref={bouncerErrorRef}
+          data-testid="bouncer-error"
+          className="flex items-center justify-between gap-2 text-rose-400 text-xs bg-rose-950/40 border border-rose-800/50 rounded-lg p-2"
+        >
           <div className="flex items-center gap-1.5">
             <span className="material-symbols-outlined !text-[15px] flex-shrink-0">error</span>
             <span>{verificationError}</span>
