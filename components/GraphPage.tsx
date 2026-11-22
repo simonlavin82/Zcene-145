@@ -2994,7 +2994,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
   return (
     <div 
-        className="absolute inset-0 flex flex-col overflow-hidden"
+        className="absolute inset-0 flex flex-col overflow-hidden zine-print-unlock"
         style={{
             backgroundImage: 'linear-gradient(rgba(17, 17, 19, 0.8), rgba(17, 17, 19, 0.8)), url("https://storage.googleapis.com/zcene-prod-assets/Zcene%20general%20background.jpeg")',
             backgroundSize: 'cover',
@@ -3145,7 +3145,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
         {isSmallScreen ? (
             <>
-                <div className="flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative">
+                <div className={`flex-grow flex-shrink min-h-0 flex flex-col overflow-hidden relative ${isMagazineViewOpen ? 'print:hidden' : ''}`}>
                     <div ref={mobileTabContainerRef} className="flex-grow overflow-hidden relative z-10 min-h-0" style={{ overscrollBehaviorY: 'contain' }}>
                         <div className="flex h-full transition-transform duration-300 ease-in-out" style={{ transform: `translateX(-${tabIndex * 100}%)` }}>
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">{ArtistsPanelContent}</div>
@@ -3166,7 +3166,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
 
 
                 {/* Mobile Floating Navigation Bar */}
-                <div className={`fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm md:hidden transition-all duration-300 ease-in-out ${isMagazineViewOpen ? 'opacity-0 pointer-events-none translate-y-4' : 'opacity-100 pointer-events-auto translate-y-0'}`}>
+                <div className={`fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] left-1/2 -translate-x-1/2 z-40 w-[calc(100%-2rem)] max-w-sm md:hidden transition-all duration-300 ease-in-out print:hidden ${isMagazineViewOpen ? 'opacity-0 pointer-events-none translate-y-4' : 'opacity-100 pointer-events-auto translate-y-0'}`}>
                     <nav className="flex items-center justify-between p-1.5 bg-zinc-900/90 backdrop-blur-xl border border-zinc-700/80 rounded-xl shadow-[0_12px_36px_rgba(0,0,0,0.6),0_2px_8px_rgba(0,0,0,0.4)]">
                         {(['artists', 'spiderweb', 'details'] as MobileTab[]).map(tab => {
                             const isActive = activeTab === tab;
@@ -3206,34 +3206,34 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 </div>
             </>
         ) : (
-            <main className={`flex-grow flex flex-row relative min-h-0 gap-4 ${isSmallScreen ? 'px-4' : 'px-6 lg:px-8'} pb-6`}>
-                <aside style={{ width: `${leftPanelWidth}px` }} className={`relative h-full z-50 flex flex-col flex-shrink-0 bg-zinc-900 border border-zinc-600/50 transition-all duration-300 ease-in-out overflow-hidden min-h-0 rounded-2xl ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+            <main className={`flex-grow flex flex-row relative min-h-0 gap-4 ${isSmallScreen ? 'px-4' : 'px-6 lg:px-8'} pb-6 zine-print-unlock`}>
+                <aside style={{ width: `${leftPanelWidth}px` }} className={`relative h-full z-50 flex flex-col flex-shrink-0 bg-zinc-900 border border-zinc-600/50 transition-all duration-300 ease-in-out overflow-hidden min-h-0 rounded-2xl print:hidden ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     {!isLeftPanelCollapsed && (<div onMouseDown={handleMouseDown('left')} className="absolute top-0 right-0 h-full w-2 cursor-col-resize select-none touch-none z-[100] group" aria-label="Resize left panel" role="separator"><div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div></div>)}
                     <div className={`${LayoutSizes.headerBar} flex-shrink-0 border-b border-zinc-600/50 flex items-center relative z-[60] ${isLeftPanelCollapsed ? 'justify-center px-1' : 'justify-between px-4'}`}>{!isLeftPanelCollapsed && (<div className="flex items-center gap-2 overflow-hidden"><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Roots</h2><span className={`h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm ${artistIndicatorStyles}`}>{enabledArtistsCount}</span></div>)}<button onClick={handleToggleLeftPanel} className="relative z-[70] w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none pointer-events-auto" title={isLeftPanelCollapsed ? "Expand Panel" : "Collapse Panel"}><span className="material-symbols-outlined !text-[18px]">{isLeftPanelCollapsed ? 'left_panel_open' : 'left_panel_close'}</span></button></div>
                     {isLeftPanelCollapsed ? (<div className="flex-grow flex-col items-center justify-between py-6 text-zinc-400"><div className="flex flex-col items-center gap-y-6">{ libraryArtists.length > 0 ? (<button onClick={() => { setIsLibraryDialogOpen(true); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">queue_music</span></button>) : (<button onClick={() => { fileInputRef.current?.click(); if (!onboardingProgress.step1) updateOnboarding('step1'); }} title="Import Library" className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none"><span className="material-symbols-outlined !text-[18px]">upload</span></button>)}</div><div className="absolute bottom-6 left-1/2 -translate-x-1/2"><button onClick={handleApplyChanges} disabled={!isArtistPending || isLoading || isOverLimit || isPreFlightChecking} className="group" title={createButtonLabel}><span className={`h-8 w-8 rounded-md flex items-center justify-center text-sm font-bold border-2 transition-all duration-500 ${artistIndicatorStyles} ${enabledArtistsCount === 0 ? 'opacity-100' : 'group-active:scale-95'}`}>{enabledArtistsCount}</span></button></div></div>) : ( <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">{ArtistsPanelContent}</div> )}
                 </aside>
 
-                <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
+                <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 print:hidden ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden rounded-2xl">
                         <div className={`${LayoutSizes.headerBar} px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden`}><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Connections</h2></div>
                         <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto px-6 sm:px-8"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
                     </div>
                 </div>
                 
-                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 outline-none transition-colors transition-[width] duration-300 ease-in-out ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-zinc-900 border border-zinc-900' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden rounded-2xl'}`}>
+                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 outline-none transition-colors transition-[width] duration-300 ease-in-out ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-zinc-900 border border-zinc-900 zine-print-unlock' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden rounded-2xl'}`}>
                        {!isDetailsPanelCollapsed && !isMagazineViewOpen && (
-                         <div onMouseDown={handleMouseDown('right')} className="absolute top-0 left-0 h-full w-2 cursor-col-resize select-none touch-none z-[100] group" aria-label="Resize right panel" role="separator">
+                         <div onMouseDown={handleMouseDown('right')} className="absolute top-0 left-0 h-full w-2 cursor-col-resize select-none touch-none z-[100] group print:hidden" aria-label="Resize right panel" role="separator">
                            <div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div>
                          </div>
                        )}
-                       <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col">
+                       <div className="relative flex-1 min-h-0 overflow-hidden flex flex-col zine-print-unlock">
                             {detailsPanelElement}
                        </div>
                 </aside>
             </main>
         )}
         {isSmallScreen && isMagazineViewOpen && (
-            <div className="fixed inset-0 z-[9999] bg-zinc-900 overflow-y-auto overscroll-contain">
+            <div className="fixed inset-0 z-[9999] bg-zinc-900 overflow-y-auto overscroll-contain zine-print-unlock">
                 {detailsPanelElement}
             </div>
         )}

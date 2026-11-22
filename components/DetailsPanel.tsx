@@ -1404,7 +1404,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         <>
             <div className={`flex flex-col ${isStaticMockup ? 'min-h-0 pb-6' : 'min-h-full'} ${isStaticMockup ? '' : isFullScreenMode ? '' : 'pb-[calc(env(safe-area-inset-bottom)+9rem)] sm:pb-20'}`}>
                 {/* 1. Action Icons (Not Sticky) — ref measures its rendered height for the dynamic scroll target */}
-                <div ref={actionIconsRef} className={`pt-3 ${isFullScreenMode ? 'px-0 bg-transparent' : 'px-4 bg-zinc-900'} z-20 flex-shrink-0`}>
+                <div ref={actionIconsRef} className={`pt-3 print:hidden ${isFullScreenMode ? 'px-0 bg-transparent' : 'px-4 bg-zinc-900'} z-20 flex-shrink-0`}>
                     <div className={`flex items-center justify-end gap-1 flex-shrink-0 ${isFullScreenMode ? 'w-fit ml-auto' : ''}`}>
                         {(isArtistNode || isLabelNode) && (
                             <button
@@ -1459,7 +1459,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                 <div ref={sentinelRef} className="w-full h-[1px] -mt-[1px] pointer-events-none" />
                 {/* 2. Artist Name & Pills */}
                 <div
-                    className={`transition-all duration-300 flex-shrink-0 z-40 w-full ${isFullScreenMode
+                    className={`transition-all duration-300 flex-shrink-0 z-40 w-full zine-print-card-header ${isFullScreenMode
                         ? isHeaderStuck ? 'sticky top-2' : 'relative'
                         : `sticky top-0 border-b ${isHeaderStuck ? 'border-zinc-800/50 bg-zinc-900' : 'border-transparent bg-transparent'}`
                         }`}
@@ -1480,7 +1480,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <h3 className={`${isHeaderStuck ? 'text-base font-medium' : headerSizeClass} text-white leading-[0.9] py-1 break-words min-w-0 ${isFullScreenMode ? '' : 'transition-all duration-300'}`}>
                                         <HighlightedText text={getArtistDisplayName(details, node) || ''} query={searchQuery} />
                                     </h3>
-                                    <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
+                                    <span className={`material-symbols-outlined !text-[16px] flex-shrink-0 transition-all duration-300 print:hidden ${isIdCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover:opacity-100'}`}>
                                         {isIdCopied ? 'check' : 'content_copy'}
                                     </span>
                                 </div>
@@ -1609,11 +1609,11 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {!isLabelNode && (
-                                <div className="relative mx-auto w-fit">
+                                <div className="relative mx-auto w-fit zine-print-keep">
                                     {imageTier !== 'placeholder' && currentImageUrl ? (
                                         <>
                                             {/* Ambient Glow */}
-                                            <div className={`absolute ${isFullScreenMode ? 'inset-[-20%] blur-2xl' : 'inset-[-15%] rounded-full opacity-35 blur-2xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={isFullScreenMode ? { background: 'radial-gradient(ellipse at center, var(--scene-accent, transparent) 0%, transparent 70%)' } : { backgroundColor: 'var(--scene-accent, transparent)' }} />
+                                            <div className={`absolute print:hidden ${isFullScreenMode ? 'inset-[-20%] blur-2xl' : 'inset-[-15%] rounded-full opacity-35 blur-2xl'} transition-colors duration-1000 z-0 pointer-events-none`} style={isFullScreenMode ? { background: 'radial-gradient(ellipse at center, var(--scene-accent, transparent) 0%, transparent 70%)' } : { backgroundColor: 'var(--scene-accent, transparent)' }} />
                                             <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
                                                 {/* Temporary Loading Skeleton while image loads */}
                                                 {!imgLoaded && (
@@ -1742,7 +1742,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
                             {isArtistNode ? (
-                                <div className="grid grid-cols-3 gap-x-4 gap-y-4 py-4 border-b border-zinc-800/50">
+                                <div className="grid grid-cols-3 gap-x-4 gap-y-4 py-4 border-b border-zinc-800/50 zine-print-keep">
                                     {/* Row 1: Label | Genre | Style */}
                                     <div className="min-w-0">
                                         <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Label</h4>
@@ -1779,7 +1779,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                     <div className="min-w-0" aria-hidden="true" />
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-3 gap-x-4 py-4 border-b border-zinc-800/50">
+                                <div className="grid grid-cols-3 gap-x-4 py-4 border-b border-zinc-800/50 zine-print-keep">
                                     {/* Row 1: Genre | Origin | Founded */}
                                     <div className="min-w-0">
                                         <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-[0.2em]">Genre</h4>
@@ -1896,7 +1896,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                 if (filteredNotableArtists.length === 0) return null;
 
                                 return (
-                                    <div>
+                                    <div className="zine-print-keep">
                                         <h4 className="font-semibold text-zinc-500 mb-3 text-[10px] uppercase tracking-widest">
                                             {isLabelNode ? 'Released Artists / Scene Circle' : 'Scene Circle'}
                                         </h4>
@@ -1955,7 +1955,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             })()}
 
                             {((details.discography && details.discography.length > 0) || !isLabelNode) && (
-                                <div>
+                                <div className="zine-print-keep">
                                     <h4 className="font-semibold text-zinc-500 mb-2 text-[10px] uppercase tracking-widest">
                                         {isLabelNode ? 'Key Catalog Releases' : 'Essential Listening'}
                                     </h4>
@@ -1971,14 +1971,16 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                         className="group/album w-full flex items-center gap-2 border-b border-zinc-800/50 py-1.5 px-1 -mx-1 rounded-lg hover:bg-zinc-800/40 transition-colors"
                                                     >
                                                         {!isLabelNode && (
-                                                            <AlbumAudioPreviewButton
-                                                                nodeId={node.id}
-                                                                albumIndex={i}
-                                                                artistName={displayName}
-                                                                albumName={album.albumName}
-                                                                itunesArtistId={details.itunesArtistId}
-                                                                itunesCollectionId={album.itunesCollectionId}
-                                                            />
+                                                            <span className="print:hidden flex items-center">
+                                                                <AlbumAudioPreviewButton
+                                                                    nodeId={node.id}
+                                                                    albumIndex={i}
+                                                                    artistName={displayName}
+                                                                    albumName={album.albumName}
+                                                                    itunesArtistId={details.itunesArtistId}
+                                                                    itunesCollectionId={album.itunesCollectionId}
+                                                                />
+                                                            </span>
                                                         )}
                                                         <button
                                                             type="button"
@@ -1997,7 +1999,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                                 <span className="text-zinc-200 group-hover/album:text-white px-0.5 tracking-normal text-sm truncate">
                                                                     {album.albumName}
                                                                 </span>
-                                                                <span className={`material-symbols-outlined !text-[15px] flex-shrink-0 transition-all duration-200 ${
+                                                                <span className={`material-symbols-outlined !text-[15px] flex-shrink-0 transition-all duration-200 print:hidden ${
                                                                     isAlbumCopied ? 'text-primary opacity-100 scale-110' : 'text-zinc-500 opacity-0 group-hover/album:opacity-100'
                                                                 }`}>
                                                                     {isAlbumCopied ? 'check' : 'content_copy'}
@@ -2018,7 +2020,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                             )}
 
                             {!isStaticMockup && links.purchase.length > 0 && (
-                                <div className="pt-6">
+                                <div className="pt-6 print:hidden">
                                     <button
                                         onClick={() => setIsCatalogOpen(!isCatalogOpen)}
                                         className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
@@ -2094,7 +2096,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
 
 
                             {!isStaticMockup && (
-                                <div className="pt-6 border-t border-zinc-800">
+                                <div className="pt-6 border-t border-zinc-800 print:hidden">
                                     <button
                                         onClick={() => setIsConnectionsOpen(!isConnectionsOpen)}
                                         className="flex w-full items-center justify-between font-semibold text-zinc-500 text-[10px] uppercase tracking-widest mb-4 hover:text-zinc-300 transition-colors"
@@ -2540,6 +2542,17 @@ const useZineViewportTier = (isSmallScreen: boolean): ZineViewportTier => {
 
     return tier;
 };
+
+export function formatZinePrintDocumentTitle(rawTitle?: string | null): string {
+    const cleaned = (rawTitle || '')
+        .replace(/[<>:"/\\|?*\u0000-\u001F]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!cleaned || /^untitled zcene$/i.test(cleaned)) {
+        return 'Zcene - Music Discovery Zine';
+    }
+    return `Zcene - ${cleaned}`;
+}
 
 interface ZineEditorialHeadingProps {
     level: 'h1' | 'h2';
@@ -4463,9 +4476,63 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         </Markdown>
     ), [magazineSearchQuery]);
 
+    const canPrintZine = !isGlobalLoading && (
+        Boolean(sanitizedRationaleText) ||
+        Boolean(sanitizedOverarchingRationale) ||
+        activeNodes.length > 0
+    );
+
+    const resolvedZinePrintTitle = useMemo(() => {
+        const customEditorialTitle = scenes.length >= 2
+            ? normalizeZineTitle(overarchingZineTitle)
+            : normalizeZineTitle(scenes[0]?.zineTitle || overarchingZineTitle);
+        const fallbackTitle = projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(', ') : '');
+        return formatZinePrintDocumentTitle(customEditorialTitle || fallbackTitle);
+    }, [scenes, overarchingZineTitle, projectName, allScenesSeedArtists]);
+
+    const handleSaveAsPdf = useCallback(() => {
+        if (typeof window === 'undefined' || typeof document === 'undefined') return;
+        stopGlobalAudio();
+
+        const runPrint = () => {
+            const prevTitle = document.title;
+            let restored = false;
+            const restorePrintState = () => {
+                if (restored) return;
+                restored = true;
+                document.title = prevTitle;
+                document.documentElement.classList.remove('zcene-printing-zine');
+            };
+
+            document.title = resolvedZinePrintTitle;
+            document.documentElement.classList.add('zcene-printing-zine');
+            window.addEventListener('afterprint', restorePrintState, { once: true });
+
+            try {
+                if (typeof window.print === 'function') {
+                    window.print();
+                }
+            } finally {
+                // Defensive cleanup if browser does not fire afterprint (e.g., cancelled or headless)
+                setTimeout(restorePrintState, 1500);
+            }
+        };
+
+        if (isEditingZine) {
+            setIsEditingZine(false);
+            if (typeof window.requestAnimationFrame === 'function') {
+                window.requestAnimationFrame(() => runPrint());
+            } else {
+                setTimeout(runPrint, 0);
+            }
+        } else {
+            runPrint();
+        }
+    }, [isEditingZine, resolvedZinePrintTitle]);
+
     return (
         <div
-            className={`w-full ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-hidden'} flex flex-col bg-zinc-900 relative min-h-0 outline-none transition-colors duration-700`}
+            className={`w-full ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-hidden'} flex flex-col bg-zinc-900 relative min-h-0 outline-none transition-colors duration-700 zine-print-unlock zine-print-root`}
             style={{
                 '--scene-accent': dominantColor,
                 ...(isMagazineViewOpen ? {
@@ -4476,7 +4543,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             } as React.CSSProperties}
         >
             {isSmallScreen ? (
-                <div className={`flex-shrink-0 z-[60] transition-all duration-300 ${isMagazineViewOpen ? `bg-transparent ${LayoutSizes.topHeader} border-b border-zinc-700/50` : 'bg-zinc-900 h-0 overflow-hidden border-transparent'}`}>
+                <div className={`flex-shrink-0 z-[60] transition-all duration-300 print:hidden ${isMagazineViewOpen ? `bg-transparent ${LayoutSizes.topHeader} border-b border-zinc-700/50` : 'bg-zinc-900 h-0 overflow-hidden border-transparent'}`}>
                     <div className="px-4 flex items-center justify-between gap-4 h-full">
                         <div className="flex items-center gap-2 flex-grow animate-in fade-in slide-in-from-top-2 duration-500">
                             <div className="relative flex-grow max-w-none">
@@ -4506,6 +4573,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     <option value="label">Label</option>
                                 </Select>
                             </div>
+                            <Button
+                                variant="secondary"
+                                size="toolbar"
+                                type="button"
+                                data-testid="zine-save-pdf-btn-mobile"
+                                disabled={!canPrintZine}
+                                onClick={handleSaveAsPdf}
+                                className="w-10 !px-0 justify-center shrink-0"
+                                title="Save Zine as PDF"
+                                aria-label="Save as PDF"
+                            >
+                                <span className="material-symbols-outlined !text-[18px]">picture_as_pdf</span>
+                            </Button>
                             {canEditZine && (
                                 <Button
                                     variant="secondary"
@@ -4528,7 +4608,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 </div>
             ) : (
                 isMagazineViewOpen ? (
-                    <div className={`${LayoutSizes.topHeader} flex-shrink-0 border-b border-zinc-700/50 bg-transparent z-[60] relative px-4 md:px-6 lg:px-8`}>
+                    <div className={`${LayoutSizes.topHeader} flex-shrink-0 border-b border-zinc-700/50 bg-transparent z-[60] relative px-4 md:px-6 lg:px-8 print:hidden`}>
                         <div className="max-w-[1400px] mx-auto w-full h-full flex items-center justify-between relative">
                             <div className="flex items-center gap-4 overflow-hidden w-full h-full -mx-1 px-1">
                                 <div className="flex items-center gap-4 flex-grow animate-in fade-in slide-in-from-left-4 duration-500">
@@ -4564,6 +4644,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                             {!isSmallScreen && (
                                 <div className="flex items-center gap-2 ml-4 shrink-0">
+                                    <Button
+                                        variant="secondary"
+                                        size="toolbar"
+                                        iconPosition="left"
+                                        type="button"
+                                        data-testid="zine-save-pdf-btn"
+                                        disabled={!canPrintZine}
+                                        onClick={handleSaveAsPdf}
+                                        title="Save Zine as PDF"
+                                    >
+                                        <span className="material-symbols-outlined !text-[18px] -ml-0.5">picture_as_pdf</span>
+                                        <span>Save as PDF</span>
+                                    </Button>
                                     {canEditZine && (
                                         <Button
                                             variant="secondary"
@@ -4634,7 +4727,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     </div>
                 </div>
             ) : (
-                <div className={`flex-grow flex flex-col min-h-0 ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-hidden'}`}>
+                <div className={`flex-grow flex flex-col min-h-0 zine-print-unlock ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-hidden'}`}>
                     {!isMagazineViewOpen && filteredAndSortedNodes.length > 0 && !isGlobalLoading && (
                         <div className="flex justify-between items-center w-full px-4 py-2 border-b border-zinc-700/50 bg-zinc-900 flex-shrink-0 gap-3">
                             {filteredAndSortedNodes.length > 1 && (
@@ -4700,7 +4793,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     <div
                         ref={magazineScrollContainerRef}
                         id="magazine-scroll-container"
-                        className={`${isStaticMockup ? 'overflow-hidden h-auto' : 'flex-grow relative min-h-0'} ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800 overflow-x-clip' : 'overflow-hidden'}`}
+                        className={`${isStaticMockup ? 'overflow-hidden h-auto' : 'flex-grow relative min-h-0'} ${isMagazineViewOpen ? 'overflow-y-auto px-4 md:px-6 lg:px-8 scrollbar-thin scrollbar-thumb-zinc-800 overflow-x-clip zine-print-unlock' : 'overflow-hidden'}`}
                         onScroll={isMagazineViewOpen ? handleScroll : undefined}
                         onWheel={isMagazineViewOpen ? () => { lastScrolledNodeIdRef.current = null; } : undefined}
                         onTouchStart={handleTouchStart}
@@ -4708,6 +4801,19 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                         onTouchEnd={handleTouchEnd}
                         style={isMagazineViewOpen ? { touchAction: 'pan-y', overscrollBehaviorY: 'auto', overflowAnchor: 'none' } : {}}
                     >
+                        {isMagazineViewOpen && (
+                            <div
+                                data-testid="zine-print-masthead"
+                                className="hidden print:flex items-center justify-between border-b-2 border-zinc-900 pb-2.5 mb-6 text-zinc-900"
+                            >
+                                <span className="font-display font-bold uppercase tracking-[0.25em] text-xs">
+                                    ZCENE — MUSIC DISCOVERY ZINE
+                                </span>
+                                <span className="font-mono text-[10px] uppercase tracking-widest text-zinc-600">
+                                    zcene.online
+                                </span>
+                            </div>
+                        )}
                         {isMagazineViewOpen && scenes.length >= 2 && (
                             <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-8 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0" data-testid="zine-multi-scene-editorial">
                                 {/* 1) TOP LAYER: OVERARCHING ZINE H1 */}
@@ -4948,7 +5054,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                 data-node-id={node.id}
                                                 data-canonical-id={nodeCanonId}
                                                 className={`${renderMode === 'magazine'
-                                                    ? 'inline-block w-full max-w-2xl text-left'
+                                                    ? 'inline-block w-full max-w-2xl text-left zine-print-card'
                                                     : `w-full ${isStaticMockup ? 'h-auto' : 'h-full'} flex-shrink-0 overflow-hidden`}`}
                                             >
                                                 <NodeDetailsCard
@@ -5026,7 +5132,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
                     </div>
                     {isMagazineViewOpen && typeof document !== 'undefined' && createPortal(
-                        <div className="fixed bottom-8 left-0 right-0 z-[1050] px-6 md:px-8 pointer-events-none flex items-center justify-between">
+                        <div className="fixed bottom-8 left-0 right-0 z-[1050] px-6 md:px-8 pointer-events-none flex items-center justify-between print:hidden">
                             <div className="w-12 md:w-16"></div>
 
                             {isSmallScreen && (

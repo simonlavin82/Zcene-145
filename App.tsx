@@ -11048,7 +11048,7 @@ const App: React.FC = () => {
   const showSplashScreen = !isAuthInitialized || !isSplashMinTimerDone || isNavigatingToDashboard || (!!user && currentView === View.Dashboard && !isProjectsSynced);
 
   return (
-    <div className="h-[100dvh] flex flex-col overflow-hidden" key={refreshKey}>
+    <div className="h-[100dvh] flex flex-col overflow-hidden zine-print-unlock" key={refreshKey}>
       <AnimatePresence>
         {showSplashScreen && <SplashScreen key="zcene-splash-screen" />}
       </AnimatePresence>
@@ -11070,9 +11070,9 @@ const App: React.FC = () => {
       <AnimatePresence>
         {toast && <Toast key={toast.id} message={toast.message} onClose={() => setToast(null)} />}
       </AnimatePresence>
-      <div className="flex-grow relative overflow-hidden h-full">
+      <div className="flex-grow relative overflow-hidden h-full zine-print-unlock">
         <React.Suspense fallback={<div className="flex h-full w-full items-center justify-center bg-brand-black"><div className="w-8 h-8 border-4 border-zinc-800 border-t-primary rounded-full animate-spin"></div></div>}>
-          <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Home ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+          <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Home ? 'z-10' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
           <HomePage
             onNavigate={handleViewChange}
             hasExistingGraph={projects.length > 0}
@@ -11085,7 +11085,7 @@ const App: React.FC = () => {
             onRestartWalkthrough={handleDashboardRestartWalkthrough}
           />
         </div>
-        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Dashboard ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Dashboard ? 'z-10' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
           <Dashboard
             user={user}
             projects={projects}
@@ -11130,7 +11130,7 @@ const App: React.FC = () => {
             activeCuratingProject={activeCuratingProject}
           />
         </div>
-        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Graph ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Graph ? 'z-10 zine-print-unlock' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
           {graphData && (
             <GraphPage
               key={currentProjectId || (isViewingShare ? 'share' : 'new-project')}
