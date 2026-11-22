@@ -28,6 +28,7 @@ import SplashScreen from './components/SplashScreen';
 import { MyStackDialog, TokenConfirmationDialog, SimulatedStripeModal, DisambiguationCandidate, FilterGuidanceModal, ConsolidatedValidationModal, PreFlightSeed } from './components/SharedModals';
 import { TOKEN_PRICING, TokenTopUpTierId, computeBaseProjectTokenCost } from './shared/tokenEconomy';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalFooter, ModalBody } from './components/ui/Dialog';
+import { Checkbox } from './components/DesignSystem';
 
 import { ShareModal } from './components/ShareModal';
 import { analyticsService } from './services/analyticsService';
@@ -1286,6 +1287,12 @@ const App: React.FC = () => {
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [deleteAccountConfirmed, setDeleteAccountConfirmed] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
+  const closeDeleteAccountModal = useCallback(() => {
+    if (isDeletingAccount) return;
+    setIsDeleteAccountModalOpen(false);
+    setDeleteAccountConfirmed(false);
+    setDeleteAccountError(null);
+  }, [isDeletingAccount]);
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -11649,9 +11656,9 @@ const App: React.FC = () => {
       {/* Global Modals */}
       <AnimatePresence>
         {isDeleteAccountModalOpen && (
-          <ModalBackdrop className="z-[1000]">
+          <ModalBackdrop className="z-[1000]" onClick={closeDeleteAccountModal}>
             <ModalContainer
-              className="max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col overflow-hidden p-0"
+              className="text-left relative"
               data-testid="delete-account-modal"
             >
               {isDeletingAccount && (
@@ -11660,13 +11667,24 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              <ModalBody className="p-6 sm:p-8 space-y-4 overflow-y-auto">
-                <div className="w-14 h-14 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
-                  <span className="material-symbols-outlined !text-[30px]">warning</span>
+              <ModalHeader className="shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-red-400 !text-[18px]">warning</span>
+                  <h3 className="text-base font-medium text-white">Delete Account?</h3>
                 </div>
+                <button
+                  type="button"
+                  disabled={isDeletingAccount}
+                  onClick={closeDeleteAccountModal}
+                  aria-label="Close delete account dialog"
+                  className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none disabled:opacity-50"
+                >
+                  <span className="material-symbols-outlined !text-[18px]">close</span>
+                </button>
+              </ModalHeader>
 
-                <h3 className="text-xl font-bold text-white">Delete Account?</h3>
-                <p className="text-zinc-400 text-sm leading-relaxed">
+              <ModalBody className="flex-1 min-h-0 space-y-3.5 overflow-y-auto">
+                <p className="text-zinc-300 text-sm leading-relaxed">
                   This will permanently erase your profile, Zcenes, Zines, saved Stack, Style profiles, shared links, and login credentials. This action is irreversible.
                 </p>
 
@@ -11682,13 +11700,12 @@ const App: React.FC = () => {
                   </p>
                 </div>
 
-                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                <p className="text-xs text-zinc-500 leading-relaxed">
                   Minimal anonymised aggregate billing totals (with zero personal data) are retained for statutory accounting, consistent with our Terms of Service.
                 </p>
 
-                <label className="flex items-start gap-3 p-3 rounded-xl bg-zinc-900/70 border border-zinc-800 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
+                <div className="p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl hover:bg-zinc-800/50 transition-colors">
+                  <Checkbox
                     data-testid="delete-account-confirm-checkbox"
                     checked={deleteAccountConfirmed}
                     disabled={isDeletingAccount}
@@ -11696,12 +11713,9 @@ const App: React.FC = () => {
                       setDeleteAccountConfirmed(e.target.checked);
                       if (deleteAccountError) setDeleteAccountError(null);
                     }}
-                    className="mt-0.5 h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-red-500 focus:ring-red-500/40 accent-red-500 cursor-pointer flex-shrink-0"
+                    label={`I understand this is permanent, cannot be undone, and any remaining unused tokens (${profile?.tokenBalance ?? 0}T) will be forfeited.`}
                   />
-                  <span className="text-xs text-zinc-300 leading-relaxed">
-                    I understand this is permanent, cannot be undone, and any remaining unused tokens ({profile?.tokenBalance ?? 0}T) will be forfeited.
-                  </span>
-                </label>
+                </div>
               </ModalBody>
 
               {/* Pinned Error Banner outside ModalBody so it stays visible without scrolling */}
@@ -11709,42 +11723,38 @@ const App: React.FC = () => {
                 <div
                   role="alert"
                   data-testid="delete-account-error"
-                  className="mx-6 sm:mx-8 mb-3 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium leading-relaxed shrink-0"
+                  className="mx-4 mb-3 p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium leading-relaxed shrink-0"
                 >
                   {deleteAccountError}
                 </div>
               )}
 
-              <div className="px-6 sm:px-8 pb-6 sm:pb-8 pt-2 flex flex-col gap-2.5 shrink-0 border-t border-zinc-800/60">
+              <ModalFooter className="shrink-0">
+                <button
+                  type="button"
+                  disabled={isDeletingAccount}
+                  onClick={closeDeleteAccountModal}
+                  className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                >
+                  Cancel
+                </button>
                 <button
                   type="button"
                   data-testid="delete-account-submit-btn"
                   disabled={isDeletingAccount || !deleteAccountConfirmed}
                   onClick={handleDeleteAccount}
-                  className="w-full py-3.5 rounded-xl bg-[#ef4444] hover:bg-[#ef4444]/90 text-white font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 shadow-lg shadow-red-900/20"
+                  className="px-4 py-1.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-medium text-sm transition-opacity flex items-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {isDeletingAccount ? (
                     <>
-                      <Spinner className="w-4 h-4 text-white" />
-                      Deleting Account...
+                      <Spinner className="w-3.5 h-3.5 text-white" />
+                      Deleting...
                     </>
                   ) : (
                     'Delete Forever'
                   )}
                 </button>
-                <button
-                  type="button"
-                  disabled={isDeletingAccount}
-                  onClick={() => {
-                    setIsDeleteAccountModalOpen(false);
-                    setDeleteAccountConfirmed(false);
-                    setDeleteAccountError(null);
-                  }}
-                  className="w-full py-3 rounded-xl border border-zinc-800 text-zinc-400 font-semibold text-sm hover:bg-zinc-800 hover:text-white transition-all disabled:opacity-50"
-                >
-                  Cancel
-                </button>
-              </div>
+              </ModalFooter>
             </ModalContainer>
           </ModalBackdrop>
         )}

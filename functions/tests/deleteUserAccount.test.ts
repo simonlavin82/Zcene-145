@@ -370,15 +370,25 @@ describe("V47.4 Server-Side deleteUserAccount, GDPR Erasure & Anonymised P&L", (
     expect(deletedTelemetryBlock).toContain("allow write: if false;");
   });
 
-  it("8. Wires App.tsx Delete Account modal to deleteUserAccount callable, reauthenticateWithGoogle retry, token forfeiture warning & confirmation checkbox", () => {
+  it("8. Wires App.tsx Delete Account modal to deleteUserAccount callable, reauthenticateWithGoogle retry, Design System anatomy (<ModalHeader>/<ModalFooter>/<Checkbox>) & token forfeiture warning", () => {
     const appSrc = fs.readFileSync(path.resolve(__dirname, "../../App.tsx"), "utf-8");
     expect(appSrc).toContain("httpsCallable(functions, 'deleteUserAccount'");
     expect(appSrc).toContain("reauthenticateWithGoogle()");
     expect(appSrc).toContain("REQUIRES_RECENT_LOGIN");
     expect(appSrc).toContain("ACTIVE_CURATION_IN_PROGRESS");
-    expect(appSrc).toContain('data-testid="delete-account-token-warning"');
-    expect(appSrc).toContain('data-testid="delete-account-confirm-checkbox"');
-    expect(appSrc).toContain('data-testid="delete-account-error"');
-    expect(appSrc).toContain("disabled={isDeletingAccount || !deleteAccountConfirmed}");
+
+    const modalSlice = appSrc.slice(
+      appSrc.indexOf('data-testid="delete-account-modal"'),
+      appSrc.indexOf('data-testid="delete-account-modal"') + 4500
+    );
+    expect(modalSlice).toContain("<ModalHeader");
+    expect(modalSlice).toContain("<ModalFooter");
+    expect(modalSlice).toContain("<Checkbox");
+    expect(modalSlice).toContain("text-red-400");
+    expect(modalSlice).toContain("bg-red-500");
+    expect(modalSlice).toContain('data-testid="delete-account-token-warning"');
+    expect(modalSlice).toContain('data-testid="delete-account-confirm-checkbox"');
+    expect(modalSlice).toContain('data-testid="delete-account-error"');
+    expect(modalSlice).toContain("disabled={isDeletingAccount || !deleteAccountConfirmed}");
   });
 });
