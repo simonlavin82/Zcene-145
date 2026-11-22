@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { initializeAppCheck, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';
+import { initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from 'firebase/app-check';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
@@ -7,7 +7,7 @@ import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
 
-// Phase 1 Firebase App Check Readiness (reCAPTCHA v3, Monitor Mode)
+// Phase 1 Firebase App Check Readiness (reCAPTCHA Enterprise, Monitor Mode)
 // Strictly guarded against SSR, Vitest offline harness, and missing site key.
 let appCheck: AppCheck | null = null;
 const isVitestEnv =
@@ -22,7 +22,7 @@ if (typeof window !== 'undefined' && !isVitestEnv && recaptchaSiteKey) {
         import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
     }
     appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+      provider: new ReCaptchaEnterpriseProvider(recaptchaSiteKey),
       isTokenAutoRefreshEnabled: true,
     });
   } catch (err) {

@@ -124,14 +124,14 @@ describe('Phase 1 Pre-Launch Security Rules, Endpoint Gating, Concurrency UX & A
     });
   });
 
-  describe('3. Firebase App Check Readiness (reCAPTCHA v3, Monitor Mode)', () => {
-    it('conditionally initializes ReCaptchaV3Provider in services/firebase.ts before testConnection with Vitest & dev debug-token guards', () => {
+  describe('3. Firebase App Check Readiness (reCAPTCHA Enterprise, Monitor Mode)', () => {
+    it('conditionally initializes ReCaptchaEnterpriseProvider in services/firebase.ts before testConnection with Vitest & dev debug-token guards', () => {
       const firebaseSrc = readRepoFile('services/firebase.ts');
-      expect(firebaseSrc).toContain("import { initializeAppCheck, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';");
+      expect(firebaseSrc).toContain("import { initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from 'firebase/app-check';");
       expect(firebaseSrc).toContain("import.meta.env.MODE === 'test'");
       expect(firebaseSrc).toContain('VITE_RECAPTCHA_SITE_KEY');
       expect(firebaseSrc).toContain('FIREBASE_APPCHECK_DEBUG_TOKEN');
-      expect(firebaseSrc).toContain('new ReCaptchaV3Provider(recaptchaSiteKey)');
+      expect(firebaseSrc).toContain('new ReCaptchaEnterpriseProvider(recaptchaSiteKey)');
       expect(firebaseSrc.indexOf('initializeAppCheck')).toBeLessThan(firebaseSrc.indexOf('testConnection();'));
     });
 
