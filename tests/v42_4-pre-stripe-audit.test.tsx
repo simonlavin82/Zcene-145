@@ -99,6 +99,27 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     expect(helpSrc).toContain('Message on Instagram');
     expect(helpSrc).toContain('Billing & Refund Reviews:');
 
+    // V47.3 Anti-Drift & Live Feature Parity Locks
+    expect(helpSrc).not.toContain('Add Seeds');
+    expect(helpSrc).not.toContain('title="SEEDS"');
+    expect(helpSrc).not.toContain('Layout by');
+    expect(helpSrc).not.toContain('Use Settings');
+    expect(helpSrc).not.toContain('Firestore Single Source of Truth');
+    expect(helpSrc).not.toContain('Snap Back');
+    expect(helpSrc).not.toContain('LegendSymbol');
+    expect(helpSrc).toContain('nodeTypeColorMap');
+    expect(helpSrc).toContain("title: 'Root Artist'");
+    expect(helpSrc).toContain("icon: 'album'");
+    expect(helpSrc).toContain("icon: 'equalizer'");
+    expect(helpSrc).toContain("icon: 'label'");
+    expect(helpSrc).toContain("icon: 'library_music'");
+    expect(helpSrc).toContain("icon: 'location_on'");
+    expect(helpSrc).toContain("icon: 'event'");
+    expect(helpSrc).toContain('ZCENE_TSHIRT_MAILTO');
+    expect(helpSrc).toContain('ZCENE_BUYMEACOFFEE_URL');
+    expect(helpSrc).toContain('10 minutes');
+    expect(helpSrc).toContain('5 minutes');
+
     // Help Footer via GlobalFooter
     expect(helpSrc).toContain('GlobalFooter');
   });
