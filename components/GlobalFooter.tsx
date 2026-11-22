@@ -110,6 +110,13 @@ export const GlobalFooter: React.FC<GlobalFooterProps> = ({
               >
                 Help
               </button>
+              <button 
+                onClick={() => onNavigate(View.Terms)} 
+                data-testid="footer-terms-link"
+                className="hover:text-primary transition-colors cursor-pointer"
+              >
+                Terms of Service
+              </button>
               {isAdmin && (
                 <>
                   <button 

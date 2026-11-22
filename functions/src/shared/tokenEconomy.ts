@@ -82,6 +82,17 @@ export const TOKEN_UNIT_GBP = 0.10;
 export const GBP_TO_USD_RATE = 1.30;
 export const TOKEN_UNIT_USD = 0.13;
 
+export const TOP_UP_PRESET_QUANTITIES = [5, 10, 25] as const;
+export const MIN_TOP_UP_TOKENS = 5;
+export const MAX_TOP_UP_TOKENS = 1000;
+export const ADMIN_GRANT_MAX_TOKENS = 10000;
+
+export function formatGbpFromTokens(quantity: number): string {
+  const safeQty = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
+  const gbp = safeQty * TOKEN_UNIT_GBP;
+  return `£${gbp.toFixed(2)}`;
+}
+
 export function tokensToGbp(tokens: number): number {
   const safeTokens = Number.isFinite(tokens) ? tokens : 0;
   return Number((safeTokens * TOKEN_UNIT_GBP).toFixed(4));

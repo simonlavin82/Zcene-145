@@ -3,6 +3,7 @@ export enum View {
   Dashboard = 'dashboard',
   Graph = 'graph',
   Help = 'help',
+  Terms = 'terms',
   StyleGuide = 'styleguide',
   Engine = 'engine',
   Analytics = 'analytics',
@@ -341,6 +342,7 @@ export interface UserProfile {
 
 export type TokenTransactionType =
   | 'topup_simulated'
+  | 'admin_grant'
   | 'spend_preflight_lookup'
   | 'spend_direct_hit'
   | 'spend_live_synthesis'
@@ -352,12 +354,16 @@ export interface TokenTransaction {
   uid: string;
   type: TokenTransactionType;
   delta: number;
+  amount?: number;
   balanceAfter: number;
   amountGbp?: number;
   tierId?: 'gbp_5' | 'gbp_10' | 'gbp_15';
   projectId?: string;
   curationSessionId?: string;
+  reason?: string;
+  grantedBy?: string;
   description: string;
+  timestamp?: any;
   createdAt?: any;
 }
 

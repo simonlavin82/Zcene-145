@@ -1,11 +1,17 @@
 import { onCall, HttpsError, CallableRequest } from "firebase-functions/v2/https";
 import { getApps, initializeApp } from "firebase-admin/app";
+import { getAuth } from "firebase-admin/auth";
 import { getFirestore, FieldValue, Timestamp } from "firebase-admin/firestore";
 import {
   isAdminUser,
   TOKEN_PRICING,
   TOP_UP_TIERS,
   TokenTopUpTierId,
+  TOKEN_UNIT_GBP,
+  MIN_TOP_UP_TOKENS,
+  MAX_TOP_UP_TOKENS,
+  ADMIN_GRANT_MAX_TOKENS,
+  formatGbpFromTokens,
   computeRemainingSettlementTokens,
   computeBaseProjectTokenCost,
 } from "./shared/tokenEconomy";
@@ -126,7 +132,262 @@ function getSessionExpiry(): Timestamp {
 }
 
 /**
- * Simulated Stripe Checkout Top-Up Callable (£5=50T, £10=100T, £15=150T).
+ * Core handler for Admin Token Grant Tool (Phase 2).
+ * Verifies caller.isAdmin, resolves target user via Firebase Admin Auth getUserByEmail,
+ * atomically increments tokenBalance (without touching lifetimeTokensPurchased),
+ * and writes an immutable 'admin_grant' audit receipt to users/{targetUid}/tokenTransactions.
+ */
+export async function executeAdminGrantTokens(
+  caller: CallerIdentity,
+  data: { email?: unknown; amount?: unknown; reason?: unknown } | undefined
+): Promise<{
+  success: true;
+  targetUid: string;
+  targetEmail: string;
+  amount: number;
+  tokenBalance: number;
+  reason: string;
+  grantedBy: string;
+  transactionId: string;
+}> {
+  if (!caller.isAdmin) {
+    throw new HttpsError("permission-denied", "Admin access required to grant tokens.");
+  }
+
+  const rawEmail = typeof data?.email === "string" ? data.email.trim().toLowerCase() : "";
+  if (!rawEmail || !rawEmail.includes("@") || rawEmail.length > 256) {
+    throw new HttpsError("invalid-argument", "Please provide a valid recipient email address.");
+  }
+
+  const parsedAmount = Number(data?.amount);
+  if (
+    !Number.isFinite(parsedAmount) ||
+    !Number.isInteger(parsedAmount) ||
+    parsedAmount < 1 ||
+    parsedAmount > ADMIN_GRANT_MAX_TOKENS
+  ) {
+    throw new HttpsError(
+      "invalid-argument",
+      `Token amount must be a whole integer between 1 and ${ADMIN_GRANT_MAX_TOKENS}.`
+    );
+  }
+
+  const rawReason = typeof data?.reason === "string" ? data.reason.trim() : "";
+  if (rawReason.length > 200) {
+    throw new HttpsError("invalid-argument", "Reason note must be 200 characters or fewer.");
+  }
+  const cleanReason = rawReason || "Goodwill credit";
+
+  let targetUserRecord;
+  try {
+    targetUserRecord = await getAuth().getUserByEmail(rawEmail);
+  } catch (authErr: any) {
+    if (authErr?.code === "auth/user-not-found" || String(authErr?.message || "").includes("user-not-found")) {
+      throw new HttpsError("not-found", `No Zcene account found for ${rawEmail}.`);
+    }
+    throw new HttpsError("internal", authErr?.message || "Failed to look up target user.");
+  }
+
+  const targetUid = targetUserRecord.uid;
+  const targetEmail = (targetUserRecord.email || rawEmail).trim();
+  const userRef = db.collection("users").doc(targetUid);
+  const txRef = userRef.collection("tokenTransactions").doc();
+
+  const txResult = await db.runTransaction(async (tx) => {
+    const userSnap = await tx.get(userRef);
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+    const prevBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
+    const newBalance = prevBalance + parsedAmount;
+
+    tx.set(
+      userRef,
+      {
+        email: userData.email || targetEmail,
+        tokenBalance: FieldValue.increment(parsedAmount),
+        updatedAt: FieldValue.serverTimestamp(),
+        ...(!userSnap.exists
+          ? {
+              createdAt: FieldValue.serverTimestamp(),
+              lifetimeTokensPurchased: 0,
+              lifetimeTokensSpent: 0,
+            }
+          : {}),
+      },
+      { merge: true }
+    );
+
+    tx.set(txRef, {
+      id: txRef.id,
+      uid: targetUid,
+      type: "admin_grant",
+      amount: parsedAmount,
+      delta: parsedAmount,
+      balanceAfter: newBalance,
+      reason: cleanReason,
+      description: `Admin Grant: ${cleanReason}`,
+      grantedBy: caller.email,
+      grantedByUid: caller.uid,
+      timestamp: FieldValue.serverTimestamp(),
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    return {
+      tokenBalance: newBalance,
+      transactionId: txRef.id,
+    };
+  });
+
+  return {
+    success: true,
+    targetUid,
+    targetEmail,
+    amount: parsedAmount,
+    tokenBalance: txResult.tokenBalance,
+    reason: cleanReason,
+    grantedBy: caller.email,
+    transactionId: txResult.transactionId,
+  };
+}
+
+/**
+ * Admin Token Grant Callable (Phase 2).
+ */
+export const adminGrantTokens = onCall(
+  {
+    timeoutSeconds: 30,
+    memory: "256MiB",
+    enforceAppCheck: ENFORCE_APP_CHECK,
+  },
+  async (request) => {
+    const caller = requireAuthenticatedCaller(request);
+    return executeAdminGrantTokens(caller, request.data);
+  }
+);
+
+/**
+ * Core handler for Simulated Stripe Checkout Top-Up (Phase 2 Flexible Quantity + Legacy Tier Compat).
+ * Strictly gated behind caller.isAdmin && process.env.ALLOW_SIMULATED_TOPUP === "true".
+ */
+export async function executeSimulatedStripeTopUp(
+  caller: CallerIdentity,
+  data: { quantity?: unknown; tierId?: TokenTopUpTierId; waiverAccepted?: unknown } | undefined
+): Promise<{
+  success: true;
+  mode: "simulated";
+  tokenBalance: number;
+  addedTokens: number;
+  quantity: number;
+  amountGbp: number;
+  currency: "GBP";
+  tierId?: TokenTopUpTierId;
+}> {
+  if (!caller.isAdmin || process.env.ALLOW_SIMULATED_TOPUP !== "true") {
+    throw new HttpsError(
+      "permission-denied",
+      "Simulated token top-ups are disabled in this environment."
+    );
+  }
+
+  let tokensToCredit: number;
+  let amountGbp: number;
+  let resolvedTierId: TokenTopUpTierId | undefined;
+  let priceDisplay: string;
+
+  if (data?.quantity !== undefined && data?.quantity !== null) {
+    const parsedQty = Number(data.quantity);
+    if (
+      !Number.isFinite(parsedQty) ||
+      !Number.isInteger(parsedQty) ||
+      parsedQty < MIN_TOP_UP_TOKENS ||
+      parsedQty > MAX_TOP_UP_TOKENS
+    ) {
+      throw new HttpsError(
+        "invalid-argument",
+        `Token quantity must be a whole integer between ${MIN_TOP_UP_TOKENS} and ${MAX_TOP_UP_TOKENS}.`
+      );
+    }
+    if (data.waiverAccepted !== true) {
+      throw new HttpsError(
+        "failed-precondition",
+        "You must accept the immediate digital delivery waiver before completing a top-up."
+      );
+    }
+    tokensToCredit = parsedQty;
+    amountGbp = Number((tokensToCredit * TOKEN_UNIT_GBP).toFixed(2));
+    priceDisplay = formatGbpFromTokens(tokensToCredit);
+    if (data.tierId && data.tierId in TOP_UP_TIERS) {
+      resolvedTierId = data.tierId;
+    }
+  } else {
+    const tierId = data?.tierId;
+    if (!tierId || !(tierId in TOP_UP_TIERS)) {
+      throw new HttpsError("invalid-argument", "Invalid top-up quantity or tier selected.");
+    }
+    const tier = TOP_UP_TIERS[tierId];
+    tokensToCredit = tier.tokens;
+    amountGbp = tier.amountGbp;
+    resolvedTierId = tier.id;
+    priceDisplay = tier.priceDisplay;
+  }
+
+  const userRef = db.collection("users").doc(caller.uid);
+  const txRef = userRef.collection("tokenTransactions").doc();
+
+  const result = await db.runTransaction(async (tx) => {
+    const userSnap = await tx.get(userRef);
+    const userData = userSnap.exists ? userSnap.data() || {} : {};
+
+    const prevBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
+    const prevPurchased = Math.max(0, Math.floor(Number(userData.lifetimeTokensPurchased) || 0));
+    const prevSpent = Math.max(0, Math.floor(Number(userData.lifetimeTokensSpent) || 0));
+    const newBalance = prevBalance + tokensToCredit;
+
+    tx.set(
+      userRef,
+      {
+        ...(caller.email ? { email: userData.email || caller.email } : {}),
+        tokenBalance: newBalance,
+        lifetimeTokensPurchased: prevPurchased + tokensToCredit,
+        lifetimeTokensSpent: prevSpent,
+        lastTopUpAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        ...(!userSnap.exists ? { createdAt: FieldValue.serverTimestamp() } : {}),
+      },
+      { merge: true }
+    );
+
+    tx.set(txRef, {
+      id: txRef.id,
+      uid: caller.uid,
+      type: "topup_simulated",
+      delta: tokensToCredit,
+      balanceAfter: newBalance,
+      amountGbp,
+      ...(resolvedTierId ? { tierId: resolvedTierId } : {}),
+      waiverAccepted: data?.waiverAccepted === true,
+      description: `Stripe Checkout Simulation — ${priceDisplay} Top-Up (${tokensToCredit} Tokens)`,
+      createdAt: FieldValue.serverTimestamp(),
+    });
+
+    return {
+      tokenBalance: newBalance,
+      addedTokens: tokensToCredit,
+      quantity: tokensToCredit,
+      amountGbp,
+      ...(resolvedTierId ? { tierId: resolvedTierId } : {}),
+    };
+  });
+
+  return {
+    success: true,
+    mode: "simulated",
+    currency: "GBP",
+    ...result,
+  };
+}
+
+/**
+ * Simulated Stripe Checkout Top-Up Callable (Flexible Quantity + Legacy Tier Compat).
  * Credits users/{uid}.tokenBalance atomically and writes an immutable receipt.
  */
 export const simulateStripeTopUpCallable = onCall(
@@ -137,68 +398,7 @@ export const simulateStripeTopUpCallable = onCall(
   },
   async (request) => {
     const caller = requireAuthenticatedCaller(request);
-    if (!caller.isAdmin || process.env.ALLOW_SIMULATED_TOPUP !== "true") {
-      throw new HttpsError(
-        "permission-denied",
-        "Simulated token top-ups are disabled in this environment."
-      );
-    }
-    const tierId = request.data?.tierId as TokenTopUpTierId | undefined;
-
-    if (!tierId || !(tierId in TOP_UP_TIERS)) {
-      throw new HttpsError("invalid-argument", "Invalid top-up tier selected.");
-    }
-
-    const tier = TOP_UP_TIERS[tierId];
-    const userRef = db.collection("users").doc(caller.uid);
-    const txRef = userRef.collection("tokenTransactions").doc();
-
-    const result = await db.runTransaction(async (tx) => {
-      const userSnap = await tx.get(userRef);
-      const userData = userSnap.exists ? userSnap.data() || {} : {};
-
-      const prevBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
-      const prevPurchased = Math.max(0, Math.floor(Number(userData.lifetimeTokensPurchased) || 0));
-      const prevSpent = Math.max(0, Math.floor(Number(userData.lifetimeTokensSpent) || 0));
-      const newBalance = prevBalance + tier.tokens;
-
-      tx.set(
-        userRef,
-        {
-          ...(caller.email ? { email: userData.email || caller.email } : {}),
-          tokenBalance: newBalance,
-          lifetimeTokensPurchased: prevPurchased + tier.tokens,
-          lifetimeTokensSpent: prevSpent,
-          lastTopUpAt: FieldValue.serverTimestamp(),
-          updatedAt: FieldValue.serverTimestamp(),
-          ...(!userSnap.exists ? { createdAt: FieldValue.serverTimestamp() } : {}),
-        },
-        { merge: true }
-      );
-
-      tx.set(txRef, {
-        id: txRef.id,
-        uid: caller.uid,
-        type: "topup_simulated",
-        delta: tier.tokens,
-        balanceAfter: newBalance,
-        amountGbp: tier.amountGbp,
-        tierId: tier.id,
-        description: `Stripe Checkout Simulation — ${tier.priceDisplay} Top-Up (${tier.tokens} Tokens)`,
-        createdAt: FieldValue.serverTimestamp(),
-      });
-
-      return {
-        tokenBalance: newBalance,
-        addedTokens: tier.tokens,
-        tierId: tier.id,
-      };
-    });
-
-    return {
-      success: true,
-      ...result,
-    };
+    return executeSimulatedStripeTopUp(caller, request.data);
   }
 );
 

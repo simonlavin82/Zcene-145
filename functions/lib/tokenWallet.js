@@ -1,10 +1,12 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.unlockDeepWebSessionCallable = exports.authorizeDirectHitCallable = exports.simulateStripeTopUpCallable = exports.STALE_LOCK_TTL_MS = exports.ENFORCE_APP_CHECK = void 0;
+exports.unlockDeepWebSessionCallable = exports.authorizeDirectHitCallable = exports.simulateStripeTopUpCallable = exports.adminGrantTokens = exports.STALE_LOCK_TTL_MS = exports.ENFORCE_APP_CHECK = void 0;
 exports.getTimestampMillis = getTimestampMillis;
 exports.isCurationLockActive = isCurationLockActive;
 exports.computeUncompletedScenesRefundCost = computeUncompletedScenesRefundCost;
 exports.requireAuthenticatedCaller = requireAuthenticatedCaller;
+exports.executeAdminGrantTokens = executeAdminGrantTokens;
+exports.executeSimulatedStripeTopUp = executeSimulatedStripeTopUp;
 exports.chargePreFlightLookupIfNeeded = chargePreFlightLookupIfNeeded;
 exports.recordPreFlightApiUsage = recordPreFlightApiUsage;
 exports.updateCurationLockJobId = updateCurationLockJobId;
@@ -15,6 +17,7 @@ exports.settleCurationProjectTokens = settleCurationProjectTokens;
 exports.refundProjectSettlementOnError = refundProjectSettlementOnError;
 const https_1 = require("firebase-functions/v2/https");
 const app_1 = require("firebase-admin/app");
+const auth_1 = require("firebase-admin/auth");
 const firestore_1 = require("firebase-admin/firestore");
 const tokenEconomy_1 = require("./shared/tokenEconomy");
 const multiSceneUtils_1 = require("./shared/multiSceneUtils");
@@ -86,23 +89,144 @@ function getSessionExpiry() {
     return firestore_1.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000);
 }
 /**
- * Simulated Stripe Checkout Top-Up Callable (£5=50T, £10=100T, £15=150T).
- * Credits users/{uid}.tokenBalance atomically and writes an immutable receipt.
+ * Core handler for Admin Token Grant Tool (Phase 2).
+ * Verifies caller.isAdmin, resolves target user via Firebase Admin Auth getUserByEmail,
+ * atomically increments tokenBalance (without touching lifetimeTokensPurchased),
+ * and writes an immutable 'admin_grant' audit receipt to users/{targetUid}/tokenTransactions.
  */
-exports.simulateStripeTopUpCallable = (0, https_1.onCall)({
+async function executeAdminGrantTokens(caller, data) {
+    if (!caller.isAdmin) {
+        throw new https_1.HttpsError("permission-denied", "Admin access required to grant tokens.");
+    }
+    const rawEmail = typeof data?.email === "string" ? data.email.trim().toLowerCase() : "";
+    if (!rawEmail || !rawEmail.includes("@") || rawEmail.length > 256) {
+        throw new https_1.HttpsError("invalid-argument", "Please provide a valid recipient email address.");
+    }
+    const parsedAmount = Number(data?.amount);
+    if (!Number.isFinite(parsedAmount) ||
+        !Number.isInteger(parsedAmount) ||
+        parsedAmount < 1 ||
+        parsedAmount > tokenEconomy_1.ADMIN_GRANT_MAX_TOKENS) {
+        throw new https_1.HttpsError("invalid-argument", `Token amount must be a whole integer between 1 and ${tokenEconomy_1.ADMIN_GRANT_MAX_TOKENS}.`);
+    }
+    const rawReason = typeof data?.reason === "string" ? data.reason.trim() : "";
+    if (rawReason.length > 200) {
+        throw new https_1.HttpsError("invalid-argument", "Reason note must be 200 characters or fewer.");
+    }
+    const cleanReason = rawReason || "Goodwill credit";
+    let targetUserRecord;
+    try {
+        targetUserRecord = await (0, auth_1.getAuth)().getUserByEmail(rawEmail);
+    }
+    catch (authErr) {
+        if (authErr?.code === "auth/user-not-found" || String(authErr?.message || "").includes("user-not-found")) {
+            throw new https_1.HttpsError("not-found", `No Zcene account found for ${rawEmail}.`);
+        }
+        throw new https_1.HttpsError("internal", authErr?.message || "Failed to look up target user.");
+    }
+    const targetUid = targetUserRecord.uid;
+    const targetEmail = (targetUserRecord.email || rawEmail).trim();
+    const userRef = db.collection("users").doc(targetUid);
+    const txRef = userRef.collection("tokenTransactions").doc();
+    const txResult = await db.runTransaction(async (tx) => {
+        const userSnap = await tx.get(userRef);
+        const userData = userSnap.exists ? userSnap.data() || {} : {};
+        const prevBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
+        const newBalance = prevBalance + parsedAmount;
+        tx.set(userRef, {
+            email: userData.email || targetEmail,
+            tokenBalance: firestore_1.FieldValue.increment(parsedAmount),
+            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+            ...(!userSnap.exists
+                ? {
+                    createdAt: firestore_1.FieldValue.serverTimestamp(),
+                    lifetimeTokensPurchased: 0,
+                    lifetimeTokensSpent: 0,
+                }
+                : {}),
+        }, { merge: true });
+        tx.set(txRef, {
+            id: txRef.id,
+            uid: targetUid,
+            type: "admin_grant",
+            amount: parsedAmount,
+            delta: parsedAmount,
+            balanceAfter: newBalance,
+            reason: cleanReason,
+            description: `Admin Grant: ${cleanReason}`,
+            grantedBy: caller.email,
+            grantedByUid: caller.uid,
+            timestamp: firestore_1.FieldValue.serverTimestamp(),
+            createdAt: firestore_1.FieldValue.serverTimestamp(),
+        });
+        return {
+            tokenBalance: newBalance,
+            transactionId: txRef.id,
+        };
+    });
+    return {
+        success: true,
+        targetUid,
+        targetEmail,
+        amount: parsedAmount,
+        tokenBalance: txResult.tokenBalance,
+        reason: cleanReason,
+        grantedBy: caller.email,
+        transactionId: txResult.transactionId,
+    };
+}
+/**
+ * Admin Token Grant Callable (Phase 2).
+ */
+exports.adminGrantTokens = (0, https_1.onCall)({
     timeoutSeconds: 30,
     memory: "256MiB",
     enforceAppCheck: exports.ENFORCE_APP_CHECK,
 }, async (request) => {
     const caller = requireAuthenticatedCaller(request);
+    return executeAdminGrantTokens(caller, request.data);
+});
+/**
+ * Core handler for Simulated Stripe Checkout Top-Up (Phase 2 Flexible Quantity + Legacy Tier Compat).
+ * Strictly gated behind caller.isAdmin && process.env.ALLOW_SIMULATED_TOPUP === "true".
+ */
+async function executeSimulatedStripeTopUp(caller, data) {
     if (!caller.isAdmin || process.env.ALLOW_SIMULATED_TOPUP !== "true") {
         throw new https_1.HttpsError("permission-denied", "Simulated token top-ups are disabled in this environment.");
     }
-    const tierId = request.data?.tierId;
-    if (!tierId || !(tierId in tokenEconomy_1.TOP_UP_TIERS)) {
-        throw new https_1.HttpsError("invalid-argument", "Invalid top-up tier selected.");
+    let tokensToCredit;
+    let amountGbp;
+    let resolvedTierId;
+    let priceDisplay;
+    if (data?.quantity !== undefined && data?.quantity !== null) {
+        const parsedQty = Number(data.quantity);
+        if (!Number.isFinite(parsedQty) ||
+            !Number.isInteger(parsedQty) ||
+            parsedQty < tokenEconomy_1.MIN_TOP_UP_TOKENS ||
+            parsedQty > tokenEconomy_1.MAX_TOP_UP_TOKENS) {
+            throw new https_1.HttpsError("invalid-argument", `Token quantity must be a whole integer between ${tokenEconomy_1.MIN_TOP_UP_TOKENS} and ${tokenEconomy_1.MAX_TOP_UP_TOKENS}.`);
+        }
+        if (data.waiverAccepted !== true) {
+            throw new https_1.HttpsError("failed-precondition", "You must accept the immediate digital delivery waiver before completing a top-up.");
+        }
+        tokensToCredit = parsedQty;
+        amountGbp = Number((tokensToCredit * tokenEconomy_1.TOKEN_UNIT_GBP).toFixed(2));
+        priceDisplay = (0, tokenEconomy_1.formatGbpFromTokens)(tokensToCredit);
+        if (data.tierId && data.tierId in tokenEconomy_1.TOP_UP_TIERS) {
+            resolvedTierId = data.tierId;
+        }
     }
-    const tier = tokenEconomy_1.TOP_UP_TIERS[tierId];
+    else {
+        const tierId = data?.tierId;
+        if (!tierId || !(tierId in tokenEconomy_1.TOP_UP_TIERS)) {
+            throw new https_1.HttpsError("invalid-argument", "Invalid top-up quantity or tier selected.");
+        }
+        const tier = tokenEconomy_1.TOP_UP_TIERS[tierId];
+        tokensToCredit = tier.tokens;
+        amountGbp = tier.amountGbp;
+        resolvedTierId = tier.id;
+        priceDisplay = tier.priceDisplay;
+    }
     const userRef = db.collection("users").doc(caller.uid);
     const txRef = userRef.collection("tokenTransactions").doc();
     const result = await db.runTransaction(async (tx) => {
@@ -111,11 +235,11 @@ exports.simulateStripeTopUpCallable = (0, https_1.onCall)({
         const prevBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
         const prevPurchased = Math.max(0, Math.floor(Number(userData.lifetimeTokensPurchased) || 0));
         const prevSpent = Math.max(0, Math.floor(Number(userData.lifetimeTokensSpent) || 0));
-        const newBalance = prevBalance + tier.tokens;
+        const newBalance = prevBalance + tokensToCredit;
         tx.set(userRef, {
             ...(caller.email ? { email: userData.email || caller.email } : {}),
             tokenBalance: newBalance,
-            lifetimeTokensPurchased: prevPurchased + tier.tokens,
+            lifetimeTokensPurchased: prevPurchased + tokensToCredit,
             lifetimeTokensSpent: prevSpent,
             lastTopUpAt: firestore_1.FieldValue.serverTimestamp(),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
@@ -125,23 +249,40 @@ exports.simulateStripeTopUpCallable = (0, https_1.onCall)({
             id: txRef.id,
             uid: caller.uid,
             type: "topup_simulated",
-            delta: tier.tokens,
+            delta: tokensToCredit,
             balanceAfter: newBalance,
-            amountGbp: tier.amountGbp,
-            tierId: tier.id,
-            description: `Stripe Checkout Simulation — ${tier.priceDisplay} Top-Up (${tier.tokens} Tokens)`,
+            amountGbp,
+            ...(resolvedTierId ? { tierId: resolvedTierId } : {}),
+            waiverAccepted: data?.waiverAccepted === true,
+            description: `Stripe Checkout Simulation — ${priceDisplay} Top-Up (${tokensToCredit} Tokens)`,
             createdAt: firestore_1.FieldValue.serverTimestamp(),
         });
         return {
             tokenBalance: newBalance,
-            addedTokens: tier.tokens,
-            tierId: tier.id,
+            addedTokens: tokensToCredit,
+            quantity: tokensToCredit,
+            amountGbp,
+            ...(resolvedTierId ? { tierId: resolvedTierId } : {}),
         };
     });
     return {
         success: true,
+        mode: "simulated",
+        currency: "GBP",
         ...result,
     };
+}
+/**
+ * Simulated Stripe Checkout Top-Up Callable (Flexible Quantity + Legacy Tier Compat).
+ * Credits users/{uid}.tokenBalance atomically and writes an immutable receipt.
+ */
+exports.simulateStripeTopUpCallable = (0, https_1.onCall)({
+    timeoutSeconds: 30,
+    memory: "256MiB",
+    enforceAppCheck: exports.ENFORCE_APP_CHECK,
+}, async (request) => {
+    const caller = requireAuthenticatedCaller(request);
+    return executeSimulatedStripeTopUp(caller, request.data);
 });
 /**
  * Atomic 1-Token Non-Refundable Pre-Flight / Escape-Hatch Lookup Debit.

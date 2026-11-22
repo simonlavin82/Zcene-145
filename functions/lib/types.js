@@ -7,6 +7,7 @@ var View;
     View["Dashboard"] = "dashboard";
     View["Graph"] = "graph";
     View["Help"] = "help";
+    View["Terms"] = "terms";
     View["StyleGuide"] = "styleguide";
     View["Engine"] = "engine";
     View["Analytics"] = "analytics";

@@ -21,6 +21,10 @@ import {
   TOKEN_PRICING,
   TOP_UP_TIERS,
   TOP_UP_TIER_LIST,
+  TOP_UP_PRESET_QUANTITIES,
+  MIN_TOP_UP_TOKENS,
+  MAX_TOP_UP_TOKENS,
+  formatGbpFromTokens,
   TokenTopUpTierId,
   ZCENE_SUPPORT_EMAIL,
   ZCENE_SUPPORT_MAILTO,
@@ -754,9 +758,10 @@ export const MyTasteDialog: React.FC<{
   );
 };
 
-// --- Simulated Stripe Top-Up Modal Component (V38 Prepaid Token Economy) ---
+// --- Simulated Stripe Top-Up Modal Component (Phase 2 Flexible Quantity + Digital Goods Waiver) ---
 export interface SimulatedStripeModalProps {
   isOpen: boolean;
+  initialQuantity?: number | null;
   initialTierId?: TokenTopUpTierId | null;
   currentBalance?: number;
   onClose: () => void;
@@ -765,46 +770,86 @@ export interface SimulatedStripeModalProps {
 
 export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
   isOpen,
+  initialQuantity,
   initialTierId,
   currentBalance = 0,
   onClose,
   onSuccess,
 }) => {
-  const [selectedTierId, setSelectedTierId] = useState<TokenTopUpTierId>(initialTierId || 'gbp_10');
+  const resolveDefaultQuantity = () => {
+    if (
+      typeof initialQuantity === 'number' &&
+      Number.isInteger(initialQuantity) &&
+      initialQuantity >= MIN_TOP_UP_TOKENS &&
+      initialQuantity <= MAX_TOP_UP_TOKENS
+    ) {
+      return initialQuantity;
+    }
+    if (initialTierId && TOP_UP_TIERS[initialTierId]) {
+      return TOP_UP_TIERS[initialTierId].tokens;
+    }
+    return TOP_UP_PRESET_QUANTITIES[1]; // Default 10 Tokens
+  };
+
+  const [quantityInput, setQuantityInput] = useState<string>(() => String(resolveDefaultQuantity()));
+  const [waiverAccepted, setWaiverAccepted] = useState<boolean>(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setSelectedTierId(initialTierId || 'gbp_10');
+      setQuantityInput(String(resolveDefaultQuantity()));
+      setWaiverAccepted(false);
       setIsProcessing(false);
       setErrorMsg(null);
     }
-  }, [isOpen, initialTierId]);
+  }, [isOpen, initialQuantity, initialTierId]);
 
   if (!isOpen) return null;
 
-  const selectedTier = TOP_UP_TIERS[selectedTierId] || TOP_UP_TIERS.gbp_10;
+  const trimmedQty = quantityInput.trim();
+  const parsedQuantity = trimmedQty === '' ? NaN : Number(trimmedQty);
+  const isValidQuantity =
+    Number.isFinite(parsedQuantity) &&
+    Number.isInteger(parsedQuantity) &&
+    parsedQuantity >= MIN_TOP_UP_TOKENS &&
+    parsedQuantity <= MAX_TOP_UP_TOKENS;
+  const displayQuantity = isValidQuantity ? parsedQuantity : 0;
+  const priceDisplay = formatGbpFromTokens(displayQuantity);
+
+  const quantityValidationError =
+    trimmedQty !== '' && !isValidQuantity
+      ? `Enter a whole number between ${MIN_TOP_UP_TOKENS} and ${MAX_TOP_UP_TOKENS} tokens.`
+      : null;
 
   const handleConfirmPurchase = async () => {
-    if (isProcessing) return;
+    if (isProcessing || !isValidQuantity || !waiverAccepted) return;
     setIsProcessing(true);
     setErrorMsg(null);
     try {
       const topUpCallable = httpsCallable(functions, 'simulateStripeTopUpCallable');
-      const result = await topUpCallable({ tierId: selectedTier.id });
+      const result = await topUpCallable({
+        quantity: parsedQuantity,
+        waiverAccepted: true,
+      });
       const data = result.data as { tokenBalance?: number; addedTokens?: number; tokensCredited?: number };
-      const nextBalance = typeof data?.tokenBalance === 'number' ? data.tokenBalance : currentBalance + selectedTier.tokens;
+      const nextBalance = typeof data?.tokenBalance === 'number' ? data.tokenBalance : currentBalance + parsedQuantity;
       const credited = typeof data?.addedTokens === 'number'
         ? data.addedTokens
         : typeof data?.tokensCredited === 'number'
           ? data.tokensCredited
-          : selectedTier.tokens;
+          : parsedQuantity;
       onSuccess?.(nextBalance, credited);
       onClose();
     } catch (err: any) {
       console.error('[SimulatedStripeModal] Top-up failed:', err);
-      setErrorMsg(err?.message || 'Unable to process simulated top-up. Please try again.');
+      const code = String(err?.code || '');
+      const msg = String(err?.message || '');
+      if (code.includes('permission-denied') || msg.toLowerCase().includes('disabled')) {
+        setErrorMsg('Live card checkout is coming soon. Token top-ups are currently restricted to admin beta simulation.');
+      } else {
+        setErrorMsg(msg || 'Unable to process simulated top-up. Please try again.');
+      }
     } finally {
       setIsProcessing(false);
     }
@@ -832,48 +877,90 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
         </ModalHeader>
 
         <div className="p-5 space-y-4 text-sm text-zinc-300">
+          {/* Flexible Preset Buttons (5T / 10T / 25T) */}
           <div className="grid grid-cols-3 gap-2.5">
-            {TOP_UP_TIER_LIST.map((tier) => {
-              const isSelected = tier.id === selectedTier.id;
+            {TOP_UP_PRESET_QUANTITIES.map((presetQty) => {
+              const isSelected = isValidQuantity && parsedQuantity === presetQty;
+              const isPopular = presetQty === 10;
               return (
                 <button
-                  key={tier.id}
+                  key={presetQty}
                   type="button"
-                  data-testid={`stripe-tier-${tier.id}`}
+                  data-testid={`topup-preset-${presetQty}`}
                   disabled={isProcessing}
-                  onClick={() => setSelectedTierId(tier.id)}
+                  onClick={() => {
+                    setQuantityInput(String(presetQty));
+                    setErrorMsg(null);
+                  }}
                   className={`relative flex flex-col items-center justify-center p-3 rounded-xl border text-center transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-primary/15 border-primary text-white shadow-[0_0_20px_rgba(255,95,31,0.15)]'
                       : 'bg-zinc-900/70 border-zinc-800 text-zinc-300 hover:border-zinc-600'
                   }`}
                 >
-                  {tier.featured && (
+                  {isPopular && (
                     <span className="absolute -top-2 px-1.5 py-0.2 rounded-full bg-primary text-brand-black text-[9px] font-bold uppercase tracking-wider">
                       Popular
                     </span>
                   )}
-                  <span className="text-lg font-semibold text-white">{tier.priceDisplay}</span>
+                  <span className="text-lg font-semibold text-white">{formatGbpFromTokens(presetQty)}</span>
                   <span className="text-xs font-mono text-primary font-semibold mt-0.5">
-                    {tier.tokens} Tokens
+                    {presetQty} Tokens
                   </span>
                 </button>
               );
             })}
           </div>
 
+          {/* Custom Quantity Input (min: 5, integer) */}
+          <div className="space-y-1.5">
+            <label htmlFor="topup-custom-quantity" className="flex items-center justify-between text-xs text-zinc-400">
+              <span>Custom token quantity</span>
+              <span className="font-mono text-[11px] text-zinc-500">Min {MIN_TOP_UP_TOKENS}T · £0.10 / Token</span>
+            </label>
+            <div className="flex items-center gap-2.5">
+              <input
+                id="topup-custom-quantity"
+                type="number"
+                inputMode="numeric"
+                min={MIN_TOP_UP_TOKENS}
+                max={MAX_TOP_UP_TOKENS}
+                step={1}
+                data-testid="topup-custom-quantity"
+                disabled={isProcessing}
+                value={quantityInput}
+                onChange={(e) => {
+                  setQuantityInput(e.target.value);
+                  setErrorMsg(null);
+                }}
+                placeholder={`Min ${MIN_TOP_UP_TOKENS}`}
+                className="flex-1 h-[38px] rounded-xl bg-zinc-950 border border-zinc-800 px-3 text-sm font-mono text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary disabled:opacity-50"
+              />
+              <div className="px-3 h-[38px] rounded-xl bg-zinc-900/80 border border-zinc-800 flex items-center font-mono text-xs text-white whitespace-nowrap" data-testid="topup-computed-price">
+                {isValidQuantity ? priceDisplay : '—'}
+              </div>
+            </div>
+            {quantityValidationError && (
+              <p className="text-[11px] text-amber-400" data-testid="topup-quantity-error">
+                {quantityValidationError}
+              </p>
+            )}
+          </div>
+
           <div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-4 space-y-2.5">
             <div className="text-xs font-medium text-white leading-relaxed" data-testid="stripe-sim-headline">
-              Stripe Checkout Simulation — Confirm {selectedTier.priceDisplay} Top-Up for {selectedTier.tokens} Tokens
+              {isValidQuantity
+                ? `Stripe Checkout Simulation — Confirm ${priceDisplay} Top-Up for ${parsedQuantity} Tokens`
+                : `Stripe Checkout Simulation — Enter at least ${MIN_TOP_UP_TOKENS} Tokens`}
             </div>
             <p className="text-[11px] text-zinc-400 leading-relaxed">
-              No real card charge is made during beta testing. Confirming credits {selectedTier.tokens} Tokens directly to your Zcene wallet.
+              No real card charge is made during beta testing. Confirming credits {isValidQuantity ? parsedQuantity : 0} Tokens directly to your Zcene wallet.
             </p>
             <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between font-mono text-xs">
               <span className="text-zinc-500">Wallet Balance:</span>
               <span className="text-zinc-200">
                 {currentBalance}T <span className="text-zinc-500">→</span>{' '}
-                <strong className="text-primary">{currentBalance + selectedTier.tokens} Tokens</strong>
+                <strong className="text-primary">{currentBalance + displayQuantity} Tokens</strong>
               </span>
             </div>
             <p className="text-[10px] text-zinc-500 pt-1.5 border-t border-zinc-800/60 leading-relaxed">
@@ -883,6 +970,31 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
               </a>.
             </p>
           </div>
+
+          {/* Required UK/EU Digital Goods Immediate Delivery Waiver */}
+          <label className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              data-testid="stripe-waiver-checkbox"
+              checked={waiverAccepted}
+              disabled={isProcessing}
+              onChange={(e) => setWaiverAccepted(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-zinc-700 bg-zinc-900 accent-primary cursor-pointer shrink-0"
+            />
+            <span className="text-[11px] text-zinc-400 leading-relaxed">
+              I request immediate digital delivery of these Zcene tokens, acknowledge that I waive my 14-day statutory right of withdrawal once credited, and agree that spent tokens are non-refundable (subject to our automatic system-error refund guarantee). I agree to the{' '}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                data-testid="stripe-waiver-terms-link"
+                onClick={(e) => e.stopPropagation()}
+                className="text-primary hover:underline font-medium"
+              >
+                Terms of Service
+              </a>.
+            </span>
+          </label>
 
           {errorMsg && (
             <div className="text-xs text-rose-400 bg-rose-950/30 border border-rose-800/50 rounded-lg p-2.5">
@@ -903,7 +1015,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
           <button
             type="button"
             data-testid="stripe-confirm-button"
-            disabled={isProcessing}
+            disabled={isProcessing || !isValidQuantity || !waiverAccepted}
             onClick={handleConfirmPurchase}
             className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
           >
@@ -913,7 +1025,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
                 <span>Crediting...</span>
               </>
             ) : (
-              <span>Confirm {selectedTier.priceDisplay} Top-Up</span>
+              <span>Confirm {isValidQuantity ? priceDisplay : ''} Top-Up</span>
             )}
           </button>
         </ModalFooter>

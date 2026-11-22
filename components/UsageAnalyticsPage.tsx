@@ -2,7 +2,8 @@ import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react'
 import { View, COST_PER_AI_CALL, RADIUS_TOKENS, TokenTransaction } from '../types';
 import { ZceneLogo } from './Icons';
 import Header from './Header';
-import { db } from '../services/firebase';
+import { db, functions } from '../services/firebase';
+import { httpsCallable } from 'firebase/functions';
 import { collection, getDocs, doc, getDoc, setDoc, serverTimestamp, query, orderBy, limit, where } from 'firebase/firestore';
 import { motion } from 'motion/react';
 import { InfoTooltip } from './ui/InfoTooltip';
@@ -14,6 +15,7 @@ import {
     TOKEN_PRICING,
     TOKEN_UNIT_GBP,
     TOKEN_UNIT_USD,
+    ADMIN_GRANT_MAX_TOKENS,
     isAdminEmail,
     tokensToGbp,
     tokensToUsd,
@@ -245,6 +247,8 @@ const formatTxTypeBadge = (type: string): { label: string; style: string } => {
         case 'topup_simulated':
         case 'top_up_simulated':
             return { label: 'Top-Up', style: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
+        case 'admin_grant':
+            return { label: 'Admin Grant', style: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' };
         case 'refund':
         case 'admin_refund':
         case 'refund_pipeline_error':
@@ -464,6 +468,7 @@ export const buildUnifiedActivityRows = (
         const isTopUpOrRefundTx =
             txType === 'topup_simulated' ||
             txType === 'top_up_simulated' ||
+            txType === 'admin_grant' ||
             txType === 'refund' ||
             txType === 'admin_refund' ||
             txType === 'refund_pipeline_error' ||
@@ -1997,6 +2002,11 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [jitHeals, setJitHeals] = useState<JitHealRecord[]>([]);
     const [isJitEnabled, setIsJitEnabled] = useState<boolean>(true);
     const [isTogglingJit, setIsTogglingJit] = useState<boolean>(false);
+    const [grantEmail, setGrantEmail] = useState<string>('');
+    const [grantAmount, setGrantAmount] = useState<string>('10');
+    const [grantReason, setGrantReason] = useState<string>('');
+    const [isGrantingTokens, setIsGrantingTokens] = useState<boolean>(false);
+    const [grantFeedback, setGrantFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -2472,6 +2482,143 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                 </a>
                             </div>
                         </div>
+                    )}
+
+                    {/* Admin Token Grant Tool (Phase 2 Admin Exclusive) */}
+                    {!isNormalUserView && (
+                        <form
+                            data-testid="admin-token-grant-card"
+                            onSubmit={async (e) => {
+                                e.preventDefault();
+                                if (isGrantingTokens) return;
+                                const trimmedEmail = grantEmail.trim();
+                                const parsedAmt = Number(grantAmount);
+                                if (!trimmedEmail || !trimmedEmail.includes('@')) {
+                                    setGrantFeedback({ type: 'error', message: 'Enter a valid user email address.' });
+                                    return;
+                                }
+                                if (!Number.isInteger(parsedAmt) || parsedAmt < 1 || parsedAmt > ADMIN_GRANT_MAX_TOKENS) {
+                                    setGrantFeedback({ type: 'error', message: `Amount must be a whole integer between 1 and ${ADMIN_GRANT_MAX_TOKENS}.` });
+                                    return;
+                                }
+                                setIsGrantingTokens(true);
+                                setGrantFeedback(null);
+                                try {
+                                    const grantCallable = httpsCallable(functions, 'adminGrantTokens');
+                                    const res = await grantCallable({
+                                        email: trimmedEmail,
+                                        amount: parsedAmt,
+                                        reason: grantReason.trim() || undefined,
+                                    });
+                                    const data = (res?.data || {}) as {
+                                        targetEmail?: string;
+                                        amount?: number;
+                                        tokenBalance?: number;
+                                    };
+                                    setGrantFeedback({
+                                        type: 'success',
+                                        message: `Granted +${data.amount ?? parsedAmt}T to ${data.targetEmail || trimmedEmail}${typeof data.tokenBalance === 'number' ? ` (New balance: ${data.tokenBalance}T)` : ''}.`,
+                                    });
+                                    setGrantEmail('');
+                                    setGrantReason('');
+                                    await fetchLedger();
+                                } catch (grantErr: any) {
+                                    console.error('[AdminTokenGrant] Failed:', grantErr);
+                                    setGrantFeedback({
+                                        type: 'error',
+                                        message: grantErr?.message || 'Unable to grant tokens. Please verify the email address.',
+                                    });
+                                } finally {
+                                    setIsGrantingTokens(false);
+                                }
+                            }}
+                            className={`bg-zinc-900/40 border border-zinc-800 p-5 space-y-3 ${RADIUS_TOKENS.frame}`}
+                        >
+                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-primary !text-[18px]">redeem</span>
+                                    <h3 className="text-sm font-semibold text-white">Admin Token Grant</h3>
+                                    <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                                        Support Credit
+                                    </span>
+                                </div>
+                                <span className="text-[11px] text-zinc-500">
+                                    Credits wallet atomically & logs an immutable <code className="text-zinc-300">admin_grant</code> receipt.
+                                </span>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-12 gap-2.5 items-center">
+                                <input
+                                    type="email"
+                                    required
+                                    autoComplete="off"
+                                    data-testid="admin-grant-email"
+                                    value={grantEmail}
+                                    onChange={(e) => {
+                                        setGrantEmail(e.target.value);
+                                        if (grantFeedback) setGrantFeedback(null);
+                                    }}
+                                    placeholder="User email (e.g. member@example.com)"
+                                    disabled={isGrantingTokens}
+                                    className={`md:col-span-4 h-[38px] bg-zinc-950 border border-zinc-800 px-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary ${RADIUS_TOKENS.input}`}
+                                />
+                                <input
+                                    type="number"
+                                    required
+                                    min={1}
+                                    max={ADMIN_GRANT_MAX_TOKENS}
+                                    step={1}
+                                    data-testid="admin-grant-amount"
+                                    value={grantAmount}
+                                    onChange={(e) => {
+                                        setGrantAmount(e.target.value);
+                                        if (grantFeedback) setGrantFeedback(null);
+                                    }}
+                                    placeholder="Tokens"
+                                    disabled={isGrantingTokens}
+                                    className={`md:col-span-2 h-[38px] bg-zinc-950 border border-zinc-800 px-3 text-sm font-mono text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary ${RADIUS_TOKENS.input}`}
+                                />
+                                <input
+                                    type="text"
+                                    maxLength={200}
+                                    autoComplete="off"
+                                    data-testid="admin-grant-reason"
+                                    value={grantReason}
+                                    onChange={(e) => setGrantReason(e.target.value)}
+                                    placeholder="Reason (optional, e.g. Goodwill credit)"
+                                    disabled={isGrantingTokens}
+                                    className={`md:col-span-4 h-[38px] bg-zinc-950 border border-zinc-800 px-3 text-sm text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary ${RADIUS_TOKENS.input}`}
+                                />
+                                <button
+                                    type="submit"
+                                    data-testid="admin-grant-submit"
+                                    disabled={isGrantingTokens}
+                                    className={`md:col-span-2 h-[38px] px-4 bg-white text-brand-black text-xs font-semibold hover:opacity-90 active:scale-95 transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap ${RADIUS_TOKENS.button}`}
+                                >
+                                    {isGrantingTokens ? (
+                                        <>
+                                            <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
+                                            <span>Granting...</span>
+                                        </>
+                                    ) : (
+                                        <span>Grant Tokens</span>
+                                    )}
+                                </button>
+                            </div>
+
+                            {grantFeedback && (
+                                <div
+                                    data-testid="admin-grant-feedback"
+                                    className={`text-xs rounded-lg px-3 py-2 border ${
+                                        grantFeedback.type === 'success'
+                                            ? 'bg-emerald-950/30 border-emerald-500/40 text-emerald-300'
+                                            : 'bg-rose-950/30 border-rose-500/40 text-rose-300'
+                                    }`}
+                                >
+                                    {grantFeedback.message}
+                                </div>
+                            )}
+                        </form>
                     )}
 
                     {/* Author Search Bar (Admin Exclusive — manual Sync Archives removed; reconciliation runs automatically on load) */}

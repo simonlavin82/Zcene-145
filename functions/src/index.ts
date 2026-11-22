@@ -4,6 +4,7 @@ import { verifyBetaPassword } from "./verifyBetaPassword";
 import { healOrphanedAsset } from "./healOrphanedAsset";
 import { reapStaleCurationJobs } from "./reapStaleCurationJobs";
 import {
+  adminGrantTokens,
   simulateStripeTopUpCallable,
   authorizeDirectHitCallable,
   unlockDeepWebSessionCallable,
@@ -16,6 +17,7 @@ export {
   verifyBetaPassword,
   healOrphanedAsset,
   reapStaleCurationJobs,
+  adminGrantTokens,
   simulateStripeTopUpCallable,
   authorizeDirectHitCallable,
   unlockDeepWebSessionCallable,

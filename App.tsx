@@ -19,6 +19,7 @@ const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then
 const EnginePage = React.lazy(() => import('./components/EnginePage').then(m => ({ default: m.EnginePage })));
 const UsageAnalyticsPage = React.lazy(() => import('./components/UsageAnalyticsPage').then(m => ({ default: m.UsageAnalyticsPage })));
 const TrashPage = React.lazy(() => import('./components/TrashPage').then(m => ({ default: m.TrashPage })));
+const TermsPage = React.lazy(() => import('./components/TermsPage').then(m => ({ default: m.TermsPage })));
 import HelpPage from './components/HelpPage';
 import GraphPage from './components/GraphPage';
 import HomePage from './components/HomePage';
@@ -1125,15 +1126,17 @@ const App: React.FC = () => {
   const curationSessionIdRef = useRef<string | null>(null);
   const [simulatedStripeModal, setSimulatedStripeModal] = useState<{
     isOpen: boolean;
+    initialQuantity?: number | null;
     initialTierId?: TokenTopUpTierId | null;
   }>({ isOpen: false });
 
   useEffect(() => {
     const handleOpenTopUp = (e: Event) => {
-      const customEvent = e as CustomEvent<{ tierId?: TokenTopUpTierId }>;
+      const customEvent = e as CustomEvent<{ quantity?: number; tierId?: TokenTopUpTierId }>;
       setSimulatedStripeModal({
         isOpen: true,
-        initialTierId: customEvent?.detail?.tierId || 'gbp_10',
+        initialQuantity: customEvent?.detail?.quantity ?? (customEvent?.detail?.tierId ? null : 10),
+        initialTierId: customEvent?.detail?.tierId || null,
       });
     };
     window.addEventListener('open-topup-modal', handleOpenTopUp);
@@ -3430,6 +3433,7 @@ const App: React.FC = () => {
         navigate('/dashboard');
         break;
       case 'help': navigate('/help'); break;
+      case 'terms': navigate('/terms'); break;
       case 'design': navigate('/design'); break;
       case 'engine': navigate('/engine'); break;
       case 'analytics': navigate('/analytics'); break;
@@ -10037,6 +10041,8 @@ const App: React.FC = () => {
           if (prev === null) return { nodes: [], links: [] };
           return prev;
         });
+      } else if (pathname === '/terms') {
+        if (currentViewRef.current !== View.Terms) setCurrentView(View.Terms);
       } else if (pathname === '/source') {
         if (currentViewRef.current !== View.Engine) setCurrentView(View.Engine);
       } else {
@@ -10920,6 +10926,7 @@ const App: React.FC = () => {
       [View.Graph]: '/app',
       [View.Dashboard]: '/dashboard',
       [View.Help]: '/help',
+      [View.Terms]: '/terms',
       [View.StyleGuide]: isAdmin ? '/design' : '/',
       [View.Engine]: isAdmin ? '/engine' : '/',
       [View.Analytics]: user ? '/analytics' : '/',
@@ -11615,6 +11622,31 @@ const App: React.FC = () => {
             tokenBalance={profile?.tokenBalance ?? 0}
           />
         </div>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Terms ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+          <TermsPage
+            onNavigate={handleViewChange}
+            onNavigateMenu={handleMenuNavigate}
+            isActive={currentView === View.Terms}
+            user={user}
+            onLogoClick={handleLogoClick}
+            isSmallScreen={isSmallScreen}
+            stackCount={stack.length}
+            isStackNew={stack.length > lastViewedStackCount}
+            onOpenStack={handleOpenStack}
+            onLogout={handleLogout}
+            onDeleteAccount={handleDeleteAccount}
+            isAdmin={isAdmin}
+            isProfileOpen={isProfileOpen}
+            setIsProfileOpen={setIsProfileOpen}
+            isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+            setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+            isMenuOpen={isMenuOpen}
+            setIsMenuOpen={setIsMenuOpen}
+            onRestartWalkthrough={handleDashboardRestartWalkthrough}
+            onClose={handleSubpageClose}
+            tokenBalance={profile?.tokenBalance ?? 0}
+          />
+        </div>
         </React.Suspense>
       </div>
 
@@ -11769,6 +11801,7 @@ const App: React.FC = () => {
 
       <SimulatedStripeModal
         isOpen={simulatedStripeModal.isOpen}
+        initialQuantity={simulatedStripeModal.initialQuantity}
         initialTierId={simulatedStripeModal.initialTierId}
         currentBalance={profile?.tokenBalance ?? 0}
         onClose={() => setSimulatedStripeModal({ isOpen: false })}

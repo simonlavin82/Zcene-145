@@ -1,8 +1,9 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.TOKEN_UNIT_USD = exports.GBP_TO_USD_RATE = exports.TOKEN_UNIT_GBP = exports.TOP_UP_TIER_LIST = exports.TOP_UP_TIERS = exports.TOKEN_PRICING = exports.ADMIN_UID = exports.ADMIN_EMAIL = exports.ZCENE_BUYMEACOFFEE_URL = exports.ZCENE_INSTAGRAM_HANDLE = exports.ZCENE_INSTAGRAM_URL = exports.ZCENE_TSHIRT_MAILTO = exports.ZCENE_SUPPORT_MAILTO = exports.ZCENE_SUPPORT_EMAIL = void 0;
+exports.ADMIN_GRANT_MAX_TOKENS = exports.MAX_TOP_UP_TOKENS = exports.MIN_TOP_UP_TOKENS = exports.TOP_UP_PRESET_QUANTITIES = exports.TOKEN_UNIT_USD = exports.GBP_TO_USD_RATE = exports.TOKEN_UNIT_GBP = exports.TOP_UP_TIER_LIST = exports.TOP_UP_TIERS = exports.TOKEN_PRICING = exports.ADMIN_UID = exports.ADMIN_EMAIL = exports.ZCENE_BUYMEACOFFEE_URL = exports.ZCENE_INSTAGRAM_HANDLE = exports.ZCENE_INSTAGRAM_URL = exports.ZCENE_TSHIRT_MAILTO = exports.ZCENE_SUPPORT_MAILTO = exports.ZCENE_SUPPORT_EMAIL = void 0;
 exports.isAdminEmail = isAdminEmail;
 exports.isAdminUser = isAdminUser;
+exports.formatGbpFromTokens = formatGbpFromTokens;
 exports.tokensToGbp = tokensToGbp;
 exports.tokensToUsd = tokensToUsd;
 exports.usdToGbp = usdToGbp;
@@ -73,6 +74,15 @@ exports.TOP_UP_TIER_LIST = [
 exports.TOKEN_UNIT_GBP = 0.10;
 exports.GBP_TO_USD_RATE = 1.30;
 exports.TOKEN_UNIT_USD = 0.13;
+exports.TOP_UP_PRESET_QUANTITIES = [5, 10, 25];
+exports.MIN_TOP_UP_TOKENS = 5;
+exports.MAX_TOP_UP_TOKENS = 1000;
+exports.ADMIN_GRANT_MAX_TOKENS = 10000;
+function formatGbpFromTokens(quantity) {
+    const safeQty = Number.isFinite(quantity) && quantity > 0 ? quantity : 0;
+    const gbp = safeQty * exports.TOKEN_UNIT_GBP;
+    return `£${gbp.toFixed(2)}`;
+}
 function tokensToGbp(tokens) {
     const safeTokens = Number.isFinite(tokens) ? tokens : 0;
     return Number((safeTokens * exports.TOKEN_UNIT_GBP).toFixed(4));

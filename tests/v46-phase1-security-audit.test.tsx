@@ -144,8 +144,8 @@ describe('Phase 1 Pre-Launch Security Rules, Endpoint Gating, Concurrency UX & A
       const reaperSrc = readRepoFile('functions/src/reapStaleCurationJobs.ts');
 
       expect(tokenWalletSrc).toContain('export const ENFORCE_APP_CHECK = process.env.ENFORCE_APP_CHECK === "true";');
-      // 3 onCall functions in tokenWallet.ts
-      expect((tokenWalletSrc.match(/enforceAppCheck:\s*ENFORCE_APP_CHECK/g) || []).length).toBe(3);
+      // 4 onCall functions in tokenWallet.ts (adminGrantTokens + 3 existing wallet callables)
+      expect((tokenWalletSrc.match(/enforceAppCheck:\s*ENFORCE_APP_CHECK/g) || []).length).toBe(4);
       // 2 onCall functions in executeCurationPipeline.ts
       expect((pipelineSrc.match(/enforceAppCheck:\s*ENFORCE_APP_CHECK/g) || []).length).toBe(2);
       // 1 onCall function in healOrphanedAsset.ts

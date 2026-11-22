@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.unlockDeepWebSessionCallable = exports.authorizeDirectHitCallable = exports.simulateStripeTopUpCallable = exports.reapStaleCurationJobs = exports.healOrphanedAsset = exports.verifyBetaPassword = exports.validateSeedOriginCallable = exports.executeCurationPipeline = exports.processCurationJob = void 0;
+exports.unlockDeepWebSessionCallable = exports.authorizeDirectHitCallable = exports.simulateStripeTopUpCallable = exports.adminGrantTokens = exports.reapStaleCurationJobs = exports.healOrphanedAsset = exports.verifyBetaPassword = exports.validateSeedOriginCallable = exports.executeCurationPipeline = exports.processCurationJob = void 0;
 const processCurationJob_1 = require("./processCurationJob");
 Object.defineProperty(exports, "processCurationJob", { enumerable: true, get: function () { return processCurationJob_1.processCurationJob; } });
 const executeCurationPipeline_1 = require("./executeCurationPipeline");
@@ -13,6 +13,7 @@ Object.defineProperty(exports, "healOrphanedAsset", { enumerable: true, get: fun
 const reapStaleCurationJobs_1 = require("./reapStaleCurationJobs");
 Object.defineProperty(exports, "reapStaleCurationJobs", { enumerable: true, get: function () { return reapStaleCurationJobs_1.reapStaleCurationJobs; } });
 const tokenWallet_1 = require("./tokenWallet");
+Object.defineProperty(exports, "adminGrantTokens", { enumerable: true, get: function () { return tokenWallet_1.adminGrantTokens; } });
 Object.defineProperty(exports, "simulateStripeTopUpCallable", { enumerable: true, get: function () { return tokenWallet_1.simulateStripeTopUpCallable; } });
 Object.defineProperty(exports, "authorizeDirectHitCallable", { enumerable: true, get: function () { return tokenWallet_1.authorizeDirectHitCallable; } });
 Object.defineProperty(exports, "unlockDeepWebSessionCallable", { enumerable: true, get: function () { return tokenWallet_1.unlockDeepWebSessionCallable; } });

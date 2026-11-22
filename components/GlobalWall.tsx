@@ -61,9 +61,11 @@ const GlobalWall: React.FC<GlobalWallProps> = ({ children }) => {
     return <>{children}</>;
   }
 
-  // Preserve intentional public /z/:id shared Zcene guest preview behavior
-  const isSharedZceneRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/z/');
-  if (isSharedZceneRoute) {
+  // Preserve intentional public /z/:id shared Zcene guest preview & /terms legal page behavior
+  const isPublicRoute =
+    typeof window !== 'undefined' &&
+    (window.location.pathname.startsWith('/z/') || window.location.pathname === '/terms');
+  if (isPublicRoute) {
     return <>{children}</>;
   }
 

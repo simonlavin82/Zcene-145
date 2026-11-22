@@ -173,9 +173,9 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(onConfirm).toHaveBeenCalledWith('authorized');
   });
 
-  it('credits tokens via SimulatedStripeModal calling simulateStripeTopUpCallable', async () => {
+  it('credits tokens via SimulatedStripeModal calling simulateStripeTopUpCallable with flexible quantity and waiver', async () => {
     const mockTopUp = vi.fn().mockResolvedValue({
-      data: { success: true, tokenBalance: 170, addedTokens: 150, tierId: 'gbp_15' },
+      data: { success: true, mode: 'simulated', tokenBalance: 45, addedTokens: 25, quantity: 25, amountGbp: 2.5, currency: 'GBP' },
     });
     mockHttpsCallable.mockReturnValue(mockTopUp);
     const onSuccess = vi.fn();
@@ -184,23 +184,29 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     render(
       <SimulatedStripeModal
         isOpen={true}
-        initialTierId="gbp_10"
+        initialQuantity={10}
         currentBalance={20}
         onClose={onClose}
         onSuccess={onSuccess}
       />
     );
 
-    fireEvent.click(screen.getByTestId('stripe-tier-gbp_15'));
+    fireEvent.click(screen.getByTestId('topup-preset-25'));
     expect(screen.getByTestId('stripe-sim-headline')).toHaveTextContent(
-      'Stripe Checkout Simulation — Confirm £15 Top-Up for 150 Tokens'
+      'Stripe Checkout Simulation — Confirm £2.50 Top-Up for 25 Tokens'
     );
 
-    fireEvent.click(screen.getByTestId('stripe-confirm-button'));
+    // Confirm button remains disabled until UK/EU immediate delivery waiver is checked
+    const confirmBtn = screen.getByTestId('stripe-confirm-button');
+    expect(confirmBtn).toBeDisabled();
+    fireEvent.click(screen.getByTestId('stripe-waiver-checkbox'));
+    expect(confirmBtn).not.toBeDisabled();
+
+    fireEvent.click(confirmBtn);
 
     await waitFor(() => {
-      expect(mockTopUp).toHaveBeenCalledWith({ tierId: 'gbp_15' });
-      expect(onSuccess).toHaveBeenCalledWith(170, 150);
+      expect(mockTopUp).toHaveBeenCalledWith({ quantity: 25, waiverAccepted: true });
+      expect(onSuccess).toHaveBeenCalledWith(45, 25);
       expect(onClose).toHaveBeenCalled();
     });
   });
