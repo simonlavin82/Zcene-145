@@ -7,7 +7,7 @@ import { UserTaste } from '../types';
 import { Flame, MoreVertical } from 'lucide-react';
 
 import { MyTasteDialog } from './SharedModals';
-import { ZCENE_INSTAGRAM_URL } from '../shared/tokenEconomy';
+import { ZCENE_INSTAGRAM_URL, isProtectedAdminIdentity } from '../shared/tokenEconomy';
 
 interface HeaderProps {
   user: User | null;
@@ -531,14 +531,18 @@ const Header: React.FC<HeaderProps> = ({
                                 <span className="material-symbols-outlined !text-[18px] text-zinc-500">logout</span>
                                 Sign Out
                               </button>
-                              <div className="border-t border-zinc-800/80 my-2" />
-                              <button
-                                onClick={() => { setIsProfileOpen(false); setIsDeleteAccountModalOpen(true); }}
-                                className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group"
-                              >
-                                <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete_forever</span>
-                                Delete Account
-                              </button>
+                              {!(isAdmin || isProtectedAdminIdentity(user?.uid, user?.email)) && (
+                                <>
+                                  <div className="border-t border-zinc-800/80 my-2" />
+                                  <button
+                                    onClick={() => { setIsProfileOpen(false); setIsDeleteAccountModalOpen(true); }}
+                                    className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group"
+                                  >
+                                    <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete_forever</span>
+                                    Delete Account
+                                  </button>
+                                </>
+                              )}
                             </div>
                           </>
                         )}

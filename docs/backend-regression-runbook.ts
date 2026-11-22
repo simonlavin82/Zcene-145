@@ -1,12 +1,12 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
 # V47.4 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (575 unit/integration tests).
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (577 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
-# Run entire full-stack regression test suite (28 test files, 575 offline deterministic tests)
+# Run entire full-stack regression test suite (28 test files, 577 offline deterministic tests)
 npm test
 
 # Run backend pipeline tests
@@ -140,7 +140,7 @@ npx vitest --ui
     *   *Assertion (PDF Filename & Toolbar Controls):* Validates \`formatZinePrintDocumentTitle\` (\`Zcene - <Title>\`), Desktop/Mobile Save as PDF buttons for both owners and shared \`/z/:id\` viewers, and temporary \`document.title\` swap/restoration around \`window.print()\`.
     *   *Assertion (Multi-Page Print Pagination & Deep Cuts):* Validates \`@layer base { @media print }\` unlocking all 6 nested viewport/fixed/scroll traps (without Tailwind \`!fixed\`/\`!h-screen\` cascade conflicts on \`GraphPage\`'s desktop magazine \`<aside>\`), light editorial palette, and Deep Cuts artist/label profile visibility in print DOM.
 11. **Server-Side Account Deletion, GDPR Art. 17 Erasure & Anonymised P&L Preservation (\`v47.4\`):**
-    *   *Assertion (Recency, Concurrency & Rules Lockdown):* Validates \`deleteUserAccount\` \`auth_time <= 300s\` (\`REQUIRES_RECENT_LOGIN\` + seamless Google popup re-auth retry), active curation lock guard (\`ACTIVE_CURATION_IN_PROGRESS\`), Admin-only \`users/{userId}\` delete lock in \`firestore.rules\`, and Admin-read/server-write-only \`adminLedger/system/deletedAccountTelemetry/{archiveId}\`.
+    *   *Assertion (Recency, Concurrency, Sole Admin Protection & Rules Lockdown):* Validates \`deleteUserAccount\` fail-closed sole Admin self-deletion hard-block (\`isProtectedAdminIdentity\` -> \`permission-denied\` / \`ADMIN_ACCOUNT_PROTECTED\` before any DB/Auth calls, with \`Delete Account\` hidden for Admin in \`Header.tsx\` and guarded in \`App.tsx\`), \`auth_time <= 300s\` (\`REQUIRES_RECENT_LOGIN\` + seamless Google popup re-auth retry), active curation lock guard (\`ACTIVE_CURATION_IN_PROGRESS\`), Admin-only \`users/{userId}\` delete lock (excluding the sole Admin UID) in \`firestore.rules\`, and Admin-read/server-write-only \`adminLedger/system/deletedAccountTelemetry/{archiveId}\`.
     *   *Assertion (Full Erasure & Zero-PII P&L Reconciliation):* Validates chunk-deletion of all user subcollections, legacy projects, \`sharedZcenes\`, locks, sessions, jobs, and Firebase Auth user, \`curationFailures\` PII scrubbing to \`"deleted_account"\`, zero-PII financial archive creation, and exact \`computeAggregateMetrics\` P&L reconciliation excluding forfeited balances from active unspent float.
 
 ## Database Purge Runbook Protocol (V47.4 Multi-Scene Architecture)

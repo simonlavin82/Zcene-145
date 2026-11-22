@@ -3,6 +3,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ADMIN_GRANT_MAX_TOKENS = exports.MAX_TOP_UP_TOKENS = exports.MIN_TOP_UP_TOKENS = exports.TOP_UP_PRESET_QUANTITIES = exports.TOKEN_UNIT_USD = exports.GBP_TO_USD_RATE = exports.TOKEN_UNIT_GBP = exports.TOP_UP_TIER_LIST = exports.TOP_UP_TIERS = exports.TOKEN_PRICING = exports.ADMIN_UID = exports.ADMIN_EMAIL = exports.ZCENE_BUYMEACOFFEE_URL = exports.ZCENE_INSTAGRAM_HANDLE = exports.ZCENE_INSTAGRAM_URL = exports.ZCENE_TSHIRT_MAILTO = exports.ZCENE_SUPPORT_MAILTO = exports.ZCENE_SUPPORT_EMAIL = void 0;
 exports.isAdminEmail = isAdminEmail;
 exports.isAdminUser = isAdminUser;
+exports.isProtectedAdminIdentity = isProtectedAdminIdentity;
 exports.formatGbpFromTokens = formatGbpFromTokens;
 exports.tokensToGbp = tokensToGbp;
 exports.tokensToUsd = tokensToUsd;
@@ -29,6 +30,15 @@ function isAdminUser(uid, email) {
     if (!email || typeof email !== 'string')
         return false;
     return uid.trim() === exports.ADMIN_UID && email.trim().toLowerCase() === exports.ADMIN_EMAIL;
+}
+/**
+ * Fail-closed Admin identity matcher (OR semantics) used exclusively to block
+ * destructive self-deletion of the sole Admin account across backend and frontend.
+ */
+function isProtectedAdminIdentity(uid, email) {
+    if (typeof uid === 'string' && uid.trim() === exports.ADMIN_UID)
+        return true;
+    return isAdminEmail(email);
 }
 exports.TOKEN_PRICING = {
     SINGLE_SEED: 5,

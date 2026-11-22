@@ -167,7 +167,8 @@ service cloud.firestore {
       
       // Account deletion flows exclusively through the deleteUserAccount Cloud Function (Admin SDK)
       // to guarantee complete subcollection erasure, GDPR scrubbing, and zero-PII P&L preservation.
-      allow delete: if isAdmin();
+      // Sole Admin account (9FBuWDALnNfUAjxV0pRe3RnKwJy1) is additionally hard-blocked from deletion.
+      allow delete: if isAdmin() && userId != '9FBuWDALnNfUAjxV0pRe3RnKwJy1';
 
       match /tokenTransactions/{txId} {
         allow get: if isOwner(userId) || isAdmin();

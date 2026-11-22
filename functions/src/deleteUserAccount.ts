@@ -9,6 +9,7 @@ import {
   isCurationLockActive,
   computeApiUsageCostUsd,
 } from "./tokenWallet";
+import { isProtectedAdminIdentity } from "./shared/tokenEconomy";
 
 if (getApps().length === 0) {
   initializeApp();
@@ -84,6 +85,17 @@ export async function executeDeleteUserAccount(
   deps: DeleteUserAccountDeps = {}
 ): Promise<DeleteUserAccountResult> {
   const caller = requireAuthenticatedCaller(request);
+
+  // 0. Fail-closed Sole Admin Protection (v47.6):
+  // Block BEFORE auth_time, lock checks, or any Firestore/Auth reads/writes.
+  if (caller.isAdmin || isProtectedAdminIdentity(caller.uid, caller.email)) {
+    throw new HttpsError(
+      "permission-denied",
+      "ADMIN_ACCOUNT_PROTECTED: The primary Admin account cannot be self-deleted.",
+      { code: "ADMIN_ACCOUNT_PROTECTED" }
+    );
+  }
+
   const db = deps.db || defaultDb;
   const authClient = deps.auth || getAuth();
   const nowMs = typeof deps.nowMs === "number" ? deps.nowMs : Date.now();

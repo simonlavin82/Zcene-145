@@ -270,10 +270,11 @@ describe("V47.4 Server-Side deleteUserAccount, GDPR Erasure & Anonymised P&L", (
     expect(serialized).not.toContain("90s Emo");
   });
 
-  it("5. Skips deletedAccountTelemetry archival for Admin or zero-activity accounts", async () => {
+  it("5. Skips deletedAccountTelemetry archival for zero-activity non-admin accounts", async () => {
+    const uid = "user_zero_activity";
     const { db, store } = createMockFirestore({
-      [`users/${ADMIN_UID}`]: {
-        email: ADMIN_EMAIL,
+      [`users/${uid}`]: {
+        email: "newuser@example.com",
         tokenBalance: 0,
         lifetimeTokensPurchased: 0,
         lifetimeTokensSpent: 0,
@@ -283,8 +284,8 @@ describe("V47.4 Server-Side deleteUserAccount, GDPR Erasure & Anonymised P&L", (
     const res = await executeDeleteUserAccount(
       {
         auth: {
-          uid: ADMIN_UID,
-          token: { email: ADMIN_EMAIL, auth_time: NOW_SEC - 5 },
+          uid,
+          token: { email: "newuser@example.com", auth_time: NOW_SEC - 5 },
         },
         data: {},
       } as any,
@@ -294,8 +295,8 @@ describe("V47.4 Server-Side deleteUserAccount, GDPR Erasure & Anonymised P&L", (
     expect(res.ok).toBe(true);
     expect(res.archivedTelemetry).toBe(false);
     expect(res.archiveId).toBeNull();
-    expect(store.has(`users/${ADMIN_UID}`)).toBe(false);
-    expect(deleteUser).toHaveBeenCalledWith(ADMIN_UID);
+    expect(store.has(`users/${uid}`)).toBe(false);
+    expect(deleteUser).toHaveBeenCalledWith(uid);
   });
 
   it("6. computeAggregateMetrics folds anonymised deletedAccountTelemetry into Admin P&L without inflating active float", () => {
@@ -340,14 +341,14 @@ describe("V47.4 Server-Side deleteUserAccount, GDPR Erasure & Anonymised P&L", (
     expect(metrics.forfeitedTokensFromDeletedAccounts).toBe(35);
   });
 
-  it("7. Locks firestore.rules: users/{userId} delete is Admin-only, stack/userSession remain owner-deletable, deletedAccountTelemetry is Admin-read/server-write-only", () => {
+  it("7. Locks firestore.rules: users/{userId} delete is Admin-only (blocking sole Admin UID), stack/userSession remain owner-deletable, deletedAccountTelemetry is Admin-read/server-write-only", () => {
     const rulesSrc = fs.readFileSync(path.resolve(__dirname, "../../firestore.rules"), "utf-8");
 
     const usersBlock = rulesSrc.slice(
       rulesSrc.indexOf("match /users/{userId}"),
       rulesSrc.indexOf("match /tokenTransactions/{txId}")
     );
-    expect(usersBlock).toContain("allow delete: if isAdmin();");
+    expect(usersBlock).toContain(`allow delete: if isAdmin() && userId != '${ADMIN_UID}';`);
     expect(usersBlock).not.toContain("allow delete: if isOwner(userId)");
 
     const stackBlock = rulesSrc.slice(
@@ -370,12 +371,17 @@ describe("V47.4 Server-Side deleteUserAccount, GDPR Erasure & Anonymised P&L", (
     expect(deletedTelemetryBlock).toContain("allow write: if false;");
   });
 
-  it("8. Wires App.tsx Delete Account modal to deleteUserAccount callable, reauthenticateWithGoogle retry, Design System anatomy (<ModalHeader>/<ModalFooter>/<Checkbox>) & token forfeiture warning", () => {
+  it("8. Wires App.tsx Delete Account modal & Header.tsx to deleteUserAccount callable, Admin protection guards, Design System anatomy (<ModalHeader>/<ModalFooter>/<Checkbox>) & token forfeiture warning", () => {
     const appSrc = fs.readFileSync(path.resolve(__dirname, "../../App.tsx"), "utf-8");
+    const headerSrc = fs.readFileSync(path.resolve(__dirname, "../../components/Header.tsx"), "utf-8");
     expect(appSrc).toContain("httpsCallable(functions, 'deleteUserAccount'");
     expect(appSrc).toContain("reauthenticateWithGoogle()");
     expect(appSrc).toContain("REQUIRES_RECENT_LOGIN");
     expect(appSrc).toContain("ACTIVE_CURATION_IN_PROGRESS");
+    expect(appSrc).toContain("ADMIN_ACCOUNT_PROTECTED");
+    expect(appSrc).toContain("if (!user || isProtectedAdmin) return;");
+    expect(appSrc).toContain("{isDeleteAccountModalOpen && !isProtectedAdmin && (");
+    expect(headerSrc).toContain("!(isAdmin || isProtectedAdminIdentity(user?.uid, user?.email))");
 
     const modalSlice = appSrc.slice(
       appSrc.indexOf('data-testid="delete-account-modal"'),
@@ -390,5 +396,46 @@ describe("V47.4 Server-Side deleteUserAccount, GDPR Erasure & Anonymised P&L", (
     expect(modalSlice).toContain('data-testid="delete-account-confirm-checkbox"');
     expect(modalSlice).toContain('data-testid="delete-account-error"');
     expect(modalSlice).toContain("disabled={isDeletingAccount || !deleteAccountConfirmed}");
+  });
+
+  it("9. Hard-blocks sole Admin self-deletion fail-closed (ADMIN_UID || ADMIN_EMAIL) before auth_time, DB, or Auth calls", async () => {
+    const dbSpy = {
+      collection: vi.fn(() => {
+        throw new Error("DB should never be touched for protected Admin self-deletion");
+      }),
+    };
+    const deleteUser = vi.fn();
+
+    const cases = [
+      // Full Admin UID + email (fresh auth_time)
+      { uid: ADMIN_UID, email: ADMIN_EMAIL, auth_time: NOW_SEC - 5 },
+      // Admin UID alone with different email (OR fail-closed)
+      { uid: ADMIN_UID, email: "other@example.com", auth_time: NOW_SEC - 5 },
+      // Admin email alone with different UID + mixed case (OR fail-closed)
+      { uid: "some_other_uid", email: ADMIN_EMAIL.toUpperCase(), auth_time: NOW_SEC - 5 },
+      // Admin with stale auth_time — must still reject as permission-denied BEFORE auth_time check
+      { uid: ADMIN_UID, email: ADMIN_EMAIL, auth_time: NOW_SEC - 99999 },
+    ];
+
+    for (const c of cases) {
+      await expect(
+        executeDeleteUserAccount(
+          {
+            auth: {
+              uid: c.uid,
+              token: { email: c.email, auth_time: c.auth_time },
+            },
+            data: {},
+          } as any,
+          { db: dbSpy, auth: { deleteUser }, nowMs: NOW_MS }
+        )
+      ).rejects.toMatchObject({
+        code: "permission-denied",
+        message: expect.stringContaining("ADMIN_ACCOUNT_PROTECTED"),
+      });
+    }
+
+    expect(dbSpy.collection).not.toHaveBeenCalled();
+    expect(deleteUser).not.toHaveBeenCalled();
   });
 });

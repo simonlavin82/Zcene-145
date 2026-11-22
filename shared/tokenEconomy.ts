@@ -22,6 +22,15 @@ export function isAdminUser(uid?: string | null, email?: string | null): boolean
   return uid.trim() === ADMIN_UID && email.trim().toLowerCase() === ADMIN_EMAIL;
 }
 
+/**
+ * Fail-closed Admin identity matcher (OR semantics) used exclusively to block
+ * destructive self-deletion of the sole Admin account across backend and frontend.
+ */
+export function isProtectedAdminIdentity(uid?: string | null, email?: string | null): boolean {
+  if (typeof uid === 'string' && uid.trim() === ADMIN_UID) return true;
+  return isAdminEmail(email);
+}
+
 export const TOKEN_PRICING = {
   SINGLE_SEED: 5,
   COMPLEX_QUERY: 10,

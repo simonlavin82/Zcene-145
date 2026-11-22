@@ -26,7 +26,7 @@ import HomePage from './components/HomePage';
 import Dashboard from './components/Dashboard';
 import SplashScreen from './components/SplashScreen';
 import { MyStackDialog, TokenConfirmationDialog, SimulatedStripeModal, DisambiguationCandidate, FilterGuidanceModal, ConsolidatedValidationModal, PreFlightSeed } from './components/SharedModals';
-import { TOKEN_PRICING, TokenTopUpTierId, computeBaseProjectTokenCost } from './shared/tokenEconomy';
+import { TOKEN_PRICING, TokenTopUpTierId, computeBaseProjectTokenCost, isProtectedAdminIdentity } from './shared/tokenEconomy';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalFooter, ModalBody } from './components/ui/Dialog';
 import { Checkbox } from './components/DesignSystem';
 
@@ -1368,6 +1368,10 @@ const App: React.FC = () => {
     const email = user.email.toLowerCase();
     return email === 'zcene.online@gmail.com' && user.uid === '9FBuWDALnNfUAjxV0pRe3RnKwJy1';
   }, [user]);
+  const isProtectedAdmin = useMemo(
+    () => isAdmin || isProtectedAdminIdentity(user?.uid, user?.email),
+    [isAdmin, user]
+  );
   const [isAdminPreview, setIsAdminPreview] = useState<boolean>(() => {
     try {
       return typeof window !== 'undefined' && (new URLSearchParams(window.location.search).get('adminPreview') === 'true' || localStorage.getItem('zcene_admin_preview') === 'true');
@@ -4285,7 +4289,7 @@ const App: React.FC = () => {
   }, [user, handleUpdateProfile, showToast]);
 
   const handleDeleteAccount = async () => {
-    if (!user) return;
+    if (!user || isProtectedAdmin) return;
 
     setIsDeletingAccount(true);
     setDeleteAccountError(null);
@@ -4326,7 +4330,9 @@ const App: React.FC = () => {
       console.error("Deletion error details:", err);
       const errMsg = String(err?.message || '');
       const detailCode = err?.details?.code || '';
-      if (detailCode === 'ACTIVE_CURATION_IN_PROGRESS' || errMsg.includes('ACTIVE_CURATION_IN_PROGRESS')) {
+      if (detailCode === 'ADMIN_ACCOUNT_PROTECTED' || errMsg.includes('ADMIN_ACCOUNT_PROTECTED')) {
+        setDeleteAccountError("The primary Admin account is protected and cannot be self-deleted.");
+      } else if (detailCode === 'ACTIVE_CURATION_IN_PROGRESS' || errMsg.includes('ACTIVE_CURATION_IN_PROGRESS')) {
         setDeleteAccountError("Please wait for your active curation to finish before deleting your account.");
       } else if (
         err?.code === 'auth/popup-closed-by-user' ||
@@ -11655,7 +11661,7 @@ const App: React.FC = () => {
 
       {/* Global Modals */}
       <AnimatePresence>
-        {isDeleteAccountModalOpen && (
+        {isDeleteAccountModalOpen && !isProtectedAdmin && (
           <ModalBackdrop className="z-[1000]" onClick={closeDeleteAccountModal}>
             <ModalContainer
               className="text-left relative"

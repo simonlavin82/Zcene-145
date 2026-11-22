@@ -11,6 +11,7 @@ const app_1 = require("firebase-admin/app");
 const auth_1 = require("firebase-admin/auth");
 const firestore_1 = require("firebase-admin/firestore");
 const tokenWallet_1 = require("./tokenWallet");
+const tokenEconomy_1 = require("./shared/tokenEconomy");
 if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
 }
@@ -65,6 +66,11 @@ async function deleteDocRefsInChunks(db, refs) {
  */
 async function executeDeleteUserAccount(request, deps = {}) {
     const caller = (0, tokenWallet_1.requireAuthenticatedCaller)(request);
+    // 0. Fail-closed Sole Admin Protection (v47.6):
+    // Block BEFORE auth_time, lock checks, or any Firestore/Auth reads/writes.
+    if (caller.isAdmin || (0, tokenEconomy_1.isProtectedAdminIdentity)(caller.uid, caller.email)) {
+        throw new https_1.HttpsError("permission-denied", "ADMIN_ACCOUNT_PROTECTED: The primary Admin account cannot be self-deleted.", { code: "ADMIN_ACCOUNT_PROTECTED" });
+    }
     const db = deps.db || defaultDb;
     const authClient = deps.auth || (0, auth_1.getAuth)();
     const nowMs = typeof deps.nowMs === "number" ? deps.nowMs : Date.now();

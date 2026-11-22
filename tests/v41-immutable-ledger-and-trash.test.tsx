@@ -157,12 +157,46 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       expect(restartIndex).toBeGreaterThan(designIndex);
       expect(instagramIndex).toBeGreaterThan(restartIndex);
       expect(signOutIndex).toBeGreaterThan(instagramIndex);
-      expect(deleteAccountIndex).toBeGreaterThan(signOutIndex);
+      // V47.6: Sole Admin account never sees Delete Account in Profile Menu
+      expect(deleteAccountIndex).toBe(-1);
 
       // Verify Trash item has NO count badges or contextual indicators
       const trashBtn = screen.getByRole('button', { name: /^delete\s*Trash$/i });
       expect(trashBtn).toBeInTheDocument();
       expect(trashBtn.textContent).not.toMatch(/\d+/);
+    });
+
+    it('renders Delete Account below Sign Out for standard non-admin users in Header', () => {
+      render(
+        <Header
+          user={{ uid: 'member-123', email: 'member@zcene.online' } as any}
+          view="dashboard"
+          isSmallScreen={false}
+          isMagazineViewOpen={false}
+          stackCount={0}
+          isStackNew={false}
+          onOpenStack={vi.fn()}
+          onNavigate={vi.fn()}
+          onLogout={vi.fn()}
+          onDeleteAccount={vi.fn()}
+          isAdmin={false}
+          isProfileOpen={true}
+          setIsProfileOpen={vi.fn()}
+          isDeleteAccountModalOpen={false}
+          setIsDeleteAccountModalOpen={vi.fn()}
+          isMenuOpen={false}
+          setIsMenuOpen={vi.fn()}
+          tokenBalance={50}
+        />
+      );
+
+      const menuButtons = screen.getAllByRole('button');
+      const menuTextList = menuButtons.map(b => b.textContent?.trim() || '');
+      const signOutIndex = menuTextList.findIndex(t => t.includes('Sign Out'));
+      const deleteAccountIndex = menuTextList.findIndex(t => t.includes('Delete Account'));
+
+      expect(signOutIndex).toBeGreaterThan(-1);
+      expect(deleteAccountIndex).toBeGreaterThan(signOutIndex);
     });
 
     it('renders clean Dashboard with static heading, strictly active projects, and no toolbar trash icon', () => {
@@ -562,7 +596,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       expect(engineContent).toContain('48 Laws');
       expect(engineContent).toContain('V47.4 Full-Stack Regression Runbook');
       expect(runbookContent).toContain('# V47.4 Regression Suite (Full-Stack)');
-      expect(runbookContent).toContain('28 test suites (575 unit/integration tests)');
+      expect(runbookContent).toContain('28 test suites (577 unit/integration tests)');
       expect(runbookContent).toContain('npx vitest run tests/v47-zine-print-pdf.test.tsx');
       expect(runbookContent).toContain('npx vitest run functions/tests/deleteUserAccount.test.ts');
       expect(runbookContent).toContain('cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts');
