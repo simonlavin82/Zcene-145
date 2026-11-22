@@ -264,12 +264,17 @@ export const ARCHITECTURE_RULES = [
     {
         id: 46,
         title: "Pre-Launch Security Rules, Uniform 1-at-a-Time Concurrency Lock, Stale-Job Reaper & App Check Readiness",
-        desc: "Hardens firestore.rules (curationJobs client create/update blocked, parenthesized isSignedIn() && (...) precedence on /artists and /labels, users/{uid} clientWritableUserKeys() allowlist + lastTopUpAt null guard, server-owned project telemetry guards including deepWebApiUsage, and Admin-write-only curationLocks/{uid} & adminLedger/system/curationFailures/{eventId}), enforces Firebase Auth on healOrphanedAsset and server.js POST /api/artist/scrape-video-id (plus UID + email + email_verified admin alignment), caps all users uniformly (including Admin) to 1 active curating Zcene via atomic curationLocks/{uid} transactions with 5-minute reapStaleCurationJobs + inline recovery auto-refunds, checkpoints partialApiUsage onto curationJobs and records idempotent sunk-cost failure receipts in adminLedger/system/curationFailures for Admin Discovery Ledger P&L visibility, and initializes Firebase App Check (ReCaptchaEnterpriseProvider) in Monitor Mode (ENFORCE_APP_CHECK=false) across all 8 onCall Cloud Functions."
+        desc: "Hardens firestore.rules (curationJobs client create/update blocked, parenthesized isSignedIn() && (...) precedence on /artists and /labels, users/{uid} clientWritableUserKeys() allowlist + lastTopUpAt null guard, server-owned project telemetry guards including deepWebApiUsage, and Admin-write-only curationLocks/{uid} & adminLedger/system/curationFailures/{eventId}), enforces Firebase Auth on healOrphanedAsset and server.js POST /api/artist/scrape-video-id (plus UID + email + email_verified admin alignment), caps all users uniformly (including Admin) to 1 active curating Zcene via atomic curationLocks/{uid} transactions with a 10-minute STALE_LOCK_TTL_MS swept every 5 minutes by reapStaleCurationJobs + inline recovery auto-refunds, checkpoints partialApiUsage onto curationJobs and records idempotent sunk-cost failure receipts in adminLedger/system/curationFailures for Admin Discovery Ledger P&L visibility, and initializes Firebase App Check (ReCaptchaEnterpriseProvider) in Monitor Mode (ENFORCE_APP_CHECK=false) across all 9 onCall Cloud Functions."
     },
     {
         id: 47,
         title: "Admin Token Grants, Flexible Beta Top-Ups, UK/EU Legal Waiver & Zine Save as PDF Print Engine",
         desc: "Adds server-verified adminGrantTokens (strict caller.isAdmin gate, getUserByEmail resolution, atomic tokenBalance increment preserving lifetimeTokensPurchased, immutable admin_grant receipt, Admin-only UsageAnalyticsPage card), upgrades simulateStripeTopUpCallable for authenticated beta users via the ALLOW_SIMULATED_TOPUP === 'true' kill-switch with [50, 100, 150] presets (min 50T / £5.00, max 1,000T at £0.10/T), required UK/EU 14-day immediate digital delivery waiver + /terms legal page (GlobalWall exempted, 30-day GDPR wind-down clause), spinnerless number inputs, pinned modal error banners outside <ModalBody>, and native window.print() Zine Save as PDF (formatZinePrintDocumentTitle -> 'Zcene - <Title>.pdf', @layer base @media print unlocking all 6 viewport/scroll traps for clean light editorial multi-page PDF output including Deep Cuts)."
+    },
+    {
+        id: 48,
+        title: "Server-Side Account Deletion, GDPR Art. 17 Erasure & Anonymised P&L Preservation",
+        desc: "Locks client allow delete on users/{userId} to Admin-only in firestore.rules and routes all self-serve deletions through deleteUserAccount (onCall Cloud Function with enforceAppCheck, auth_time <= 300s recent-login verification, seamless Google reauthenticateWithPopup retry on REQUIRES_RECENT_LOGIN, and active curation lock guard). Preserves one zero-PII financial summary under adminLedger/system/deletedAccountTelemetry/{uuid} (Admin-read, server-write-only) folded into UsageAnalyticsPage computeAggregateMetrics, scrubs PII on curationFailures to 'deleted_account', chunk-deletes all user subcollections, legacy projects, sharedZcenes, locks, sessions, and jobs, deletes the Firebase Auth user via Admin SDK, and enforces explicit live tokenBalance forfeiture disclosure and confirmation checkbox in the Delete Account modal."
     }
 ];
 
@@ -439,7 +444,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                     <span className="material-symbols-outlined text-primary text-base">gavel</span>
                     <span>Rules Ledger</span>
                 </div>
-                <span className="text-[10px] font-mono text-primary uppercase font-bold tracking-wider">47 Laws</span>
+                <span className="text-[10px] font-mono text-primary uppercase font-bold tracking-wider">48 Laws</span>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
                 {ARCHITECTURE_RULES.map(rule => (
@@ -804,7 +809,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V47.1 Full-Stack Regression Runbook
+                    V47.4 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -960,7 +965,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         ))}
                     </nav>
                     <div className="mt-8 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono pl-2">
-                        Zcene V47.1 Blueprint<br/>
+                        Zcene V47.4 Blueprint<br/>
                         100% Anti-Regression
                     </div>
                 </aside>
@@ -974,7 +979,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.1 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.4 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -1064,7 +1069,7 @@ LOCKED SEMANTIC TOPOLOGY & ZERO READ-ONLY WRITES (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.1 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.4 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

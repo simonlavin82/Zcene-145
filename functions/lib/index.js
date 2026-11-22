@@ -1,6 +1,6 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.unlockDeepWebSessionCallable = exports.authorizeDirectHitCallable = exports.simulateStripeTopUpCallable = exports.adminGrantTokens = exports.reapStaleCurationJobs = exports.healOrphanedAsset = exports.verifyBetaPassword = exports.validateSeedOriginCallable = exports.executeCurationPipeline = exports.processCurationJob = void 0;
+exports.unlockDeepWebSessionCallable = exports.authorizeDirectHitCallable = exports.simulateStripeTopUpCallable = exports.adminGrantTokens = exports.deleteUserAccount = exports.reapStaleCurationJobs = exports.healOrphanedAsset = exports.verifyBetaPassword = exports.validateSeedOriginCallable = exports.executeCurationPipeline = exports.processCurationJob = void 0;
 const processCurationJob_1 = require("./processCurationJob");
 Object.defineProperty(exports, "processCurationJob", { enumerable: true, get: function () { return processCurationJob_1.processCurationJob; } });
 const executeCurationPipeline_1 = require("./executeCurationPipeline");
@@ -12,6 +12,8 @@ const healOrphanedAsset_1 = require("./healOrphanedAsset");
 Object.defineProperty(exports, "healOrphanedAsset", { enumerable: true, get: function () { return healOrphanedAsset_1.healOrphanedAsset; } });
 const reapStaleCurationJobs_1 = require("./reapStaleCurationJobs");
 Object.defineProperty(exports, "reapStaleCurationJobs", { enumerable: true, get: function () { return reapStaleCurationJobs_1.reapStaleCurationJobs; } });
+const deleteUserAccount_1 = require("./deleteUserAccount");
+Object.defineProperty(exports, "deleteUserAccount", { enumerable: true, get: function () { return deleteUserAccount_1.deleteUserAccount; } });
 const tokenWallet_1 = require("./tokenWallet");
 Object.defineProperty(exports, "adminGrantTokens", { enumerable: true, get: function () { return tokenWallet_1.adminGrantTokens; } });
 Object.defineProperty(exports, "simulateStripeTopUpCallable", { enumerable: true, get: function () { return tokenWallet_1.simulateStripeTopUpCallable; } });

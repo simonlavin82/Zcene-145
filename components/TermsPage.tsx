@@ -159,7 +159,10 @@ export const TermsPage: React.FC<TermsPageProps> = ({
               4. Account Data, Privacy &amp; Self-Service Deletion
             </h2>
             <p className="text-sm text-zinc-400 leading-relaxed">
-              We collect only the Google Sign-In email address and profile display name necessary to authenticate your account, persist your private Zcene workspaces, and maintain your immutable token wallet ledger. We do not sell personal data or display third-party advertising. You may decline optional Google Analytics telemetry via the consent banner and may permanently delete your account at any time from your Profile menu.
+              We collect only the Google Sign-In email address and profile display name necessary to authenticate your account, persist your private Zcene workspaces, and maintain your immutable token wallet ledger. We do not sell personal data or display third-party advertising. You may decline optional Google Analytics telemetry via the consent banner and may permanently delete your account at any time from your Profile menu (recent Google re-authentication is verified for your security).
+            </p>
+            <p className="text-sm text-zinc-400 leading-relaxed">
+              Voluntary self-service account deletion permanently erases your Google login link, profile, Zcenes, Zines, saved Stack, Style profiles, shared links, and personal query records in accordance with UK GDPR and EU GDPR Article 17. Any remaining unused token balance or active Deep Connections pass is permanently forfeited and non-refundable upon voluntary deletion. Minimal anonymised aggregate billing totals (containing zero personal data) are retained exclusively for statutory tax and accounting compliance.
             </p>
             <p className="text-sm text-zinc-400 leading-relaxed">
               For privacy inquiries, GDPR data requests, or billing support, contact{' '}

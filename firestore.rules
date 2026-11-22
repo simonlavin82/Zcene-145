@@ -165,7 +165,9 @@ service cloud.firestore {
                       request.resource.data.diff(resource.data).affectedKeys()
                         .hasOnly(clientWritableUserKeys());
       
-      allow delete: if isOwner(userId) || isAdmin();
+      // Account deletion flows exclusively through the deleteUserAccount Cloud Function (Admin SDK)
+      // to guarantee complete subcollection erasure, GDPR scrubbing, and zero-PII P&L preservation.
+      allow delete: if isAdmin();
 
       match /tokenTransactions/{txId} {
         allow get: if isOwner(userId) || isAdmin();
@@ -421,6 +423,11 @@ service cloud.firestore {
     match /adminLedger/system/curationFailures/{eventId} {
       allow read: if isAdmin();
       allow write: if false; // Exclusively written by Cloud Functions via Firebase Admin SDK
+    }
+
+    match /adminLedger/system/deletedAccountTelemetry/{archiveId} {
+      allow read: if isAdmin();
+      allow write: if false; // Exclusively written by deleteUserAccount Cloud Function via Admin SDK (zero PII)
     }
 
     // --- Prepaid Token Economy Split-Debit & Deep Web Leases (Rule 43) ---

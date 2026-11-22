@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { initializeAppCheck, ReCaptchaEnterpriseProvider, type AppCheck } from 'firebase/app-check';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User, connectAuthEmulator } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, reauthenticateWithPopup, signOut, onAuthStateChanged, User, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import firebaseConfig from '../firebase-applet-config.json';
@@ -60,6 +60,17 @@ export const signInWithGoogle = async () => {
   } finally {
     isSigningIn = false;
   }
+};
+
+export const reauthenticateWithGoogle = async () => {
+  const currentUser = auth.currentUser;
+  if (!currentUser) {
+    throw new Error('No authenticated user session found.');
+  }
+  const result = await reauthenticateWithPopup(currentUser, googleProvider);
+  // Force-refresh ID token so the new auth_time claim is embedded immediately for Cloud Functions
+  await result.user.getIdToken(true);
+  return result.user;
 };
 
 export const logout = async () => {

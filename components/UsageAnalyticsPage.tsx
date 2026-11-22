@@ -141,6 +141,17 @@ export interface ProjectTelemetry {
     isComplexProject?: boolean;
 }
 
+export interface DeletedAccountTelemetryRecord {
+    id: string;
+    deletedAtMs: number;
+    lifetimeTokensPurchased: number;
+    lifetimeTokensSpent: number;
+    forfeitedTokenBalance: number;
+    totalAiCostUsd: number;
+    totalCurations: number;
+    directHitCurations: number;
+}
+
 export interface TelemetryAggregateMetrics {
     // Card 1: Token Revenue (Earned)
     customerTokensSpent: number;
@@ -152,6 +163,8 @@ export interface TelemetryAggregateMetrics {
     customerUnspentFloatTokens: number;
     customerUnspentFloatGbp: number;
     customerUnspentFloatUsd: number;
+    deletedAccountsCount: number;
+    forfeitedTokensFromDeletedAccounts: number;
 
     // Card 2: Actual AI API Cost
     totalPlatformAiCostUsd: number;
@@ -328,7 +341,8 @@ const renderProjectStatusBadge = (
 export const computeAggregateMetrics = (
     ledgerData: UserTelemetry[],
     jitHeals: JitHealRecord[] = [],
-    curationFailures: CurationFailureRecord[] = []
+    curationFailures: CurationFailureRecord[] = [],
+    deletedAccountTelemetry: DeletedAccountTelemetryRecord[] = []
 ): TelemetryAggregateMetrics => {
     let customerTokensSpent = 0;
     let customerGrossPurchasedTokens = 0;
@@ -365,6 +379,19 @@ export const computeAggregateMetrics = (
                 }
             }
         });
+    });
+
+    // Fold anonymised zero-PII deleted-account billing telemetry into lifetime customer P&L
+    // (forfeitedTokenBalance is intentionally excluded from active unspent wallet float)
+    let forfeitedTokensFromDeletedAccounts = 0;
+    const deletedAccountsCount = deletedAccountTelemetry.length;
+    deletedAccountTelemetry.forEach((rec) => {
+        customerTokensSpent += Math.max(0, Number(rec.lifetimeTokensSpent) || 0);
+        customerGrossPurchasedTokens += Math.max(0, Number(rec.lifetimeTokensPurchased) || 0);
+        customerAiCostUsd += Math.max(0, Number(rec.totalAiCostUsd) || 0);
+        totalCurations += Math.max(0, Number(rec.totalCurations) || 0);
+        directHitCurations += Math.max(0, Number(rec.directHitCurations) || 0);
+        forfeitedTokensFromDeletedAccounts += Math.max(0, Number(rec.forfeitedTokenBalance) || 0);
     });
 
     const jitAiCostUsd = jitHeals.reduce((sum, h) => sum + (Number(h.costUsd) || 0), 0);
@@ -414,6 +441,8 @@ export const computeAggregateMetrics = (
         customerUnspentFloatTokens,
         customerUnspentFloatGbp,
         customerUnspentFloatUsd,
+        deletedAccountsCount,
+        forfeitedTokensFromDeletedAccounts,
         totalPlatformAiCostUsd,
         totalPlatformAiCostGbp,
         customerAiCostUsd,
@@ -905,6 +934,14 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
                         Unspent Wallet Float: <span className="font-mono text-primary">{aggregateMetrics.customerUnspentFloatTokens}T</span>{' '}
                         <span className="font-mono text-zinc-500">(£{aggregateMetrics.customerUnspentFloatGbp.toFixed(2)})</span>
                     </div>
+                    {aggregateMetrics.deletedAccountsCount > 0 && (
+                        <div className="text-[10px] text-zinc-500 pt-0.5">
+                            Includes {aggregateMetrics.deletedAccountsCount} anonymised deleted account{aggregateMetrics.deletedAccountsCount === 1 ? '' : 's'}
+                            {aggregateMetrics.forfeitedTokensFromDeletedAccounts > 0
+                                ? ` (${aggregateMetrics.forfeitedTokensFromDeletedAccounts}T forfeited)`
+                                : ''}
+                        </div>
+                    )}
                 </div>
             </div>
 
@@ -2037,6 +2074,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [tokenTransactions, setTokenTransactions] = useState<TokenTransaction[]>([]);
     const [jitHeals, setJitHeals] = useState<JitHealRecord[]>([]);
     const [curationFailures, setCurationFailures] = useState<CurationFailureRecord[]>([]);
+    const [deletedAccountTelemetry, setDeletedAccountTelemetry] = useState<DeletedAccountTelemetryRecord[]>([]);
     const [isJitEnabled, setIsJitEnabled] = useState<boolean>(true);
     const [isTogglingJit, setIsTogglingJit] = useState<boolean>(false);
     const [grantEmail, setGrantEmail] = useState<string>('');
@@ -2274,9 +2312,31 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     console.warn("[UsageAnalyticsPage] Could not query curationFailures collection:", failErr.message);
                     setCurationFailures([]);
                 }
+                try {
+                    const deletedTelemetryRef = collection(db, 'adminLedger', 'system', 'deletedAccountTelemetry');
+                    const deletedSnap = await getDocs(deletedTelemetryRef);
+                    const parsedDeleted: DeletedAccountTelemetryRecord[] = deletedSnap.docs.map(d => {
+                        const dt = d.data() || {};
+                        return {
+                            id: d.id,
+                            deletedAtMs: typeof dt.deletedAtMs === 'number' ? dt.deletedAtMs : 0,
+                            lifetimeTokensPurchased: Math.max(0, Number(dt.lifetimeTokensPurchased) || 0),
+                            lifetimeTokensSpent: Math.max(0, Number(dt.lifetimeTokensSpent) || 0),
+                            forfeitedTokenBalance: Math.max(0, Number(dt.forfeitedTokenBalance) || 0),
+                            totalAiCostUsd: Math.max(0, Number(dt.totalAiCostUsd) || 0),
+                            totalCurations: Math.max(0, Number(dt.totalCurations) || 0),
+                            directHitCurations: Math.max(0, Number(dt.directHitCurations) || 0),
+                        };
+                    });
+                    setDeletedAccountTelemetry(parsedDeleted);
+                } catch (delErr: any) {
+                    console.warn("[UsageAnalyticsPage] Could not query deletedAccountTelemetry collection:", delErr.message);
+                    setDeletedAccountTelemetry([]);
+                }
             } else {
                 setJitHeals([]);
                 setCurationFailures([]);
+                setDeletedAccountTelemetry([]);
             }
         } catch (err: any) {
             console.error("Error fetching ledger data:", err);
@@ -2340,8 +2400,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const juicePct = Math.min(100, Math.round((liveTokenBalance / juiceMax) * 100));
 
     const aggregateMetrics = useMemo(
-        () => computeAggregateMetrics(ledgerData, jitHeals, curationFailures),
-        [ledgerData, jitHeals, curationFailures]
+        () => computeAggregateMetrics(ledgerData, jitHeals, curationFailures, deletedAccountTelemetry),
+        [ledgerData, jitHeals, curationFailures, deletedAccountTelemetry]
     );
 
     const unifiedUserRows = useMemo(

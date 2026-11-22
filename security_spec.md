@@ -12,7 +12,8 @@
 9. `curationJobs/{jobId}` is strictly write-locked against client `create` and `update` in `firestore.rules`; only Cloud Functions (Admin SDK) can create or advance curation job state.
 10. Per-user 1-at-a-time curation concurrency is enforced uniformly (including Admin) via server-owned `curationLocks/{userId}` (`allow get: if isOwner(userId) || isAdmin(); allow list, write: if false;`) with automatic stale-lock recovery, auto-refund, and idempotent sunk-cost failure audit receipts written exclusively via Admin SDK to `adminLedger/system/curationFailures/{eventId}` (`allow read: if isAdmin(); allow write: if false;`).
 11. All backend mutation/proxy endpoints require verified Firebase Auth (`requireAuthenticatedCaller` on `healOrphanedAsset` and `simulateStripeTopUpCallable`; Firebase Bearer ID token verification on `server.js` `POST /api/artist/scrape-video-id`), and `adminGrantTokens` is strictly gated on `caller.isAdmin` (`ADMIN_UID + ADMIN_EMAIL + email_verified === true`).
-12. Firebase App Check (`ReCaptchaEnterpriseProvider`) is initialized on the client via `VITE_RECAPTCHA_SITE_KEY` and wired across all 8 `onCall` Cloud Functions via `ENFORCE_APP_CHECK` (Monitor Mode default `false` prior to enforcement cutover). Simulated top-ups are controlled by a single server env kill-switch (`ALLOW_SIMULATED_TOPUP === "true"`).
+12. Firebase App Check (`ReCaptchaEnterpriseProvider`) is initialized on the client via `VITE_RECAPTCHA_SITE_KEY` and wired across all 9 `onCall` Cloud Functions via `ENFORCE_APP_CHECK` (Monitor Mode default `false` prior to enforcement cutover). Simulated top-ups are controlled by a single server env kill-switch (`ALLOW_SIMULATED_TOPUP === "true"`).
+13. Self-serve account deletion flows exclusively through the server-side `deleteUserAccount` Cloud Function (`users/{userId}` `allow delete: if isAdmin();` in `firestore.rules`), enforcing `auth_time <= 300s`, blocking deletion during active curation locks, performing complete chunked GDPR Art. 17 erasure across all user collections and Firebase Auth, scrubbing PII from `curationFailures`, and preserving one zero-PII aggregate financial summary in `adminLedger/system/deletedAccountTelemetry/{archiveId}` (`allow read: if isAdmin(); allow write: if false;`).
 
 ## The "Dirty Dozen" Payloads
 
@@ -105,3 +106,8 @@
 **Attempt**: Standard user invokes `adminGrantTokens`, or any user invokes `simulateStripeTopUpCallable` after `ALLOW_SIMULATED_TOPUP` is disabled for live Stripe launch.
 **Payload**: `adminGrantTokens({ email: 'me@example.com', amount: 500 })` or `simulateStripeTopUpCallable({ quantity: 50, waiverAccepted: true })` with `ALLOW_SIMULATED_TOPUP !== "true"`
 **Expectation**: `permission-denied` (`adminGrantTokens` strictly checks `caller.isAdmin`; `simulateStripeTopUpCallable` strictly checks `process.env.ALLOW_SIMULATED_TOPUP === "true"`).
+
+### 19. Client-Side Account Deletion / Anonymised Ledger Tamper Bypass
+**Attempt**: Authenticated user attempts direct `deleteDoc(doc(db, 'users', myUid))` to bypass server-side erasure & P&L archival, or attempts to write/read `adminLedger/system/deletedAccountTelemetry/{archiveId}`.
+**Payload**: `deleteDoc(doc(db, 'users', 'my_uid'))` or `setDoc(doc(db, 'adminLedger/system/deletedAccountTelemetry', 'fake'), { totalAiCostUsd: 0 })`
+**Expectation**: PERMISSION_DENIED (`users/{userId}` `allow delete` is Admin-only; `deletedAccountTelemetry` is Admin-read, server-write-only).

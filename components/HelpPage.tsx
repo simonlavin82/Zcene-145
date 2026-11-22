@@ -7,13 +7,13 @@ import { BackButton } from './DesignSystem';
 import { GlobalFooter } from './GlobalFooter';
 import { nodeTypeColorMap } from '../utils/formatters';
 import {
-  ZCENE_SUPPORT_EMAIL,
-  ZCENE_SUPPORT_MAILTO,
-  ZCENE_TSHIRT_MAILTO,
-  ZCENE_INSTAGRAM_URL,
-  ZCENE_INSTAGRAM_HANDLE,
-  ZCENE_BUYMEACOFFEE_URL,
-  TOKEN_PRICING,
+    ZCENE_SUPPORT_EMAIL,
+    ZCENE_SUPPORT_MAILTO,
+    ZCENE_TSHIRT_MAILTO,
+    ZCENE_INSTAGRAM_URL,
+    ZCENE_INSTAGRAM_HANDLE,
+    ZCENE_BUYMEACOFFEE_URL,
+    TOKEN_PRICING,
 } from '../shared/tokenEconomy';
 
 // --- Visual Support Components ---
@@ -246,11 +246,10 @@ const DeepCutMock = () => (
                 {['Label', 'Genre', 'Style', 'Origin', 'Era'].map((crit, idx) => (
                     <div key={crit} className="space-y-1">
                         <div
-                            className={`h-1.5 rounded-full border ${
-                                idx < 4
+                            className={`h-1.5 rounded-full border ${idx < 4
                                     ? 'bg-[#a855f7] border-[#a855f7]'
                                     : 'bg-transparent border-zinc-600 border-dashed'
-                            }`}
+                                }`}
                         />
                         <span className="block text-[9px] text-zinc-500 text-center">{crit}</span>
                     </div>
@@ -468,33 +467,33 @@ const HelpSection: React.FC<{ title: string; id?: string; children: React.ReactN
 );
 
 interface HelpPageProps {
-  onNavigate: (view: View) => void;
-  isActive: boolean;
-  onClose?: () => void;
-  isAdmin?: boolean;
-  user: any;
-  onLogoClick: () => void;
-  isSmallScreen: boolean;
-  stackCount: number;
-  isStackNew: boolean;
-  onOpenStack: () => void;
-  onNavigateMenu?: (path: string) => void;
-  onLogout: () => void;
-  onDeleteAccount: () => void;
-  isProfileOpen: boolean;
-  setIsProfileOpen: (open: boolean) => void;
-  isDeleteAccountModalOpen: boolean;
-  setIsDeleteAccountModalOpen: (open: boolean) => void;
-  isMenuOpen: boolean;
-  setIsMenuOpen: (open: boolean) => void;
-  onRestartWalkthrough?: () => void;
-  tokenBalance?: number;
+    onNavigate: (view: View) => void;
+    isActive: boolean;
+    onClose?: () => void;
+    isAdmin?: boolean;
+    user: any;
+    onLogoClick: () => void;
+    isSmallScreen: boolean;
+    stackCount: number;
+    isStackNew: boolean;
+    onOpenStack: () => void;
+    onNavigateMenu?: (path: string) => void;
+    onLogout: () => void;
+    onDeleteAccount: () => void;
+    isProfileOpen: boolean;
+    setIsProfileOpen: (open: boolean) => void;
+    isDeleteAccountModalOpen: boolean;
+    setIsDeleteAccountModalOpen: (open: boolean) => void;
+    isMenuOpen: boolean;
+    setIsMenuOpen: (open: boolean) => void;
+    onRestartWalkthrough?: () => void;
+    tokenBalance?: number;
 }
 
-const HelpPage: React.FC<HelpPageProps> = ({ 
-    onNavigate, 
-    isActive, 
-    onClose, 
+const HelpPage: React.FC<HelpPageProps> = ({
+    onNavigate,
+    isActive,
+    onClose,
     isAdmin,
     user,
     onLogoClick,
@@ -650,10 +649,10 @@ const HelpPage: React.FC<HelpPageProps> = ({
                     </div>
                     <nav className="space-y-1">
                         {sections.map(section => (
-                            <a 
-                                key={section.id} 
-                                href={`#${section.id}`} 
-                                onClick={(e) => handleNavClick(e, section.id)} 
+                            <a
+                                key={section.id}
+                                href={`#${section.id}`}
+                                onClick={(e) => handleNavClick(e, section.id)}
                                 className="block text-zinc-400 hover:text-primary hover:bg-zinc-800/50 py-1.5 px-2 rounded-xl transition-colors text-sm"
                             >
                                 {section.title}
@@ -666,7 +665,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                     <div className="lg:hidden pt-4 pb-2">
                         <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
                     </div>
-                    
+
                     {/* CHOOSING YOUR ROOTS */}
                     <section id="choose-artists">
                         <div className="mb-10 border-b border-zinc-700 pb-8">
@@ -717,7 +716,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         <p className="text-zinc-400 max-w-3xl mb-10 text-base leading-relaxed">
                             The Connections canvas is built for tactile exploration. Pan across clusters, hover for quick context, and toggle node types on the fly.
                         </p>
-                        
+
                         <InteractionVisual />
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-12 mt-14">
@@ -745,7 +744,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                     {/* DIGGING FOR DETAILS */}
                     <HelpSection id="digging-details" title="Digging for details">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                             <MockUIContainer title="Deep Cuts Panel">
+                            <MockUIContainer title="Deep Cuts Panel">
                                 <DeepCutMock />
                             </MockUIContainer>
                             <div className="space-y-6">
@@ -822,7 +821,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                     {/* STYLE PROFILES & MY STACK */}
                     <HelpSection id="curating-stack" title="Style Profiles & My Stack">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                             <MockUIContainer title="Style Profiles & My Stack">
+                            <MockUIContainer title="Style Profiles & My Stack">
                                 <MyStackMock />
                             </MockUIContainer>
                             <div className="space-y-8">
@@ -884,11 +883,11 @@ const HelpPage: React.FC<HelpPageProps> = ({
                     {/* PRIVATE, PERSISTENT & MOBILE */}
                     <HelpSection id="private-persistent" title="Private, Persistent & Mobile">
                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-                             <div className="order-2 lg:order-1">
+                            <div className="order-2 lg:order-1">
                                 <MockUIContainer title="Cloud Sync & Privacy">
                                     <PersistenceMock />
                                 </MockUIContainer>
-                             </div>
+                            </div>
                             <div className="space-y-6 order-1 lg:order-2">
                                 <p className="text-zinc-400 text-base leading-relaxed">
                                     Your music discovery library stays private, synced across devices, and tailored to both desktop and mobile screens.
@@ -909,7 +908,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                     <div className="flex gap-4">
                                         <span className="material-symbols-outlined text-primary flex-shrink-0">shield_person</span>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            <strong className="text-zinc-200">Privacy &amp; Account Deletion:</strong> Zcene is 100% ad-free and never sells your data. You can opt out of optional Google Analytics via the cookie banner, or initiate account deletion from your Profile menu (<strong>Delete Account</strong>). Note that voluntary account deletion is permanent and any remaining unused tokens are non-refundable. For full GDPR Article 17 erasure or billing ledger inquiries, email{' '}
+                                            <strong className="text-zinc-200">Privacy &amp; Account Deletion:</strong> Zcene is 100% ad-free and never sells your data. You can opt out of optional Google Analytics via the cookie banner, or permanently delete your account from your Profile menu (<strong>Delete Account</strong>). For security, Zcene verifies a recent Google sign-in and completes full server-side erasure of your profile, Zcenes, Zines, Stack, Style profiles, shared links, and login credentials while retaining only zero-PII aggregate billing totals for statutory accounting. Voluntary account deletion is permanent and any remaining unused tokens are forfeited and non-refundable. For GDPR Article 17 questions or billing inquiries, email{' '}
                                             <a href={ZCENE_SUPPORT_MAILTO} className="text-primary hover:underline font-mono">
                                                 {ZCENE_SUPPORT_EMAIL}
                                             </a>{' '}
@@ -1036,7 +1035,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                     {/* TROUBLESHOOTING */}
                     <HelpSection id="troubleshooting" title="Troubleshooting">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                             <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-3">
+                            <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-3">
                                 <h4 className="text-primary font-medium text-lg flex items-center gap-3">
                                     <span className="material-symbols-outlined !text-xl">upload_file</span>
                                     Library File Imports
@@ -1044,8 +1043,8 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 <p className="text-sm text-zinc-400 leading-relaxed">
                                     Ensure your CSV has a column header called <strong>&quot;Artist&quot;</strong>. For Apple Music, export via <strong>File &gt; Library &gt; Export Library</strong> (.xml).
                                 </p>
-                             </div>
-                             <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-3">
+                            </div>
+                            <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-3">
                                 <h4 className="text-primary font-medium text-lg flex items-center gap-3">
                                     <span className="material-symbols-outlined !text-xl">bolt</span>
                                     1-at-a-Time Curation Lock &amp; Stale Recovery
@@ -1053,8 +1052,8 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 <p className="text-sm text-zinc-400 leading-relaxed">
                                     Zcene curates one active project per account at a time to protect your token balance and guarantee clean synthesis. If a background curation ever stalls, its lock expires after <strong>10 minutes</strong> and our recovery service (sweeping every <strong>5 minutes</strong>) automatically clears the lock and refunds spent settlement tokens.
                                 </p>
-                             </div>
-                             <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-3">
+                            </div>
+                            <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-3">
                                 <h4 className="text-primary font-medium text-lg flex items-center gap-3">
                                     <span className="material-symbols-outlined !text-xl">picture_as_pdf</span>
                                     Zine PDF Printing Tips
@@ -1062,8 +1061,8 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 <p className="text-sm text-zinc-400 leading-relaxed">
                                     Click <strong>Save as PDF</strong> inside Zine View and choose <strong>Save as PDF</strong> as your print destination. Zcene automatically formats an ink-friendly white editorial layout across multiple pages, including both your Zine essays and Deep Cuts profiles.
                                 </p>
-                             </div>
-                             <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-3">
+                            </div>
+                            <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-xl space-y-3">
                                 <h4 className="text-primary font-medium text-lg flex items-center gap-3">
                                     <span className="material-symbols-outlined !text-xl">mic</span>
                                     Audio Previews &amp; Voice Dictation
@@ -1071,7 +1070,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 <p className="text-sm text-zinc-400 leading-relaxed">
                                     Only one 30-second preview plays at a time across the app. Voice dictation in Zine Curator&apos;s Notes uses your browser&apos;s built-in Speech Recognition API (supported in Chrome, Edge, and Safari) and requires microphone permission when prompted.
                                 </p>
-                             </div>
+                            </div>
                         </div>
                     </HelpSection>
 
@@ -1097,18 +1096,18 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 </div>
                                 <div className="flex flex-wrap items-center gap-3">
                                     <a
-                                      href={ZCENE_SUPPORT_MAILTO}
-                                      className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-medium text-brand-black hover:opacity-90 transition-all active:scale-95 shadow-white/20"
+                                        href={ZCENE_SUPPORT_MAILTO}
+                                        className="inline-flex items-center gap-2 rounded-xl bg-white px-5 py-2.5 text-sm font-medium text-brand-black hover:opacity-90 transition-all active:scale-95 shadow-white/20"
                                     >
-                                      <span className="material-symbols-outlined !text-[18px]">send</span>
-                                      Email Support
+                                        <span className="material-symbols-outlined !text-[18px]">send</span>
+                                        Email Support
                                     </a>
                                     <a
-                                      href={ZCENE_TSHIRT_MAILTO}
-                                      className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-all active:scale-95"
+                                        href={ZCENE_TSHIRT_MAILTO}
+                                        className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 px-4 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-all active:scale-95"
                                     >
-                                      <span className="material-symbols-outlined !text-[18px]">checkroom</span>
-                                      Email T-Shirt Order
+                                        <span className="material-symbols-outlined !text-[18px]">checkroom</span>
+                                        Email T-Shirt Order
                                     </a>
                                 </div>
                             </div>
@@ -1136,13 +1135,13 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 </div>
                                 <div>
                                     <a
-                                      href={ZCENE_INSTAGRAM_URL}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-all active:scale-95"
+                                        href={ZCENE_INSTAGRAM_URL}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-800 px-5 py-2.5 text-sm font-medium text-white hover:bg-zinc-700 transition-all active:scale-95"
                                     >
-                                      <InstagramIcon className="w-4 h-4 text-white" />
-                                      Message on Instagram
+                                        <InstagramIcon className="w-4 h-4 text-white" />
+                                        Message on Instagram
                                     </a>
                                 </div>
                             </div>

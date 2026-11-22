@@ -3,6 +3,7 @@ import { executeCurationPipeline, validateSeedOriginCallable } from "./executeCu
 import { verifyBetaPassword } from "./verifyBetaPassword";
 import { healOrphanedAsset } from "./healOrphanedAsset";
 import { reapStaleCurationJobs } from "./reapStaleCurationJobs";
+import { deleteUserAccount } from "./deleteUserAccount";
 import {
   adminGrantTokens,
   simulateStripeTopUpCallable,
@@ -17,6 +18,7 @@ export {
   verifyBetaPassword,
   healOrphanedAsset,
   reapStaleCurationJobs,
+  deleteUserAccount,
   adminGrantTokens,
   simulateStripeTopUpCallable,
   authorizeDirectHitCallable,

@@ -12,7 +12,7 @@ import { qualifyCacheEntry, deriveRoutingDecision, isLocallyRenderable, CacheVer
 import { normalizeCountry } from './utils/normalization';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from './utils/projectHydrationFingerprint';
 export { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature };
-import { auth, signInWithGoogle, logout, onAuthStateChanged, User, db, functions, handleFirestoreError, OperationType } from './services/firebase';
+import { auth, signInWithGoogle, reauthenticateWithGoogle, logout, onAuthStateChanged, User, db, functions, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
 import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit, Timestamp } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
@@ -1284,6 +1284,8 @@ const App: React.FC = () => {
   const [isDeleteAccountModalOpen, setIsDeleteAccountModalOpen] = useState(false);
   const [isExitBlockerModalOpen, setIsExitBlockerModalOpen] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [deleteAccountConfirmed, setDeleteAccountConfirmed] = useState(false);
+  const [deleteAccountError, setDeleteAccountError] = useState<string | null>(null);
   const [isAuthInitialized, setIsAuthInitialized] = useState(false);
   const [isFirebaseReady, setIsFirebaseReady] = useState(false);
   const [isSharing, setIsSharing] = useState(false);
@@ -4279,62 +4281,56 @@ const App: React.FC = () => {
     if (!user) return;
 
     setIsDeletingAccount(true);
+    setDeleteAccountError(null);
     setError(null);
     try {
-      const batch = writeBatch(db);
-
-      // 1. Clean Sweep: Projects in subcollection
-      const projectsRef = collection(db, 'users', user.uid, 'projects');
-      const projectsSnap = await getDocs(projectsRef);
-      projectsSnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
-
-      // 2. Clean Sweep: Search for projects in potential top-level collection
+      const deleteAccountFn = httpsCallable(functions, 'deleteUserAccount', { timeout: 120000 });
       try {
-        const topLevelProjectsRef = collection(db, 'projects');
-        const q = query(topLevelProjectsRef, where('authorId', '==', user.uid));
-        const topLevelSnap = await getDocs(q);
-        topLevelSnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
-      } catch (e) {
-        console.log("No top-level projects collection or access denied (expected if not using top-level)");
+        await deleteAccountFn({});
+      } catch (firstErr: any) {
+        const firstMsg = String(firstErr?.message || '');
+        const firstDetailCode = firstErr?.details?.code || '';
+        const needsReauth =
+          firstDetailCode === 'REQUIRES_RECENT_LOGIN' ||
+          firstMsg.includes('REQUIRES_RECENT_LOGIN') ||
+          firstErr?.code === 'auth/requires-recent-login';
+
+        if (!needsReauth) {
+          throw firstErr;
+        }
+
+        // Seamless re-authentication via Google popup refreshes auth_time without manual logout
+        await reauthenticateWithGoogle();
+        await deleteAccountFn({});
       }
 
-      // 3. Delete Stack items
-      const stackRef = collection(db, 'users', user.uid, 'stack');
-      const stackSnap = await getDocs(stackRef);
-      stackSnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
-
-      // 4. Delete Session
-      const sessionRef = doc(db, 'users', user.uid, 'userSession', 'current');
-      batch.delete(sessionRef);
-
-      // 5. Delete shared Zcenes
-      const sharedRef = collection(db, 'sharedZcenes');
-      const sharedQ = query(sharedRef, where('authorId', '==', user.uid));
-      const sharedSnap = await getDocs(sharedQ);
-      sharedSnap.docs.forEach(docSnap => batch.delete(docSnap.ref));
-
-      // 6. Delete user profile
-      const userRef = doc(db, 'users', user.uid);
-      batch.delete(userRef);
-
-      // Commit the batch
-      await batch.commit();
-
-      // 7. Delete Auth User
-      await user.delete();
+      // Sign out locally to clear Firebase Auth cache after server-side deleteUser(uid)
+      await logout().catch(() => {});
 
       setUser(null);
       setProfile(null);
+      setDeleteAccountConfirmed(false);
+      setDeleteAccountError(null);
       setIsDeleteAccountModalOpen(false);
       setCurrentView(View.Home);
       navigate('/');
-      showToast('Account deleted successfully');
+      showToast('Account permanently deleted');
     } catch (err: any) {
       console.error("Deletion error details:", err);
-      if (err.code === 'auth/requires-recent-login' || (err.message && err.message.includes('auth/requires-recent-login'))) {
-        setError("For security, please log out and back in once more before deleting your account.");
+      const errMsg = String(err?.message || '');
+      const detailCode = err?.details?.code || '';
+      if (detailCode === 'ACTIVE_CURATION_IN_PROGRESS' || errMsg.includes('ACTIVE_CURATION_IN_PROGRESS')) {
+        setDeleteAccountError("Please wait for your active curation to finish before deleting your account.");
+      } else if (
+        err?.code === 'auth/popup-closed-by-user' ||
+        err?.code === 'auth/cancelled-popup-request' ||
+        err?.code === 'auth/popup-blocked'
+      ) {
+        setDeleteAccountError("Google re-authentication was cancelled or blocked. Please allow the popup and try again to confirm deletion.");
+      } else if (detailCode === 'REQUIRES_RECENT_LOGIN' || errMsg.includes('REQUIRES_RECENT_LOGIN')) {
+        setDeleteAccountError("For security, please re-authenticate with Google before deleting your account.");
       } else {
-        handleFirestoreError(err, OperationType.DELETE, `users/${user.uid}`);
+        setDeleteAccountError(errMsg || "Unable to delete account right now. Please contact support@zcene.online.");
       }
     } finally {
       setIsDeletingAccount(false);
@@ -11655,48 +11651,96 @@ const App: React.FC = () => {
         {isDeleteAccountModalOpen && (
           <ModalBackdrop className="z-[1000]">
             <ModalContainer
-              className="max-w-sm rounded-t-2xl sm:rounded-2xl p-8"
+              className="max-w-md rounded-t-2xl sm:rounded-2xl max-h-[90vh] flex flex-col overflow-hidden p-0"
+              data-testid="delete-account-modal"
             >
               {isDeletingAccount && (
-                <div className="absolute top-0 left-0 w-full h-1 bg-zinc-800 overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-1 bg-zinc-800 overflow-hidden z-10">
                   <div className="h-full bg-primary animate-[loading-sliver_1.5s_infinite_linear] w-[40%]" />
                 </div>
               )}
 
-              <div className="w-16 h-16 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 mb-6">
-                <span className="material-symbols-outlined !text-[32px]">warning</span>
-              </div>
+              <ModalBody className="p-6 sm:p-8 space-y-4 overflow-y-auto">
+                <div className="w-14 h-14 rounded-xl bg-red-500/10 flex items-center justify-center text-red-500 border border-red-500/20">
+                  <span className="material-symbols-outlined !text-[30px]">warning</span>
+                </div>
 
-              <h3 className="text-xl font-bold text-white mb-3">Delete Account?</h3>
-              <p className="text-zinc-400 text-sm mb-3 leading-relaxed">
-                This will permanently delete your profile, projects, saved stack, and all active sessions. This action is irreversible.
-              </p>
+                <h3 className="text-xl font-bold text-white">Delete Account?</h3>
+                <p className="text-zinc-400 text-sm leading-relaxed">
+                  This will permanently erase your profile, Zcenes, Zines, saved Stack, Style profiles, shared links, and login credentials. This action is irreversible.
+                </p>
 
-              {error && (
-                <div className="mb-6 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-medium leading-relaxed">
-                  {error}
+                <div
+                  data-testid="delete-account-token-warning"
+                  className="p-3.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs leading-relaxed space-y-1"
+                >
+                  <p className="font-semibold text-amber-300">Unused Token Balance Forfeiture</p>
+                  <p>
+                    {(profile?.tokenBalance ?? 0) > 0
+                      ? `Your remaining balance of ${profile?.tokenBalance ?? 0}T (and any active Deep Connections pass) will be permanently forfeited and is non-refundable upon voluntary deletion.`
+                      : 'Any remaining unused tokens or active Deep Connections passes are permanently forfeited and non-refundable upon voluntary deletion.'}
+                  </p>
+                </div>
+
+                <p className="text-[11px] text-zinc-500 leading-relaxed">
+                  Minimal anonymised aggregate billing totals (with zero personal data) are retained for statutory accounting, consistent with our Terms of Service.
+                </p>
+
+                <label className="flex items-start gap-3 p-3 rounded-xl bg-zinc-900/70 border border-zinc-800 cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    data-testid="delete-account-confirm-checkbox"
+                    checked={deleteAccountConfirmed}
+                    disabled={isDeletingAccount}
+                    onChange={(e) => {
+                      setDeleteAccountConfirmed(e.target.checked);
+                      if (deleteAccountError) setDeleteAccountError(null);
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-red-500 focus:ring-red-500/40 accent-red-500 cursor-pointer flex-shrink-0"
+                  />
+                  <span className="text-xs text-zinc-300 leading-relaxed">
+                    I understand this is permanent, cannot be undone, and any remaining unused tokens ({profile?.tokenBalance ?? 0}T) will be forfeited.
+                  </span>
+                </label>
+              </ModalBody>
+
+              {/* Pinned Error Banner outside ModalBody so it stays visible without scrolling */}
+              {deleteAccountError && (
+                <div
+                  role="alert"
+                  data-testid="delete-account-error"
+                  className="mx-6 sm:mx-8 mb-3 p-3.5 rounded-xl bg-red-500/10 border border-red-500/30 text-red-400 text-xs font-medium leading-relaxed shrink-0"
+                >
+                  {deleteAccountError}
                 </div>
               )}
 
-              <div className="flex flex-col gap-3">
+              <div className="px-6 sm:px-8 pb-6 sm:pb-8 pt-2 flex flex-col gap-2.5 shrink-0 border-t border-zinc-800/60">
                 <button
-                  disabled={isDeletingAccount}
+                  type="button"
+                  data-testid="delete-account-submit-btn"
+                  disabled={isDeletingAccount || !deleteAccountConfirmed}
                   onClick={handleDeleteAccount}
-                  className="w-full py-4 rounded-xl bg-[#ef4444] hover:bg-[#ef4444]/90 text-white font-bold transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 shadow-lg shadow-red-900/20"
+                  className="w-full py-3.5 rounded-xl bg-[#ef4444] hover:bg-[#ef4444]/90 text-white font-bold text-sm transition-all active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 shadow-lg shadow-red-900/20"
                 >
                   {isDeletingAccount ? (
                     <>
                       <Spinner className="w-4 h-4 text-white" />
-                      Deleting...
+                      Deleting Account...
                     </>
                   ) : (
                     'Delete Forever'
                   )}
                 </button>
                 <button
+                  type="button"
                   disabled={isDeletingAccount}
-                  onClick={() => setIsDeleteAccountModalOpen(false)}
-                  className="w-full py-4 rounded-none border border-zinc-800 text-zinc-400 font-bold hover:bg-zinc-800 hover:text-white transition-all disabled:opacity-50"
+                  onClick={() => {
+                    setIsDeleteAccountModalOpen(false);
+                    setDeleteAccountConfirmed(false);
+                    setDeleteAccountError(null);
+                  }}
+                  className="w-full py-3 rounded-xl border border-zinc-800 text-zinc-400 font-semibold text-sm hover:bg-zinc-800 hover:text-white transition-all disabled:opacity-50"
                 >
                   Cancel
                 </button>
