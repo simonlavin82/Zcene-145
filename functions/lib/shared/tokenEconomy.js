@@ -74,8 +74,8 @@ exports.TOP_UP_TIER_LIST = [
 exports.TOKEN_UNIT_GBP = 0.10;
 exports.GBP_TO_USD_RATE = 1.30;
 exports.TOKEN_UNIT_USD = 0.13;
-exports.TOP_UP_PRESET_QUANTITIES = [5, 10, 25];
-exports.MIN_TOP_UP_TOKENS = 5;
+exports.TOP_UP_PRESET_QUANTITIES = [50, 100, 150];
+exports.MIN_TOP_UP_TOKENS = 50;
 exports.MAX_TOP_UP_TOKENS = 1000;
 exports.ADMIN_GRANT_MAX_TOKENS = 10000;
 function formatGbpFromTokens(quantity) {

@@ -175,7 +175,7 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
 
   it('credits tokens via SimulatedStripeModal calling simulateStripeTopUpCallable with flexible quantity and waiver', async () => {
     const mockTopUp = vi.fn().mockResolvedValue({
-      data: { success: true, mode: 'simulated', tokenBalance: 45, addedTokens: 25, quantity: 25, amountGbp: 2.5, currency: 'GBP' },
+      data: { success: true, mode: 'simulated', tokenBalance: 170, addedTokens: 150, quantity: 150, amountGbp: 15, currency: 'GBP' },
     });
     mockHttpsCallable.mockReturnValue(mockTopUp);
     const onSuccess = vi.fn();
@@ -184,16 +184,16 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     render(
       <SimulatedStripeModal
         isOpen={true}
-        initialQuantity={10}
+        initialQuantity={100}
         currentBalance={20}
         onClose={onClose}
         onSuccess={onSuccess}
       />
     );
 
-    fireEvent.click(screen.getByTestId('topup-preset-25'));
+    fireEvent.click(screen.getByTestId('topup-preset-150'));
     expect(screen.getByTestId('stripe-sim-headline')).toHaveTextContent(
-      'Stripe Checkout Simulation — Confirm £2.50 Top-Up for 25 Tokens'
+      'Stripe Checkout Simulation — Confirm £15.00 Top-Up for 150 Tokens'
     );
 
     // Confirm button remains disabled until UK/EU immediate delivery waiver is checked
@@ -205,8 +205,8 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     fireEvent.click(confirmBtn);
 
     await waitFor(() => {
-      expect(mockTopUp).toHaveBeenCalledWith({ quantity: 25, waiverAccepted: true });
-      expect(onSuccess).toHaveBeenCalledWith(45, 25);
+      expect(mockTopUp).toHaveBeenCalledWith({ quantity: 150, waiverAccepted: true });
+      expect(onSuccess).toHaveBeenCalledWith(170, 150);
       expect(onClose).toHaveBeenCalled();
     });
   });

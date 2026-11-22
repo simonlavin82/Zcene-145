@@ -788,7 +788,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
     if (initialTierId && TOP_UP_TIERS[initialTierId]) {
       return TOP_UP_TIERS[initialTierId].tokens;
     }
-    return TOP_UP_PRESET_QUANTITIES[1]; // Default 10 Tokens
+    return TOP_UP_PRESET_QUANTITIES[1]; // Default 100 Tokens
   };
 
   const [quantityInput, setQuantityInput] = useState<string>(() => String(resolveDefaultQuantity()));
@@ -858,7 +858,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
   return (
     <ModalBackdrop className="z-[2200]" onClick={isProcessing ? undefined : onClose}>
       <ModalContainer data-testid="simulated-stripe-modal" className="max-w-md w-full">
-        <ModalHeader>
+        <ModalHeader className="shrink-0">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">bolt</span>
             <h3 className="text-lg font-medium text-white">Top Up Zcene Tokens</h3>
@@ -876,12 +876,15 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
           </button>
         </ModalHeader>
 
-        <div className="p-5 space-y-4 text-sm text-zinc-300">
-          {/* Flexible Preset Buttons (5T / 10T / 25T) */}
+        <ModalBody
+          data-testid="simulated-stripe-modal-body"
+          className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-4 sm:p-5 space-y-3.5 text-sm text-zinc-300"
+        >
+          {/* Flexible Preset Buttons (50T / 100T / 150T) */}
           <div className="grid grid-cols-3 gap-2.5">
             {TOP_UP_PRESET_QUANTITIES.map((presetQty) => {
               const isSelected = isValidQuantity && parsedQuantity === presetQty;
-              const isPopular = presetQty === 10;
+              const isPopular = presetQty === 100;
               return (
                 <button
                   key={presetQty}
@@ -912,7 +915,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
             })}
           </div>
 
-          {/* Custom Quantity Input (min: 5, integer) */}
+          {/* Custom Quantity Input (min: 50, integer) */}
           <div className="space-y-1.5">
             <label htmlFor="topup-custom-quantity" className="flex items-center justify-between text-xs text-zinc-400">
               <span>Custom token quantity</span>
@@ -934,7 +937,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
                   setErrorMsg(null);
                 }}
                 placeholder={`Min ${MIN_TOP_UP_TOKENS}`}
-                className="flex-1 h-[38px] rounded-xl bg-zinc-950 border border-zinc-800 px-3 text-sm font-mono text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary disabled:opacity-50"
+                className="flex-1 h-[38px] appearance-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none rounded-xl bg-zinc-950 border border-zinc-800 px-3 text-sm font-mono text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary disabled:opacity-50"
               />
               <div className="px-3 h-[38px] rounded-xl bg-zinc-900/80 border border-zinc-800 flex items-center font-mono text-xs text-white whitespace-nowrap" data-testid="topup-computed-price">
                 {isValidQuantity ? priceDisplay : '—'}
@@ -947,7 +950,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
             )}
           </div>
 
-          <div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-4 space-y-2.5">
+          <div className="bg-zinc-900/70 border border-zinc-800 rounded-xl p-3.5 space-y-2">
             <div className="text-xs font-medium text-white leading-relaxed" data-testid="stripe-sim-headline">
               {isValidQuantity
                 ? `Stripe Checkout Simulation — Confirm ${priceDisplay} Top-Up for ${parsedQuantity} Tokens`
@@ -972,7 +975,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
           </div>
 
           {/* Required UK/EU Digital Goods Immediate Delivery Waiver */}
-          <label className="flex items-start gap-2.5 p-3 rounded-xl bg-zinc-950/70 border border-zinc-800 cursor-pointer select-none">
+          <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-zinc-950/70 border border-zinc-800 cursor-pointer select-none">
             <input
               type="checkbox"
               data-testid="stripe-waiver-checkbox"
@@ -1001,9 +1004,9 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
               {errorMsg}
             </div>
           )}
-        </div>
+        </ModalBody>
 
-        <ModalFooter>
+        <ModalFooter className="shrink-0">
           <button
             type="button"
             disabled={isProcessing}

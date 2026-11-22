@@ -2576,7 +2576,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                     }}
                                     placeholder="Tokens"
                                     disabled={isGrantingTokens}
-                                    className={`md:col-span-2 h-[38px] bg-zinc-950 border border-zinc-800 px-3 text-sm font-mono text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary ${RADIUS_TOKENS.input}`}
+                                    className={`md:col-span-2 h-[38px] appearance-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none bg-zinc-950 border border-zinc-800 px-3 text-sm font-mono text-white placeholder:text-zinc-600 focus:outline-none focus:border-primary ${RADIUS_TOKENS.input}`}
                                 />
                                 <input
                                     type="text"

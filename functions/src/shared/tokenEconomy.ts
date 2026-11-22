@@ -82,8 +82,8 @@ export const TOKEN_UNIT_GBP = 0.10;
 export const GBP_TO_USD_RATE = 1.30;
 export const TOKEN_UNIT_USD = 0.13;
 
-export const TOP_UP_PRESET_QUANTITIES = [5, 10, 25] as const;
-export const MIN_TOP_UP_TOKENS = 5;
+export const TOP_UP_PRESET_QUANTITIES = [50, 100, 150] as const;
+export const MIN_TOP_UP_TOKENS = 50;
 export const MAX_TOP_UP_TOKENS = 1000;
 export const ADMIN_GRANT_MAX_TOKENS = 10000;
 

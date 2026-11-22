@@ -53,19 +53,19 @@ describe('Phase 2 (v46.1): Admin Token Grant UI, Flexible Simulation Top-Up Moda
     mockGetDocs.mockResolvedValue({ docs: [] });
   });
 
-  it('exports Phase 2 flexible top-up presets [5, 10, 25], bounds, and GBP formatter at £0.10/T', () => {
-    expect(TOP_UP_PRESET_QUANTITIES).toEqual([5, 10, 25]);
-    expect(MIN_TOP_UP_TOKENS).toBe(5);
+  it('exports Phase 2 flexible top-up presets [50, 100, 150], bounds (min 50), and GBP formatter at £0.10/T', () => {
+    expect(TOP_UP_PRESET_QUANTITIES).toEqual([50, 100, 150]);
+    expect(MIN_TOP_UP_TOKENS).toBe(50);
     expect(MAX_TOP_UP_TOKENS).toBe(1000);
     expect(ADMIN_GRANT_MAX_TOKENS).toBe(10000);
-    expect(formatGbpFromTokens(5)).toBe('£0.50');
-    expect(formatGbpFromTokens(10)).toBe('£1.00');
-    expect(formatGbpFromTokens(25)).toBe('£2.50');
+    expect(formatGbpFromTokens(50)).toBe('£5.00');
+    expect(formatGbpFromTokens(100)).toBe('£10.00');
+    expect(formatGbpFromTokens(150)).toBe('£15.00');
   });
 
-  it('SimulatedStripeModal supports presets (5, 10, 25), custom integer validation (min 5), and requires UK/EU waiver before confirm', async () => {
+  it('SimulatedStripeModal supports presets (50, 100, 150), scrollable body, spinnerless input, custom integer validation (min 50), and requires UK/EU waiver before confirm', async () => {
     const mockTopUp = vi.fn().mockResolvedValue({
-      data: { success: true, mode: 'simulated', tokenBalance: 47, addedTokens: 37, quantity: 37, amountGbp: 3.7, currency: 'GBP' },
+      data: { success: true, mode: 'simulated', tokenBalance: 85, addedTokens: 75, quantity: 75, amountGbp: 7.5, currency: 'GBP' },
     });
     mockHttpsCallable.mockReturnValue(mockTopUp);
     const onSuccess = vi.fn();
@@ -80,10 +80,15 @@ describe('Phase 2 (v46.1): Admin Token Grant UI, Flexible Simulation Top-Up Moda
       />
     );
 
-    // Preset buttons exist
-    expect(screen.getByTestId('topup-preset-5')).toHaveTextContent('£0.50');
-    expect(screen.getByTestId('topup-preset-10')).toHaveTextContent('£1.00');
-    expect(screen.getByTestId('topup-preset-25')).toHaveTextContent('£2.50');
+    // Scrollable ModalBody prevents CTA clipping on 13-inch laptop viewports
+    const modalBody = screen.getByTestId('simulated-stripe-modal-body');
+    expect(modalBody).toHaveClass('flex-1', 'min-h-0', 'overflow-y-auto');
+
+    // Preset buttons exist and 100T (£10.00) carries the Popular badge
+    expect(screen.getByTestId('topup-preset-50')).toHaveTextContent('£5.00');
+    expect(screen.getByTestId('topup-preset-100')).toHaveTextContent('£10.00');
+    expect(screen.getByTestId('topup-preset-100')).toHaveTextContent('Popular');
+    expect(screen.getByTestId('topup-preset-150')).toHaveTextContent('£15.00');
 
     // Waiver starts unchecked -> Confirm button disabled
     const waiverCheckbox = screen.getByTestId('stripe-waiver-checkbox') as HTMLInputElement;
@@ -96,23 +101,28 @@ describe('Phase 2 (v46.1): Admin Token Grant UI, Flexible Simulation Top-Up Moda
     expect(termsLink).toHaveAttribute('href', '/terms');
     expect(termsLink).toHaveAttribute('target', '_blank');
 
-    // Custom quantity below min 5 shows validation error and keeps Confirm disabled even when waiver checked
+    // Custom quantity input strips native number spinners
+    const customInput = screen.getByTestId('topup-custom-quantity');
+    expect(customInput.className).toContain('[appearance:textfield]');
+    expect(customInput.className).toContain('[&::-webkit-inner-spin-button]:appearance-none');
+    expect(customInput.className).toContain('[&::-webkit-outer-spin-button]:appearance-none');
+
+    // Custom quantity below min 50 shows validation error and keeps Confirm disabled even when waiver checked
     fireEvent.click(waiverCheckbox);
     expect(waiverCheckbox.checked).toBe(true);
-    const customInput = screen.getByTestId('topup-custom-quantity');
-    fireEvent.change(customInput, { target: { value: '3' } });
+    fireEvent.change(customInput, { target: { value: '49' } });
     expect(screen.getByTestId('topup-quantity-error')).toBeInTheDocument();
     expect(confirmBtn).toBeDisabled();
 
-    // Valid custom integer (37T -> £3.70) enables Confirm and calls simulateStripeTopUpCallable
-    fireEvent.change(customInput, { target: { value: '37' } });
-    expect(screen.getByTestId('topup-computed-price')).toHaveTextContent('£3.70');
+    // Valid custom integer (75T -> £7.50) enables Confirm and calls simulateStripeTopUpCallable
+    fireEvent.change(customInput, { target: { value: '75' } });
+    expect(screen.getByTestId('topup-computed-price')).toHaveTextContent('£7.50');
     expect(confirmBtn).not.toBeDisabled();
 
     fireEvent.click(confirmBtn);
     await waitFor(() => {
-      expect(mockTopUp).toHaveBeenCalledWith({ quantity: 37, waiverAccepted: true });
-      expect(onSuccess).toHaveBeenCalledWith(47, 37);
+      expect(mockTopUp).toHaveBeenCalledWith({ quantity: 75, waiverAccepted: true });
+      expect(onSuccess).toHaveBeenCalledWith(85, 75);
       expect(onClose).toHaveBeenCalled();
     });
   });
@@ -175,8 +185,13 @@ describe('Phase 2 (v46.1): Admin Token Grant UI, Flexible Simulation Top-Up Moda
 
     expect(screen.getByTestId('admin-token-grant-card')).toBeInTheDocument();
 
+    const adminGrantAmountInput = screen.getByTestId('admin-grant-amount');
+    expect(adminGrantAmountInput.className).toContain('[appearance:textfield]');
+    expect(adminGrantAmountInput.className).toContain('[&::-webkit-inner-spin-button]:appearance-none');
+    expect(adminGrantAmountInput.className).toContain('[&::-webkit-outer-spin-button]:appearance-none');
+
     fireEvent.change(screen.getByTestId('admin-grant-email'), { target: { value: 'fan@example.com' } });
-    fireEvent.change(screen.getByTestId('admin-grant-amount'), { target: { value: '20' } });
+    fireEvent.change(adminGrantAmountInput, { target: { value: '20' } });
     fireEvent.change(screen.getByTestId('admin-grant-reason'), { target: { value: 'Goodwill credit' } });
     fireEvent.click(screen.getByTestId('admin-grant-submit'));
 

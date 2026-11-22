@@ -254,32 +254,32 @@ describe('Phase 2 Backend: adminGrantTokens & Flexible Simulated Top-Up', () => 
     it('blocks non-admin callers and blocks even admin when ALLOW_SIMULATED_TOPUP !== "true"', async () => {
       process.env.ALLOW_SIMULATED_TOPUP = 'true';
       await expect(
-        executeSimulatedStripeTopUp(standardCaller, { quantity: 10, waiverAccepted: true })
+        executeSimulatedStripeTopUp(standardCaller, { quantity: 100, waiverAccepted: true })
       ).rejects.toMatchObject({ code: 'permission-denied' });
 
       delete process.env.ALLOW_SIMULATED_TOPUP;
       await expect(
-        executeSimulatedStripeTopUp(adminCaller, { quantity: 10, waiverAccepted: true })
+        executeSimulatedStripeTopUp(adminCaller, { quantity: 100, waiverAccepted: true })
       ).rejects.toMatchObject({ code: 'permission-denied' });
     });
 
-    it('enforces min 5 integer quantity and required waiverAccepted === true for flexible top-ups', async () => {
+    it('enforces min 50 integer quantity and required waiverAccepted === true for flexible top-ups', async () => {
       process.env.ALLOW_SIMULATED_TOPUP = 'true';
 
       await expect(
-        executeSimulatedStripeTopUp(adminCaller, { quantity: 4, waiverAccepted: true })
+        executeSimulatedStripeTopUp(adminCaller, { quantity: 49, waiverAccepted: true })
       ).rejects.toMatchObject({ code: 'invalid-argument' });
 
       await expect(
-        executeSimulatedStripeTopUp(adminCaller, { quantity: 12.5, waiverAccepted: true })
+        executeSimulatedStripeTopUp(adminCaller, { quantity: 75.5, waiverAccepted: true })
       ).rejects.toMatchObject({ code: 'invalid-argument' });
 
       await expect(
-        executeSimulatedStripeTopUp(adminCaller, { quantity: 10, waiverAccepted: false })
+        executeSimulatedStripeTopUp(adminCaller, { quantity: 100, waiverAccepted: false })
       ).rejects.toMatchObject({ code: 'failed-precondition' });
     });
 
-    it('credits flexible quantity (e.g. 25T = £2.50) atomically and returns Stripe-ready payload', async () => {
+    it('credits flexible quantity (e.g. 75T = £7.50) atomically and returns Stripe-ready payload', async () => {
       process.env.ALLOW_SIMULATED_TOPUP = 'true';
       store.set(`users/${ADMIN_UID}`, {
         email: ADMIN_EMAIL,
@@ -289,7 +289,7 @@ describe('Phase 2 Backend: adminGrantTokens & Flexible Simulated Top-Up', () => 
       });
 
       const res = await executeSimulatedStripeTopUp(adminCaller, {
-        quantity: 25,
+        quantity: 75,
         waiverAccepted: true,
       });
 
@@ -297,14 +297,14 @@ describe('Phase 2 Backend: adminGrantTokens & Flexible Simulated Top-Up', () => 
         success: true,
         mode: 'simulated',
         currency: 'GBP',
-        tokenBalance: 35,
-        addedTokens: 25,
-        quantity: 25,
-        amountGbp: 2.5,
+        tokenBalance: 85,
+        addedTokens: 75,
+        quantity: 75,
+        amountGbp: 7.5,
       });
 
-      expect(store.get(`users/${ADMIN_UID}`)?.tokenBalance).toBe(35);
-      expect(store.get(`users/${ADMIN_UID}`)?.lifetimeTokensPurchased).toBe(35);
+      expect(store.get(`users/${ADMIN_UID}`)?.tokenBalance).toBe(85);
+      expect(store.get(`users/${ADMIN_UID}`)?.lifetimeTokensPurchased).toBe(85);
     });
   });
 });

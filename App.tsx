@@ -1135,7 +1135,7 @@ const App: React.FC = () => {
       const customEvent = e as CustomEvent<{ quantity?: number; tierId?: TokenTopUpTierId }>;
       setSimulatedStripeModal({
         isOpen: true,
-        initialQuantity: customEvent?.detail?.quantity ?? (customEvent?.detail?.tierId ? null : 10),
+        initialQuantity: customEvent?.detail?.quantity ?? (customEvent?.detail?.tierId ? null : 100),
         initialTierId: customEvent?.detail?.tierId || null,
       });
     };

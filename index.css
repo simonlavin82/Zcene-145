@@ -67,6 +67,18 @@
     display: none !important;
   }
 
+  /* Hide native OS number input spinners across Chromium, Safari, and Firefox */
+  input[type="number"]::-webkit-inner-spin-button,
+  input[type="number"]::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    appearance: none;
+    margin: 0;
+  }
+  input[type="number"] {
+    -moz-appearance: textfield;
+    appearance: textfield;
+  }
+
   /* Fix awkward hard crops for placeholders */
   input::placeholder {
     text-overflow: ellipsis;
