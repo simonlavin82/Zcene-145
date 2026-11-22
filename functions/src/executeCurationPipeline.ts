@@ -45,6 +45,8 @@ import {
   refundProjectSettlementOnError,
   updateCurationLockJobId,
   releaseCurationLock,
+  computeApiUsageCostUsd,
+  recordCurationFailureAudit,
   ENFORCE_APP_CHECK,
 } from "./tokenWallet";
 
@@ -656,6 +658,8 @@ export const executeCurationPipeline = onCall({
     seedArtist: batchDisplaySeeds,
   });
 
+  let collectedTokens: Record<string, any> = {};
+
   try {
   const shouldDeferToWorker = payload.deferPhase1ToWorker === true || isUpfrontBatch;
 
@@ -663,7 +667,6 @@ export const executeCurationPipeline = onCall({
   let resolvedSeedArray: any[] = [];
   let seedStubs: Record<string, any> = {};
   let determinedGenerationType: any = "Root Generation";
-  let collectedTokens: Record<string, any> = {};
 
   if (!shouldDeferToWorker) {
     const topoResult = await resolveSceneTopologyBackend({
@@ -926,13 +929,30 @@ export const executeCurationPipeline = onCall({
       tokensSpent: settlement.tokensSpent,
       tokenBalance: settlement.tokenBalance,
   };
-  } catch (pipelineErr) {
+  } catch (pipelineErr: any) {
+    const { costUsd: sunkCostUsd } = computeApiUsageCostUsd(collectedTokens);
     await releaseCurationLock(caller.uid, settlement.curationSessionId);
-    await refundProjectSettlementOnError({
+    const refundOutcome = await refundProjectSettlementOnError({
       uid: caller.uid,
       projectId: payload.projectId,
       curationSessionId: settlement.curationSessionId,
       reason: "Column 2 Topology Pipeline Error",
+      sunkCostUsd,
+      sunkApiUsage: collectedTokens,
+    });
+    await recordCurationFailureAudit({
+      source: "column2_error",
+      uid: caller.uid,
+      userEmail: caller.email,
+      projectId: payload.projectId || null,
+      projectName: batchDisplaySeeds || null,
+      curationSessionId: settlement.curationSessionId,
+      sceneId: targetSceneId,
+      tokensRefunded: refundOutcome.refundedTokens,
+      isFullRefund: refundOutcome.isFullRefund,
+      reason: "Column 2 Topology Pipeline Error",
+      errorMessage: pipelineErr?.message || String(pipelineErr),
+      sunkApiUsage: collectedTokens,
     });
     throw pipelineErr;
   }

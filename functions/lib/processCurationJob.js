@@ -253,20 +253,34 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
         .map((a) => a.trim())
         .filter(Boolean);
     let isAllScenesDirectHitBatch = false;
+    const collectedTokens = {};
+    const usageCollector = {
+        push: (model, usage) => {
+            if (!collectedTokens[model])
+                collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+            collectedTokens[model].prompt += usage.promptTokenCount;
+            collectedTokens[model].candidates += usage.candidatesTokenCount;
+            collectedTokens[model].total += usage.totalTokenCount;
+        }
+    };
+    const checkpointPartialApiUsage = async () => {
+        try {
+            const mergedPartial = (0, tokenWallet_1.mergeApiUsageMaps)(inputPayload?.foregroundApiUsage, collectedTokens);
+            if (Object.keys(mergedPartial).length > 0) {
+                await jobDocRef.set({
+                    partialApiUsage: mergedPartial,
+                    updatedAt: firestore_2.FieldValue.serverTimestamp(),
+                }, { merge: true });
+            }
+        }
+        catch {
+            // Non-fatal checkpoint
+        }
+    };
     try {
         console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
         let result = null;
         let nextChainedJobId = null;
-        const collectedTokens = {};
-        const usageCollector = {
-            push: (model, usage) => {
-                if (!collectedTokens[model])
-                    collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
-                collectedTokens[model].prompt += usage.promptTokenCount;
-                collectedTokens[model].candidates += usage.candidatesTokenCount;
-                collectedTokens[model].total += usage.totalTokenCount;
-            }
-        };
         let existingProjectCanvasLayout;
         if (inputPayload?.canvasLayout) {
             try {
@@ -827,6 +841,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             existingProjectDetailsMap.set(k, v);
                         }
                     }
+                    await checkpointPartialApiUsage();
                 }
                 // Structural Integrity Guard: Verify that we have a valid, rich graph
                 const artistNodesCount = finalGraph?.nodes?.filter((n) => n.type === 'artist' || !n.type).length || 0;
@@ -1385,6 +1400,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         }
                     }
                 }
+                await checkpointPartialApiUsage();
                 let rootBreakdownStr = "";
                 const sceneArtistSnippetsMap = {};
                 try {
@@ -2931,6 +2947,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
         // Unified error messaging using the shared errorTranslationLayer
         const translatedError = (0, errorTranslationLayer_1.translateError)(error);
         const hasCompletedScenes = existingProjectScenes.some((s) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+        const totalSunkApiUsage = (0, tokenWallet_1.mergeApiUsageMaps)(jobData?.inputPayload?.foregroundApiUsage, collectedTokens);
+        const { costUsd: sunkCostUsd } = (0, tokenWallet_1.computeApiUsageCostUsd)(totalSunkApiUsage);
+        let refundOutcome = { refundedTokens: 0, isFullRefund: !hasCompletedScenes };
         if (jobData?.userId && jobData?.inputPayload?.curationSessionId) {
             // Sum costs across ALL remaining uncurated scenes (target + any queued scenes that won't run)
             const uncompletedScenesRefundCost = (0, tokenWallet_1.computeUncompletedScenesRefundCost)({
@@ -2939,15 +2958,31 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 fallbackArtists: artistList,
                 fallbackFilters: jobData?.inputPayload?.filters,
             });
-            await (0, tokenWallet_1.refundProjectSettlementOnError)({
+            refundOutcome = await (0, tokenWallet_1.refundProjectSettlementOnError)({
                 uid: jobData.userId,
                 projectId: jobData.inputPayload?.projectId,
                 curationSessionId: jobData.inputPayload.curationSessionId,
                 refundAmountOverride: uncompletedScenesRefundCost,
                 reason: `Column 3 Worker Failure for scene ${targetSceneId}`,
+                sunkCostUsd,
+                sunkApiUsage: totalSunkApiUsage,
             });
         }
         if (jobData?.userId) {
+            await (0, tokenWallet_1.recordCurationFailureAudit)({
+                source: "column3_worker_error",
+                uid: jobData.userId,
+                projectId: jobData.inputPayload?.projectId || null,
+                projectName: jobData.inputPayload?.projectName || artistList.join(", ") || null,
+                jobId,
+                curationSessionId: jobData.inputPayload?.curationSessionId || null,
+                sceneId: targetSceneId,
+                tokensRefunded: refundOutcome.refundedTokens,
+                isFullRefund: refundOutcome.isFullRefund,
+                reason: `Column 3 Worker Failure for scene ${targetSceneId}`,
+                errorMessage: translatedError.userFriendlyMessage,
+                sunkApiUsage: totalSunkApiUsage,
+            });
             await (0, tokenWallet_1.releaseCurationLock)(jobData.userId, jobData?.inputPayload?.curationSessionId);
         }
         await jobDocRef.update({

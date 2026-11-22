@@ -12,6 +12,9 @@ exports.recordPreFlightApiUsage = recordPreFlightApiUsage;
 exports.updateCurationLockJobId = updateCurationLockJobId;
 exports.refreshCurationLock = refreshCurationLock;
 exports.releaseCurationLock = releaseCurationLock;
+exports.mergeApiUsageMaps = mergeApiUsageMaps;
+exports.computeApiUsageCostUsd = computeApiUsageCostUsd;
+exports.recordCurationFailureAudit = recordCurationFailureAudit;
 exports.recoverStaleCurationLock = recoverStaleCurationLock;
 exports.settleCurationProjectTokens = settleCurationProjectTokens;
 exports.refundProjectSettlementOnError = refundProjectSettlementOnError;
@@ -502,6 +505,133 @@ async function releaseCurationLock(uid, curationSessionId) {
         console.warn(`[CurationLock] Failed to release lock for uid=${uid}:`, err?.message || err);
     }
 }
+function mergeApiUsageMaps(...maps) {
+    const merged = {};
+    for (const map of maps) {
+        if (!map || typeof map !== "object")
+            continue;
+        for (const [model, rawUsage] of Object.entries(map)) {
+            if (!rawUsage || typeof rawUsage !== "object")
+                continue;
+            const u = rawUsage;
+            const prompt = Math.max(0, Number(u.prompt ?? u.promptTokenCount ?? 0) || 0);
+            const candidates = Math.max(0, Number(u.candidates ?? u.candidatesTokenCount ?? 0) || 0);
+            const total = Math.max(prompt + candidates, Number(u.total ?? u.totalTokenCount ?? 0) || 0);
+            if (prompt === 0 && candidates === 0 && total === 0)
+                continue;
+            if (!merged[model]) {
+                merged[model] = { prompt: 0, candidates: 0, total: 0 };
+            }
+            merged[model].prompt += prompt;
+            merged[model].candidates += candidates;
+            merged[model].total += total;
+        }
+    }
+    return merged;
+}
+function computeApiUsageCostUsd(apiUsage) {
+    if (!apiUsage || typeof apiUsage !== "object") {
+        return { costUsd: 0, totalTokens: 0 };
+    }
+    let costUsd = 0;
+    let totalTokens = 0;
+    for (const [model, usage] of Object.entries(apiUsage)) {
+        if (!usage || typeof usage !== "object")
+            continue;
+        const u = usage;
+        const prompt = Math.max(0, Number(u.prompt ?? u.promptTokenCount ?? 0) || 0);
+        const candidates = Math.max(0, Number(u.candidates ?? u.candidatesTokenCount ?? 0) || 0);
+        const total = Math.max(prompt + candidates, Number(u.total ?? u.totalTokenCount ?? 0) || 0);
+        const reasoningTokens = Math.max(0, total - (prompt + candidates));
+        totalTokens += total;
+        if (model.includes("gemini-3.1-pro") || model.includes("gemini-1.5-pro")) {
+            if (prompt > 128000) {
+                costUsd += (prompt / 1_000_000) * 7.00 + ((candidates + reasoningTokens) / 1_000_000) * 21.00;
+            }
+            else {
+                costUsd += (prompt / 1_000_000) * 3.50 + ((candidates + reasoningTokens) / 1_000_000) * 10.50;
+            }
+        }
+        else {
+            costUsd += (prompt / 1_000_000) * 1.50 + ((candidates + reasoningTokens) / 1_000_000) * 7.50;
+        }
+    }
+    return {
+        costUsd: Number(costUsd.toFixed(4)),
+        totalTokens,
+    };
+}
+/**
+ * Writes an idempotent permanent failure + sunk API cost receipt to adminLedger/system/curationFailures/{docId}.
+ * Keyed deterministically by curationSessionId (or jobId) so retries or duplicate reaper sweeps never double-count sunk USD.
+ */
+async function recordCurationFailureAudit(params) {
+    const { source, uid, projectId, jobId, curationSessionId, sceneId, tokensRefunded, isFullRefund, reason, errorMessage, } = params;
+    if (!uid)
+        return null;
+    const cleanSunkUsage = mergeApiUsageMaps(params.sunkApiUsage);
+    const { costUsd: sunkCostUsd, totalTokens: sunkTotalTokens } = computeApiUsageCostUsd(cleanSunkUsage);
+    const rawKey = (curationSessionId || jobId || `${uid}_${Date.now()}`).toString().trim();
+    const safeDocId = rawKey.replace(/[^a-zA-Z0-9_-]/g, "_").slice(0, 120) || `fail_${Date.now()}`;
+    let resolvedEmail = typeof params.userEmail === "string" && params.userEmail.trim() ? params.userEmail.trim() : null;
+    if (!resolvedEmail) {
+        try {
+            const userSnap = await db.collection("users").doc(uid).get();
+            if (userSnap.exists) {
+                const uEmail = userSnap.data()?.email;
+                if (typeof uEmail === "string" && uEmail.trim()) {
+                    resolvedEmail = uEmail.trim();
+                }
+            }
+        }
+        catch {
+            // Non-fatal
+        }
+    }
+    const failureRef = db
+        .collection("adminLedger")
+        .doc("system")
+        .collection("curationFailures")
+        .doc(safeDocId);
+    try {
+        await db.runTransaction(async (tx) => {
+            const existingSnap = await tx.get(failureRef);
+            const existing = existingSnap.exists ? existingSnap.data() || {} : null;
+            // Preserve the higher sunk cost / refunded tokens if both worker crash and reaper touch the same session
+            const existingCost = Number(existing?.sunkCostUsd) || 0;
+            const existingTotalTokens = Number(existing?.sunkTotalTokens) || 0;
+            const existingRefunded = Number(existing?.tokensRefunded) || 0;
+            const nextRefunded = Math.max(existingRefunded, Math.max(0, Math.floor(Number(tokensRefunded) || 0)));
+            const useIncomingUsage = !existing || sunkCostUsd > existingCost || sunkTotalTokens > existingTotalTokens;
+            tx.set(failureRef, {
+                eventId: safeDocId,
+                source: existing?.source || source,
+                uid,
+                userEmail: resolvedEmail || existing?.userEmail || null,
+                projectId: projectId || existing?.projectId || null,
+                projectName: params.projectName || existing?.projectName || null,
+                jobId: jobId || existing?.jobId || null,
+                curationSessionId: curationSessionId || existing?.curationSessionId || null,
+                sceneId: sceneId || existing?.sceneId || null,
+                tokensRefunded: nextRefunded,
+                isFullRefund: Boolean(existing?.isFullRefund || isFullRefund),
+                reason: existing?.reason || reason,
+                errorMessage: errorMessage || existing?.errorMessage || null,
+                sunkApiUsage: useIncomingUsage ? cleanSunkUsage : (existing?.sunkApiUsage || {}),
+                sunkTotalTokens: useIncomingUsage ? sunkTotalTokens : existingTotalTokens,
+                sunkCostUsd: useIncomingUsage ? sunkCostUsd : existingCost,
+                occurredAtMs: typeof existing?.occurredAtMs === "number" ? existing.occurredAtMs : Date.now(),
+                createdAt: existing?.createdAt || firestore_1.FieldValue.serverTimestamp(),
+                updatedAt: firestore_1.FieldValue.serverTimestamp(),
+            }, { merge: true });
+        });
+        return safeDocId;
+    }
+    catch (err) {
+        console.warn(`[AdminLedger] Non-fatal failed to record curationFailure ${safeDocId}:`, err?.message || err);
+        return null;
+    }
+}
 async function recoverStaleCurationLock(lockData, options) {
     const { uid, jobId, projectId, curationSessionId } = lockData || {};
     if (!uid)
@@ -511,11 +641,17 @@ async function recoverStaleCurationLock(lockData, options) {
     const timeoutMessage = "Curation timed out and spent tokens were automatically refunded.";
     try {
         let jobAlreadyCompleted = false;
+        let recoveredSunkApiUsage = {};
+        let recoveredSceneId = null;
+        let recoveredProjectName = null;
         if (jobId) {
             const jobRef = db.collection("curationJobs").doc(jobId);
             const jobSnap = await jobRef.get();
             if (jobSnap.exists) {
                 const jData = jobSnap.data() || {};
+                recoveredSunkApiUsage = mergeApiUsageMaps(jData.inputPayload?.foregroundApiUsage, jData.partialApiUsage);
+                recoveredSceneId = jData.inputPayload?.targetSceneId || jData.inputPayload?.activeSceneId || null;
+                recoveredProjectName = jData.inputPayload?.projectName || jData.inputPayload?.artists || null;
                 if (jData.status === "completed") {
                     jobAlreadyCompleted = true;
                 }
@@ -539,6 +675,12 @@ async function recoverStaleCurationLock(lockData, options) {
                 const projSnap = await projectRef.get();
                 if (projSnap.exists) {
                     const pData = projSnap.data() || {};
+                    if (typeof pData.name === "string" && pData.name.trim()) {
+                        recoveredProjectName = pData.name.trim();
+                    }
+                    if (!recoveredSceneId && typeof pData.activeSceneId === "string") {
+                        recoveredSceneId = pData.activeSceneId;
+                    }
                     const scenes = (0, multiSceneUtils_1.parseProjectScenes)(pData.scenes);
                     hasCompletedScenes = scenes.some((s) => s?.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
                     refundAmountOverride = computeUncompletedScenesRefundCost({
@@ -560,16 +702,34 @@ async function recoverStaleCurationLock(lockData, options) {
                         }, { merge: true });
                 }
             }
+            const { costUsd: recoveredSunkCostUsd } = computeApiUsageCostUsd(recoveredSunkApiUsage);
+            let refundOutcome = { refundedTokens: 0, isFullRefund: !hasCompletedScenes };
             if (curationSessionId) {
-                await refundProjectSettlementOnError({
+                refundOutcome = await refundProjectSettlementOnError({
                     uid,
                     projectId: projectId || undefined,
                     curationSessionId,
                     refundAmountOverride,
                     reason: "Stale Curation Timeout Auto-Refund",
+                    sunkCostUsd: recoveredSunkCostUsd,
+                    sunkApiUsage: recoveredSunkApiUsage,
                 });
                 refunded = true;
             }
+            await recordCurationFailureAudit({
+                source: "stale_reaper",
+                uid,
+                projectId: projectId || null,
+                projectName: recoveredProjectName,
+                jobId: jobId || null,
+                curationSessionId: curationSessionId || null,
+                sceneId: recoveredSceneId,
+                tokensRefunded: refundOutcome.refundedTokens,
+                isFullRefund: refundOutcome.isFullRefund,
+                reason: "Stale Curation Timeout Auto-Refund",
+                errorMessage: timeoutMessage,
+                sunkApiUsage: recoveredSunkApiUsage,
+            });
         }
         if (options?.deleteLockIfMatching) {
             await releaseCurationLock(uid, curationSessionId || undefined);
@@ -773,15 +933,16 @@ async function settleCurationProjectTokens(params) {
  * Preserves the non-refundable 1-Token Pre-Flight Flash Lookup Fee.
  */
 async function refundProjectSettlementOnError(params) {
-    const { uid, projectId, curationSessionId, refundAmountOverride, reason } = params;
+    const { uid, projectId, curationSessionId, refundAmountOverride, reason, sunkCostUsd, sunkApiUsage } = params;
     if (!uid || !curationSessionId)
-        return;
+        return { refundedTokens: 0, isFullRefund: false };
     const userRef = db.collection("users").doc(uid);
     const sessionRef = db.collection("curationSessions").doc(curationSessionId);
     const txRef = userRef.collection("tokenTransactions").doc();
     const projectRef = projectId
         ? db.collection("users").doc(uid).collection("projects").doc(projectId)
         : null;
+    let outcome = { refundedTokens: 0, isFullRefund: false };
     try {
         await db.runTransaction(async (tx) => {
             const [userSnap, sessionSnap, projectSnap] = await Promise.all([
@@ -804,6 +965,7 @@ async function refundProjectSettlementOnError(params) {
                 return;
             const newRefundedTotal = alreadyRefunded + refundAmount;
             const isFullRefund = newRefundedTotal >= fullSettlementAmount;
+            outcome = { refundedTokens: refundAmount, isFullRefund };
             tx.update(sessionRef, {
                 status: isFullRefund ? "refunded_settlement" : "partially_refunded_settlement",
                 settlementTokensRefunded: newRefundedTotal,
@@ -819,6 +981,10 @@ async function refundProjectSettlementOnError(params) {
                     lifetimeTokensSpent: Math.max(0, prevSpent - refundAmount),
                     updatedAt: firestore_1.FieldValue.serverTimestamp(),
                 });
+                const cleanSunkUsage = sunkApiUsage && Object.keys(sunkApiUsage).length > 0 ? sunkApiUsage : undefined;
+                const cleanSunkCost = typeof sunkCostUsd === "number" && Number.isFinite(sunkCostUsd) && sunkCostUsd > 0
+                    ? Number(sunkCostUsd.toFixed(4))
+                    : undefined;
                 tx.set(txRef, {
                     id: txRef.id,
                     uid,
@@ -827,6 +993,8 @@ async function refundProjectSettlementOnError(params) {
                     balanceAfter: newBalance,
                     ...(projectId ? { projectId } : {}),
                     curationSessionId,
+                    ...(cleanSunkCost !== undefined ? { sunkCostUsd: cleanSunkCost } : {}),
+                    ...(cleanSunkUsage ? { sunkApiUsage: cleanSunkUsage } : {}),
                     description: `Automatic Refund (${isFullRefund ? "Full" : "Partial"} Synthesis Error${reason ? `: ${reason}` : ""})`,
                     createdAt: firestore_1.FieldValue.serverTimestamp(),
                 });
@@ -846,6 +1014,7 @@ async function refundProjectSettlementOnError(params) {
     catch (err) {
         console.error(`[TokenWallet] Failed to refund settlement for session ${curationSessionId}:`, err);
     }
+    return outcome;
 }
 /**
  * Column 1 Direct Hit Settlement Callable (Rule 20, Rule 43 & Rule 44).

@@ -362,6 +362,8 @@ export interface TokenTransaction {
   curationSessionId?: string;
   reason?: string;
   grantedBy?: string;
+  sunkCostUsd?: number;
+  sunkApiUsage?: Record<string, any>;
   description: string;
   timestamp?: any;
   createdAt?: any;

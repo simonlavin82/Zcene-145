@@ -166,6 +166,9 @@ import {
   releaseCurationLock,
   recoverStaleCurationLock,
   requireAuthenticatedCaller,
+  mergeApiUsageMaps,
+  computeApiUsageCostUsd,
+  recordCurationFailureAudit,
 } from '../src/tokenWallet';
 import { ADMIN_EMAIL, ADMIN_UID } from '../src/shared/tokenEconomy';
 
@@ -415,6 +418,92 @@ describe('Phase 1 Backend Atomic 1-at-a-Time Curation Lock, Stale-Job Safety Val
     expect(settlement.tokensSpent).toBe(5);
     expect(settlement.projectTokensSpent).toBe(10);
     expect(store.get('users/user-cum/projects/proj-cum')?.tokensSpent).toBe(10);
+  });
+
+  it('captures checkpointed partialApiUsage + foregroundApiUsage on stale-reaper timeout into adminLedger/system/curationFailures and refund tx idempotently', async () => {
+    store.set('users/user-sunk', { email: 'sunk@test.com', tokenBalance: 40, lifetimeTokensSpent: 10 });
+    store.set('curationSessions/sess-sunk', {
+      sessionId: 'sess-sunk',
+      uid: 'user-sunk',
+      status: 'settled',
+      preFlightTokensDeducted: 1,
+      settlementTokensDeducted: 4,
+      projectId: 'proj-sunk',
+    });
+    store.set('users/user-sunk/projects/proj-sunk', {
+      name: 'Fugazi',
+      status: 'curating',
+      activeJobId: 'job-sunk',
+      tokensSpent: 5,
+      scenes: JSON.stringify([{ sceneId: 'scene-1', seedArtists: 'Fugazi', graphData: { nodes: [], links: [] } }]),
+    });
+    store.set('curationJobs/job-sunk', {
+      status: 'processing',
+      userId: 'user-sunk',
+      inputPayload: {
+        projectId: 'proj-sunk',
+        projectName: 'Fugazi',
+        targetSceneId: 'scene-1',
+        curationSessionId: 'sess-sunk',
+        foregroundApiUsage: {
+          'gemini-3.1-pro-preview': { prompt: 10_000, candidates: 2_000, total: 12_000 },
+        },
+      },
+      partialApiUsage: {
+        'gemini-3.6-flash': { prompt: 20_000, candidates: 4_000, total: 24_000 },
+      },
+    });
+
+    // Verify helper math directly
+    const merged = mergeApiUsageMaps(
+      { 'gemini-3.1-pro-preview': { prompt: 10_000, candidates: 2_000, total: 12_000 } },
+      { 'gemini-3.6-flash': { prompt: 20_000, candidates: 4_000, total: 24_000 } }
+    );
+    const computed = computeApiUsageCostUsd(merged);
+    // Pro: (10k/1M)*3.5 + (2k/1M)*10.5 = 0.035 + 0.021 = 0.056
+    // Flash: (20k/1M)*1.5 + (4k/1M)*7.5 = 0.030 + 0.030 = 0.060 -> total = 0.116
+    expect(computed.costUsd).toBeCloseTo(0.116, 4);
+    expect(computed.totalTokens).toBe(36_000);
+
+    await recoverStaleCurationLock({
+      uid: 'user-sunk',
+      jobId: 'job-sunk',
+      projectId: 'proj-sunk',
+      curationSessionId: 'sess-sunk',
+    });
+
+    const failureDoc = store.get('adminLedger/system/curationFailures/sess-sunk');
+    expect(failureDoc).toBeDefined();
+    expect(failureDoc?.source).toBe('stale_reaper');
+    expect(failureDoc?.uid).toBe('user-sunk');
+    expect(failureDoc?.userEmail).toBe('sunk@test.com');
+    expect(failureDoc?.projectName).toBe('Fugazi');
+    expect(failureDoc?.tokensRefunded).toBe(4);
+    expect(failureDoc?.isFullRefund).toBe(true);
+    expect(failureDoc?.sunkTotalTokens).toBe(36_000);
+    expect(failureDoc?.sunkCostUsd).toBeCloseTo(0.116, 4);
+
+    // Verify refund_pipeline_error tx also carries sunkCostUsd
+    const txEntries = Array.from(store.entries()).filter(([k]) =>
+      k.startsWith('users/user-sunk/tokenTransactions/')
+    );
+    expect(txEntries).toHaveLength(1);
+    expect(txEntries[0][1].type).toBe('refund_pipeline_error');
+    expect(txEntries[0][1].sunkCostUsd).toBeCloseTo(0.116, 4);
+
+    // Re-running recordCurationFailureAudit for the same session is idempotent and preserves higher sunk cost
+    await recordCurationFailureAudit({
+      source: 'column3_worker_error',
+      uid: 'user-sunk',
+      curationSessionId: 'sess-sunk',
+      tokensRefunded: 0,
+      isFullRefund: false,
+      reason: 'Duplicate retry',
+      sunkApiUsage: {},
+    });
+    const afterDuplicate = store.get('adminLedger/system/curationFailures/sess-sunk');
+    expect(afterDuplicate?.sunkCostUsd).toBeCloseTo(0.116, 4);
+    expect(afterDuplicate?.tokensRefunded).toBe(4);
   });
 
   it('rejects unauthenticated requests via requireAuthenticatedCaller', () => {

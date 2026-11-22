@@ -6,6 +6,7 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { translateError } from '../services/errorTranslationLayer';
 import { CreateProjectCard } from '../components/CreateProjectCard';
 import Dashboard from '../components/Dashboard';
+import { computeAggregateMetrics, buildUnifiedActivityRows } from '../components/UsageAnalyticsPage';
 import { Project } from '../types';
 
 vi.mock('../services/firebase', () => ({
@@ -267,6 +268,114 @@ describe('Phase 1 Pre-Launch Security Rules, Endpoint Gating, Concurrency UX & A
       expect(appSrc).toContain('const isActiveCurationLock =');
       expect(appSrc).toContain("includes('ACTIVE_CURATION_IN_PROGRESS')");
       expect(appSrc).toContain('activeCuratingProject={activeCuratingProject}');
+    });
+
+    it('locks adminLedger/system/curationFailures in firestore.rules and includes sunk failure USD in Admin Discovery Ledger KPIs and wallet inspection', () => {
+      const rulesSrc = readRepoFile('firestore.rules');
+      expect(rulesSrc).toContain('match /adminLedger/system/curationFailures/{eventId}');
+      const failuresRuleSlice = rulesSrc.slice(
+        rulesSrc.indexOf('match /adminLedger/system/curationFailures/{eventId}'),
+        rulesSrc.indexOf('match /adminLedger/system/curationFailures/{eventId}') + 200
+      );
+      expect(failuresRuleSlice).toContain('allow read: if isAdmin();');
+      expect(failuresRuleSlice).toContain('allow write: if false;');
+
+      const metrics = computeAggregateMetrics(
+        [
+          {
+            uid: 'u-cust',
+            email: 'fan@example.com',
+            projectsCount: 1,
+            actionTriggers: { createCount: 1, updateCount: 0 },
+            artistSearches: { globalCount: 1, topSearches: [] },
+            cacheEfficiency: { liveQueries: 1, cacheHits: 0 },
+            deepCutsOpened: 0,
+            exactCost: 0.10,
+            hasExactCost: true,
+            tokenBalance: 45,
+            lifetimeTokensPurchased: 50,
+            lifetimeTokensSpent: 5,
+            projects: [],
+          },
+        ],
+        [
+          {
+            id: 'h1',
+            entityId: 'fugazi-us',
+            rawEntityId: 'fugazi',
+            entityType: 'artist',
+            displayName: 'Fugazi',
+            callerUid: 'u-cust',
+            callerEmail: 'fan@example.com',
+            totalTokens: 1000,
+            promptTokens: 800,
+            candidatesTokens: 200,
+            costUsd: 0.02,
+            timestamp: Date.now(),
+          },
+        ],
+        [
+          {
+            id: 'sess-failed-1',
+            source: 'stale_reaper',
+            uid: 'u-cust',
+            userEmail: 'fan@example.com',
+            projectId: 'proj-failed',
+            projectName: 'Shellac',
+            jobId: 'job-failed',
+            curationSessionId: 'sess-failed-1',
+            sceneId: 'scene-1',
+            tokensRefunded: 4,
+            isFullRefund: true,
+            reason: 'Stale Curation Timeout Auto-Refund',
+            errorMessage: 'Curation timed out',
+            sunkTotalTokens: 36000,
+            sunkCostUsd: 0.116,
+            timestamp: Date.now(),
+          },
+        ]
+      );
+
+      expect(metrics.sunkFailureAiCostUsd).toBeCloseTo(0.116, 4);
+      expect(metrics.curationFailuresCount).toBe(1);
+      // 0.10 customer + 0.02 JIT + 0.116 sunk failure = 0.236
+      expect(metrics.totalPlatformAiCostUsd).toBeCloseTo(0.236, 4);
+      // Customer earned = 5 * 0.13 = 0.65 -> platformNetProfitUsd = 0.65 - 0.236 = 0.414
+      expect(metrics.platformNetProfitUsd).toBeCloseTo(0.414, 4);
+
+      // Author-Targeted Wallet Inspection surfaces sunkCostUsd on refund_pipeline_error rows
+      const rows = buildUnifiedActivityRows(
+        {
+          uid: 'u-cust',
+          email: 'fan@example.com',
+          projectsCount: 0,
+          actionTriggers: { createCount: 0, updateCount: 0 },
+          artistSearches: { globalCount: 0, topSearches: [] },
+          cacheEfficiency: { liveQueries: 0, cacheHits: 0 },
+          deepCutsOpened: 0,
+          exactCost: 0,
+          hasExactCost: true,
+          tokenBalance: 45,
+          lifetimeTokensPurchased: 50,
+          lifetimeTokensSpent: 5,
+          projects: [],
+        },
+        [
+          {
+            id: 'tx-refund-1',
+            uid: 'u-cust',
+            type: 'refund_pipeline_error',
+            delta: 4,
+            balanceAfter: 49,
+            sunkCostUsd: 0.116,
+            description: 'Automatic Refund (Full Synthesis Error: Stale Curation Timeout Auto-Refund)',
+            createdAt: Date.now(),
+          },
+        ]
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].aiCostUsd).toBeCloseTo(0.116, 4);
+      expect(rows[0].netMarginUsd).toBeCloseTo(-0.116, 4);
     });
   });
 });

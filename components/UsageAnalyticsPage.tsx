@@ -58,8 +58,29 @@ export interface LedgerTransactionRecord {
     generationType?: string;
     costUsd?: number;
     apiUsage?: Record<string, any>;
+    sunkCostUsd?: number;
+    sunkApiUsage?: Record<string, any>;
     description: string;
     createdAt?: any;
+}
+
+export interface CurationFailureRecord {
+    id: string;
+    source: 'column2_error' | 'column3_worker_error' | 'stale_reaper' | string;
+    uid: string;
+    userEmail: string | null;
+    projectId: string | null;
+    projectName: string | null;
+    jobId: string | null;
+    curationSessionId: string | null;
+    sceneId: string | null;
+    tokensRefunded: number;
+    isFullRefund: boolean;
+    reason: string;
+    errorMessage: string | null;
+    sunkTotalTokens: number;
+    sunkCostUsd: number;
+    timestamp: number;
 }
 
 export interface UserTelemetry {
@@ -138,6 +159,8 @@ export interface TelemetryAggregateMetrics {
     customerAiCostUsd: number;
     adminAiCostUsd: number;
     jitAiCostUsd: number;
+    sunkFailureAiCostUsd: number;
+    curationFailuresCount: number;
 
     // Card 3: Net Gross Profit & Margin
     customerNetProfitUsd: number;
@@ -304,7 +327,8 @@ const renderProjectStatusBadge = (
 
 export const computeAggregateMetrics = (
     ledgerData: UserTelemetry[],
-    jitHeals: JitHealRecord[] = []
+    jitHeals: JitHealRecord[] = [],
+    curationFailures: CurationFailureRecord[] = []
 ): TelemetryAggregateMetrics => {
     let customerTokensSpent = 0;
     let customerGrossPurchasedTokens = 0;
@@ -344,8 +368,10 @@ export const computeAggregateMetrics = (
     });
 
     const jitAiCostUsd = jitHeals.reduce((sum, h) => sum + (Number(h.costUsd) || 0), 0);
+    const sunkFailureAiCostUsd = curationFailures.reduce((sum, f) => sum + (Number(f.sunkCostUsd) || 0), 0);
+    const curationFailuresCount = curationFailures.length;
     const totalPlatformAiCostUsd = roundUsd4(
-        roundUsd4(customerAiCostUsd) + roundUsd4(adminAiCostUsd) + roundUsd4(jitAiCostUsd)
+        roundUsd4(customerAiCostUsd) + roundUsd4(adminAiCostUsd) + roundUsd4(jitAiCostUsd) + roundUsd4(sunkFailureAiCostUsd)
     );
     const totalPlatformAiCostGbp = usdToGbp(totalPlatformAiCostUsd);
 
@@ -393,6 +419,8 @@ export const computeAggregateMetrics = (
         customerAiCostUsd,
         adminAiCostUsd,
         jitAiCostUsd,
+        sunkFailureAiCostUsd,
+        curationFailuresCount,
         customerNetProfitUsd,
         customerGrossMarginPct,
         platformNetProfitUsd,
@@ -665,6 +693,10 @@ export const buildUnifiedActivityRows = (
         }
 
         if (isTopUpOrRefundTx) {
+            const refundSunkCostUsd =
+                txType === 'refund_pipeline_error' && typeof tx.sunkCostUsd === 'number' && tx.sunkCostUsd > 0
+                    ? tx.sunkCostUsd
+                    : null;
             rows.push({
                 id: txId,
                 timestampMs: tsMs,
@@ -679,9 +711,9 @@ export const buildUnifiedActivityRows = (
                 balanceAfter: typeof tx.balanceAfter === 'number' ? tx.balanceAfter : null,
                 isSyntheticFallback: false,
                 isAdminBypass: authorIsAdmin,
-                aiCostUsd: null,
+                aiCostUsd: refundSunkCostUsd,
                 isCostEstimate: false,
-                netMarginUsd: null,
+                netMarginUsd: refundSunkCostUsd !== null ? -refundSunkCostUsd : null,
                 netMarginPct: null,
             });
             return;
@@ -900,6 +932,8 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
                     </div>
                     <div>
                         JIT Auto-Healing: <span className="text-zinc-300">${formatUsd4(aggregateMetrics.jitAiCostUsd)}</span>
+                        {' • '}
+                        Failed / Reaped: <span className={aggregateMetrics.sunkFailureAiCostUsd > 0 ? 'text-rose-400' : 'text-zinc-300'}>${formatUsd4(aggregateMetrics.sunkFailureAiCostUsd)}</span>
                     </div>
                 </div>
             </div>
@@ -1758,6 +1792,8 @@ export const calculateTelemetryForUser = (
                 generationType: tx.generationType,
                 costUsd: typeof tx.costUsd === 'number' ? tx.costUsd : undefined,
                 apiUsage: tx.apiUsage,
+                sunkCostUsd: typeof tx.sunkCostUsd === 'number' ? tx.sunkCostUsd : undefined,
+                sunkApiUsage: tx.sunkApiUsage,
                 description: tx.description || 'Token Activity',
                 createdAt: tx.createdAt,
             });
@@ -2000,6 +2036,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [ledgerData, setLedgerData] = useState<UserTelemetry[]>([]);
     const [tokenTransactions, setTokenTransactions] = useState<TokenTransaction[]>([]);
     const [jitHeals, setJitHeals] = useState<JitHealRecord[]>([]);
+    const [curationFailures, setCurationFailures] = useState<CurationFailureRecord[]>([]);
     const [isJitEnabled, setIsJitEnabled] = useState<boolean>(true);
     const [isTogglingJit, setIsTogglingJit] = useState<boolean>(false);
     const [grantEmail, setGrantEmail] = useState<string>('');
@@ -2198,8 +2235,48 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                 } catch (healErr: any) {
                     console.warn("[UsageAnalyticsPage] Could not query JIT heals collection or settings:", healErr.message);
                 }
+
+                try {
+                    const failuresRef = collection(db, 'adminLedger', 'system', 'curationFailures');
+                    const failuresQuery = query(failuresRef, orderBy('occurredAtMs', 'desc'), limit(100));
+                    const failuresSnap = await getDocs(failuresQuery);
+                    const parsedFailures: CurationFailureRecord[] = failuresSnap.docs.map(d => {
+                        const fData = d.data();
+                        let ts = Date.now();
+                        if (typeof fData.occurredAtMs === 'number') {
+                            ts = fData.occurredAtMs;
+                        } else if (fData.createdAt?.toMillis) {
+                            ts = fData.createdAt.toMillis();
+                        } else if (fData.createdAt?.seconds) {
+                            ts = fData.createdAt.seconds * 1000;
+                        }
+                        return {
+                            id: d.id,
+                            source: fData.source || 'column3_worker_error',
+                            uid: fData.uid || 'unknown',
+                            userEmail: fData.userEmail || null,
+                            projectId: fData.projectId || null,
+                            projectName: fData.projectName || null,
+                            jobId: fData.jobId || null,
+                            curationSessionId: fData.curationSessionId || null,
+                            sceneId: fData.sceneId || null,
+                            tokensRefunded: Number(fData.tokensRefunded) || 0,
+                            isFullRefund: Boolean(fData.isFullRefund),
+                            reason: fData.reason || 'Curation Error Auto-Refund',
+                            errorMessage: fData.errorMessage || null,
+                            sunkTotalTokens: Number(fData.sunkTotalTokens) || 0,
+                            sunkCostUsd: Number(fData.sunkCostUsd) || 0,
+                            timestamp: ts,
+                        };
+                    });
+                    setCurationFailures(parsedFailures);
+                } catch (failErr: any) {
+                    console.warn("[UsageAnalyticsPage] Could not query curationFailures collection:", failErr.message);
+                    setCurationFailures([]);
+                }
             } else {
                 setJitHeals([]);
+                setCurationFailures([]);
             }
         } catch (err: any) {
             console.error("Error fetching ledger data:", err);
@@ -2263,8 +2340,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const juicePct = Math.min(100, Math.round((liveTokenBalance / juiceMax) * 100));
 
     const aggregateMetrics = useMemo(
-        () => computeAggregateMetrics(ledgerData, jitHeals),
-        [ledgerData, jitHeals]
+        () => computeAggregateMetrics(ledgerData, jitHeals, curationFailures),
+        [ledgerData, jitHeals, curationFailures]
     );
 
     const unifiedUserRows = useMemo(
@@ -2912,6 +2989,125 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                             </td>
                                                             <td className="p-3.5 text-xs text-right font-mono text-red-400 font-bold">
                                                                 ${heal.costUsd.toFixed(5)}
+                                                            </td>
+                                                        </tr>
+                                                    );
+                                                })
+                                            )}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            {/* Failed & Auto-Refunded Curations (Sunk Cost Audit) Section */}
+                            <div className="space-y-4 pt-6 border-t border-zinc-800/80" data-testid="admin-curation-failures-section">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="material-symbols-outlined text-rose-400 !text-[22px]">receipt_long</span>
+                                            <h2 className="text-xl font-medium text-white">Failed &amp; Auto-Refunded Curations</h2>
+                                            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                                                Sunk Cost Audit
+                                            </span>
+                                        </div>
+                                        <p className="text-sm text-zinc-400 mt-1 max-w-3xl leading-relaxed">
+                                            Permanent audit ledger of in-flight pipeline failures and 5-minute stale-lock reaper recoveries, capturing refunded tokens alongside partial Gemini API spend already incurred prior to abort.
+                                        </p>
+                                    </div>
+
+                                    <div className="flex items-center gap-6 font-mono text-xs shrink-0">
+                                        <div>
+                                            <span className="text-zinc-500 block text-[10px] uppercase">Failed Jobs</span>
+                                            <span className="text-white font-bold">{curationFailures.length}</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-zinc-500 block text-[10px] uppercase">Refunded</span>
+                                            <span className="text-emerald-300 font-bold">+{curationFailures.reduce((acc, f) => acc + f.tokensRefunded, 0)}T</span>
+                                        </div>
+                                        <div>
+                                            <span className="text-zinc-500 block text-[10px] uppercase">Sunk API Cost</span>
+                                            <span className="text-rose-400 font-bold">${curationFailures.reduce((acc, f) => acc + f.sunkCostUsd, 0).toFixed(4)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
+                                    <table className="w-full text-left border-collapse min-w-[780px]">
+                                        <thead>
+                                            <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">User / Project</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Source</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Reason</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Refunded</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Sunk Tokens</th>
+                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Sunk Cost</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {isLoading && curationFailures.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="p-6 text-center text-zinc-500 text-xs italic">
+                                                        Loading failure &amp; refund receipts...
+                                                    </td>
+                                                </tr>
+                                            ) : curationFailures.length === 0 ? (
+                                                <tr>
+                                                    <td colSpan={7} className="p-6 text-center text-zinc-500 text-xs italic">
+                                                        No failed or reaped curation events recorded.
+                                                    </td>
+                                                </tr>
+                                            ) : (
+                                                curationFailures.map((fail) => {
+                                                    const d = new Date(fail.timestamp);
+                                                    const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
+                                                        d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                                                    const sourceLabel =
+                                                        fail.source === 'stale_reaper'
+                                                            ? 'Stale Reaper'
+                                                            : fail.source === 'column2_error'
+                                                                ? 'Topology Error'
+                                                                : 'Worker Crash';
+                                                    const sourceBadgeClass =
+                                                        fail.source === 'stale_reaper'
+                                                            ? 'border-amber-500/30 text-amber-300 bg-amber-950/20'
+                                                            : 'border-rose-500/30 text-rose-300 bg-rose-950/20';
+                                                    return (
+                                                        <tr key={fail.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
+                                                            <td className="p-3.5 text-xs text-zinc-400 font-mono whitespace-nowrap">
+                                                                {dateStr}
+                                                            </td>
+                                                            <td className="p-3.5 text-xs text-zinc-300">
+                                                                <span className="font-medium text-white block truncate max-w-[220px]" title={fail.userEmail || fail.uid}>
+                                                                    {fail.userEmail || fail.uid}
+                                                                </span>
+                                                                <span className="block text-[11px] text-zinc-500 truncate max-w-[220px]" title={fail.projectId || undefined}>
+                                                                    {fail.projectName || fail.projectId || '—'}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-3.5 text-xs whitespace-nowrap">
+                                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${sourceBadgeClass}`}>
+                                                                    {sourceLabel}
+                                                                </span>
+                                                            </td>
+                                                            <td className="p-3.5 text-xs text-zinc-400 max-w-[260px]">
+                                                                <span className="block truncate text-zinc-300" title={fail.reason}>
+                                                                    {fail.reason}
+                                                                </span>
+                                                                {fail.errorMessage && (
+                                                                    <span className="block text-[11px] text-zinc-500 truncate mt-0.5" title={fail.errorMessage}>
+                                                                        {fail.errorMessage}
+                                                                    </span>
+                                                                )}
+                                                            </td>
+                                                            <td className="p-3.5 text-xs text-right font-mono text-emerald-300 font-semibold whitespace-nowrap">
+                                                                {fail.tokensRefunded > 0 ? `+${fail.tokensRefunded}T` : '0T'}
+                                                            </td>
+                                                            <td className="p-3.5 text-xs text-right font-mono text-zinc-400 whitespace-nowrap">
+                                                                {fail.sunkTotalTokens.toLocaleString()}
+                                                            </td>
+                                                            <td className="p-3.5 text-xs text-right font-mono text-rose-400 font-bold whitespace-nowrap">
+                                                                ${fail.sunkCostUsd.toFixed(4)}
                                                             </td>
                                                         </tr>
                                                     );

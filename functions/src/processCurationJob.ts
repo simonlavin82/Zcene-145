@@ -68,6 +68,9 @@ import {
   refreshCurationLock,
   releaseCurationLock,
   computeUncompletedScenesRefundCost,
+  mergeApiUsageMaps,
+  computeApiUsageCostUsd,
+  recordCurationFailureAudit,
 } from "./tokenWallet";
 
 // Initialize Firebase Admin SDK if not already done
@@ -327,21 +330,38 @@ export const processCurationJob = onDocumentCreated({
     .filter(Boolean);
   let isAllScenesDirectHitBatch = false;
 
+  const collectedTokens: Record<string, { prompt: number, candidates: number, total: number }> = {};
+  const usageCollector = {
+    push: (model: string, usage: any) => {
+      if (!collectedTokens[model]) collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
+      collectedTokens[model].prompt += usage.promptTokenCount;
+      collectedTokens[model].candidates += usage.candidatesTokenCount;
+      collectedTokens[model].total += usage.totalTokenCount;
+    }
+  };
+
+  const checkpointPartialApiUsage = async () => {
+    try {
+      const mergedPartial = mergeApiUsageMaps(inputPayload?.foregroundApiUsage, collectedTokens);
+      if (Object.keys(mergedPartial).length > 0) {
+        await jobDocRef.set(
+          {
+            partialApiUsage: mergedPartial,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+    } catch {
+      // Non-fatal checkpoint
+    }
+  };
+
   try {
     console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
 
     let result: any = null;
     let nextChainedJobId: string | null = null;
-
-    const collectedTokens: Record<string, { prompt: number, candidates: number, total: number }> = {};
-    const usageCollector = {
-      push: (model: string, usage: any) => {
-        if (!collectedTokens[model]) collectedTokens[model] = { prompt: 0, candidates: 0, total: 0 };
-        collectedTokens[model].prompt += usage.promptTokenCount;
-        collectedTokens[model].candidates += usage.candidatesTokenCount;
-        collectedTokens[model].total += usage.totalTokenCount;
-      }
-    };
     let existingProjectCanvasLayout: any[] | undefined;
     if (inputPayload?.canvasLayout) {
       try {
@@ -926,6 +946,7 @@ export const processCurationJob = onDocumentCreated({
               existingProjectDetailsMap.set(k, v);
             }
           }
+          await checkpointPartialApiUsage();
         }
 
         // Structural Integrity Guard: Verify that we have a valid, rich graph
@@ -1532,6 +1553,8 @@ export const processCurationJob = onDocumentCreated({
             }
           }
         }
+
+        await checkpointPartialApiUsage();
 
         let rootBreakdownStr = "";
         const sceneArtistSnippetsMap: Record<string, string> = {};
@@ -3236,6 +3259,13 @@ export const processCurationJob = onDocumentCreated({
       (s: any) => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
     );
 
+    const totalSunkApiUsage = mergeApiUsageMaps(
+      jobData?.inputPayload?.foregroundApiUsage,
+      collectedTokens
+    );
+    const { costUsd: sunkCostUsd } = computeApiUsageCostUsd(totalSunkApiUsage);
+    let refundOutcome = { refundedTokens: 0, isFullRefund: !hasCompletedScenes };
+
     if (jobData?.userId && jobData?.inputPayload?.curationSessionId) {
       // Sum costs across ALL remaining uncurated scenes (target + any queued scenes that won't run)
       const uncompletedScenesRefundCost = computeUncompletedScenesRefundCost({
@@ -3245,16 +3275,32 @@ export const processCurationJob = onDocumentCreated({
         fallbackFilters: jobData?.inputPayload?.filters,
       });
 
-      await refundProjectSettlementOnError({
+      refundOutcome = await refundProjectSettlementOnError({
         uid: jobData.userId,
         projectId: jobData.inputPayload?.projectId,
         curationSessionId: jobData.inputPayload.curationSessionId,
         refundAmountOverride: uncompletedScenesRefundCost,
         reason: `Column 3 Worker Failure for scene ${targetSceneId}`,
+        sunkCostUsd,
+        sunkApiUsage: totalSunkApiUsage,
       });
     }
 
     if (jobData?.userId) {
+      await recordCurationFailureAudit({
+        source: "column3_worker_error",
+        uid: jobData.userId,
+        projectId: jobData.inputPayload?.projectId || null,
+        projectName: jobData.inputPayload?.projectName || artistList.join(", ") || null,
+        jobId,
+        curationSessionId: jobData.inputPayload?.curationSessionId || null,
+        sceneId: targetSceneId,
+        tokensRefunded: refundOutcome.refundedTokens,
+        isFullRefund: refundOutcome.isFullRefund,
+        reason: `Column 3 Worker Failure for scene ${targetSceneId}`,
+        errorMessage: translatedError.userFriendlyMessage,
+        sunkApiUsage: totalSunkApiUsage,
+      });
       await releaseCurationLock(jobData.userId, jobData?.inputPayload?.curationSessionId);
     }
 

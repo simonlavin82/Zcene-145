@@ -418,6 +418,11 @@ service cloud.firestore {
       allow write: if false; // Exclusively written by Cloud Functions via Firebase Admin SDK
     }
 
+    match /adminLedger/system/curationFailures/{eventId} {
+      allow read: if isAdmin();
+      allow write: if false; // Exclusively written by Cloud Functions via Firebase Admin SDK
+    }
+
     // --- Prepaid Token Economy Split-Debit & Deep Web Leases (Rule 43) ---
     match /curationSessions/{sessionId} {
       allow read, write: if false; // Exclusively managed by Cloud Functions via Firebase Admin SDK
