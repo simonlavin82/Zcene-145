@@ -237,15 +237,33 @@ describe('Phase 3 (v47.0): Zine Save as PDF Button & @media print Stylesheet', (
     expect(document.title).toBe('Fugazi - Zcene');
   });
 
-  it('defines light editorial @media print rules in index.css unlocking scroll containers and preventing awkward page splits', () => {
+  it('defines @layer base @media print rules in index.css, removes Tailwind !important viewport locks in GraphPage.tsx, and keeps Deep Cuts visible for multi-page PDF output', () => {
     const cssSrc = fs.readFileSync(path.resolve(__dirname, '../index.css'), 'utf-8');
     expect(cssSrc).toContain('@page');
-    expect(cssSrc).toContain('@media print');
+    expect(cssSrc).toMatch(/@layer base\s*\{\s*@media print\s*\{/);
     expect(cssSrc).toContain('.zine-print-unlock');
     expect(cssSrc).toContain('#magazine-scroll-container');
     expect(cssSrc).toContain('overflow: visible !important;');
     expect(cssSrc).toContain('break-inside: avoid;');
     expect(cssSrc).toContain('break-after: avoid;');
     expect(cssSrc).toContain('background: #ffffff !important;');
+    expect(cssSrc).toContain('.zine-print-card > div');
+    expect(cssSrc).toContain('opacity: 1 !important;');
+
+    // GraphPage desktop magazine <aside> must not use !fixed / !h-screen (which beat unlayered @media print in CSS Cascade Level 5)
+    const graphPageSrc = fs.readFileSync(path.resolve(__dirname, '../components/GraphPage.tsx'), 'utf-8');
+    expect(graphPageSrc).not.toContain('!fixed !inset-0');
+    expect(graphPageSrc).not.toContain('!h-screen');
+    expect(graphPageSrc).toContain('print:static print:inset-auto print:w-auto print:h-auto print:block print:overflow-visible');
+
+    // Deep Cuts section heading + artist profile card (bio + discography) remain visible in Zine print DOM
+    renderZineDetailsPanel();
+    expect(screen.getByTestId('zine-print-deep-cuts-heading')).toHaveTextContent('Deep Cuts — Artist & Label Profiles');
+    const cardEl = document.getElementById('magazine-card-fugazi');
+    expect(cardEl).not.toBeNull();
+    expect(cardEl?.className).toContain('zine-print-card');
+    expect(cardEl?.className).not.toContain('print:hidden');
+    expect(cardEl).toHaveTextContent('Iconic Washington D.C. post-hardcore band formed by Ian MacKaye.');
+    expect(cardEl).toHaveTextContent('Repeater');
   });
 });

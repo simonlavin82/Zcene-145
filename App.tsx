@@ -11483,7 +11483,7 @@ const App: React.FC = () => {
             />
           )}
         </div>
-        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Help ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Help ? 'z-10' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
           <HelpPage
             onNavigate={handleViewChange}
             onNavigateMenu={handleMenuNavigate}
@@ -11508,7 +11508,7 @@ const App: React.FC = () => {
             tokenBalance={profile?.tokenBalance ?? 0}
           />
         </div>
-        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Engine ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Engine ? 'z-10' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
           <EnginePage
             onNavigate={handleViewChange}
             onNavigateMenu={handleMenuNavigate}
@@ -11535,7 +11535,7 @@ const App: React.FC = () => {
             tokenBalance={profile?.tokenBalance ?? 0}
           />
         </div>
-        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.StyleGuide ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.StyleGuide ? 'z-10' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
           <StyleGuidePage
             onNavigate={handleViewChange}
             onNavigateMenu={handleMenuNavigate}
@@ -11563,7 +11563,7 @@ const App: React.FC = () => {
             tokenBalance={profile?.tokenBalance ?? 0}
           />
         </div>
-        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Analytics ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Analytics ? 'z-10' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
           <UsageAnalyticsPage
             onNavigate={handleViewChange}
             onNavigateMenu={handleMenuNavigate}
@@ -11588,7 +11588,7 @@ const App: React.FC = () => {
             profile={profile}
           />
         </div>
-        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Trash ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Trash ? 'z-10' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
           <TrashPage
             onNavigate={handleViewChange}
             onNavigateMenu={handleMenuNavigate}
@@ -11622,7 +11622,7 @@ const App: React.FC = () => {
             tokenBalance={profile?.tokenBalance ?? 0}
           />
         </div>
-        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Terms ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>
+        <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Terms ? 'z-10' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
           <TermsPage
             onNavigate={handleViewChange}
             onNavigateMenu={handleMenuNavigate}

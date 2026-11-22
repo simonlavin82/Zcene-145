@@ -1617,7 +1617,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             <div className={`w-40 h-40 sm:w-44 sm:h-44 flex-shrink-0 mx-auto bg-zinc-900 overflow-hidden relative ring-1 ring-white/10 ring-inset rounded-lg group z-10 ${isFullScreenMode ? 'shadow-[0_48px_120px_0px_rgba(0,0,0,1),0_12px_40px_0px_rgba(0,0,0,0.9)]' : 'shadow-[0_12px_36px_0px_rgba(0,0,0,0.85),0_3px_8px_0px_rgba(0,0,0,0.65)]'}`}>
                                                 {/* Temporary Loading Skeleton while image loads */}
                                                 {!imgLoaded && (
-                                                    <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10">
+                                                    <div className="absolute inset-0 w-full h-full flex flex-col items-center justify-center p-6 text-center bg-zinc-900 overflow-hidden z-10 print:hidden">
                                                         <img
                                                             src={isLabelNode
                                                                 ? "https://storage.googleapis.com/zcene-prod-assets/Deep%20Cut%20background.png"
@@ -4994,6 +4994,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                         )}
                         {/* 4) DEEP CUT CARDS GRID (Z-INDEX 10) */}
+                        {isMagazineViewOpen && filteredAndSortedNodes.length > 0 && (
+                            <h2
+                                data-testid="zine-print-deep-cuts-heading"
+                                className="hidden print:block font-display text-lg font-bold uppercase tracking-[0.2em] border-b-2 border-zinc-900 pb-2 mt-6 mb-4 text-zinc-900"
+                            >
+                                Deep Cuts — Artist &amp; Label Profiles
+                            </h2>
+                        )}
                         <div
                             data-testid="deep-cut-cards-container"
                             className={`${renderMode === 'magazine'

@@ -3220,7 +3220,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                     </div>
                 </div>
                 
-                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 outline-none transition-colors transition-[width] duration-300 ease-in-out ${isMagazineViewOpen ? '!fixed !inset-0 !top-0 !left-0 !m-0 !w-screen !h-screen !z-[1000] bg-zinc-900 border border-zinc-900 zine-print-unlock' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden rounded-2xl'}`}>
+                <aside style={isMagazineViewOpen ? {} : { width: `${rightPanelWidth}px` }} className={`z-50 flex flex-col flex-shrink-0 outline-none transition-colors transition-[width] duration-300 ease-in-out ${isMagazineViewOpen ? 'fixed inset-0 top-0 left-0 m-0 w-screen h-screen z-[1000] bg-zinc-900 border border-zinc-900 zine-print-unlock print:static print:inset-auto print:w-auto print:h-auto print:block print:overflow-visible' : 'relative h-full bg-zinc-900 border border-zinc-600/50 overflow-hidden rounded-2xl'}`}>
                        {!isDetailsPanelCollapsed && !isMagazineViewOpen && (
                          <div onMouseDown={handleMouseDown('right')} className="absolute top-0 left-0 h-full w-2 cursor-col-resize select-none touch-none z-[100] group print:hidden" aria-label="Resize right panel" role="separator">
                            <div className="w-full h-full bg-transparent group-hover:bg-primary/20 transition-colors"></div>
