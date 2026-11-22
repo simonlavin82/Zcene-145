@@ -7,6 +7,7 @@ const firestore_1 = require("firebase-admin/firestore");
 const curatorService_1 = require("./services/curatorService");
 const isoCountries_1 = require("./shared/isoCountries");
 const cacheQualification_1 = require("./services/cacheQualification");
+const tokenWallet_1 = require("./tokenWallet");
 if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
 }
@@ -21,7 +22,9 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
     secrets: ["GEMINI_API_KEY"],
     timeoutSeconds: 60,
     memory: "512MiB",
+    enforceAppCheck: tokenWallet_1.ENFORCE_APP_CHECK,
 }, async (request) => {
+    (0, tokenWallet_1.requireAuthenticatedCaller)(request);
     const { entityId, entityType = 'artist', displayName, countrySlug, projectId, projectName } = request.data || {};
     if (!entityId || typeof entityId !== 'string') {
         throw new https_1.HttpsError("invalid-argument", "Missing or invalid entityId parameter");

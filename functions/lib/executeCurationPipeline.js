@@ -366,6 +366,7 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
     secrets: ["GEMINI_API_KEY"],
     timeoutSeconds: 60,
     memory: "512MiB",
+    enforceAppCheck: tokenWallet_1.ENFORCE_APP_CHECK,
 }, async (request) => {
     const caller = (0, tokenWallet_1.requireAuthenticatedCaller)(request);
     const { seed, bundledSeedsLabel, originHint, genreHint, curationSessionId, mode, expectedProjectCost } = request.data || {};
@@ -465,6 +466,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
     secrets: ["GEMINI_API_KEY"],
     timeoutSeconds: 540,
     memory: "1GiB",
+    enforceAppCheck: tokenWallet_1.ENFORCE_APP_CHECK,
 }, async (request) => {
     const caller = (0, tokenWallet_1.requireAuthenticatedCaller)(request);
     const payload = request.data;
@@ -672,7 +674,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                     seedArtistIds: (0, multiSceneUtils_1.getAllProjectSeedIds)(updatedScenes),
                     supportsLabelDeepCuts: true,
                     generationType: determinedGenerationType,
-                    tokensSpent: settlement.tokensSpent,
+                    tokensSpent: settlement.projectTokensSpent,
                     updatedAt: firestore_1.FieldValue.serverTimestamp()
                 };
                 if (updatedScenes.length > 1) {
@@ -748,6 +750,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                             seedStubs: seedStubs
                         }
                     });
+                    await (0, tokenWallet_1.updateCurationLockJobId)(caller.uid, settlement.curationSessionId, curationJobId);
                     console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration (scene=${targetSceneId}, lockedSeeds=${resolvedSeedArray.map(s => s.id).join(', ')})`);
                     // Update project with activeJobId and lock status to curating
                     await projectDocRef.set({
@@ -758,12 +761,22 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
                 }
                 else {
                     console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Skipping background hydration job.`);
+                    await projectDocRef.set({
+                        status: "completed",
+                        activeJobId: null,
+                        updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                    }, { merge: true });
+                    await (0, tokenWallet_1.releaseCurationLock)(caller.uid, settlement.curationSessionId);
                 }
             }
             catch (err) {
                 console.error(`[Pipeline Diamond] -> Failed to update project doc ${payload.projectId} / spawn job`, err);
                 throw err;
             }
+        }
+        else {
+            // No background curation job spawned when projectId is omitted -> release lock immediately
+            await (0, tokenWallet_1.releaseCurationLock)(caller.uid, settlement.curationSessionId);
         }
         console.log(`[Pipeline Diamond] -> Curation Phase 1 Complete, returning structural payload to client`);
         return {
@@ -778,6 +791,7 @@ exports.executeCurationPipeline = (0, https_1.onCall)({
         };
     }
     catch (pipelineErr) {
+        await (0, tokenWallet_1.releaseCurationLock)(caller.uid, settlement.curationSessionId);
         await (0, tokenWallet_1.refundProjectSettlementOnError)({
             uid: caller.uid,
             projectId: payload.projectId,

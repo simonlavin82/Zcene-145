@@ -1,9 +1,16 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.unlockDeepWebSessionCallable = exports.authorizeDirectHitCallable = exports.simulateStripeTopUpCallable = void 0;
+exports.unlockDeepWebSessionCallable = exports.authorizeDirectHitCallable = exports.simulateStripeTopUpCallable = exports.STALE_LOCK_TTL_MS = exports.ENFORCE_APP_CHECK = void 0;
+exports.getTimestampMillis = getTimestampMillis;
+exports.isCurationLockActive = isCurationLockActive;
+exports.computeUncompletedScenesRefundCost = computeUncompletedScenesRefundCost;
 exports.requireAuthenticatedCaller = requireAuthenticatedCaller;
 exports.chargePreFlightLookupIfNeeded = chargePreFlightLookupIfNeeded;
 exports.recordPreFlightApiUsage = recordPreFlightApiUsage;
+exports.updateCurationLockJobId = updateCurationLockJobId;
+exports.refreshCurationLock = refreshCurationLock;
+exports.releaseCurationLock = releaseCurationLock;
+exports.recoverStaleCurationLock = recoverStaleCurationLock;
 exports.settleCurationProjectTokens = settleCurationProjectTokens;
 exports.refundProjectSettlementOnError = refundProjectSettlementOnError;
 const https_1 = require("firebase-functions/v2/https");
@@ -11,6 +18,48 @@ const app_1 = require("firebase-admin/app");
 const firestore_1 = require("firebase-admin/firestore");
 const tokenEconomy_1 = require("./shared/tokenEconomy");
 const multiSceneUtils_1 = require("./shared/multiSceneUtils");
+const cacheQualification_1 = require("./services/cacheQualification");
+exports.ENFORCE_APP_CHECK = process.env.ENFORCE_APP_CHECK === "true";
+exports.STALE_LOCK_TTL_MS = 10 * 60 * 1000; // 10 minutes (> 540s Cloud Function hard ceiling)
+function getTimestampMillis(ts) {
+    if (!ts)
+        return 0;
+    if (typeof ts === "number" && Number.isFinite(ts))
+        return ts;
+    if (typeof ts?.toMillis === "function")
+        return ts.toMillis();
+    if (typeof ts?.seconds === "number")
+        return ts.seconds * 1000;
+    return 0;
+}
+function isCurationLockActive(lockData, nowMs = Date.now()) {
+    if (!lockData || lockData.status !== "active")
+        return false;
+    const expiresMs = getTimestampMillis(lockData.expiresAt);
+    return expiresMs > nowMs;
+}
+function computeUncompletedScenesRefundCost(params) {
+    const scenes = Array.isArray(params.scenes) ? params.scenes : [];
+    const hasCompletedScenes = scenes.some((s) => s?.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+    if (!hasCompletedScenes) {
+        return undefined;
+    }
+    const uncompletedScenes = scenes.filter((s) => !(s?.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0));
+    const targetIncluded = !params.targetSceneId ||
+        uncompletedScenes.some((s) => (s.sceneId || s.id) === params.targetSceneId);
+    let totalCost = 0;
+    for (const sc of uncompletedScenes) {
+        const scSeeds = (0, multiSceneUtils_1.toSeedArtistsArray)(sc?.seedArtists);
+        const scFilters = (0, cacheQualification_1.sanitizeDiscoveryFilters)(sc?.discoveryFilters);
+        totalCost += (0, tokenEconomy_1.computeBaseProjectTokenCost)(scSeeds.length || 1, (0, cacheQualification_1.hasActiveDiscoveryFilters)(scFilters));
+    }
+    if (!targetIncluded) {
+        const fallbackCount = (params.fallbackArtists || []).filter(Boolean).length || 1;
+        const fallbackFilters = (0, cacheQualification_1.sanitizeDiscoveryFilters)(params.fallbackFilters);
+        totalCost += (0, tokenEconomy_1.computeBaseProjectTokenCost)(fallbackCount, (0, cacheQualification_1.hasActiveDiscoveryFilters)(fallbackFilters));
+    }
+    return totalCost > 0 ? totalCost : undefined;
+}
 if ((0, app_1.getApps)().length === 0) {
     (0, app_1.initializeApp)();
 }
@@ -43,8 +92,12 @@ function getSessionExpiry() {
 exports.simulateStripeTopUpCallable = (0, https_1.onCall)({
     timeoutSeconds: 30,
     memory: "256MiB",
+    enforceAppCheck: exports.ENFORCE_APP_CHECK,
 }, async (request) => {
     const caller = requireAuthenticatedCaller(request);
+    if (!caller.isAdmin || process.env.ALLOW_SIMULATED_TOPUP !== "true") {
+        throw new https_1.HttpsError("permission-denied", "Simulated token top-ups are disabled in this environment.");
+    }
     const tierId = request.data?.tierId;
     if (!tierId || !(tierId in tokenEconomy_1.TOP_UP_TIERS)) {
         throw new https_1.HttpsError("invalid-argument", "Invalid top-up tier selected.");
@@ -242,69 +295,249 @@ async function recordPreFlightApiUsage(params) {
         console.warn(`[Pre-Flight Telemetry] Non-fatal persistence warning for uid=${caller.uid}:`, err?.message || err);
     }
 }
+async function updateCurationLockJobId(uid, curationSessionId, jobId) {
+    if (!uid || !curationSessionId || !jobId)
+        return;
+    const lockRef = db.collection("curationLocks").doc(uid);
+    try {
+        await db.runTransaction(async (tx) => {
+            const snap = await tx.get(lockRef);
+            if (!snap.exists)
+                return;
+            const data = snap.data() || {};
+            if (data.curationSessionId !== curationSessionId)
+                return;
+            tx.update(lockRef, {
+                jobId,
+                updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                expiresAt: firestore_1.Timestamp.fromMillis(Date.now() + exports.STALE_LOCK_TTL_MS),
+            });
+        });
+    }
+    catch (err) {
+        console.warn(`[CurationLock] Failed to stamp jobId=${jobId} for uid=${uid}:`, err?.message || err);
+    }
+}
+async function refreshCurationLock(uid, curationSessionId, nextJobId) {
+    if (!uid || !curationSessionId)
+        return;
+    const lockRef = db.collection("curationLocks").doc(uid);
+    try {
+        await db.runTransaction(async (tx) => {
+            const snap = await tx.get(lockRef);
+            if (!snap.exists)
+                return;
+            const data = snap.data() || {};
+            if (data.curationSessionId !== curationSessionId)
+                return;
+            tx.update(lockRef, {
+                ...(nextJobId ? { jobId: nextJobId } : {}),
+                updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                expiresAt: firestore_1.Timestamp.fromMillis(Date.now() + exports.STALE_LOCK_TTL_MS),
+            });
+        });
+    }
+    catch (err) {
+        console.warn(`[CurationLock] Failed to refresh lock for uid=${uid}:`, err?.message || err);
+    }
+}
+async function releaseCurationLock(uid, curationSessionId) {
+    if (!uid)
+        return;
+    const lockRef = db.collection("curationLocks").doc(uid);
+    try {
+        await db.runTransaction(async (tx) => {
+            const snap = await tx.get(lockRef);
+            if (!snap.exists)
+                return;
+            const data = snap.data() || {};
+            if (curationSessionId && data.curationSessionId && data.curationSessionId !== curationSessionId) {
+                return;
+            }
+            tx.delete(lockRef);
+        });
+    }
+    catch (err) {
+        console.warn(`[CurationLock] Failed to release lock for uid=${uid}:`, err?.message || err);
+    }
+}
+async function recoverStaleCurationLock(lockData, options) {
+    const { uid, jobId, projectId, curationSessionId } = lockData || {};
+    if (!uid)
+        return { refunded: false, jobMarkedFailed: false };
+    let jobMarkedFailed = false;
+    let refunded = false;
+    const timeoutMessage = "Curation timed out and spent tokens were automatically refunded.";
+    try {
+        let jobAlreadyCompleted = false;
+        if (jobId) {
+            const jobRef = db.collection("curationJobs").doc(jobId);
+            const jobSnap = await jobRef.get();
+            if (jobSnap.exists) {
+                const jData = jobSnap.data() || {};
+                if (jData.status === "completed") {
+                    jobAlreadyCompleted = true;
+                }
+                else if (jData.status !== "failed") {
+                    await jobRef.update({
+                        status: "failed",
+                        errorMessage: timeoutMessage,
+                        updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                        completedAt: firestore_1.FieldValue.serverTimestamp(),
+                        expireAt: firestore_1.Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
+                    });
+                    jobMarkedFailed = true;
+                }
+            }
+        }
+        if (!jobAlreadyCompleted) {
+            let hasCompletedScenes = false;
+            let refundAmountOverride = undefined;
+            if (projectId) {
+                const projectRef = db.collection("users").doc(uid).collection("projects").doc(projectId);
+                const projSnap = await projectRef.get();
+                if (projSnap.exists) {
+                    const pData = projSnap.data() || {};
+                    const scenes = (0, multiSceneUtils_1.parseProjectScenes)(pData.scenes);
+                    hasCompletedScenes = scenes.some((s) => s?.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
+                    refundAmountOverride = computeUncompletedScenesRefundCost({
+                        scenes,
+                        targetSceneId: pData.activeSceneId,
+                    });
+                    await projectRef.set(hasCompletedScenes
+                        ? {
+                            status: "completed",
+                            activeJobId: null,
+                            partialError: timeoutMessage,
+                            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                        }
+                        : {
+                            status: "failed",
+                            activeJobId: null,
+                            errorMessage: timeoutMessage,
+                            updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                        }, { merge: true });
+                }
+            }
+            if (curationSessionId) {
+                await refundProjectSettlementOnError({
+                    uid,
+                    projectId: projectId || undefined,
+                    curationSessionId,
+                    refundAmountOverride,
+                    reason: "Stale Curation Timeout Auto-Refund",
+                });
+                refunded = true;
+            }
+        }
+        if (options?.deleteLockIfMatching) {
+            await releaseCurationLock(uid, curationSessionId || undefined);
+        }
+    }
+    catch (err) {
+        console.error(`[CurationLock] Error recovering stale lock for uid=${uid} session=${curationSessionId}:`, err?.message || err);
+    }
+    return { refunded, jobMarkedFailed };
+}
 /**
  * Shared Split-Debit Settlement Helper used by both authorizeDirectHitCallable (Column 1 Direct Hit)
  * and executeCurationPipeline (Column 2 Live Synthesis).
+ * Uniformly enforces the 1-at-a-Time per-user curation lock (curationLocks/{uid}) for ALL users including Admin.
  */
 async function settleCurationProjectTokens(params) {
     const { caller, totalProjectCost, projectId, txType, description, generationTypeToStamp } = params;
+    const shouldAcquireLock = params.acquireLock !== false;
     const sessionId = typeof params.curationSessionId === "string" && params.curationSessionId.trim().length > 0
         ? params.curationSessionId.trim()
         : db.collection("curationSessions").doc().id;
-    if (caller.isAdmin) {
-        if (projectId) {
-            const projectRef = db.collection("users").doc(caller.uid).collection("projects").doc(projectId);
-            await projectRef.set({
-                tokensSpent: 0,
-                ...(generationTypeToStamp ? { generationType: generationTypeToStamp } : {}),
-                updatedAt: firestore_1.FieldValue.serverTimestamp(),
-            }, { merge: true });
-        }
-        const adminTxRef = db.collection("users").doc(caller.uid).collection("tokenTransactions").doc();
-        const effectiveGenType = generationTypeToStamp || (txType === "spend_direct_hit" ? "Direct Hit" : "Root Generation");
-        await adminTxRef.set({
-            id: adminTxRef.id,
-            uid: caller.uid,
-            type: txType,
-            delta: 0,
-            balanceAfter: 0,
-            isAdminBypass: true,
-            ...(projectId ? { projectId } : {}),
-            sceneId: params.targetSceneId || "scene-1",
-            curationSessionId: sessionId,
-            description: `${description} (Admin 0T Wallet Bypass)`,
-            generationType: effectiveGenType,
-            ...(params.seedArtist ? { seedArtist: params.seedArtist } : {}),
-            costUsd: typeof params.costUsd === "number" ? params.costUsd : (txType === "spend_direct_hit" ? 0.0000 : 0),
-            apiUsage: params.apiUsage || {},
-            anchorResolution: params.anchorResolution || (txType === "spend_direct_hit" ? { cacheHits: 1, cacheMisses: 0 } : {}),
-            createdAt: firestore_1.FieldValue.serverTimestamp(),
-        });
-        return {
-            tokensSpent: 0,
-            creditablePreFlight: 0,
-            settlementCharged: 0,
-            tokenBalance: null,
-            curationSessionId: sessionId,
-        };
-    }
     const userRef = db.collection("users").doc(caller.uid);
+    const lockRef = db.collection("curationLocks").doc(caller.uid);
     const sessionRef = db.collection("curationSessions").doc(sessionId);
     const txRef = userRef.collection("tokenTransactions").doc();
     const projectRef = projectId
         ? db.collection("users").doc(caller.uid).collection("projects").doc(projectId)
         : null;
-    return await db.runTransaction(async (tx) => {
-        const [userSnap, sessionSnap, projectSnap] = await Promise.all([
-            tx.get(userRef),
-            tx.get(sessionRef),
+    let staleLockToRecover = null;
+    const settlementResult = await db.runTransaction(async (tx) => {
+        const [userSnap, sessionSnap, projectSnap, lockSnap] = await Promise.all([
+            caller.isAdmin ? Promise.resolve(null) : tx.get(userRef),
+            caller.isAdmin ? Promise.resolve(null) : tx.get(sessionRef),
             projectRef ? tx.get(projectRef) : Promise.resolve(null),
+            tx.get(lockRef),
         ]);
-        const userData = userSnap.exists ? userSnap.data() || {} : {};
+        const nowMs = Date.now();
+        if (lockSnap.exists) {
+            const lockData = lockSnap.data() || {};
+            const isSameSessionRetry = Boolean(lockData.curationSessionId) && lockData.curationSessionId === sessionId;
+            if (!isSameSessionRetry) {
+                if (isCurationLockActive(lockData, nowMs)) {
+                    throw new https_1.HttpsError("resource-exhausted", "ACTIVE_CURATION_IN_PROGRESS: You already have a Zcene curating. Please wait for it to finish before starting another.");
+                }
+                // Expired stale lock -> capture for post-transaction recovery & reclaim cleanly
+                staleLockToRecover = {
+                    uid: caller.uid,
+                    jobId: lockData.jobId || null,
+                    projectId: lockData.projectId || null,
+                    curationSessionId: lockData.curationSessionId || null,
+                };
+            }
+        }
+        if (shouldAcquireLock) {
+            tx.set(lockRef, {
+                uid: caller.uid,
+                projectId: projectId || null,
+                jobId: null,
+                curationSessionId: sessionId,
+                status: "active",
+                acquiredAt: firestore_1.FieldValue.serverTimestamp(),
+                updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                expiresAt: firestore_1.Timestamp.fromMillis(nowMs + exports.STALE_LOCK_TTL_MS),
+            });
+        }
+        if (caller.isAdmin) {
+            if (projectRef) {
+                tx.set(projectRef, {
+                    tokensSpent: 0,
+                    ...(generationTypeToStamp ? { generationType: generationTypeToStamp } : {}),
+                    updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                }, { merge: true });
+            }
+            const effectiveGenType = generationTypeToStamp || (txType === "spend_direct_hit" ? "Direct Hit" : "Root Generation");
+            tx.set(txRef, {
+                id: txRef.id,
+                uid: caller.uid,
+                type: txType,
+                delta: 0,
+                balanceAfter: 0,
+                isAdminBypass: true,
+                ...(projectId ? { projectId } : {}),
+                sceneId: params.targetSceneId || "scene-1",
+                curationSessionId: sessionId,
+                description: `${description} (Admin 0T Wallet Bypass)`,
+                generationType: effectiveGenType,
+                ...(params.seedArtist ? { seedArtist: params.seedArtist } : {}),
+                costUsd: typeof params.costUsd === "number" ? params.costUsd : (txType === "spend_direct_hit" ? 0.0000 : 0),
+                apiUsage: params.apiUsage || {},
+                anchorResolution: params.anchorResolution || (txType === "spend_direct_hit" ? { cacheHits: 1, cacheMisses: 0 } : {}),
+                createdAt: firestore_1.FieldValue.serverTimestamp(),
+            });
+            return {
+                tokensSpent: 0,
+                projectTokensSpent: 0,
+                creditablePreFlight: 0,
+                settlementCharged: 0,
+                tokenBalance: null,
+                curationSessionId: sessionId,
+            };
+        }
+        const userData = userSnap && userSnap.exists ? userSnap.data() || {} : {};
         const currentBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
         const prevSpent = Math.max(0, Math.floor(Number(userData.lifetimeTokensSpent) || 0));
+        const prevProjectTokens = projectSnap?.exists
+            ? Math.max(0, Math.floor(Number(projectSnap.data()?.tokensSpent) || 0))
+            : 0;
         let preFlightTokensDeducted = 0;
-        if (sessionSnap.exists) {
+        if (sessionSnap && sessionSnap.exists) {
             const sData = sessionSnap.data() || {};
             if (sData.uid && sData.uid !== caller.uid) {
                 throw new https_1.HttpsError("permission-denied", "Curation session belongs to another user.");
@@ -313,6 +546,7 @@ async function settleCurationProjectTokens(params) {
             if (sData.status === "settled" && projectId && sData.projectId === projectId) {
                 return {
                     tokensSpent: totalProjectCost,
+                    projectTokensSpent: prevProjectTokens || totalProjectCost,
                     creditablePreFlight: Math.min(1, Number(sData.preFlightTokensDeducted) || 0),
                     settlementCharged: Number(sData.settlementTokensDeducted) || 0,
                     tokenBalance: currentBalance,
@@ -345,7 +579,7 @@ async function settleCurationProjectTokens(params) {
             settlementTokensDeducted: remainingSettlement,
             status: "settled",
             ...(projectId ? { projectId } : {}),
-            ...(!sessionSnap.exists ? { createdAt: firestore_1.FieldValue.serverTimestamp() } : {}),
+            ...(!sessionSnap?.exists ? { createdAt: firestore_1.FieldValue.serverTimestamp() } : {}),
             updatedAt: firestore_1.FieldValue.serverTimestamp(),
             expireAt: getSessionExpiry(),
         }, { merge: true });
@@ -368,9 +602,6 @@ async function settleCurationProjectTokens(params) {
             ...(params.anchorResolution ? { anchorResolution: params.anchorResolution } : (txType === "spend_direct_hit" ? { anchorResolution: { cacheHits: 1, cacheMisses: 0 } } : {})),
             createdAt: firestore_1.FieldValue.serverTimestamp(),
         });
-        const prevProjectTokens = projectSnap?.exists
-            ? Math.max(0, Math.floor(Number(projectSnap.data()?.tokensSpent) || 0))
-            : 0;
         const finalProjectTokensSpent = prevProjectTokens + totalActualTokensForProject;
         if (projectRef) {
             tx.set(projectRef, {
@@ -381,12 +612,20 @@ async function settleCurationProjectTokens(params) {
         }
         return {
             tokensSpent: totalActualTokensForProject,
+            projectTokensSpent: finalProjectTokensSpent,
             creditablePreFlight,
             settlementCharged: remainingSettlement,
             tokenBalance: newBalance,
             curationSessionId: sessionId,
         };
     });
+    if (staleLockToRecover) {
+        // Reclaimed an expired stale lock inline -> trigger best-effort async cleanup & refund for the crashed job
+        recoverStaleCurationLock(staleLockToRecover, { deleteLockIfMatching: false }).catch((err) => {
+            console.warn("[CurationLock] Non-fatal stale lock recovery warning:", err?.message || err);
+        });
+    }
+    return settlementResult;
 }
 /**
  * Refunds ONLY settlementTokensDeducted (4T/5T/9T/10T) if Column 2 or Column 3 crashes fatally.
@@ -404,7 +643,11 @@ async function refundProjectSettlementOnError(params) {
         : null;
     try {
         await db.runTransaction(async (tx) => {
-            const [userSnap, sessionSnap] = await Promise.all([tx.get(userRef), tx.get(sessionRef)]);
+            const [userSnap, sessionSnap, projectSnap] = await Promise.all([
+                tx.get(userRef),
+                tx.get(sessionRef),
+                projectRef ? tx.get(projectRef) : Promise.resolve(null),
+            ]);
             if (!sessionSnap.exists)
                 return;
             const sData = sessionSnap.data() || {};
@@ -448,19 +691,14 @@ async function refundProjectSettlementOnError(params) {
                 });
             }
             if (projectRef) {
-                if (isFullRefund) {
-                    const retainedPreFlight = Math.max(0, Math.floor(Number(sData.preFlightTokensDeducted) || 0));
-                    tx.set(projectRef, {
-                        tokensSpent: retainedPreFlight,
-                        updatedAt: firestore_1.FieldValue.serverTimestamp(),
-                    }, { merge: true });
-                }
-                else {
-                    tx.set(projectRef, {
-                        tokensSpent: firestore_1.FieldValue.increment(-refundAmount),
-                        updatedAt: firestore_1.FieldValue.serverTimestamp(),
-                    }, { merge: true });
-                }
+                const prevProjTokens = projectSnap?.exists
+                    ? Math.max(0, Math.floor(Number(projectSnap.data()?.tokensSpent) || 0))
+                    : 0;
+                const nextProjTokens = Math.max(0, prevProjTokens - refundAmount);
+                tx.set(projectRef, {
+                    tokensSpent: nextProjTokens,
+                    updatedAt: firestore_1.FieldValue.serverTimestamp(),
+                }, { merge: true });
             }
         });
     }
@@ -477,6 +715,7 @@ async function refundProjectSettlementOnError(params) {
 exports.authorizeDirectHitCallable = (0, https_1.onCall)({
     timeoutSeconds: 30,
     memory: "256MiB",
+    enforceAppCheck: exports.ENFORCE_APP_CHECK,
 }, async (request) => {
     const caller = requireAuthenticatedCaller(request);
     const { projectId, seedArtistId, projectName, curationSessionId, targetSceneId, scenes, detailsCache, triggerOverarchingSynthesis, overarchingHistory, } = request.data || {};
@@ -485,6 +724,19 @@ exports.authorizeDirectHitCallable = (0, https_1.onCall)({
     }
     const label = (projectName || seedArtistId || "Zcene").toString().trim();
     const cleanProjectId = typeof projectId === "string" && projectId.trim() ? projectId.trim() : undefined;
+    const parsedScenes = Array.isArray(scenes)
+        ? scenes
+        : typeof scenes === "string"
+            ? (() => {
+                try {
+                    return JSON.parse(scenes);
+                }
+                catch {
+                    return [];
+                }
+            })()
+            : [];
+    const shouldQueueOverarching = Boolean(cleanProjectId && (triggerOverarchingSynthesis || parsedScenes.length >= 2));
     const settlement = await settleCurationProjectTokens({
         caller,
         curationSessionId,
@@ -498,21 +750,10 @@ exports.authorizeDirectHitCallable = (0, https_1.onCall)({
         costUsd: 0.0000,
         apiUsage: {},
         anchorResolution: { cacheHits: 1, cacheMisses: 0 },
+        acquireLock: shouldQueueOverarching,
     });
     let activeJobId = null;
-    const parsedScenes = Array.isArray(scenes)
-        ? scenes
-        : typeof scenes === "string"
-            ? (() => {
-                try {
-                    return JSON.parse(scenes);
-                }
-                catch {
-                    return [];
-                }
-            })()
-            : [];
-    if (cleanProjectId && (triggerOverarchingSynthesis || parsedScenes.length >= 2)) {
+    if (shouldQueueOverarching && cleanProjectId) {
         try {
             const jobRef = db.collection("curationJobs").doc();
             activeJobId = jobRef.id;
@@ -536,6 +777,7 @@ exports.authorizeDirectHitCallable = (0, https_1.onCall)({
                     overarchingHistory: overarchingHistory || null,
                 },
             });
+            await updateCurationLockJobId(caller.uid, settlement.curationSessionId, activeJobId);
             await db
                 .collection("users")
                 .doc(caller.uid)
@@ -550,6 +792,7 @@ exports.authorizeDirectHitCallable = (0, https_1.onCall)({
         }
         catch (jobErr) {
             console.warn("[authorizeDirectHitCallable] Non-fatal error queueing overarching_only job:", jobErr);
+            await releaseCurationLock(caller.uid, settlement.curationSessionId);
         }
     }
     return {
@@ -565,6 +808,7 @@ exports.authorizeDirectHitCallable = (0, https_1.onCall)({
 exports.unlockDeepWebSessionCallable = (0, https_1.onCall)({
     timeoutSeconds: 30,
     memory: "256MiB",
+    enforceAppCheck: exports.ENFORCE_APP_CHECK,
 }, async (request) => {
     const caller = requireAuthenticatedCaller(request);
     const { projectId, nodeId, nodeName } = request.data || {};

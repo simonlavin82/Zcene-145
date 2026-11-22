@@ -50,6 +50,7 @@ interface DashboardProps {
   onUpdateCrateColor?: (crate: string, color: string) => void;
   onDuplicateProject?: (project: Project) => void;
   tokenBalance?: number;
+  activeCuratingProject?: Project | null;
 }
 
 const Dashboard: React.FC<DashboardProps> = ({
@@ -85,7 +86,8 @@ const Dashboard: React.FC<DashboardProps> = ({
   crateColors,
   onUpdateCrateColor,
   onDuplicateProject,
-  tokenBalance = 0
+  tokenBalance = 0,
+  activeCuratingProject
 }) => {
   const [projectToDelete, setProjectToDelete] = React.useState<string | null>(null);
   const [projectToRename, setProjectToRename] = React.useState<Project | null>(null);
@@ -134,6 +136,24 @@ const Dashboard: React.FC<DashboardProps> = ({
   };
 
   const activeProjects = React.useMemo(() => projects.filter(p => p.status !== 'trashed' && p.status !== 'deleted'), [projects]);
+
+  const resolvedActiveCuratingProject = React.useMemo(() => {
+    if (activeCuratingProject !== undefined) return activeCuratingProject;
+    const nowMs = Date.now();
+    const STALE_MS = 10 * 60 * 1000;
+    return activeProjects.find((p) => {
+      const isCurating = p.status === 'curating' || p.status === 'pending' || Boolean(p.activeJobId);
+      if (!isCurating) return false;
+      const updatedMs = typeof (p.updatedAt as any)?.toMillis === 'function'
+        ? (p.updatedAt as any).toMillis()
+        : typeof (p.updatedAt as any)?.seconds === 'number'
+          ? (p.updatedAt as any).seconds * 1000
+          : typeof p.updatedAt === 'number'
+            ? p.updatedAt
+            : nowMs;
+      return nowMs - updatedMs < STALE_MS;
+    }) || null;
+  }, [activeCuratingProject, activeProjects]);
 
   const filteredProjects = React.useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -525,11 +545,26 @@ const Dashboard: React.FC<DashboardProps> = ({
               {/* New Zcene Button */}
               <div className="flex items-center flex-shrink-0">
                 <button 
-                  onClick={onCreateProject}
+                  onClick={() => {
+                    if (resolvedActiveCuratingProject) {
+                      onSelectProject(resolvedActiveCuratingProject.id);
+                    } else {
+                      onCreateProject();
+                    }
+                  }}
                   disabled={isCreatingProject}
-                  className="h-[38px] rounded-xl bg-white text-brand-black text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap transition-opacity hover:opacity-90 disabled:opacity-50"
+                  className={`h-[38px] rounded-xl text-sm px-4 font-medium flex items-center gap-2 whitespace-nowrap transition-opacity hover:opacity-90 disabled:opacity-50 ${
+                    resolvedActiveCuratingProject
+                      ? 'bg-zinc-900 border border-primary/50 text-primary'
+                      : 'bg-white text-brand-black'
+                  }`}
                 >
-                  {isCreatingProject ? (
+                  {resolvedActiveCuratingProject ? (
+                    <>
+                      <span className="material-symbols-outlined animate-spin !text-lg">progress_activity</span>
+                      Curation in Progress — View Active Zcene
+                    </>
+                  ) : isCreatingProject ? (
                     <>
                       <span className="material-symbols-outlined animate-spin !text-lg">progress_activity</span>
                       Creating...
@@ -554,7 +589,9 @@ const Dashboard: React.FC<DashboardProps> = ({
           {activeProjects.length === 0 ? (
             <CreateProjectCard 
               onCreateProject={onCreateProject} 
-              isCreatingProject={isCreatingProject} 
+              isCreatingProject={isCreatingProject}
+              activeCuratingProject={resolvedActiveCuratingProject}
+              onViewActiveCuration={onSelectProject}
             />
           ) : filteredProjects.length === 0 ? (
             <div className="w-full flex flex-col items-center justify-center py-16 px-4 text-center bg-zinc-950/40 border border-dashed border-zinc-800/80 rounded-xl">
@@ -697,7 +734,9 @@ const Dashboard: React.FC<DashboardProps> = ({
               {/* Standalone Add New Crate Folder */}
               <CreateProjectCard 
                 onCreateProject={onCreateProject} 
-                isCreatingProject={isCreatingProject} 
+                isCreatingProject={isCreatingProject}
+                activeCuratingProject={resolvedActiveCuratingProject}
+                onViewActiveCuration={onSelectProject}
               />
             </div>
           ) : (

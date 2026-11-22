@@ -20,6 +20,7 @@ import {
   ISO_TO_COUNTRY_NAME
 } from "./shared/isoCountries";
 import { isFullyQualifiedEntityProfile } from "./services/cacheQualification";
+import { requireAuthenticatedCaller, ENFORCE_APP_CHECK } from "./tokenWallet";
 
 if (getApps().length === 0) {
   initializeApp();
@@ -36,7 +37,9 @@ export const healOrphanedAsset = onCall({
   secrets: ["GEMINI_API_KEY"],
   timeoutSeconds: 60,
   memory: "512MiB",
+  enforceAppCheck: ENFORCE_APP_CHECK,
 }, async (request) => {
+  requireAuthenticatedCaller(request);
   const { entityId, entityType = 'artist', displayName, countrySlug, projectId, projectName } = request.data || {};
   if (!entityId || typeof entityId !== 'string') {
     throw new HttpsError("invalid-argument", "Missing or invalid entityId parameter");

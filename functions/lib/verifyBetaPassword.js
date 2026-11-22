@@ -56,6 +56,7 @@ exports.verifyBetaPassword = (0, https_1.onCall)({
     secrets: ["BETA_WALL_PASSWORD"],
     timeoutSeconds: 30,
     memory: "512MiB",
+    enforceAppCheck: process.env.ENFORCE_APP_CHECK === "true",
 }, async (request) => {
     const { password } = request.data;
     if (!password || typeof password !== "string") {

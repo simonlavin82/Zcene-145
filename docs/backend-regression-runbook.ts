@@ -1,12 +1,12 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
 # V45.1 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 22 test suites (528 unit/integration tests).
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 24 test suites (550 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
-# Run entire full-stack regression test suite (22 test files, 528 offline deterministic tests)
+# Run entire full-stack regression test suite (24 test files, 550 offline deterministic tests)
 npm test
 
 # Run backend pipeline tests
@@ -75,6 +75,12 @@ npx vitest run tests/v45_1-curation-time-and-admin-badge.test.tsx
 
 # Run V45.7 stateful closed-loop "Pub Demo" integration journeys (real <App /> + <MusicGraph /> + in-memory Firestore harness)
 npx vitest run src/test/v45_7-stateful-pub-demo-journeys.test.tsx
+
+# Run V46.0 Phase 1 pre-launch security rules, endpoint gating, concurrency UX & App Check readiness tests
+npx vitest run tests/v46-phase1-security-audit.test.tsx
+
+# Run V46.0 Phase 1 backend atomic 1-at-a-time curation lock, stale-job auto-refund & multi-scene refund tests
+npx vitest run functions/tests/curationLockAndRefund.test.ts
 
 # Or run with UI for visual tracing:
 npx vitest --ui

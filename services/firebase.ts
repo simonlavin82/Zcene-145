@@ -1,10 +1,36 @@
 import { initializeApp } from 'firebase/app';
+import { initializeAppCheck, ReCaptchaV3Provider, type AppCheck } from 'firebase/app-check';
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User, connectAuthEmulator } from 'firebase/auth';
 import { getFirestore, connectFirestoreEmulator } from 'firebase/firestore';
 import { getFunctions } from 'firebase/functions';
 import firebaseConfig from '../firebase-applet-config.json';
 
 const app = initializeApp(firebaseConfig);
+
+// Phase 1 Firebase App Check Readiness (reCAPTCHA v3, Monitor Mode)
+// Strictly guarded against SSR, Vitest offline harness, and missing site key.
+let appCheck: AppCheck | null = null;
+const isVitestEnv =
+  import.meta.env.MODE === 'test' ||
+  Boolean((import.meta.env as Record<string, unknown>).VITEST);
+const recaptchaSiteKey = import.meta.env.VITE_RECAPTCHA_SITE_KEY as string | undefined;
+
+if (typeof window !== 'undefined' && !isVitestEnv && recaptchaSiteKey) {
+  try {
+    if (import.meta.env.DEV) {
+      (self as unknown as Record<string, unknown>).FIREBASE_APPCHECK_DEBUG_TOKEN =
+        import.meta.env.VITE_APPCHECK_DEBUG_TOKEN || true;
+    }
+    appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(recaptchaSiteKey),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (err) {
+    console.warn('[AppCheck] Non-fatal initialization warning:', err);
+  }
+}
+
+export { appCheck };
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
 export const functions = getFunctions(app);

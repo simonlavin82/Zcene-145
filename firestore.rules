@@ -40,6 +40,23 @@ service cloud.firestore {
 
     // --- Validation Blueprints ---
 
+    function clientWritableUserKeys() {
+      return [
+        'email',
+        'displayName',
+        'photoURL',
+        'createdAt',
+        'updatedAt',
+        'libraryArtists',
+        'libraryBaseGraph',
+        'onboardingProgress',
+        'deepCutsOpened',
+        'pageAuth',
+        'taste',
+        'crateColors'
+      ];
+    }
+
     function isValidUser(data) {
       return data.keys().hasAll(['email']) &&
              data.keys().size() <= 25 &&
@@ -53,6 +70,8 @@ service cloud.firestore {
              (!('onboardingProgress' in data) || data.onboardingProgress is map) &&
              (!('deepCutsOpened' in data) || (data.deepCutsOpened is int)) &&
              (!('pageAuth' in data) || data.pageAuth is map) &&
+             (!('taste' in data) || (data.taste == null || data.taste is list || data.taste is map)) &&
+             (!('crateColors' in data) || (data.crateColors == null || data.crateColors is map)) &&
              (!('tokenBalance' in data) || (data.tokenBalance is int && data.tokenBalance >= 0)) &&
              (!('lifetimeTokensPurchased' in data) || (data.lifetimeTokensPurchased is int && data.lifetimeTokensPurchased >= 0)) &&
              (!('lifetimeTokensSpent' in data) || (data.lifetimeTokensSpent is int && data.lifetimeTokensSpent >= 0)) &&
@@ -127,16 +146,24 @@ service cloud.firestore {
       
       allow create: if isOwner(userId) && 
                       isValidUser(incoming()) &&
+                      incoming().keys().hasOnly([
+                        'email', 'displayName', 'photoURL', 'createdAt', 'updatedAt',
+                        'libraryArtists', 'libraryBaseGraph', 'onboardingProgress',
+                        'deepCutsOpened', 'pageAuth', 'taste', 'crateColors',
+                        'tokenBalance', 'lifetimeTokensPurchased', 'lifetimeTokensSpent',
+                        'lastTopUpAt', 'preflightApiUsage', 'deepWebApiUsage'
+                      ]) &&
                       (!('tokenBalance' in incoming()) || incoming().tokenBalance == 0) &&
                       (!('lifetimeTokensPurchased' in incoming()) || incoming().lifetimeTokensPurchased == 0) &&
                       (!('lifetimeTokensSpent' in incoming()) || incoming().lifetimeTokensSpent == 0) &&
+                      (!('lastTopUpAt' in incoming()) || incoming().lastTopUpAt == null) &&
                       (!('preflightApiUsage' in incoming()) || incoming().preflightApiUsage == null) &&
                       (!('deepWebApiUsage' in incoming()) || incoming().deepWebApiUsage == null);
       
       allow update: if isOwner(userId) && 
                       isValidUser(incoming()) &&
-                      !request.resource.data.diff(resource.data).affectedKeys()
-                        .hasAny(['tokenBalance', 'lifetimeTokensPurchased', 'lifetimeTokensSpent', 'lastTopUpAt', 'preflightApiUsage', 'deepWebApiUsage']);
+                      request.resource.data.diff(resource.data).affectedKeys()
+                        .hasOnly(clientWritableUserKeys());
       
       allow delete: if isOwner(userId) || isAdmin();
 
@@ -152,11 +179,15 @@ service cloud.firestore {
         
         allow create: if isOwner(userId) && 
                         isValidProject(incoming()) &&
-                        (!('tokensSpent' in incoming()) || incoming().tokensSpent == null || incoming().tokensSpent == 0 || isAdmin());
+                        (!('tokensSpent' in incoming()) || incoming().tokensSpent == null || incoming().tokensSpent == 0 || isAdmin()) &&
+                        (!('apiUsage' in incoming()) || incoming().apiUsage == null || isAdmin()) &&
+                        (!('deepWebApiUsage' in incoming()) || incoming().deepWebApiUsage == null || isAdmin()) &&
+                        (!('anchorResolution' in incoming()) || incoming().anchorResolution == null || isAdmin()) &&
+                        (!('generationType' in incoming()) || incoming().generationType == null || isAdmin());
         
         allow update: if isOwner(userId) && 
                         isValidProject(incoming()) &&
-                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['tokensSpent', 'apiUsage', 'anchorResolution', 'generationType']) || isAdmin());
+                        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['tokensSpent', 'apiUsage', 'deepWebApiUsage', 'anchorResolution', 'generationType']) || isAdmin());
         
         // Anti-Vandalism & Permanent Ledger Invariant:
         // Disallow hard deleteDoc on any project that has recorded tokens or API cost.
@@ -165,7 +196,8 @@ service cloud.firestore {
           isOwner(userId) && (
             resource == null || (
               (!('tokensSpent' in resource.data) || resource.data.tokensSpent == null || resource.data.tokensSpent == 0) &&
-              (!('apiUsage' in resource.data) || resource.data.apiUsage == null)
+              (!('apiUsage' in resource.data) || resource.data.apiUsage == null) &&
+              (!('deepWebApiUsage' in resource.data) || resource.data.deepWebApiUsage == null)
             )
           )
         );
@@ -266,7 +298,7 @@ service cloud.firestore {
       // Authenticated users may update detailsCache (Phase 03 write-back) and hitCount (analytics).
       // They may also upgrade legacy cache entries (cacheVersion < 2) to version 2 by writing graphData and filters.
       // General modifications to graphData for version 2+ remain blocked to prevent graph poisoning.
-      allow update: if isSignedIn() &&
+      allow update: if isSignedIn() && (
                        (
                          // Case A: Standard metadata and telemetry updates on qualified cache docs
                          request.resource.data.diff(resource.data).affectedKeys()
@@ -295,7 +327,8 @@ service cloud.firestore {
                               incoming().candidates is list
                             )
                           )
-                       );
+                       )
+                     );
 
       // Only admins may delete cache entries (manual invalidation).
       allow delete: if isAdmin();
@@ -333,7 +366,7 @@ service cloud.firestore {
                          )
                        );
 
-      allow update: if isSignedIn() &&
+      allow update: if isSignedIn() && (
                        (
                          request.resource.data.diff(resource.data).affectedKeys()
                            .hasOnly(['detailsCache', 'hitCount', 'cachedAt', 'cacheVersion', 'labelId', 'cacheKey', 'isDeep', 'graphData', 'synthesisRationale', 'filters', 'seedArtists', 'redirectTo', 'candidates', '_isStub', 'isAmbiguous'])
@@ -349,7 +382,8 @@ service cloud.firestore {
                            'candidates' in incoming() &&
                            incoming().candidates is list
                          )
-                       );
+                       )
+                     );
 
       allow delete: if isAdmin();
     }
@@ -359,21 +393,18 @@ service cloud.firestore {
       // Users can only read their own curation jobs, admins can read all
       allow read: if isSignedIn() && (resource == null || resource.data.userId == request.auth.uid || isAdmin());
       
-      // Users can only create pending curation jobs owned by themselves
-      allow create: if isSignedIn() &&
-                       incoming().userId == request.auth.uid &&
-                       incoming().status == 'pending' &&
-                       incoming().createdAt == request.time;
-                       
-      // Users can only cancel their own pending/processing jobs
-      allow update: if isSignedIn() &&
-                       resource.data.userId == request.auth.uid &&
-                       incoming().userId == request.auth.uid &&
-                       request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) &&
-                       incoming().status == 'cancelled';
+      // Exclusively created and updated by Cloud Functions via Firebase Admin SDK
+      allow create: if false;
+      allow update: if false;
                        
       // Only admins can delete jobs
       allow delete: if isAdmin();
+    }
+
+    // --- Per-User 1-at-a-Time Curation Concurrency Locks (Phase 1) ---
+    match /curationLocks/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list, write: if false; // Exclusively managed by Cloud Functions via Firebase Admin SDK
     }
 
     // --- Admin Ledger & Telemetry (Phase 3) ---

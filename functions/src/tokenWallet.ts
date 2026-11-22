@@ -7,8 +7,89 @@ import {
   TOP_UP_TIERS,
   TokenTopUpTierId,
   computeRemainingSettlementTokens,
+  computeBaseProjectTokenCost,
 } from "./shared/tokenEconomy";
-import { compactDetailsCacheToCanonical } from "./shared/multiSceneUtils";
+import {
+  compactDetailsCacheToCanonical,
+  parseProjectScenes,
+  toSeedArtistsArray,
+} from "./shared/multiSceneUtils";
+import {
+  hasActiveDiscoveryFilters,
+  sanitizeDiscoveryFilters,
+} from "./services/cacheQualification";
+
+export const ENFORCE_APP_CHECK = process.env.ENFORCE_APP_CHECK === "true";
+export const STALE_LOCK_TTL_MS = 10 * 60 * 1000; // 10 minutes (> 540s Cloud Function hard ceiling)
+
+export interface CurationLockData {
+  uid: string;
+  projectId?: string | null;
+  jobId?: string | null;
+  curationSessionId: string;
+  status: "active";
+  acquiredAt?: any;
+  updatedAt?: any;
+  expiresAt: Timestamp | { toMillis?: () => number; seconds?: number } | number;
+}
+
+export function getTimestampMillis(ts: any): number {
+  if (!ts) return 0;
+  if (typeof ts === "number" && Number.isFinite(ts)) return ts;
+  if (typeof ts?.toMillis === "function") return ts.toMillis();
+  if (typeof ts?.seconds === "number") return ts.seconds * 1000;
+  return 0;
+}
+
+export function isCurationLockActive(lockData: any, nowMs: number = Date.now()): boolean {
+  if (!lockData || lockData.status !== "active") return false;
+  const expiresMs = getTimestampMillis(lockData.expiresAt);
+  return expiresMs > nowMs;
+}
+
+export function computeUncompletedScenesRefundCost(params: {
+  scenes?: any[];
+  targetSceneId?: string;
+  fallbackArtists?: string[];
+  fallbackFilters?: any;
+}): number | undefined {
+  const scenes = Array.isArray(params.scenes) ? params.scenes : [];
+  const hasCompletedScenes = scenes.some(
+    (s: any) => s?.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+  );
+  if (!hasCompletedScenes) {
+    return undefined;
+  }
+
+  const uncompletedScenes = scenes.filter(
+    (s: any) => !(s?.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0)
+  );
+
+  const targetIncluded =
+    !params.targetSceneId ||
+    uncompletedScenes.some((s: any) => (s.sceneId || s.id) === params.targetSceneId);
+
+  let totalCost = 0;
+  for (const sc of uncompletedScenes) {
+    const scSeeds = toSeedArtistsArray(sc?.seedArtists);
+    const scFilters = sanitizeDiscoveryFilters(sc?.discoveryFilters);
+    totalCost += computeBaseProjectTokenCost(
+      scSeeds.length || 1,
+      hasActiveDiscoveryFilters(scFilters)
+    );
+  }
+
+  if (!targetIncluded) {
+    const fallbackCount = (params.fallbackArtists || []).filter(Boolean).length || 1;
+    const fallbackFilters = sanitizeDiscoveryFilters(params.fallbackFilters);
+    totalCost += computeBaseProjectTokenCost(
+      fallbackCount,
+      hasActiveDiscoveryFilters(fallbackFilters)
+    );
+  }
+
+  return totalCost > 0 ? totalCost : undefined;
+}
 
 if (getApps().length === 0) {
   initializeApp();
@@ -52,9 +133,16 @@ export const simulateStripeTopUpCallable = onCall(
   {
     timeoutSeconds: 30,
     memory: "256MiB",
+    enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
     const caller = requireAuthenticatedCaller(request);
+    if (!caller.isAdmin || process.env.ALLOW_SIMULATED_TOPUP !== "true") {
+      throw new HttpsError(
+        "permission-denied",
+        "Simulated token top-ups are disabled in this environment."
+      );
+    }
     const tierId = request.data?.tierId as TokenTopUpTierId | undefined;
 
     if (!tierId || !(tierId in TOP_UP_TIERS)) {
@@ -340,9 +428,176 @@ export async function recordPreFlightApiUsage(params: {
   }
 }
 
+export async function updateCurationLockJobId(
+  uid: string,
+  curationSessionId: string | undefined | null,
+  jobId: string
+): Promise<void> {
+  if (!uid || !curationSessionId || !jobId) return;
+  const lockRef = db.collection("curationLocks").doc(uid);
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(lockRef);
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      if (data.curationSessionId !== curationSessionId) return;
+      tx.update(lockRef, {
+        jobId,
+        updatedAt: FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(Date.now() + STALE_LOCK_TTL_MS),
+      });
+    });
+  } catch (err: any) {
+    console.warn(`[CurationLock] Failed to stamp jobId=${jobId} for uid=${uid}:`, err?.message || err);
+  }
+}
+
+export async function refreshCurationLock(
+  uid: string,
+  curationSessionId: string | undefined | null,
+  nextJobId?: string | null
+): Promise<void> {
+  if (!uid || !curationSessionId) return;
+  const lockRef = db.collection("curationLocks").doc(uid);
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(lockRef);
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      if (data.curationSessionId !== curationSessionId) return;
+      tx.update(lockRef, {
+        ...(nextJobId ? { jobId: nextJobId } : {}),
+        updatedAt: FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(Date.now() + STALE_LOCK_TTL_MS),
+      });
+    });
+  } catch (err: any) {
+    console.warn(`[CurationLock] Failed to refresh lock for uid=${uid}:`, err?.message || err);
+  }
+}
+
+export async function releaseCurationLock(
+  uid: string,
+  curationSessionId?: string | null
+): Promise<void> {
+  if (!uid) return;
+  const lockRef = db.collection("curationLocks").doc(uid);
+  try {
+    await db.runTransaction(async (tx) => {
+      const snap = await tx.get(lockRef);
+      if (!snap.exists) return;
+      const data = snap.data() || {};
+      if (curationSessionId && data.curationSessionId && data.curationSessionId !== curationSessionId) {
+        return;
+      }
+      tx.delete(lockRef);
+    });
+  } catch (err: any) {
+    console.warn(`[CurationLock] Failed to release lock for uid=${uid}:`, err?.message || err);
+  }
+}
+
+export async function recoverStaleCurationLock(
+  lockData: {
+    uid: string;
+    jobId?: string | null;
+    projectId?: string | null;
+    curationSessionId?: string | null;
+  },
+  options?: { deleteLockIfMatching?: boolean }
+): Promise<{ refunded: boolean; jobMarkedFailed: boolean }> {
+  const { uid, jobId, projectId, curationSessionId } = lockData || {};
+  if (!uid) return { refunded: false, jobMarkedFailed: false };
+
+  let jobMarkedFailed = false;
+  let refunded = false;
+  const timeoutMessage = "Curation timed out and spent tokens were automatically refunded.";
+
+  try {
+    let jobAlreadyCompleted = false;
+    if (jobId) {
+      const jobRef = db.collection("curationJobs").doc(jobId);
+      const jobSnap = await jobRef.get();
+      if (jobSnap.exists) {
+        const jData = jobSnap.data() || {};
+        if (jData.status === "completed") {
+          jobAlreadyCompleted = true;
+        } else if (jData.status !== "failed") {
+          await jobRef.update({
+            status: "failed",
+            errorMessage: timeoutMessage,
+            updatedAt: FieldValue.serverTimestamp(),
+            completedAt: FieldValue.serverTimestamp(),
+            expireAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000),
+          });
+          jobMarkedFailed = true;
+        }
+      }
+    }
+
+    if (!jobAlreadyCompleted) {
+      let hasCompletedScenes = false;
+      let refundAmountOverride: number | undefined = undefined;
+
+      if (projectId) {
+        const projectRef = db.collection("users").doc(uid).collection("projects").doc(projectId);
+        const projSnap = await projectRef.get();
+        if (projSnap.exists) {
+          const pData = projSnap.data() || {};
+          const scenes = parseProjectScenes(pData.scenes);
+          hasCompletedScenes = scenes.some(
+            (s: any) => s?.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0
+          );
+          refundAmountOverride = computeUncompletedScenesRefundCost({
+            scenes,
+            targetSceneId: pData.activeSceneId,
+          });
+
+          await projectRef.set(
+            hasCompletedScenes
+              ? {
+                  status: "completed",
+                  activeJobId: null,
+                  partialError: timeoutMessage,
+                  updatedAt: FieldValue.serverTimestamp(),
+                }
+              : {
+                  status: "failed",
+                  activeJobId: null,
+                  errorMessage: timeoutMessage,
+                  updatedAt: FieldValue.serverTimestamp(),
+                },
+            { merge: true }
+          );
+        }
+      }
+
+      if (curationSessionId) {
+        await refundProjectSettlementOnError({
+          uid,
+          projectId: projectId || undefined,
+          curationSessionId,
+          refundAmountOverride,
+          reason: "Stale Curation Timeout Auto-Refund",
+        });
+        refunded = true;
+      }
+    }
+
+    if (options?.deleteLockIfMatching) {
+      await releaseCurationLock(uid, curationSessionId || undefined);
+    }
+  } catch (err: any) {
+    console.error(`[CurationLock] Error recovering stale lock for uid=${uid} session=${curationSessionId}:`, err?.message || err);
+  }
+
+  return { refunded, jobMarkedFailed };
+}
+
 /**
  * Shared Split-Debit Settlement Helper used by both authorizeDirectHitCallable (Column 1 Direct Hit)
  * and executeCurationPipeline (Column 2 Live Synthesis).
+ * Uniformly enforces the 1-at-a-Time per-user curation lock (curationLocks/{uid}) for ALL users including Admin.
  */
 export async function settleCurationProjectTokens(params: {
   caller: CallerIdentity;
@@ -358,80 +613,132 @@ export async function settleCurationProjectTokens(params: {
   costUsd?: number;
   apiUsage?: Record<string, any>;
   anchorResolution?: Record<string, any>;
+  acquireLock?: boolean;
 }): Promise<{
   tokensSpent: number;
+  projectTokensSpent: number;
   creditablePreFlight: number;
   settlementCharged: number;
   tokenBalance: number | null;
   curationSessionId: string;
 }> {
   const { caller, totalProjectCost, projectId, txType, description, generationTypeToStamp } = params;
+  const shouldAcquireLock = params.acquireLock !== false;
   const sessionId =
     typeof params.curationSessionId === "string" && params.curationSessionId.trim().length > 0
       ? params.curationSessionId.trim()
       : db.collection("curationSessions").doc().id;
 
-  if (caller.isAdmin) {
-    if (projectId) {
-      const projectRef = db.collection("users").doc(caller.uid).collection("projects").doc(projectId);
-      await projectRef.set(
-        {
-          tokensSpent: 0,
-          ...(generationTypeToStamp ? { generationType: generationTypeToStamp } : {}),
-          updatedAt: FieldValue.serverTimestamp(),
-        },
-        { merge: true }
-      );
-    }
-    const adminTxRef = db.collection("users").doc(caller.uid).collection("tokenTransactions").doc();
-    const effectiveGenType = generationTypeToStamp || (txType === "spend_direct_hit" ? "Direct Hit" : "Root Generation");
-    await adminTxRef.set({
-      id: adminTxRef.id,
-      uid: caller.uid,
-      type: txType,
-      delta: 0,
-      balanceAfter: 0,
-      isAdminBypass: true,
-      ...(projectId ? { projectId } : {}),
-      sceneId: params.targetSceneId || "scene-1",
-      curationSessionId: sessionId,
-      description: `${description} (Admin 0T Wallet Bypass)`,
-      generationType: effectiveGenType,
-      ...(params.seedArtist ? { seedArtist: params.seedArtist } : {}),
-      costUsd: typeof params.costUsd === "number" ? params.costUsd : (txType === "spend_direct_hit" ? 0.0000 : 0),
-      apiUsage: params.apiUsage || {},
-      anchorResolution: params.anchorResolution || (txType === "spend_direct_hit" ? { cacheHits: 1, cacheMisses: 0 } : {}),
-      createdAt: FieldValue.serverTimestamp(),
-    });
-
-    return {
-      tokensSpent: 0,
-      creditablePreFlight: 0,
-      settlementCharged: 0,
-      tokenBalance: null,
-      curationSessionId: sessionId,
-    };
-  }
-
   const userRef = db.collection("users").doc(caller.uid);
+  const lockRef = db.collection("curationLocks").doc(caller.uid);
   const sessionRef = db.collection("curationSessions").doc(sessionId);
   const txRef = userRef.collection("tokenTransactions").doc();
   const projectRef = projectId
     ? db.collection("users").doc(caller.uid).collection("projects").doc(projectId)
     : null;
 
-  return await db.runTransaction(async (tx) => {
-    const [userSnap, sessionSnap, projectSnap] = await Promise.all([
-      tx.get(userRef),
-      tx.get(sessionRef),
+  let staleLockToRecover: {
+    uid: string;
+    jobId?: string | null;
+    projectId?: string | null;
+    curationSessionId?: string | null;
+  } | null = null;
+
+  const settlementResult = await db.runTransaction(async (tx) => {
+    const [userSnap, sessionSnap, projectSnap, lockSnap] = await Promise.all([
+      caller.isAdmin ? Promise.resolve(null) : tx.get(userRef),
+      caller.isAdmin ? Promise.resolve(null) : tx.get(sessionRef),
       projectRef ? tx.get(projectRef) : Promise.resolve(null),
+      tx.get(lockRef),
     ]);
-    const userData = userSnap.exists ? userSnap.data() || {} : {};
+
+    const nowMs = Date.now();
+    if (lockSnap.exists) {
+      const lockData = lockSnap.data() || {};
+      const isSameSessionRetry =
+        Boolean(lockData.curationSessionId) && lockData.curationSessionId === sessionId;
+
+      if (!isSameSessionRetry) {
+        if (isCurationLockActive(lockData, nowMs)) {
+          throw new HttpsError(
+            "resource-exhausted",
+            "ACTIVE_CURATION_IN_PROGRESS: You already have a Zcene curating. Please wait for it to finish before starting another."
+          );
+        }
+        // Expired stale lock -> capture for post-transaction recovery & reclaim cleanly
+        staleLockToRecover = {
+          uid: caller.uid,
+          jobId: lockData.jobId || null,
+          projectId: lockData.projectId || null,
+          curationSessionId: lockData.curationSessionId || null,
+        };
+      }
+    }
+
+    if (shouldAcquireLock) {
+      tx.set(lockRef, {
+        uid: caller.uid,
+        projectId: projectId || null,
+        jobId: null,
+        curationSessionId: sessionId,
+        status: "active",
+        acquiredAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp(),
+        expiresAt: Timestamp.fromMillis(nowMs + STALE_LOCK_TTL_MS),
+      });
+    }
+
+    if (caller.isAdmin) {
+      if (projectRef) {
+        tx.set(
+          projectRef,
+          {
+            tokensSpent: 0,
+            ...(generationTypeToStamp ? { generationType: generationTypeToStamp } : {}),
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
+      }
+      const effectiveGenType = generationTypeToStamp || (txType === "spend_direct_hit" ? "Direct Hit" : "Root Generation");
+      tx.set(txRef, {
+        id: txRef.id,
+        uid: caller.uid,
+        type: txType,
+        delta: 0,
+        balanceAfter: 0,
+        isAdminBypass: true,
+        ...(projectId ? { projectId } : {}),
+        sceneId: params.targetSceneId || "scene-1",
+        curationSessionId: sessionId,
+        description: `${description} (Admin 0T Wallet Bypass)`,
+        generationType: effectiveGenType,
+        ...(params.seedArtist ? { seedArtist: params.seedArtist } : {}),
+        costUsd: typeof params.costUsd === "number" ? params.costUsd : (txType === "spend_direct_hit" ? 0.0000 : 0),
+        apiUsage: params.apiUsage || {},
+        anchorResolution: params.anchorResolution || (txType === "spend_direct_hit" ? { cacheHits: 1, cacheMisses: 0 } : {}),
+        createdAt: FieldValue.serverTimestamp(),
+      });
+
+      return {
+        tokensSpent: 0,
+        projectTokensSpent: 0,
+        creditablePreFlight: 0,
+        settlementCharged: 0,
+        tokenBalance: null,
+        curationSessionId: sessionId,
+      };
+    }
+
+    const userData = userSnap && userSnap.exists ? userSnap.data() || {} : {};
     const currentBalance = Math.max(0, Math.floor(Number(userData.tokenBalance) || 0));
     const prevSpent = Math.max(0, Math.floor(Number(userData.lifetimeTokensSpent) || 0));
+    const prevProjectTokens = projectSnap?.exists
+      ? Math.max(0, Math.floor(Number(projectSnap.data()?.tokensSpent) || 0))
+      : 0;
 
     let preFlightTokensDeducted = 0;
-    if (sessionSnap.exists) {
+    if (sessionSnap && sessionSnap.exists) {
       const sData = sessionSnap.data() || {};
       if (sData.uid && sData.uid !== caller.uid) {
         throw new HttpsError("permission-denied", "Curation session belongs to another user.");
@@ -440,6 +747,7 @@ export async function settleCurationProjectTokens(params: {
       if (sData.status === "settled" && projectId && sData.projectId === projectId) {
         return {
           tokensSpent: totalProjectCost,
+          projectTokensSpent: prevProjectTokens || totalProjectCost,
           creditablePreFlight: Math.min(1, Number(sData.preFlightTokensDeducted) || 0),
           settlementCharged: Number(sData.settlementTokensDeducted) || 0,
           tokenBalance: currentBalance,
@@ -489,7 +797,7 @@ export async function settleCurationProjectTokens(params: {
         settlementTokensDeducted: remainingSettlement,
         status: "settled",
         ...(projectId ? { projectId } : {}),
-        ...(!sessionSnap.exists ? { createdAt: FieldValue.serverTimestamp() } : {}),
+        ...(!sessionSnap?.exists ? { createdAt: FieldValue.serverTimestamp() } : {}),
         updatedAt: FieldValue.serverTimestamp(),
         expireAt: getSessionExpiry(),
       },
@@ -517,9 +825,6 @@ export async function settleCurationProjectTokens(params: {
       createdAt: FieldValue.serverTimestamp(),
     });
 
-    const prevProjectTokens = projectSnap?.exists
-      ? Math.max(0, Math.floor(Number(projectSnap.data()?.tokensSpent) || 0))
-      : 0;
     const finalProjectTokensSpent = prevProjectTokens + totalActualTokensForProject;
 
     if (projectRef) {
@@ -536,12 +841,22 @@ export async function settleCurationProjectTokens(params: {
 
     return {
       tokensSpent: totalActualTokensForProject,
+      projectTokensSpent: finalProjectTokensSpent,
       creditablePreFlight,
       settlementCharged: remainingSettlement,
       tokenBalance: newBalance,
       curationSessionId: sessionId,
     };
   });
+
+  if (staleLockToRecover) {
+    // Reclaimed an expired stale lock inline -> trigger best-effort async cleanup & refund for the crashed job
+    recoverStaleCurationLock(staleLockToRecover, { deleteLockIfMatching: false }).catch((err) => {
+      console.warn("[CurationLock] Non-fatal stale lock recovery warning:", err?.message || err);
+    });
+  }
+
+  return settlementResult;
 }
 
 /**
@@ -567,7 +882,11 @@ export async function refundProjectSettlementOnError(params: {
 
   try {
     await db.runTransaction(async (tx) => {
-      const [userSnap, sessionSnap] = await Promise.all([tx.get(userRef), tx.get(sessionRef)]);
+      const [userSnap, sessionSnap, projectSnap] = await Promise.all([
+        tx.get(userRef),
+        tx.get(sessionRef),
+        projectRef ? tx.get(projectRef) : Promise.resolve(null),
+      ]);
       if (!sessionSnap.exists) return;
 
       const sData = sessionSnap.data() || {};
@@ -618,26 +937,18 @@ export async function refundProjectSettlementOnError(params: {
       }
 
       if (projectRef) {
-        if (isFullRefund) {
-          const retainedPreFlight = Math.max(0, Math.floor(Number(sData.preFlightTokensDeducted) || 0));
-          tx.set(
-            projectRef,
-            {
-              tokensSpent: retainedPreFlight,
-              updatedAt: FieldValue.serverTimestamp(),
-            },
-            { merge: true }
-          );
-        } else {
-          tx.set(
-            projectRef,
-            {
-              tokensSpent: FieldValue.increment(-refundAmount),
-              updatedAt: FieldValue.serverTimestamp(),
-            },
-            { merge: true }
-          );
-        }
+        const prevProjTokens = projectSnap?.exists
+          ? Math.max(0, Math.floor(Number(projectSnap.data()?.tokensSpent) || 0))
+          : 0;
+        const nextProjTokens = Math.max(0, prevProjTokens - refundAmount);
+        tx.set(
+          projectRef,
+          {
+            tokensSpent: nextProjTokens,
+            updatedAt: FieldValue.serverTimestamp(),
+          },
+          { merge: true }
+        );
       }
     });
   } catch (err) {
@@ -655,6 +966,7 @@ export const authorizeDirectHitCallable = onCall(
   {
     timeoutSeconds: 30,
     memory: "256MiB",
+    enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
     const caller = requireAuthenticatedCaller(request);
@@ -678,6 +990,19 @@ export const authorizeDirectHitCallable = onCall(
     const cleanProjectId =
       typeof projectId === "string" && projectId.trim() ? projectId.trim() : undefined;
 
+    const parsedScenes = Array.isArray(scenes)
+      ? scenes
+      : typeof scenes === "string"
+        ? (() => {
+            try {
+              return JSON.parse(scenes);
+            } catch {
+              return [];
+            }
+          })()
+        : [];
+    const shouldQueueOverarching = Boolean(cleanProjectId && (triggerOverarchingSynthesis || parsedScenes.length >= 2));
+
     const settlement = await settleCurationProjectTokens({
       caller,
       curationSessionId,
@@ -691,22 +1016,12 @@ export const authorizeDirectHitCallable = onCall(
       costUsd: 0.0000,
       apiUsage: {},
       anchorResolution: { cacheHits: 1, cacheMisses: 0 },
+      acquireLock: shouldQueueOverarching,
     });
 
     let activeJobId: string | null = null;
-    const parsedScenes = Array.isArray(scenes)
-      ? scenes
-      : typeof scenes === "string"
-        ? (() => {
-            try {
-              return JSON.parse(scenes);
-            } catch {
-              return [];
-            }
-          })()
-        : [];
 
-    if (cleanProjectId && (triggerOverarchingSynthesis || parsedScenes.length >= 2)) {
+    if (shouldQueueOverarching && cleanProjectId) {
       try {
         const jobRef = db.collection("curationJobs").doc();
         activeJobId = jobRef.id;
@@ -730,6 +1045,7 @@ export const authorizeDirectHitCallable = onCall(
             overarchingHistory: overarchingHistory || null,
           },
         });
+        await updateCurationLockJobId(caller.uid, settlement.curationSessionId, activeJobId);
         await db
           .collection("users")
           .doc(caller.uid)
@@ -743,6 +1059,7 @@ export const authorizeDirectHitCallable = onCall(
           }, { merge: true });
       } catch (jobErr) {
         console.warn("[authorizeDirectHitCallable] Non-fatal error queueing overarching_only job:", jobErr);
+        await releaseCurationLock(caller.uid, settlement.curationSessionId);
       }
     }
 
@@ -762,6 +1079,7 @@ export const unlockDeepWebSessionCallable = onCall(
   {
     timeoutSeconds: 30,
     memory: "256MiB",
+    enforceAppCheck: ENFORCE_APP_CHECK,
   },
   async (request) => {
     const caller = requireAuthenticatedCaller(request);

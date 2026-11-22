@@ -43,6 +43,9 @@ import {
   recordPreFlightApiUsage,
   settleCurationProjectTokens,
   refundProjectSettlementOnError,
+  updateCurationLockJobId,
+  releaseCurationLock,
+  ENFORCE_APP_CHECK,
 } from "./tokenWallet";
 
 if (getApps().length === 0) {
@@ -463,6 +466,7 @@ export const validateSeedOriginCallable = onCall({
   secrets: ["GEMINI_API_KEY"],
   timeoutSeconds: 60,
   memory: "512MiB",
+  enforceAppCheck: ENFORCE_APP_CHECK,
 }, async (request) => {
   const caller = requireAuthenticatedCaller(request);
   const { seed, bundledSeedsLabel, originHint, genreHint, curationSessionId, mode, expectedProjectCost } = request.data || {};
@@ -574,6 +578,7 @@ export const executeCurationPipeline = onCall({
   secrets: ["GEMINI_API_KEY"],
   timeoutSeconds: 540,
   memory: "1GiB",
+  enforceAppCheck: ENFORCE_APP_CHECK,
 }, async (request) => {
   const caller = requireAuthenticatedCaller(request);
   const payload = request.data;
@@ -802,7 +807,7 @@ export const executeCurationPipeline = onCall({
         seedArtistIds: getAllProjectSeedIds(updatedScenes),
         supportsLabelDeepCuts: true,
         generationType: determinedGenerationType,
-        tokensSpent: settlement.tokensSpent,
+        tokensSpent: settlement.projectTokensSpent,
         updatedAt: FieldValue.serverTimestamp()
       };
 
@@ -881,6 +886,7 @@ export const executeCurationPipeline = onCall({
              seedStubs: seedStubs
           }
         });
+        await updateCurationLockJobId(caller.uid, settlement.curationSessionId, curationJobId);
         console.log(`[Pipeline Diamond] -> Created curation job ${curationJobId} for background hydration (scene=${targetSceneId}, lockedSeeds=${resolvedSeedArray.map(s => s.id).join(', ')})`);
 
         // Update project with activeJobId and lock status to curating
@@ -891,12 +897,21 @@ export const executeCurationPipeline = onCall({
         }, { merge: true });
       } else {
         console.log(`[Pipeline Diamond] -> Single Seed Cache Hit: Skipping background hydration job.`);
+        await projectDocRef.set({
+           status: "completed",
+           activeJobId: null,
+           updatedAt: FieldValue.serverTimestamp(),
+        }, { merge: true });
+        await releaseCurationLock(caller.uid, settlement.curationSessionId);
       }
 
     } catch (err) {
       console.error(`[Pipeline Diamond] -> Failed to update project doc ${payload.projectId} / spawn job`, err);
       throw err;
     }
+  } else {
+    // No background curation job spawned when projectId is omitted -> release lock immediately
+    await releaseCurationLock(caller.uid, settlement.curationSessionId);
   }
 
   console.log(`[Pipeline Diamond] -> Curation Phase 1 Complete, returning structural payload to client`);
@@ -912,6 +927,7 @@ export const executeCurationPipeline = onCall({
       tokenBalance: settlement.tokenBalance,
   };
   } catch (pipelineErr) {
+    await releaseCurationLock(caller.uid, settlement.curationSessionId);
     await refundProjectSettlementOnError({
       uid: caller.uid,
       projectId: payload.projectId,

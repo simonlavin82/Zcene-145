@@ -45,7 +45,6 @@ import {
   canonicalizeArtistSlugWithOrigin,
   resolveSceneTopologyBackend
 } from "./executeCurationPipeline";
-import { computeBaseProjectTokenCost } from "./shared/tokenEconomy";
 import { upsertBareRouterStub } from "./services/routerStubService";
 import { AnchorResolutionStatus, ProjectScene, CrossSceneLink, OverarchingHistoryEntry } from "./types";
 import {
@@ -64,7 +63,12 @@ import {
   parseOverarchingHistory,
   pruneOverarchingHistory,
 } from "./shared/multiSceneUtils";
-import { refundProjectSettlementOnError } from "./tokenWallet";
+import {
+  refundProjectSettlementOnError,
+  refreshCurationLock,
+  releaseCurationLock,
+  computeUncompletedScenesRefundCost,
+} from "./tokenWallet";
 
 // Initialize Firebase Admin SDK if not already done
 if (getApps().length === 0) {
@@ -3107,6 +3111,7 @@ export const processCurationJob = onDocumentCreated({
             existingDetailsCache: result.detailsCache,
           }
         });
+        await refreshCurationLock(jobData.userId, inputPayload?.curationSessionId, nextChainedJobId);
         console.log(`[Curation Backend] [Atomic Baton Handoff] Created chained job ${nextChainedJobId} targeting scene "${nextScene.sceneId}".`);
       }
 
@@ -3215,6 +3220,9 @@ export const processCurationJob = onDocumentCreated({
       completedAt: FieldValue.serverTimestamp(),
       expireAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000)
     });
+    if (!nextChainedJobId && jobData?.userId) {
+      await releaseCurationLock(jobData.userId, inputPayload?.curationSessionId);
+    }
     console.log(`[Curation Backend] Successfully completed job ${jobId} (set TTL expireAt +24h)`);
 
 
@@ -3229,21 +3237,25 @@ export const processCurationJob = onDocumentCreated({
     );
 
     if (jobData?.userId && jobData?.inputPayload?.curationSessionId) {
-      const activeSceneObj = existingProjectScenes.find((s: any) => (s.sceneId || s.id) === targetSceneId);
-      const failedSceneCost = hasCompletedScenes
-        ? computeBaseProjectTokenCost(
-            (activeSceneObj?.seedArtists || artistList.join('::')).split('::').filter(Boolean).length || 1,
-            hasActiveDiscoveryFilters(activeSceneObj?.discoveryFilters || jobData?.inputPayload?.filters)
-          )
-        : undefined;
+      // Sum costs across ALL remaining uncurated scenes (target + any queued scenes that won't run)
+      const uncompletedScenesRefundCost = computeUncompletedScenesRefundCost({
+        scenes: existingProjectScenes,
+        targetSceneId,
+        fallbackArtists: artistList,
+        fallbackFilters: jobData?.inputPayload?.filters,
+      });
 
       await refundProjectSettlementOnError({
         uid: jobData.userId,
         projectId: jobData.inputPayload?.projectId,
         curationSessionId: jobData.inputPayload.curationSessionId,
-        refundAmountOverride: failedSceneCost,
+        refundAmountOverride: uncompletedScenesRefundCost,
         reason: `Column 3 Worker Failure for scene ${targetSceneId}`,
       });
+    }
+
+    if (jobData?.userId) {
+      await releaseCurationLock(jobData.userId, jobData?.inputPayload?.curationSessionId);
     }
 
     await jobDocRef.update({

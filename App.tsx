@@ -206,9 +206,13 @@ const generateGraphDataViaCloudJob = async (
       console.error("🔥 HTTPS CALLABLE FAILED:", error);
       console.log("Payload attempted:", payload);
 
+      const isActiveCurationLock =
+        error?.message?.includes('ACTIVE_CURATION_IN_PROGRESS');
       const isInsufficientTokens =
-        error?.message?.includes('INSUFFICIENT_TOKENS') ||
-        error?.code === 'functions/failed-precondition';
+        !isActiveCurationLock && (
+          error?.message?.includes('INSUFFICIENT_TOKENS') ||
+          error?.code === 'functions/failed-precondition'
+        );
 
       if (isInsufficientTokens && confirmTokenUsageHook) {
         const artistCount = artists.split('::').filter(Boolean).length;
@@ -1087,6 +1091,33 @@ export function resolveDocumentTitle(
   return BRAND_DOCUMENT_TITLE;
 }
 
+export const STALE_CURATION_UI_MS = 10 * 60 * 1000;
+
+export function findActiveCuratingProject(
+  projects: Project[],
+  nowMs: number = Date.now()
+): Project | null {
+  if (!Array.isArray(projects) || projects.length === 0) return null;
+  for (const p of projects) {
+    if (!p || p.status === 'trashed' || p.status === 'deleted') continue;
+    const isCurating = p.status === 'curating' || p.status === 'pending' || Boolean(p.activeJobId);
+    if (!isCurating) continue;
+    const rawUpdated: any = p.updatedAt;
+    const updatedMs =
+      typeof rawUpdated?.toMillis === 'function'
+        ? rawUpdated.toMillis()
+        : typeof rawUpdated?.seconds === 'number'
+          ? rawUpdated.seconds * 1000
+          : typeof rawUpdated === 'number' && Number.isFinite(rawUpdated)
+            ? rawUpdated
+            : nowMs;
+    if (nowMs - updatedMs < STALE_CURATION_UI_MS) {
+      return p;
+    }
+  }
+  return null;
+}
+
 const App: React.FC = () => {
   const [currentView, setCurrentView] = useState<View>(View.Home);
   const currentViewRef = useRef<View>(View.Home);
@@ -1118,6 +1149,9 @@ const App: React.FC = () => {
     window.dispatchEvent(new PopStateEvent('popstate'));
   }, []);
   const [projects, setProjects] = useState<Project[]>([]);
+  const activeCuratingProject = useMemo(() => findActiveCuratingProject(projects), [projects]);
+  const activeCuratingProjectRef = useRef<Project | null>(null);
+  useEffect(() => { activeCuratingProjectRef.current = activeCuratingProject; }, [activeCuratingProject]);
   const [isProjectsSynced, setIsProjectsSynced] = useState<boolean>(false);
   const [isSplashMinTimerDone, setIsSplashMinTimerDone] = useState<boolean>(false);
   const [isNavigatingToDashboard, setIsNavigatingToDashboard] = useState<boolean>(false);
@@ -4774,9 +4808,13 @@ const App: React.FC = () => {
         sessionTokenApprovedRef.current = false;
         return true;
       } catch (err: any) {
+        const isActiveCurationLock =
+          err?.message?.includes('ACTIVE_CURATION_IN_PROGRESS');
         const isInsufficient =
-          err?.message?.includes('INSUFFICIENT_TOKENS') ||
-          err?.code === 'functions/failed-precondition';
+          !isActiveCurationLock && (
+            err?.message?.includes('INSUFFICIENT_TOKENS') ||
+            err?.code === 'functions/failed-precondition'
+          );
         if (isInsufficient) {
           const reconfirmed = await confirmTokenUsage(
             'generation',
@@ -4820,6 +4858,20 @@ const App: React.FC = () => {
   ) => {
     if (!bypassTokenConfirmation) {
       sessionTokenApprovedRef.current = false;
+    }
+
+    // Phase 1 Uniform 1-at-a-Time Client Guard: block before 1T pre-flight if another Zcene is actively curating
+    const targetProjectIdForGuard = explicitProjectId || currentProjectIdRef.current || currentProjectId;
+    const liveActiveCurating = activeCuratingProjectRef.current;
+    if (
+      user &&
+      !isGuest &&
+      liveActiveCurating &&
+      liveActiveCurating.id !== targetProjectIdForGuard
+    ) {
+      const activeTitle = liveActiveCurating.name?.trim() || 'your active Zcene';
+      showToast(`Another Zcene is already curating (${activeTitle}). Please wait for it to finish before starting a new one.`);
+      return;
     }
 
     if (explicitProjectId) {
@@ -11068,6 +11120,7 @@ const App: React.FC = () => {
               crateColors: { ...(profile?.crateColors || {}), [crate]: color }
             })}
             tokenBalance={profile?.tokenBalance ?? 0}
+            activeCuratingProject={activeCuratingProject}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Graph ? 'z-10' : 'z-0 opacity-0 pointer-events-none'}`}>

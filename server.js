@@ -102,6 +102,9 @@ const extractCleanJsonString = (rawText) => {
   return text.trim();
 };
 
+const ADMIN_EMAIL = 'zcene.online@gmail.com';
+const ADMIN_UID = '9FBuWDALnNfUAjxV0pRe3RnKwJy1';
+
 // Proxy all requests starting with /api/gemini/ to the Google GenAI API
 // Rule 43: Verified via Firebase Bearer ID Token + deepWebSessions lease (Admin zcene.online@gmail.com bypassed)
 app.all('/api/gemini/*wildcard', async (req, res) => {
@@ -140,7 +143,10 @@ app.all('/api/gemini/*wildcard', async (req, res) => {
   }
 
   const callerEmail = (decodedToken?.email || '').trim().toLowerCase();
-  const isCallerAdmin = callerEmail === 'zcene.online@gmail.com';
+  const isCallerAdmin =
+    decodedToken.uid === ADMIN_UID &&
+    callerEmail === ADMIN_EMAIL &&
+    decodedToken.email_verified === true;
   let decrementedSessionRef = null;
   let activeSessionData = null;
 
@@ -1119,6 +1125,34 @@ app.get('/api/label/validate-video/:videoId', async (req, res) => {
 
 // Dedicated backend validation endpoint to execute an isolated web crawl task for video asset IDs.
 app.post('/api/artist/scrape-video-id', express.json(), async (req, res) => {
+  const customIdTokenRaw = (req.headers['x-zcene-id-token'] || '').toString().trim();
+  const forwardedAuthHeader = (req.headers['x-forwarded-authorization'] || '').toString().trim();
+  const authHeader = (req.headers['authorization'] || req.headers['Authorization'] || '').toString().trim();
+  const extractBearer = (val) => {
+    if (!val) return '';
+    const match = val.match(/^Bearer\s+(.+)$/i);
+    return match && match[1] ? match[1].trim() : val.trim();
+  };
+  const candidateToken =
+    extractBearer(customIdTokenRaw) ||
+    extractBearer(forwardedAuthHeader) ||
+    extractBearer(authHeader);
+
+  let decodedToken = null;
+  if (candidateToken) {
+    try {
+      decodedToken = await getAuth().verifyIdToken(candidateToken);
+    } catch (verifyErr) {
+      console.warn('[Scraper API] Invalid Firebase ID token:', verifyErr?.message || verifyErr);
+    }
+  }
+  if (!decodedToken) {
+    return res.status(401).json({
+      code: candidateToken ? 'AUTH_TOKEN_INVALID' : 'AUTH_TOKEN_MISSING',
+      error: candidateToken ? 'Invalid or expired authentication token.' : 'Missing Firebase Authorization Bearer token.',
+    });
+  }
+
   const { artistName, artistId } = req.body;
   if (!artistName || !artistId) {
     return res.status(400).json({ error: 'artistName and artistId are required' });

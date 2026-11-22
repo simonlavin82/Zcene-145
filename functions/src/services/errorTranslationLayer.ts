@@ -25,6 +25,13 @@ export interface ErrorMappingRule {
 
 export const ERROR_MAPPING_RULES: ErrorMappingRule[] = [
   {
+    scenario: "Active Curation Concurrency Lock",
+    rawPattern: "ACTIVE_CURATION_IN_PROGRESS",
+    finalMessage: "Another Zcene is already curating. Please wait for it to finish before starting a new one.",
+    severity: "transient",
+    targetComponent: "GLOBAL TOAST"
+  },
+  {
     scenario: "Deep Web Session Required (403)",
     rawPattern: "DEEP_WEB_SESSION_REQUIRED",
     finalMessage: "Deep Connections session required. Unlock a 3-message Deep Connections session to continue.",
