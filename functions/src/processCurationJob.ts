@@ -9,8 +9,6 @@ import {
   normalizeArtistId,
   normalizeLabelId,
   fetchNodeDetailsBackend,
-  scrapeVideoIdBackend,
-  checkVideoPlayability,
   scrapeImageUrlBackend,
   CURRENT_ITUNES_SCRAPE_VERSION,
   shouldRunRule38NotFoundUpgrade,
@@ -202,10 +200,11 @@ export function sanitizeUndefinedProperties(obj: any): any {
  * regardless of what upstream LLM parsing or sanitization returned.
  * Applied immediately before every sanitizeUndefinedProperties call at write time.
  */
-function normalizeDetailsForWrite(details: any): any {
+export function normalizeDetailsForWrite(details: any): any {
   if (!details || typeof details !== 'object' || Array.isArray(details)) return details;
+  const { _isReadOnly, ...rest } = details;
   return {
-    ...details,
+    ...rest,
     imageUrl: (typeof details.imageUrl === 'string') ? details.imageUrl : ""
   };
 }
@@ -1191,7 +1190,6 @@ export const processCurationJob = onDocumentCreated({
               // 2. Fetch from Gemini if cache miss or partial hydration needed
               let requiresTextHydration = false;
               let requiresImageScraping = false;
-              let requiresVideoScraping = false;
 
               // Extract clean human-readable name for APIs by prioritizing seedNamesMap, then stripping known country slugs
               let searchArtistName = seedNamesMap[artistNormId] ||
@@ -1205,7 +1203,6 @@ export const processCurationJob = onDocumentCreated({
               if (!details || !isFullyQualifiedEntityProfile(details, isLabel, expectedNodeIso, { requireMembersAndPeers: true })) {
                 requiresTextHydration = true;
                 requiresImageScraping = true;
-                requiresVideoScraping = true;
               } else {
                 // Complete canonical cache hit -> STRICT BYPASS
                 // Note: details.imageUrl is guaranteed non-empty (either https:// or terminal 'not-found'
@@ -1221,12 +1218,10 @@ export const processCurationJob = onDocumentCreated({
                     console.log(`[Image Scraper / Rule 38 V47.8] Queuing one-time $0.00 iTunes-only upgrade for legacy not-found doc: ${artistNormId}`);
                   }
                 }
-                if (!details.youtubeVideoId && !isLabel) {
-                  requiresVideoScraping = true;
-                  isReadOnly = false;
-                }
                 if (isReadOnly) {
                   details._isReadOnly = true;
+                } else {
+                  delete details._isReadOnly;
                 }
               }
 
@@ -1245,7 +1240,7 @@ export const processCurationJob = onDocumentCreated({
               };
 
               // Stagger concurrent requests by 1000ms to prevent API burst rate limiting (iTunes & Gemini)
-              if (idx > 0 && (requiresTextHydration || requiresImageScraping || requiresVideoScraping)) {
+              if (idx > 0 && (requiresTextHydration || requiresImageScraping)) {
                 await new Promise(resolve => setTimeout(resolve, idx * 1000));
               }
 
@@ -1287,31 +1282,6 @@ export const processCurationJob = onDocumentCreated({
               }
 
               if (details) {
-                // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
-                if (!isLabel && requiresVideoScraping) {
-                  try {
-                    if (details.youtubeVideoId) {
-                      const playable = await checkVideoPlayability(details.youtubeVideoId);
-                      if (!playable) {
-                        details.youtubeVideoId = null;
-                      }
-                    }
-                    if (!details.youtubeVideoId && details.youtubeSearchQuery) {
-                      batchAiCallsCount++;
-                      const scrapedId = await scrapeVideoIdBackend(searchArtistName, artistNormId);
-                      if (scrapedId) {
-                        const playable = await checkVideoPlayability(scrapedId);
-                        if (playable) {
-                          details.youtubeVideoId = scrapedId;
-                        }
-                      }
-                    }
-                  } catch (e) {
-                    console.warn(`[Media Sync] Soft warning: Media player validation failed for ${searchArtistName}. Bypassing sync check.`, e);
-                    details.youtubeVideoId = null;
-                  }
-                }
-
                 if (!details.details) {
                   details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
                 }
@@ -1377,7 +1347,7 @@ export const processCurationJob = onDocumentCreated({
             })
           );
 
-          console.log(`[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing ${chunkResults.length} entities to Firestore cache...`);
+          console.log(`[Curation Backend] [Step 3: In-Memory Staging] Batch hydration complete. Staged ${chunkResults.length} entities into detailsCacheEntries...`);
 
           for (const res of chunkResults) {
             if (res) {
@@ -1392,7 +1362,7 @@ export const processCurationJob = onDocumentCreated({
 
           // ── Dynamic Rate-Limit Cooldown ──────────────────────────────────────────────
           // The Gemini 15 RPM quota requires a minimum 25-second window between full batches
-          // of 3 entities (~6 calls). If the batch made 0 Gemini calls (100% cache hits),
+          // of 3 entities (~3 calls). If the batch made 0 Gemini calls (100% cache hits),
           // the rate-limit window does not need to elapse and cooldown is skipped completely.
           // For partial batches, the window scales proportionally to batchAiCallsCount.
           if (i + batchSize < recommendedEntities.length) {
@@ -1400,7 +1370,7 @@ export const processCurationJob = onDocumentCreated({
             if (batchAiCallsCount === 0) {
               console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active, 0 Gemini calls). 100% cache hits — skipping rate-limit cooldown.`);
             } else {
-              const dynamicWindowMs = Math.min(25000, Math.max(8000, Math.ceil((batchAiCallsCount / 6) * 25000)));
+              const dynamicWindowMs = Math.min(25000, Math.max(8000, Math.ceil((batchAiCallsCount / 3) * 25000)));
               const remainingCooldownMs = Math.max(0, dynamicWindowMs - batchElapsedMs);
               if (remainingCooldownMs > 0) {
                 console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active, ${batchAiCallsCount} Gemini calls). Cooling down for ${Math.round(remainingCooldownMs / 1000)}s to respect rate limits...`);

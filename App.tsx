@@ -6706,7 +6706,7 @@ const App: React.FC = () => {
         }
 
         // Write both newly fetched and enriched/upgraded artists to Firestore (fire-and-forget) - only for standalone queries
-        if (artistList.length === 1) {
+        if (artistList.length === 1 && !useCloudCuration) {
           const fetchedDetailsMap = new Map<string, NodeDetails>();
           const seedName = toFetch[0];
           const nodeObj = { id: seedName, label: seedName, type: 'artist' as any, group: 0 };

@@ -384,7 +384,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
                                     <li>Read Gate (isFullyQualifiedEntityProfile with requireMembersAndPeers: true + Origin-Suffix Parity): Requires complete structured schema (summary, genre, origin, founded, canonical style, non-empty members and notableArtists peer circle free of member pollution), origin matching <code>-iso</code> suffix. Rejects stale docs missing members/peers, foreign homonyms, and member-polluted profiles to trigger full re-hydration self-healing.</li>
                                     <li>Miss: Enforces <code>lockedSeeds</code> / <code>-iso</code> identity lock, canonical <code>node.id</code> scene context, and strict <code>ARTIST/LABEL_NODE_DETAILS_SCHEMA</code> (3x retry). ARTIST schema requires <code>members</code> (Name (Role) for bands/soloists; honest [] for obscure underground acts [Rule 8]) and strictly bars band members or self-references in <code>notableArtists</code> (deterministically scrubbed via <code>sanitizeNotableArtists</code>). Rule 38 Waterfall queries regional <code>country=ISO</code> storefronts first before US fallback with <code>fetchItunesJsonWithRetry</code> (4000ms timeout + up to 2 jittered retries on HTTP <code>403/429</code>), Tier 1 spacing-collapsed &amp; Leading <code>"The "</code> fallbacks, expanded emo/rock/punk taxonomy parity, <code>isAppleElectronicHardcoreGenre</code> Electronic/Gabber isolation, generic-safe catalog corroboration, <code>passesUncorroboratedEraGate</code> (<code>[foundedYear - 1, foundedYear + 10]</code> when uncorroborated), <code>reconciled.length &gt; 0</code> across all tiers, year-aware <code>deduplicateDiscographyItems</code>, Mutual Non-Hostility Catalog-Corroborated Genre Relaxation (<code>isCatalogCorroboratedNonHostileGenre</code> for <code>&gt;= 2</code> distinct non-generic matches on 1 unambiguous <code>artistId</code>), Tier 3B album-anchored <code>entity=song</code> fallback (<code>cleanSongQueryAlbumTitle</code> format-stripping, collapsed self-titled/generic exclusion, prioritized 4-query cap, strict whole-word artist, fuzzy album, genre/era sanity &amp; single <code>artistId</code>, plus Multi-Album Reissue Year-Drift Relaxation, Conflation-Pinned Compilation Rescue via <code>COMPILATION_COLLECTION_RE</code> across <code>&gt;= 2</code> tracks or <code>1 collectionName + &gt;= 1 trackName</code> with <code>trackCount &gt;= 8</code>, and <code>[Tier 3B Miss]</code> diagnostic logging), and Collection-Level Apple Music Conflation Guard (<code>filterConflatedArtistCollections</code> protecting title-corroborated non-hostile releases); stamps <code>itunesScrapeVersion: 2</code> (with one-time $0.00 Step 2 upgrade for anchored legacy <code>not-found</code> docs via <code>shouldRunRule38NotFoundUpgrade</code>); unverified artists fail fast to terminal quarantine <code>imageUrl: 'not-found'</code>, <code>discography: []</code>, <code>itunesArtistId: null</code>.</li>
-                                    <li>Slug deduplication skips stubs, ambiguous multi-ISO collisions, and cross-scene foreign homonyms (<code>sceneAnchorIsos</code>); falls back to <code>seedStubs</code> if retries fail. Dynamic cooldown skips sleep on 100% cache-hit batches.</li>
+                                    <li>Slug deduplication skips stubs, ambiguous multi-ISO collisions, and cross-scene foreign homonyms (<code>sceneAnchorIsos</code>); falls back to <code>seedStubs</code> if retries fail. Complete artist and label cache hits strictly bypass Gemini calls and stagger sleeps (<code>_isReadOnly: true</code>, stripped before Firestore writes via <code>normalizeDetailsForWrite</code>; legacy <code>not-found</code> docs clear stale <code>_isReadOnly</code> for one-time $0.00 Rule 38 upgrades). Dynamic cooldown scales across text hydration calls (<code>batchAiCallsCount / 3</code> * 25s, preserving 25s full-cold-batch pacing while skipping sleep on 100% cache-hit batches).</li>
                                 </ul>
                             </li>
                             <li>
@@ -809,7 +809,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V47.14 Full-Stack Regression Runbook
+                    V47.15 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -965,7 +965,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         ))}
                     </nav>
                     <div className="mt-8 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono pl-2">
-                        Zcene V47.14 Blueprint<br/>
+                        Zcene V47.15 Blueprint<br/>
                         100% Anti-Regression
                     </div>
                 </aside>
@@ -979,7 +979,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.14 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.15 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -1069,7 +1069,7 @@ LOCKED SEMANTIC TOPOLOGY & ZERO READ-ONLY WRITES (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.14 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.15 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

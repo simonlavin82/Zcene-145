@@ -1,12 +1,12 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V47.14 Regression Suite (Full-Stack)
+# V47.15 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (607 unit/integration tests).
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (610 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
-# Run entire full-stack regression test suite (28 test files, 607 offline deterministic tests)
+# Run entire full-stack regression test suite (28 test files, 610 offline deterministic tests)
 npm test
 
 # Run backend pipeline tests
@@ -149,10 +149,11 @@ npx vitest --ui
     *   *Assertion (Compilation Track-Match Rescue, Collection+Track Corroboration, Format-Stripping, Multi-Album Reissue Drift & Leading \`"The "\` Fallback):* Validates conflation-pinned Compilation Rescue for \`mouthpiece-us\` (\`#161072028\` pinned strictly to \`#300974664\` across 2-track, 1-collectionName + 1-trackName, format-suffixed \`"What Was Said EP"\` / \`"Face Tomorrow 7-inch"\`, chronological \`"Mouthpiece EP"\` + \`"Demo 1991"\` prioritization, and 5th-title cross-scanning) and \`friction-us\` (\`#4940290\` pinned strictly to \`#1653010702\`), negative guards (1-of-2 track coincidence, 1 collectionName with 0 track matches, collapsed self-titled \`"Mouthpiece EP"\`, same-track duplicate, \`< 8\` track EP), \`jejune-us\` (\`#1457025031\`) multi-album 2025 reissue pass vs. single-album year-drift rejection, and Tier 1 Leading \`"The "\` fallback for \`the-rocking-horse-winner-us\` (\`#31536457\`).
 
     *   *Assertion (Mutual Non-Hostility Catalog-Corroborated Genre Guard, Emo/Rock Taxonomy Parity & Year-Aware Discography Deduplication — \`v47.14\`):* Validates live \`Fairweather\` (\`#31535979\`, \`genre: 'Emo'\`, mixed \`'Rock'\`/\`'Punk'\` catalog recovering \`"Alaska"\` 2001 + \`"Lusitania"\` 2003), \`isCatalogCorroboratedNonHostileGenre\` multi-album pass for unmapped editorial subgenres (\`'Sasscore / Nintendocore'\`) and crossovers (\`'Rap Rock'\`, \`'Jazz Rock'\`, \`'Electronic Rock'\`, \`'Soul Punk'\`) vs. cross-family non-umbrella Zcene genre / hostile Apple genre / bare Electronic \`'Hardcore'\` 1050 / single-album rejections, and year-aware \`deduplicateDiscographyItems\` eliminating duplicate \`Horizon\` (\`#493669654\`), \`Turning Point\` (\`#1537004455\`), *Good Apollo* Volume One/Two prefix collisions, and yearless duplicates while preserving multi-year self-titled albums (*American Football* 1999/2016/2019, *Weezer* 1994/2001).
+    *   *Assertion (Cached-Artist 0-Call Bypass, Recalibrated \`/ 3\` Cold-Batch Cooldown & Write-Boundary \`_isReadOnly\` Hygiene — \`v47.15\`):* Validates Step 2 retirement of \`requiresVideoScraping\` / \`scrapeVideoIdBackend\` so qualified cached artists (\`youtubeVideoId: null\`) execute 0 Gemini calls, 0ms stagger, \`_isReadOnly: true\`, and 0ms rate-limit cooldown (matching cached labels), legacy \`'not-found'\` cached artists (\`itunesScrapeVersion < 2\`) clear stale \`_isReadOnly\` for one-time \`$0.00\` iTunes-only upgrades at \`batchAiCallsCount = 0\`, \`normalizeDetailsForWrite\` strips transient \`_isReadOnly\` before Firestore writes, cold-batch cooldown scales via \`batchAiCallsCount / 3\` (preserving the 25s cycle window on 100% cold 3-artist batches), and \`App.tsx\` guards single-artist enrichment against client-side \`runUpfrontFetchAndWrite\` in Cloud Curation mode.
 
-## Database Purge Runbook Protocol (V47.14 Multi-Scene Architecture)
+## Database Purge Runbook Protocol (V47.15 Multi-Scene Architecture)
 
-Note: The V47.14 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V47.14 operations.
+Note: The V47.15 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V47.15 operations.
 
 When rolling out structural schema migrations, Tier 1 Global Assets (\`/artists\` and \`/labels\`) remain canonical and 100% unchanged. Legacy purge automation (\`scripts/execute_v43_purge.cjs\`) is retained for emergency reset procedures only, while **strictly preserving Tier 1 \`/artists\` and \`/labels\`**, user wallets, and financial ledgers.
 

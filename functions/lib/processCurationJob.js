@@ -2,6 +2,7 @@
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.processCurationJob = void 0;
 exports.sanitizeUndefinedProperties = sanitizeUndefinedProperties;
+exports.normalizeDetailsForWrite = normalizeDetailsForWrite;
 const firestore_1 = require("firebase-functions/v2/firestore");
 const app_1 = require("firebase-admin/app");
 const firestore_2 = require("firebase-admin/firestore");
@@ -137,8 +138,9 @@ function sanitizeUndefinedProperties(obj) {
 function normalizeDetailsForWrite(details) {
     if (!details || typeof details !== 'object' || Array.isArray(details))
         return details;
+    const { _isReadOnly, ...rest } = details;
     return {
-        ...details,
+        ...rest,
         imageUrl: (typeof details.imageUrl === 'string') ? details.imageUrl : ""
     };
 }
@@ -1065,7 +1067,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         // 2. Fetch from Gemini if cache miss or partial hydration needed
                         let requiresTextHydration = false;
                         let requiresImageScraping = false;
-                        let requiresVideoScraping = false;
                         // Extract clean human-readable name for APIs by prioritizing seedNamesMap, then stripping known country slugs
                         let searchArtistName = seedNamesMap[artistNormId] ||
                             seedNamesMap[(0, curatorService_1.normalizeArtistId)(rawName)] ||
@@ -1076,7 +1077,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         if (!details || !(0, cacheQualification_1.isFullyQualifiedEntityProfile)(details, isLabel, expectedNodeIso, { requireMembersAndPeers: true })) {
                             requiresTextHydration = true;
                             requiresImageScraping = true;
-                            requiresVideoScraping = true;
                         }
                         else {
                             // Complete canonical cache hit -> STRICT BYPASS
@@ -1093,12 +1093,11 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                     console.log(`[Image Scraper / Rule 38 V47.8] Queuing one-time $0.00 iTunes-only upgrade for legacy not-found doc: ${artistNormId}`);
                                 }
                             }
-                            if (!details.youtubeVideoId && !isLabel) {
-                                requiresVideoScraping = true;
-                                isReadOnly = false;
-                            }
                             if (isReadOnly) {
                                 details._isReadOnly = true;
+                            }
+                            else {
+                                delete details._isReadOnly;
                             }
                         }
                         const tempNode = {
@@ -1115,7 +1114,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             genreHint: resolvedGenreHint
                         };
                         // Stagger concurrent requests by 1000ms to prevent API burst rate limiting (iTunes & Gemini)
-                        if (idx > 0 && (requiresTextHydration || requiresImageScraping || requiresVideoScraping)) {
+                        if (idx > 0 && (requiresTextHydration || requiresImageScraping)) {
                             await new Promise(resolve => setTimeout(resolve, idx * 1000));
                         }
                         if (requiresTextHydration) {
@@ -1155,31 +1154,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             }
                         }
                         if (details) {
-                            // 3. Scrape YouTube and validate video ID (only for artists; labels do not have music videos)
-                            if (!isLabel && requiresVideoScraping) {
-                                try {
-                                    if (details.youtubeVideoId) {
-                                        const playable = await (0, curatorService_1.checkVideoPlayability)(details.youtubeVideoId);
-                                        if (!playable) {
-                                            details.youtubeVideoId = null;
-                                        }
-                                    }
-                                    if (!details.youtubeVideoId && details.youtubeSearchQuery) {
-                                        batchAiCallsCount++;
-                                        const scrapedId = await (0, curatorService_1.scrapeVideoIdBackend)(searchArtistName, artistNormId);
-                                        if (scrapedId) {
-                                            const playable = await (0, curatorService_1.checkVideoPlayability)(scrapedId);
-                                            if (playable) {
-                                                details.youtubeVideoId = scrapedId;
-                                            }
-                                        }
-                                    }
-                                }
-                                catch (e) {
-                                    console.warn(`[Media Sync] Soft warning: Media player validation failed for ${searchArtistName}. Bypassing sync check.`, e);
-                                    details.youtubeVideoId = null;
-                                }
-                            }
                             if (!details.details) {
                                 details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
                             }
@@ -1235,7 +1209,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         // Sync strictly to the topology node ID, ignoring any internal deduplication mutation.
                         return [entityObj.id, details];
                     }));
-                    console.log(`[Curation Backend] [Step 3: Firestore Caching] Hydration complete. Writing ${chunkResults.length} entities to Firestore cache...`);
+                    console.log(`[Curation Backend] [Step 3: In-Memory Staging] Batch hydration complete. Staged ${chunkResults.length} entities into detailsCacheEntries...`);
                     for (const res of chunkResults) {
                         if (res) {
                             const existingIndex = detailsCacheEntries.findIndex((entry) => entry[0] === res[0] || (0, isoCountries_1.isEntitySeedMatch)((0, curatorService_1.normalizeArtistId)(res[0]), entry[0]));
@@ -1249,7 +1223,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     }
                     // ── Dynamic Rate-Limit Cooldown ──────────────────────────────────────────────
                     // The Gemini 15 RPM quota requires a minimum 25-second window between full batches
-                    // of 3 entities (~6 calls). If the batch made 0 Gemini calls (100% cache hits),
+                    // of 3 entities (~3 calls). If the batch made 0 Gemini calls (100% cache hits),
                     // the rate-limit window does not need to elapse and cooldown is skipped completely.
                     // For partial batches, the window scales proportionally to batchAiCallsCount.
                     if (i + batchSize < recommendedEntities.length) {
@@ -1258,7 +1232,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active, 0 Gemini calls). 100% cache hits — skipping rate-limit cooldown.`);
                         }
                         else {
-                            const dynamicWindowMs = Math.min(25000, Math.max(8000, Math.ceil((batchAiCallsCount / 6) * 25000)));
+                            const dynamicWindowMs = Math.min(25000, Math.max(8000, Math.ceil((batchAiCallsCount / 3) * 25000)));
                             const remainingCooldownMs = Math.max(0, dynamicWindowMs - batchElapsedMs);
                             if (remainingCooldownMs > 0) {
                                 console.log(`[Curation Backend] Batch complete (${Math.round(batchElapsedMs / 1000)}s active, ${batchAiCallsCount} Gemini calls). Cooling down for ${Math.round(remainingCooldownMs / 1000)}s to respect rate limits...`);
