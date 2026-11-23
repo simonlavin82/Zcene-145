@@ -1,5 +1,5 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V47.9 Regression Suite (Full-Stack)
+# V47.10 Regression Suite (Full-Stack)
 
 This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (583 unit/integration tests).
 
@@ -142,14 +142,15 @@ npx vitest --ui
 11. **Server-Side Account Deletion, GDPR Art. 17 Erasure & Anonymised P&L Preservation (\`v47.4\`):**
     *   *Assertion (Recency, Concurrency, Sole Admin Protection & Rules Lockdown):* Validates \`deleteUserAccount\` fail-closed sole Admin self-deletion hard-block (\`isProtectedAdminIdentity\` -> \`permission-denied\` / \`ADMIN_ACCOUNT_PROTECTED\` before any DB/Auth calls, with \`Delete Account\` hidden for Admin in \`Header.tsx\` and guarded in \`App.tsx\`), \`auth_time <= 300s\` (\`REQUIRES_RECENT_LOGIN\` + seamless Google popup re-auth retry), active curation lock guard (\`ACTIVE_CURATION_IN_PROGRESS\`), Admin-only \`users/{userId}\` delete lock (excluding the sole Admin UID) in \`firestore.rules\`, and Admin-read/server-write-only \`adminLedger/system/deletedAccountTelemetry/{archiveId}\`.
     *   *Assertion (Full Erasure & Zero-PII P&L Reconciliation):* Validates chunk-deletion of all user subcollections, legacy projects, \`sharedZcenes\`, locks, sessions, jobs, and Firebase Auth user, \`curationFailures\` PII scrubbing to \`"deleted_account"\`, zero-PII financial archive creation, and exact \`computeAggregateMetrics\` P&L reconciliation excluding forfeited balances from active unspent float.
-12. **Landing Page Demo Parity (\`v47.7\`), Rule 38 Two-Layer Album-Anchored iTunes Fallback (\`v47.8\`) & Guard Hardening (\`v47.9\`):**
+12. **Landing Page Demo Parity (\`v47.7\`), Rule 38 Two-Layer Album-Anchored iTunes Fallback (\`v47.8\`), Guard Hardening (\`v47.9\`) & Compilation / Reissue Rescue (\`v47.10\`):**
     *   *Assertion (HomePage Live-Parity Mockups & Zero Mount-Time Fetches):* Validates Multi-Scene Switcher Strip in \`ArtistFeatureVisual.tsx\`, live-parity The Get Up Kids Members, Scene Circle & 6 Essential Listening albums in \`CollectionIntelligenceVisual.tsx\`, \`Style resonance\` copy without em-dashes, and zero mount-time iTunes fetches via \`!isStaticMockup\`.
     *   *Assertion (Tier 3B Album-Anchored Fallback, Conflation Guard & One-Time Upgrade):* Validates 3-query-capped \`entity=song\` recovery, fail-closed guards (Various Artists, substring artists, hostile genres, year drift, multi-\`artistId\` ambiguity), exact \`#1511350574\` Exhibition conflated catalog filtering (blocking 1994–2003 Christian/New Age 1-track singles), generic-only \`"Demo"\` Tier 1 safeguard vs. \`Reason to Believe\` corroboration rejection, and Step 2 \`itunesScrapeVersion: 2\` one-time \`$0.00\` upgrade check.
     *   *Assertion (Apple Electronic \`"Hardcore"\`, Uncorroborated Debut-Era Gate & Empty-Catalog Fail-Closed):* Validates \`isAppleElectronicHardcoreGenre\` blocking bare Apple \`"Hardcore"\` against non-electronic hardcore/metalcore/punk subgenres (\`panic-us\` \`#15241026\`), \`passesUncorroboratedEraGate\` rejecting \`reason-to-believe-us\`, \`sunrise-pl\`, \`hands-tied-us\`, \`zwan-us\`, pre-formation homonyms, and missing \`foundedYear\` while preserving \`exhibition-us\` & \`christie-front-drive-us\`, anchored \`shouldRunRule38NotFoundUpgrade\`, and empty-reconciled fail-closed (\`certain-people-i-know-us\`).
+    *   *Assertion (Compilation Track-Match Rescue, Multi-Album Reissue Drift & Leading \`"The "\` Fallback):* Validates conflation-pinned Compilation Rescue for \`mouthpiece-us\` (\`#161072028\` pinned strictly to \`#300974664\`) and \`friction-us\` (\`#4940290\` pinned strictly to \`#1653010702\`), negative guards (1-of-2 track coincidence, same-track duplicate, \`< 8\` track EP), \`jejune-us\` (\`#1457025031\`) multi-album 2025 reissue pass vs. single-album year-drift rejection, and Tier 1 Leading \`"The "\` fallback for \`the-rocking-horse-winner-us\` (\`#31536457\`).
 
-## Database Purge Runbook Protocol (V47.9 Multi-Scene Architecture)
+## Database Purge Runbook Protocol (V47.10 Multi-Scene Architecture)
 
-Note: The V47.9 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V47.9 operations.
+Note: The V47.10 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V47.10 operations.
 
 When rolling out structural schema migrations, Tier 1 Global Assets (\`/artists\` and \`/labels\`) remain canonical and 100% unchanged. Legacy purge automation (\`scripts/execute_v43_purge.cjs\`) is retained for emergency reset procedures only, while **strictly preserving Tier 1 \`/artists\` and \`/labels\`**, user wallets, and financial ledgers.
 

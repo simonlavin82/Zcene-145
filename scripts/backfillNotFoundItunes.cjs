@@ -1,19 +1,20 @@
 /**
  * scripts/backfillNotFoundItunes.cjs
  *
- * V47.9 Non-Destructive $0.00 iTunes-Only Backfill Script for Legacy 'not-found' /artists Docs.
+ * V47.10 Non-Destructive $0.00 iTunes-Only Backfill Script for Legacy 'not-found' /artists Docs.
  *
  * Safety & Cost Guarantees:
  * - Mandatory --dry-run default. Pass --apply explicitly to mutate Firestore.
- * - Zero Gemini API calls ($0.00 AI cost). Uses compiled Rule 38 v47.9 scrapeImageUrlBackend directly.
+ * - Zero Gemini API calls ($0.00 AI cost). Uses compiled Rule 38 v47.10 scrapeImageUrlBackend directly.
  * - Strictly preserves 100% of existing Gemini bios, members, scene circles, links, graphData,
  *   and synthesisRationale — updates ONLY detailsCache.imageUrl, detailsCache.discography,
  *   detailsCache.itunesArtistId, detailsCache.itunesScrapeVersion, and updatedAt in place.
  *
  * Usage:
  *   node scripts/backfillNotFoundItunes.cjs --dry-run --artist=exhibition-us
+ *   node scripts/backfillNotFoundItunes.cjs --dry-run --artist=the-rocking-horse-winner-us --force
  *   node scripts/backfillNotFoundItunes.cjs --dry-run --limit=25
- *   node scripts/backfillNotFoundItunes.cjs --apply --artist=exhibition-us
+ *   node scripts/backfillNotFoundItunes.cjs --apply --artist=the-rocking-horse-winner-us --force
  */
 
 const path = require('path');
@@ -32,12 +33,18 @@ const {
 
 const args = process.argv.slice(2);
 const isApply = args.includes('--apply');
+const isForce = args.includes('--force');
 const artistArg = args.find((a) => a.startsWith('--artist='));
 const targetArtistSlug = artistArg ? artistArg.slice('--artist='.length).trim().toLowerCase() : null;
 const limitArg = args.find((a) => a.startsWith('--limit='));
 const maxLimit = limitArg ? Math.max(1, parseInt(limitArg.slice('--limit='.length), 10) || 0) : Infinity;
 const delayArg = args.find((a) => a.startsWith('--delay-ms='));
 const delayMs = delayArg ? Math.max(0, parseInt(delayArg.slice('--delay-ms='.length), 10) || 3500) : 3500;
+
+if (isForce && !targetArtistSlug) {
+  console.error('[backfillNotFoundItunes] --force is strictly gated to require an explicit --artist=<slug> (never allowed on global sweeps).');
+  process.exit(1);
+}
 
 const serviceAccountPath = path.resolve(__dirname, '../firebase-service-account.json');
 const serviceAccount = require(serviceAccountPath);
@@ -81,8 +88,8 @@ function formatDiscogSummary(discog) {
 
 async function run() {
   console.log('=================================================================');
-  console.log(`Rule 38 v47.9 Non-Destructive iTunes-Only Backfill (${isApply ? 'APPLY MODE' : 'DRY-RUN MODE — NO WRITES'})`);
-  console.log(`Target: ${targetArtistSlug ? `artists/${targetArtistSlug}` : 'all eligible /artists docs'} | Limit: ${Number.isFinite(maxLimit) ? maxLimit : 'none'} | Pacing: ${delayMs}ms`);
+  console.log(`Rule 38 v47.10 Non-Destructive iTunes-Only Backfill (${isApply ? 'APPLY MODE' : 'DRY-RUN MODE — NO WRITES'})`);
+  console.log(`Target: ${targetArtistSlug ? `artists/${targetArtistSlug}${isForce ? ' (--force)' : ''}` : 'all eligible /artists docs'} | Limit: ${Number.isFinite(maxLimit) ? maxLimit : 'none'} | Pacing: ${delayMs}ms`);
   console.log('=================================================================\n');
 
   let docs = [];
@@ -132,10 +139,10 @@ async function run() {
     const existingScrapeVersion = Number(profile.itunesScrapeVersion) || 0;
     const existingImageUrl = typeof profile.imageUrl === 'string' ? profile.imageUrl.trim() : '';
 
-    if (existingScrapeVersion >= CURRENT_ITUNES_SCRAPE_VERSION) {
+    if (!isForce && existingScrapeVersion >= CURRENT_ITUNES_SCRAPE_VERSION) {
       skipped++;
       if (targetArtistSlug) {
-        console.log(`[SKIP] ${docId}: already stamped itunesScrapeVersion=${existingScrapeVersion}`);
+        console.log(`[SKIP] ${docId}: already stamped itunesScrapeVersion=${existingScrapeVersion} (pass --force with --artist=${docId} to re-evaluate)`);
       }
       continue;
     }
@@ -148,9 +155,11 @@ async function run() {
       continue;
     }
 
-    const probeProfile = existingImageUrl
-      ? profile
-      : { ...profile, imageUrl: 'not-found' };
+    const probeProfile = {
+      ...profile,
+      imageUrl: 'not-found',
+      ...(isForce && targetArtistSlug ? { itunesScrapeVersion: 0 } : {}),
+    };
     if (!shouldRunRule38NotFoundUpgrade(probeProfile, false)) {
       skipped++;
       if (targetArtistSlug) {

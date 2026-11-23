@@ -9,6 +9,7 @@ import {
   evaluateGenreDistanceScore,
   isAppleElectronicHardcoreGenre,
   passesUncorroboratedEraGate,
+  COMPILATION_COLLECTION_RE,
   selectBestArtistArtwork,
   CURRENT_ITUNES_SCRAPE_VERSION,
   shouldRunRule38NotFoundUpgrade
@@ -1224,6 +1225,544 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           '2012'
         );
         expect(res).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('V47.10 Rule 38: Compilation Track-Match Rescue, Multi-Album Reissue Drift & Leading "The " Fallback', () => {
+    it('1. Conflation-Pinned Compilation Rescue recovers mouthpiece-us (#161072028) pinned strictly to #300974664 and blocks 2025 feat. single + Hip-Hop/Christian albums', async () => {
+      expect(COMPILATION_COLLECTION_RE.test("Can't Kill What's Inside: The Complete Discography")).toBe(true);
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('term=Mouthpiece&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 161072028, artistName: 'Mouthpiece', primaryGenreName: 'Hip-Hop/Rap' },
+                { wrapperType: 'artist', artistId: 1679167303, artistName: 'Mouthpiece', primaryGenreName: 'Afrobeats' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('entity=song&limit=15')) {
+          if (url.includes('Face%20Tomorrow')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 161072028,
+                    artistName: 'Mouthpiece',
+                    collectionId: 300974664,
+                    collectionName: "Can't Kill What's Inside: The Complete Discography",
+                    trackName: 'Face Tomorrow',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2009-01-20T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          if (url.includes('What%20Was%20Said')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 161072028,
+                    artistName: 'Mouthpiece',
+                    collectionId: 300974664,
+                    collectionName: "Can't Kill What's Inside: The Complete Discography",
+                    trackName: 'What Was Said',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2009-01-20T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=300974664&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 161072028,
+                  collectionId: 300974664,
+                  collectionName: "Can't Kill What's Inside: The Complete Discography",
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                  trackCount: 38,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/mouthpiece/complete-discog/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Mouthpiece',
+          'artist',
+          'Youth Crew Hardcore',
+          'New Jersey straight-edge hardcore band founded in 1991 on New Age and Revelation Records.',
+          'New Jersey, USA',
+          [
+            { albumName: 'What Was Said', releaseYear: '1994' },
+            { albumName: 'Face Tomorrow', releaseYear: '1995' },
+          ],
+          'us',
+          '1991'
+        );
+
+        expect(res.itunesArtistId).toBe(161072028);
+        expect(res.imageUrl).toBe('https://is1-ssl.mzstatic.com/mouthpiece/complete-discog/600x600bb.jpg');
+        expect(res.reconciledDiscography).toEqual([
+          {
+            albumName: "Can't Kill What's Inside: The Complete Discography",
+            releaseYear: '2009',
+            itunesCollectionId: 300974664,
+          },
+        ]);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('2. Conflation-Pinned Compilation Rescue recovers friction-us (#4940290) pinned strictly to #1653010702 and excludes Japanese Friction Alternative LPs', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('term=Friction&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 4940290, artistName: 'Friction', primaryGenreName: 'Alternative' },
+                { wrapperType: 'artist', artistId: 1640912527, artistName: 'Friction', primaryGenreName: 'Punk' },
+              ],
+            }),
+          } as any;
+        }
+        // Tier 3A lookup on #4940290 returns compilation + Japanese Friction albums (none match "Blurred in Six" or "The Makeshift Chimney" as collectionName)
+        if (url.includes('lookup?id=4940290&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'collection', artistId: 4940290, collectionId: 260169621, collectionName: '軋轢', primaryGenreName: 'Alternative', releaseDate: '2005-05-20T07:00:00Z', trackCount: 10, artworkUrl100: 'https://is1-ssl.mzstatic.com/jp-friction/100x100bb.jpg' },
+                { wrapperType: 'collection', artistId: 4940290, collectionId: 1653010702, collectionName: 'Hours of Operation: Discography 1991 - 1994', primaryGenreName: 'Alternative', releaseDate: '2002-04-16T07:00:00Z', trackCount: 32, artworkUrl100: 'https://is1-ssl.mzstatic.com/us-friction/hours/100x100bb.jpg' },
+                { wrapperType: 'collection', artistId: 4940290, collectionId: 1537156474, collectionName: 'SKIN DEEP', primaryGenreName: 'Rock', releaseDate: '2006-08-21T07:00:00Z', trackCount: 8, artworkUrl100: 'https://is1-ssl.mzstatic.com/jp-friction-2/100x100bb.jpg' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('entity=song&limit=15')) {
+          if (url.includes('Blurred%20in%20Six')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 4940290,
+                    artistName: 'Friction',
+                    collectionId: 1653010702,
+                    collectionName: 'Hours of Operation: Discography 1991 - 1994',
+                    trackName: 'Blurred in Six',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2002-04-16T07:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          if (url.includes('The%20Makeshift%20Chimney')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 4940290,
+                    artistName: 'Friction',
+                    collectionId: 1653010702,
+                    collectionName: 'Hours of Operation: Discography 1991 - 1994',
+                    trackName: 'The Makeshift Chimney',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2002-04-16T07:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=1653010702&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 4940290,
+                  collectionId: 1653010702,
+                  collectionName: 'Hours of Operation: Discography 1991 - 1994',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2002-04-16T07:00:00Z',
+                  trackCount: 32,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/us-friction/hours/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Friction',
+          'artist',
+          'Post-Hardcore',
+          'Chicago post-hardcore band active from 1991 to 1994.',
+          'Chicago, USA',
+          [
+            { albumName: 'Blurred in Six', releaseYear: '1993' },
+            { albumName: 'The Makeshift Chimney', releaseYear: '1994' },
+          ],
+          'us',
+          '1991'
+        );
+
+        expect(res.itunesArtistId).toBe(4940290);
+        expect(res.imageUrl).toBe('https://is1-ssl.mzstatic.com/us-friction/hours/600x600bb.jpg');
+        expect(res.reconciledDiscography).toEqual([
+          {
+            albumName: 'Hours of Operation: Discography 1991 - 1994',
+            releaseYear: '2002',
+            itunesCollectionId: 1653010702,
+          },
+        ]);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('3. Compilation negative guards: 1-of-2 track coincidence, same-track duplicate, or <8-track EP all fail closed to Tier 4', async () => {
+      // Case A: Only 1 of 2 Gemini titles matches a track on the compilation -> fail closed
+      const oneOfTwoSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=song&limit=15') && url.includes('Face%20Tomorrow')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'track',
+                  kind: 'song',
+                  artistId: 161072028,
+                  artistName: 'Mouthpiece',
+                  collectionId: 300974664,
+                  collectionName: "Can't Kill What's Inside: The Complete Discography",
+                  trackName: 'Face Tomorrow',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                },
+                {
+                  wrapperType: 'track',
+                  kind: 'song',
+                  artistId: 161072028,
+                  artistName: 'Mouthpiece',
+                  collectionId: 300974664,
+                  collectionName: "Can't Kill What's Inside: The Complete Discography",
+                  trackName: 'Face Tomorrow (Live)',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const oneMatchRes = await scrapeImageUrlBackend(
+          'Mouthpiece',
+          'artist',
+          'Youth Crew Hardcore',
+          'NJ hardcore band.',
+          'New Jersey, USA',
+          [
+            { albumName: 'Face Tomorrow', releaseYear: '1995' },
+            { albumName: 'Nonexistent Second Record', releaseYear: '1996' },
+          ],
+          'us',
+          '1991'
+        );
+        expect(oneMatchRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        oneOfTwoSpy.mockRestore();
+      }
+
+      // Case B: Short <8-track EP masquerading with "Complete" in title -> rejected by trackCount >= 8 check
+      const shortEpSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=song&limit=15')) {
+          const isFirst = url.includes('Track%20Alpha');
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'track',
+                  kind: 'song',
+                  artistId: 500001,
+                  artistName: 'Mouthpiece',
+                  collectionId: 600001,
+                  collectionName: 'Complete Control - EP',
+                  trackName: isFirst ? 'Track Alpha' : 'Track Bravo',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=600001&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 500001,
+                  collectionId: 600001,
+                  collectionName: 'Complete Control - EP',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                  trackCount: 4, // < 8 tracks -> must fail closed
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/short-ep/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const shortEpRes = await scrapeImageUrlBackend(
+          'Mouthpiece',
+          'artist',
+          'Youth Crew Hardcore',
+          'NJ hardcore band.',
+          'New Jersey, USA',
+          [
+            { albumName: 'Track Alpha', releaseYear: '1994' },
+            { albumName: 'Track Bravo', releaseYear: '1995' },
+          ],
+          'us',
+          '1991'
+        );
+        expect(shortEpRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        shortEpSpy.mockRestore();
+      }
+    });
+
+    it('4. Multi-Album Reissue Year-Drift Relaxation rescues jejune-us (#1457025031, 1997/1998 -> 2025) while single-album year drift still fails closed', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=musicArtist')) {
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('entity=song&limit=15')) {
+          if (url.includes('Malady')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 1457025031,
+                    artistName: 'Jejune',
+                    collectionId: 1835015465,
+                    collectionName: 'This Afternoons Malady',
+                    trackName: 'Morale Is Low',
+                    primaryGenreName: 'Rock',
+                    releaseDate: '2025-09-05T07:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          if (url.includes('Junk')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 1457025031,
+                    artistName: 'Jejune',
+                    collectionId: 1824532811,
+                    collectionName: 'Junk',
+                    trackName: 'Coping With Senility',
+                    primaryGenreName: 'Indie Rock',
+                    releaseDate: '2025-07-18T07:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=1457025031&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'collection', artistId: 1457025031, collectionId: 1835015465, collectionName: 'This Afternoons Malady', primaryGenreName: 'Rock', releaseDate: '2025-09-05T07:00:00Z', trackCount: 12, artworkUrl100: 'https://is1-ssl.mzstatic.com/jejune/malady/100x100bb.jpg' },
+                { wrapperType: 'collection', artistId: 1457025031, collectionId: 1824532811, collectionName: 'Junk', primaryGenreName: 'Indie Rock', releaseDate: '2025-07-18T07:00:00Z', trackCount: 8, artworkUrl100: 'https://is1-ssl.mzstatic.com/jejune/junk/100x100bb.jpg' },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        // Multi-album (2 distinct albums matching 2025 reissues on #1457025031) -> passes
+        const multiRes = await scrapeImageUrlBackend(
+          'Jejune',
+          'artist',
+          'Emo / Indie Rock',
+          'Boston 1990s emo band.',
+          'Boston, USA',
+          [
+            { albumName: 'Junk', releaseYear: '1997' },
+            { albumName: "This Afternoon's Malady", releaseYear: '1998' },
+          ],
+          'us',
+          '1996'
+        );
+        expect(multiRes.itunesArtistId).toBe(1457025031);
+        expect(multiRes.imageUrl).toContain('jejune');
+        expect(multiRes.reconciledDiscography.map((d) => d.albumName)).toEqual(['Junk', 'This Afternoons Malady']);
+
+        // Single-album >2 yr drift (only 1 album provided: 1998 vs 2025) -> still fails closed!
+        const singleDriftRes = await scrapeImageUrlBackend(
+          'Jejune',
+          'artist',
+          'Emo / Indie Rock',
+          'Boston 1990s emo band.',
+          'Boston, USA',
+          [{ albumName: "This Afternoon's Malady", releaseYear: '1998' }],
+          'us',
+          '1996'
+        );
+        expect(singleDriftRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('5. Tier 1 Leading "The " Fallback rescues the-rocking-horse-winner-us (#31536457) when bare query misses and never double-prefixes "The "', async () => {
+      const queriedTerms: string[] = [];
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=musicArtist')) {
+          queriedTerms.push(url);
+          if (url.includes('term=The%20Rocking%20Horse%20Winner&')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  { wrapperType: 'artist', artistId: 31536457, artistName: 'The Rocking Horse Winner', primaryGenreName: 'Rock' },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=31536457&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'collection', artistId: 31536457, collectionId: 555153017, collectionName: 'State of Feeling Concentration', primaryGenreName: 'Rock', releaseDate: '2000-06-12T07:00:00Z', trackCount: 10, artworkUrl100: 'https://is1-ssl.mzstatic.com/trhw/state/100x100bb.jpg' },
+                { wrapperType: 'collection', artistId: 31536457, collectionId: 493669654, collectionName: 'Horizon', primaryGenreName: 'Rock', releaseDate: '2002-01-01T08:00:00Z', trackCount: 10, artworkUrl100: 'https://is1-ssl.mzstatic.com/trhw/horizon/100x100bb.jpg' },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Rocking Horse Winner',
+          'artist',
+          'Emo / Indie Rock',
+          'Florida indie emo band on Equal Vision Records.',
+          'Coral Springs, Florida, USA',
+          [],
+          'us',
+          '1999'
+        );
+
+        expect(res.itunesArtistId).toBe(31536457);
+        expect(res.imageUrl).toBe('https://is1-ssl.mzstatic.com/trhw/state/600x600bb.jpg');
+        expect(res.reconciledDiscography.map((d) => d.albumName)).toEqual(['State of Feeling Concentration', 'Horizon']);
+
+        // Calling with an input that already starts with "The " must NEVER query "The The ..."
+        queriedTerms.length = 0;
+        await scrapeImageUrlBackend(
+          'The Nonexistent Band',
+          'artist',
+          'Indie Rock',
+          'Indie rock band.',
+          'USA',
+          [],
+          'us',
+          '1999'
+        );
+        expect(queriedTerms.some((u) => u.includes('The%20The'))).toBe(false);
       } finally {
         fetchSpy.mockRestore();
       }
