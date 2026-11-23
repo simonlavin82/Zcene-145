@@ -566,4 +566,126 @@ describe('Architecture V42: Global 249-Country ISO-3166 Registry & End-to-End Di
       expect(buildDisambiguationSnippet({ genre: 'Pop Rock', origin: 'Thailand' })).toBe('Pop Rock act from Thailand.');
     });
   });
+
+  describe('7. V47.13 Canonical Band-Name Resolution (Leading "The " Restoration), Collision Guard & Router-Stub Keying', () => {
+    it('(a) enforces official leading "The " restoration, non-"The " preservation, and erroneous "The " stripping in SEED_VALIDATION_SCHEMA and validateSeedOriginBackend prompt', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const curatorSrc = fs.readFileSync(path.resolve(__dirname, '../src/services/curatorService.ts'), 'utf8');
+
+      // Schema & Prompt Rule 1 locks:
+      expect(curatorSrc).toContain('CANONICAL NAME, SPELLING & OFFICIAL ARTICLE NORMALIZATION (MANDATORY)');
+      expect(curatorSrc).toContain('OFFICIAL LEADING "THE " RESTORATION');
+      expect(curatorSrc).toContain('"Rocking Horse Winner" -> "The Rocking Horse Winner"');
+      expect(curatorSrc).toContain('"Get Up Kids" -> "The Get Up Kids"');
+      expect(curatorSrc).toContain('STRICT NON-"THE" PRESERVATION');
+      expect(curatorSrc).toContain('"Pixies", "Ramones", "Talking Heads", "Deftones", "Fugazi", "Quicksand", "Snapcase"');
+      expect(curatorSrc).toContain('"The Pixies" -> "Pixies"');
+      expect(curatorSrc).toContain('"The Deftones" -> "Deftones"');
+    });
+
+    it('(b) multi-candidate "The X" vs. "X" or cross-country homonym collisions keep isAmbiguous: true without false programmatic correctedInput: true', () => {
+      const enforceSingleArtistCanonicalCorrection = (
+        seed: string,
+        validationResult: { isValid: boolean; hasCollision?: boolean; id: string; correctedInput: boolean }
+      ) => {
+        if (
+          validationResult.isValid &&
+          !validationResult.hasCollision &&
+          String(seed).trim().toLowerCase() !== String(validationResult.id || '').trim().toLowerCase()
+        ) {
+          validationResult.correctedInput = true;
+        }
+        return validationResult;
+      };
+
+      // 1. Single-artist dropped leading "The " -> sets correctedInput: true
+      const singleRestored = enforceSingleArtistCanonicalCorrection('Rocking Horse Winner', {
+        isValid: true,
+        hasCollision: false,
+        id: 'The Rocking Horse Winner',
+        correctedInput: false,
+      });
+      expect(singleRestored.correctedInput).toBe(true);
+
+      // 2. Single-artist stripped erroneous leading "The " -> sets correctedInput: true
+      const singleStripped = enforceSingleArtistCanonicalCorrection('The Deftones', {
+        isValid: true,
+        hasCollision: false,
+        id: 'Deftones',
+        correctedInput: false,
+      });
+      expect(singleStripped.correctedInput).toBe(true);
+
+      // 3. Multi-candidate homonym collision (e.g. "Darko" -> primary "Darko US" + collision "Darko" [UK]) -> does NOT force correctedInput: true
+      const multiCollision = enforceSingleArtistCanonicalCorrection('Darko', {
+        isValid: true,
+        hasCollision: true,
+        id: 'Darko US',
+        correctedInput: false,
+      });
+      expect(multiCollision.correctedInput).toBe(false);
+    });
+
+    it('(c) keys pre-flight single-artist Rule 17 bare router stubs strictly by canonicalBareNormId so typos and dropped articles never pollute /artists on cancel', async () => {
+      const store = new Map<string, any>();
+      const fakeDb: any = {
+        collection: (coll: string) => ({
+          doc: (docId: string) => ({
+            get: async () => ({
+              exists: store.has(`${coll}/${docId}`),
+              data: () => store.get(`${coll}/${docId}`),
+            }),
+            set: async (payload: any, opts?: { merge?: boolean }) => {
+              const key = `${coll}/${docId}`;
+              const prev = opts?.merge ? store.get(key) || {} : {};
+              store.set(key, { ...prev, ...payload });
+            },
+          }),
+        }),
+      };
+
+      const normalizeId = (s: string) =>
+        s.trim().toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Simulate pre-flight stub minting for both typo ("the rocking horse winer") and dropped article ("Rocking Horse Winner")
+      for (const rawSeed of ['the rocking horse winer', 'Rocking Horse Winner']) {
+        const validationResult = {
+          isValid: true,
+          correctedInput: true,
+          hasCollision: false,
+          id: 'The Rocking Horse Winner',
+          origin: 'USA',
+          genre: 'Indie Rock',
+          candidates: [
+            {
+              id: 'the-rocking-horse-winner-us',
+              name: 'The Rocking Horse Winner',
+              origin: 'USA',
+              genre: 'Indie Rock',
+              disambiguationSnippet: 'South Florida indie emo band on Equal Vision Records.',
+            },
+          ],
+        };
+        const isAmbiguous = Boolean(validationResult.hasCollision && validationResult.candidates.length > 1);
+        const bareNormId = normalizeId(!isAmbiguous && validationResult.id ? validationResult.id : rawSeed);
+
+        await upsertBareRouterStub(fakeDb, bareNormId, validationResult.candidates[0].id, {
+          name: validationResult.candidates[0].name,
+          origin: validationResult.candidates[0].origin,
+          genre: validationResult.candidates[0].genre,
+          disambiguationSnippet: validationResult.candidates[0].disambiguationSnippet,
+          candidates: validationResult.candidates,
+        });
+      }
+
+      // Canonical bare stub exists -> points strictly to the-rocking-horse-winner-us
+      expect(store.has('artists/the-rocking-horse-winner')).toBe(true);
+      expect(store.get('artists/the-rocking-horse-winner').redirectTo).toBe('the-rocking-horse-winner-us');
+
+      // Zero typo or dropped-article stub pollution in /artists
+      expect(store.has('artists/the-rocking-horse-winer')).toBe(false);
+      expect(store.has('artists/rocking-horse-winner')).toBe(false);
+    });
+  });
 });

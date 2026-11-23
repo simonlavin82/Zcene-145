@@ -713,7 +713,7 @@ export const SEED_VALIDATION_SCHEMA = {
     },
     correctedInput: {
       type: Type.BOOLEAN,
-      description: "True if the primary name returned is a spelling or typo correction of the user's input (e.g. input 'turstile' -> 'Turnstile'). False if exact match (case-insensitive)."
+      description: "True if the canonical primary.id differs from the user's input beyond letter casing — including spelling/typo fixes (e.g. 'turstile' -> 'Turnstile'), restored official leading articles (e.g. 'Rocking Horse Winner' -> 'The Rocking Horse Winner', 'Get Up Kids' -> 'The Get Up Kids'), stripped unofficial leading articles (e.g. 'The Deftones' -> 'Deftones', 'The Pixies' -> 'Pixies'), or canonical punctuation (e.g. 'Blink 182' -> 'blink-182'). False only if exact match (case-insensitive)."
     },
     hasCollision: {
       type: Type.BOOLEAN,
@@ -725,7 +725,7 @@ export const SEED_VALIDATION_SCHEMA = {
       properties: {
         id: {
           type: Type.STRING,
-          description: "The canonical, professional name of the artist. If the real-world official band name includes a regional tag (e.g. 'Darko US'), include it. Otherwise do NOT add country suffixes."
+          description: "The exact official, commercially published canonical name of the artist (including official leading 'The ' when part of the band's real billing, e.g. 'The Rocking Horse Winner', 'The Get Up Kids', 'The Promise Ring', 'The Smiths', 'The Cure', and excluding 'The ' when not part of the official billing, e.g. 'Pixies', 'Ramones', 'Talking Heads', 'Deftones', 'Fugazi', 'Quicksand', 'Snapcase'). If the real-world official band name includes a regional tag (e.g. 'Darko US'), include it. Otherwise do NOT add country suffixes."
         },
         origin: {
           type: Type.STRING,
@@ -804,9 +804,13 @@ export const validateSeedOriginBackend = async (
     const prompt = `Validate this seed artist: "${artistId}".${hintContext}
 
 CRITICAL RULES (non-negotiable):
-1. TYPO CORRECTION (MANDATORY): If the input is an obvious misspelling or transposition of a real artist name (e.g. "turstile" for "Turnstile", "radiohed" for "Radiohead", "nirvanna" for "Nirvana"), return the correctly-spelled canonical name in 'primary.id' and set 'correctedInput' to true. Do NOT return the original typo'd spelling under any circumstances.
+1. CANONICAL NAME, SPELLING & OFFICIAL ARTICLE NORMALIZATION (MANDATORY):
+   - Always return the artist's exact official, commercially published canonical name in 'primary.id', and set 'correctedInput' to true whenever 'primary.id' differs from the user's input beyond letter casing.
+   - SPELLING & PUNCTUATION: Fix any misspelling, transposition, or missing punctuation/hyphenation (e.g. "turstile" for "Turnstile", "radiohed" for "Radiohead", "nirvanna" for "Nirvana", "the rocking horse winer" for "The Rocking Horse Winner", "Blink 182" for "blink-182", "Capn Jazz" for "Cap'n Jazz"). Do NOT return the original typo'd spelling under any circumstances.
+   - OFFICIAL LEADING "THE " RESTORATION: If the user omitted an official leading "The " from a band whose real-world published name begins with "The " (e.g. "Rocking Horse Winner" -> "The Rocking Horse Winner", "Get Up Kids" -> "The Get Up Kids", "Promise Ring" -> "The Promise Ring", "Dillinger Escape Plan" -> "The Dillinger Escape Plan", "Smiths" -> "The Smiths", "Cure" -> "The Cure", "Starting Line" -> "The Starting Line"), you MUST restore the leading "The " in 'primary.id' and set 'correctedInput' to true.
+   - STRICT NON-"THE" PRESERVATION: Never prepend "The " to artists whose official billing does NOT start with "The " (e.g. "Pixies", "Ramones", "Talking Heads", "Deftones", "Fugazi", "Quicksand", "Snapcase", "Turnstile", "Mouthpiece", "Texas Is the Reason"). If the user erroneously typed an unofficial leading "The " (e.g. "The Pixies" -> "Pixies", "The Ramones" -> "Ramones", "The Talking Heads" -> "Talking Heads", "The Deftones" -> "Deftones"), strip the unofficial "The " in 'primary.id' and set 'correctedInput' to true.
 2. STRICT ANTI-HALLUCINATION / NO "PEOPLE-PLEASING" COLLISIONS:
-   - A collision exists ONLY when there are multiple distinct, widely-known, commercially released musical artists that legitimately share this name (e.g. "Darko" -> Darko US [Deathcore] and Darko [UK Melodic Punk]).
+   - A collision exists ONLY when there are multiple distinct, widely-known, commercially released musical artists that legitimately share this name or where both a prominent "The <Name>" and a distinct prominent "<Name>" act exist (e.g. "Darko" -> Darko US [Deathcore] and Darko [UK Melodic Punk]).
    - DO NOT invent, hallucinate, or scour for obscure local bar bands, unreleased bedroom projects, or minor soundcloud profiles just to be a "people pleaser".
    - If there is only one predominant, notable, or famous artist (e.g. "Turnstile", "Radiohead", "Nirvana", "Deftones"), you MUST set 'hasCollision' to false and 'collisions' to an empty array []. A false collision ruins user experience.
 3. RE-QUERY BOUNCER & REAL ENTITY CHECK:${hasHints ? `
@@ -822,7 +826,7 @@ CRITICAL RULES (non-negotiable):
       model: currentModel,
       contents: prompt,
       config: {
-        systemInstruction: "You are a strict music data validator, collision detector, and anti-hallucination bouncer. You do NOT infer intent or people-please. If the user input contains a spelling error, return the REAL canonical artist name. If the user provides an origin hint, verify whether an artist by that name actually exists from that origin; if not, return isValid: false. Only report collisions when there are multiple genuinely prominent, commercially published artists sharing the name. NEVER invent minor artists. Return ONLY valid JSON matching the schema.",
+        systemInstruction: "You are a strict music data validator, canonical band-name normalizer, collision detector, and anti-hallucination bouncer. You do NOT infer intent or people-please. Always return the artist's official published canonical name in primary.id (fixing typos, restoring omitted official leading 'The ' articles such as 'Rocking Horse Winner' -> 'The Rocking Horse Winner' or 'Get Up Kids' -> 'The Get Up Kids', and stripping erroneous 'The ' prefixes from bands like 'Pixies', 'Ramones', 'Talking Heads', or 'Deftones') and set correctedInput: true whenever primary.id differs from the input beyond case. If the user provides an origin hint, verify whether an artist by that name actually exists from that origin; if not, return isValid: false. Only report collisions when there are multiple genuinely prominent, commercially published artists sharing the name. NEVER invent minor artists. Return ONLY valid JSON matching the schema.",
         thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL },
         responseMimeType: "application/json",
         responseSchema: SEED_VALIDATION_SCHEMA

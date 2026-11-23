@@ -579,7 +579,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
   });
 
   describe('Part 5: Architecture & Master Blueprint Parity Gate', () => {
-    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V47.12', () => {
+    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V47.13', () => {
       const truthPath = path.resolve(__dirname, '../architecture_truth.md');
       const truthContent = fs.readFileSync(truthPath, 'utf8');
 
@@ -589,23 +589,26 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       const runbookPath = path.resolve(__dirname, '../docs/backend-regression-runbook.ts');
       const runbookContent = fs.readFileSync(runbookPath, 'utf8');
 
-      // Check V47.12 headers & badges (48 Laws)
-      expect(truthContent).toContain('V47.12 — 48 Laws');
-      expect(engineContent).toContain('Zcene V47.12 Blueprint');
-      expect(engineContent).toContain('V47.12 Locked');
+      // Check V47.13 headers & badges (48 Laws)
+      expect(truthContent).toContain('V47.13 — 48 Laws');
+      expect(engineContent).toContain('Zcene V47.13 Blueprint');
+      expect(engineContent).toContain('V47.13 Locked');
       expect(engineContent).toContain('48 Laws');
-      expect(engineContent).toContain('V47.12 Full-Stack Regression Runbook');
-      expect(runbookContent).toContain('# V47.12 Regression Suite (Full-Stack)');
-      expect(runbookContent).toContain('28 test suites (599 unit/integration tests)');
+      expect(engineContent).toContain('V47.13 Full-Stack Regression Runbook');
+      expect(runbookContent).toContain('# V47.13 Regression Suite (Full-Stack)');
+      expect(runbookContent).toContain('28 test suites (604 unit/integration tests)');
       expect(runbookContent).not.toContain('583 unit/integration tests');
+      expect(runbookContent).not.toContain('599 unit/integration tests');
 
-      // Content-level Rule 38 parity locks across EnginePage.tsx, architecture_truth.md, and runbook
+      // Content-level Rule 38 & Rule 11/17 parity locks across EnginePage.tsx, architecture_truth.md, and runbook
       for (const docSurface of [truthContent, engineContent, runbookContent]) {
         expect(docSurface).toContain('isAppleElectronicHardcoreGenre');
         expect(docSurface).toContain('passesUncorroboratedEraGate');
         expect(docSurface).toContain('cleanSongQueryAlbumTitle');
         expect(docSurface).toContain('COMPILATION_COLLECTION_RE');
         expect(docSurface).toContain('shouldRunRule38NotFoundUpgrade');
+        expect(docSurface).toContain('The Rocking Horse Winner');
+        expect(docSurface).toContain('The Get Up Kids');
         expect(docSurface).not.toContain('capped at 3 non-generic titles');
         expect(docSurface).not.toContain('3-query cap');
         expect(docSurface).not.toContain('3-query-capped');

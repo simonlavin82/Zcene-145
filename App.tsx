@@ -5309,6 +5309,7 @@ const App: React.FC = () => {
                   let correctedQuery = undefined;
                   let originalQuery = undefined;
                   let isKnownCacheHit = false;
+                  let isTopologyHit = Boolean(s.isTopologyHit);
 
                   if (data.hasCollision && Array.isArray(data.candidates) && data.candidates.length > 1) {
                     isAmbiguous = true;
@@ -5332,6 +5333,7 @@ const App: React.FC = () => {
                         predictedOrigin = interceptCandidates[0].origin || predictedOrigin;
                         genre = interceptCandidates[0].genre || genre;
                         isKnownCacheHit = true;
+                        isTopologyHit = !interceptCandidates[0].isStub;
                         candidateId = interceptCandidates[0].id;
                       }
                     }
@@ -5350,15 +5352,35 @@ const App: React.FC = () => {
                     correctedQuery,
                     originalQuery,
                     isKnownCacheHit,
+                    isTopologyHit,
                   };
 
                   const idx = cacheCandidatesPerSeed.findIndex(item => item.id === s.id);
                   if (idx !== -1) cacheCandidatesPerSeed[idx] = updatedSeed;
 
+                  const nextAllTopologyCached =
+                    cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(item => item.isTopologyHit);
+                  const nextRoutingDecision = deriveRoutingDecision(
+                    cacheCandidatesPerSeed.map(item => (item.isTopologyHit ? 'TOPOLOGY_HIT' : item.isKnownCacheHit ? 'STUB' : 'MISS')),
+                    isLiveSynthesis
+                  );
+                  const nextExpectedSpeed =
+                    isBatchMultiScene && nextAllTopologyCached
+                      ? 'partial'
+                      : classifyCurationSpeed({
+                          seedCount: artistList.length,
+                          hasActiveFilters,
+                          routingDecision: nextRoutingDecision,
+                          allSeedsTopologyCached: nextAllTopologyCached,
+                          isMultiSceneOverarching,
+                        });
+                  setExpectedCurationSpeed(nextExpectedSpeed);
+
                   setConsolidatedValidationDialog(prev => {
                     if (!prev || validationRunIdRef.current !== currentRunId) return prev;
                     return {
                       ...prev,
+                      expectedSpeed: nextExpectedSpeed,
                       seeds: prev.seeds.map(item => item.id === s.id ? updatedSeed : item)
                     };
                   });
@@ -5522,7 +5544,9 @@ const App: React.FC = () => {
             activeDisambiguationGenres[item.id] = item.genre;
           }
           if (item.originalQuery || (item.selectedCandidateId && item.selectedCandidateId !== item.id)) {
-            activeOriginalQueries[normId] = item.originalQuery || item.id;
+            activeOriginalQueries[normId] = item.isCorrected && item.correctedQuery
+              ? item.correctedQuery
+              : (item.originalQuery || item.id);
           }
         });
 
@@ -5530,8 +5554,16 @@ const App: React.FC = () => {
           const sKey = s.sceneId || s.id;
           const matchingSeeds = cacheCandidatesPerSeed.filter(item => item.sceneId === sKey);
           if (matchingSeeds.length > 0) {
-            const resolvedIds = matchingSeeds.map(m => normalizeArtistId(m.isCorrected && m.correctedQuery ? m.correctedQuery : (m.selectedCandidateId || m.candidateId || m.id)));
-            const resolvedDisplay = matchingSeeds.map(m => m.isCorrected && m.correctedQuery ? m.correctedQuery : m.query).join('::');
+            const resolvedIds = matchingSeeds.map(m =>
+              normalizeArtistId(m.selectedCandidateId || m.candidateId || (m.isCorrected && m.correctedQuery ? m.correctedQuery : m.id))
+            );
+            const resolvedDisplay = matchingSeeds.map(m => {
+              if (m.isAmbiguous && m.selectedCandidateId && Array.isArray(m.candidates)) {
+                const chosen = m.candidates.find(c => c.id === m.selectedCandidateId);
+                if (chosen?.name) return chosen.name;
+              }
+              return m.isCorrected && m.correctedQuery ? m.correctedQuery : m.query;
+            }).join('::');
             return normalizeProjectScene({
               ...s,
               seedArtists: resolvedDisplay || s.seedArtists,
@@ -5547,7 +5579,9 @@ const App: React.FC = () => {
         // Guard 1: Filter strictly to seeds belonging to lockedTargetSceneId for Hop 1
         const targetSceneSeeds = cacheCandidatesPerSeed.filter(item => !item.sceneId || item.sceneId === lockedTargetSceneId);
         const targetArtistSeeds = targetSceneSeeds.length > 0
-          ? targetSceneSeeds.map(s => normalizeArtistId(s.isCorrected && s.correctedQuery ? s.correctedQuery : (s.selectedCandidateId || s.candidateId || s.id)))
+          ? targetSceneSeeds.map(s =>
+              normalizeArtistId(s.selectedCandidateId || s.candidateId || (s.isCorrected && s.correctedQuery ? s.correctedQuery : s.id))
+            )
           : artistList;
         const targetArtists = targetSceneSeeds.length > 0
           ? targetArtistSeeds.join('::')
@@ -5624,21 +5658,31 @@ const App: React.FC = () => {
                 activeDisambiguationHints[resolvedId] = rawCountryName;
                 if (preFlightSeed.genre) activeDisambiguationGenres[resolvedId] = preFlightSeed.genre;
                 if (resolvedId !== searchId) {
-                  activeOriginalQueries[resolvedId] = searchId;
+                  activeOriginalQueries[resolvedId] = preFlightSeed.isCorrected && preFlightSeed.correctedQuery
+                    ? preFlightSeed.correctedQuery
+                    : searchId;
                 } else if (preFlightSeed.originalQuery) {
-                  activeOriginalQueries[resolvedId] = preFlightSeed.originalQuery;
+                  activeOriginalQueries[resolvedId] = preFlightSeed.isCorrected && preFlightSeed.correctedQuery
+                    ? preFlightSeed.correctedQuery
+                    : preFlightSeed.originalQuery;
                 }
               } else {
-                const seedToUse = preFlightSeed.isCorrected && preFlightSeed.correctedQuery ? preFlightSeed.correctedQuery : searchId;
+                const seedToUse = preFlightSeed.candidateId
+                  ? normalizeArtistId(preFlightSeed.candidateId)
+                  : (preFlightSeed.isCorrected && preFlightSeed.correctedQuery ? preFlightSeed.correctedQuery : searchId);
                 resolvedArtistSeeds[i] = seedToUse;
                 activeSeedNames[seedToUse] = cleanDisplayName;
                 activeSeedNames[normalizeArtistId(seedToUse)] = cleanDisplayName;
                 activeDisambiguationHints[seedToUse] = rawCountryName;
                 if (preFlightSeed.genre) activeDisambiguationGenres[seedToUse] = preFlightSeed.genre;
                 if (seedToUse !== searchId) {
-                  activeOriginalQueries[seedToUse] = searchId;
+                  activeOriginalQueries[seedToUse] = preFlightSeed.isCorrected && preFlightSeed.correctedQuery
+                    ? preFlightSeed.correctedQuery
+                    : searchId;
                 } else if (preFlightSeed.originalQuery) {
-                  activeOriginalQueries[seedToUse] = preFlightSeed.originalQuery;
+                  activeOriginalQueries[seedToUse] = preFlightSeed.isCorrected && preFlightSeed.correctedQuery
+                    ? preFlightSeed.correctedQuery
+                    : preFlightSeed.originalQuery;
                 }
               }
               hasDisambiguated = true;

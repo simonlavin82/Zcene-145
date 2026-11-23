@@ -2348,7 +2348,8 @@ export function ConsolidatedValidationModal({
               selectedCandidateId: hasCollision ? data.candidates[0].id : undefined,
               candidateId: data.candidates && data.candidates.length === 1 ? data.candidates[0].id : undefined,
               isCorrected: true,
-              correctedQuery: (data.id && data.id !== seedQuery) ? data.id : s.correctedQuery
+              correctedQuery: (data.id && data.id !== seedQuery) ? data.id : s.correctedQuery,
+              originalQuery: (data.id && data.id !== seedQuery) ? (s.originalQuery || s.query) : s.originalQuery
             };
           }
           return s;

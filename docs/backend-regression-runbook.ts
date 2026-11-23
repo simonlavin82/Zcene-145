@@ -1,12 +1,12 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V47.12 Regression Suite (Full-Stack)
+# V47.13 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (599 unit/integration tests).
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (604 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
-# Run entire full-stack regression test suite (28 test files, 599 offline deterministic tests)
+# Run entire full-stack regression test suite (28 test files, 604 offline deterministic tests)
 npm test
 
 # Run backend pipeline tests
@@ -125,7 +125,7 @@ npx vitest --ui
     *   *Telemetry Audit:* Validates receipt creation in \`adminLedger/system/jitHeals\` with accurate token counts and list-price cost calculations.
 7.  **Upfront Multi-Scene Batch Curation & Chained Worker Handoff ("Cup of Tea" Mode):**
     *   *Assertion (Bundled Pre-Flight & Dynamic Batch Pricing):* Asserts that multi-scene batches calculate aggregate token totals (5T–50T) with a single bundled 1T pre-flight fee across uncached scenes (\`bundledSeedsLabel\`).
-    *   *Assertion (Pass 1 Typo Auto-Correction):* Asserts that \`validateSeedOriginCallable\` auto-corrects typos (\`correctedInput: true\`), dynamically updating input cards to verified entities with inline correction notices.
+    *   *Assertion (Pass 1 Typo & Canonical Band-Name / Leading \`"The "\` Auto-Correction — \`v47.13\`):* Asserts that \`validateSeedOriginCallable\` auto-corrects typos and restores omitted official leading \`"The "\` articles (\`"Rocking Horse Winner"\` -> \`"The Rocking Horse Winner"\`, \`"Get Up Kids"\` -> \`"The Get Up Kids"\`) while preserving non-\`"The "\` acts and stripping erroneous \`"The "\` prefixes, keys single-artist Rule 17 bare router stubs strictly by \`canonicalBareNormId\`, handles canceled-stub re-entry cleanly, and promotes post-canonicalization cached Root hits to \`isTopologyHit: true\` with exact \`1T + 4T = 5T\` split-debit Direct Hit settlement.
     *   *Assertion (Worker Phase 1 Deferral & Fast Return <1.5s):* Asserts that Column 2 sets \`deferPhase1ToWorker: true\`, persisting projects in \`status: 'curating'\` and returning HTTP 200 OK immediately.
     *   *Assertion (Chained Worker Baton Handoffs & Intermediate Hop Step 3B Bypass):* Asserts that sequential chained hops (\`job_1 -> ... -> job_N\` with \`isChainedHop: true\`) execute without client coordination, bypassing Overarching Zine synthesis until the final hop across the completed constellation.
     *   *Assertion (Step 0 Direct Hit & Peer Profile Hydration):* Asserts that cached entities across all batch scenes are pre-hydrated into \`existingProjectDetailsMap\` with stripped \`canonicalKey\`s to eliminate client request storms upon completion.
@@ -148,9 +148,9 @@ npx vitest --ui
     *   *Assertion (Apple Electronic \`"Hardcore"\`, Uncorroborated Debut-Era Gate & Empty-Catalog Fail-Closed):* Validates \`isAppleElectronicHardcoreGenre\` blocking bare Apple \`"Hardcore"\` against non-electronic hardcore/metalcore/punk subgenres (\`panic-us\` \`#15241026\`), \`passesUncorroboratedEraGate\` rejecting \`reason-to-believe-us\`, \`sunrise-pl\`, \`hands-tied-us\`, \`zwan-us\`, pre-formation homonyms, and missing \`foundedYear\` while preserving \`exhibition-us\` & \`christie-front-drive-us\`, anchored \`shouldRunRule38NotFoundUpgrade\`, and empty-reconciled fail-closed (\`certain-people-i-know-us\`).
     *   *Assertion (Compilation Track-Match Rescue, Collection+Track Corroboration, Format-Stripping, Multi-Album Reissue Drift & Leading \`"The "\` Fallback):* Validates conflation-pinned Compilation Rescue for \`mouthpiece-us\` (\`#161072028\` pinned strictly to \`#300974664\` across 2-track, 1-collectionName + 1-trackName, format-suffixed \`"What Was Said EP"\` / \`"Face Tomorrow 7-inch"\`, chronological \`"Mouthpiece EP"\` + \`"Demo 1991"\` prioritization, and 5th-title cross-scanning) and \`friction-us\` (\`#4940290\` pinned strictly to \`#1653010702\`), negative guards (1-of-2 track coincidence, 1 collectionName with 0 track matches, collapsed self-titled \`"Mouthpiece EP"\`, same-track duplicate, \`< 8\` track EP), \`jejune-us\` (\`#1457025031\`) multi-album 2025 reissue pass vs. single-album year-drift rejection, and Tier 1 Leading \`"The "\` fallback for \`the-rocking-horse-winner-us\` (\`#31536457\`).
 
-## Database Purge Runbook Protocol (V47.12 Multi-Scene Architecture)
+## Database Purge Runbook Protocol (V47.13 Multi-Scene Architecture)
 
-Note: The V47.12 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V47.12 operations.
+Note: The V47.13 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V47.13 operations.
 
 When rolling out structural schema migrations, Tier 1 Global Assets (\`/artists\` and \`/labels\`) remain canonical and 100% unchanged. Legacy purge automation (\`scripts/execute_v43_purge.cjs\`) is retained for emergency reset procedures only, while **strictly preserving Tier 1 \`/artists\` and \`/labels\`**, user wallets, and financial ledgers.
 

@@ -89,7 +89,7 @@ export const ARCHITECTURE_RULES = [
     { 
         id: 11, 
         title: "Validation Reasoning & Escape Hatch Bouncer", 
-        desc: "Requires human confirmation of root artist to prevent costly AI pipeline runs on acronyms or typos. The 'Not this artist?' manual escape hatch MUST NOT bypass validation. Any user-injected origin or genre hints must trigger a synchronous Flash 3.6 re-query. Overrides that fail parametric verification are hard-rejected with inline UI errors to prevent database pollution." 
+        desc: "Requires human confirmation of root artist to prevent costly AI pipeline runs on acronyms or typos. Pre-flight Flash 3.6 enforces full Canonical Band-Name, Spelling & Official Article Normalization (restoring omitted official leading 'The ' articles such as 'Rocking Horse Winner' → 'The Rocking Horse Winner' and 'Get Up Kids' → 'The Get Up Kids', preserving non-'The ' bands like 'Pixies', 'Ramones', 'Talking Heads', 'Deftones', 'Fugazi', 'Quicksand', and 'Snapcase', stripping erroneous leading 'The ' prefixes from non-'The ' bands, and surfacing genuine 'The X' vs. 'X' or cross-country homonyms via hasCollision: true without false correctedInput). Post-canonicalization cache re-check updates isTopologyHit and expectedSpeed so cached Root topologies immediately promote to the 4T-remainder Direct Hit exit. The 'Not this artist?' manual escape hatch MUST NOT bypass validation: any user-injected origin or genre hints trigger a synchronous Flash 3.6 re-query, and overrides failing parametric verification are hard-rejected with inline UI errors." 
     },
     { 
         id: 12, 
@@ -119,7 +119,7 @@ export const ARCHITECTURE_RULES = [
     { 
         id: 17, 
         title: "Universal Pre-Flight Stub Minting", 
-        desc: "Pre-flight alias resolution MUST synchronously mint evolved stubs (_isStub: true, isAmbiguous: boolean, candidates: []) to Firestore before background job creation. Stubs MUST ONLY be minted from verified Flash candidate payloads or verified cache hits. Minting stubs directly from unverified raw user strings is strictly prohibited." 
+        desc: "Pre-flight alias resolution MUST synchronously mint evolved stubs (_isStub: true, isAmbiguous: boolean, candidates: []) to Firestore before background job creation. Single-artist bare router stubs are keyed strictly by the validated canonical name (canonicalBareNormId = normalizeArtistId(validationResult.id)) in both validateSeedOriginCallable and resolveSceneTopologyBackend so typos ('the-rocking-horse-winer') and dropped articles ('rocking-horse-winner') never mint orphan/typo stub docs in /artists or leak back into Column 2. Stubs MUST ONLY be minted from verified Flash candidate payloads or verified cache hits; minting stubs directly from unverified raw user strings is strictly prohibited." 
     },
     { 
         id: 18, 
@@ -300,7 +300,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 <span className="text-primary font-medium">Flash 3.6 Collision Detection (-1T Pre-Flight):</span> Calls <code>validateSeedOriginCallable</code> (<code>thinking_level: minimal</code>, Zero Search Grounding). Deducts non-refundable <code>1T</code> lookup fee once per uncached batch and mints Evolved Stubs. Runs concurrently inside Box 4 with <code>validationRunIdRef</code> cancellation guard.
                             </li>
                             <li>
-                                <span className="text-primary font-medium">4. Confirm Your Artists &amp; Inline Origin Verification ([Rules 11, 17, 20, 45]):</span> <code>&lt;ConsolidatedValidationModal&gt;</code> presents inline micro-spinners for verifying roots, transitioning dynamically to verified cards, Pass 1 typo auto-correction (<code>correctedInput: true</code> / <code>isCorrected: true</code>), multi-scene duration estimate (<code>~3*K–5*K minutes (~3–5 mins per scene)</code>), disambiguation radio, or Escape Hatch (<code>-1T</code> per re-query). "Confirm &amp; Generate" button stays disabled until verification finishes.
+                                <span className="text-primary font-medium">4. Confirm Your Artists &amp; Inline Origin Verification ([Rules 11, 17, 20, 45]):</span> <code>&lt;ConsolidatedValidationModal&gt;</code> presents inline micro-spinners for verifying roots, transitioning dynamically to verified cards, Pass 1 canonical band-name, typo &amp; official leading <code>"The "</code> auto-correction (<code>correctedInput: true</code> / <code>isCorrected: true</code>, restoring omitted official <code>"The "</code> while preserving non-<code>"The "</code> acts, keying single-artist router stubs strictly by canonical bare slug, and promoting post-canonicalization cached Root hits to <code>isTopologyHit: true</code> for instant <code>-4T</code> remainder Direct Hit settlement), multi-scene duration estimate (<code>~3*K–5*K minutes (~3–5 mins per scene)</code>), disambiguation radio, or Escape Hatch (<code>-1T</code> per re-query). "Confirm &amp; Generate" button stays disabled until verification finishes.
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
                                     <li><span className="text-zinc-300">Direct Hit / Typo Corrected Exit:</span> Routes through <code>authorizeDirectHitCallable</code> (settling <code>-5T</code> or <code>-4T</code> remainder) directly to Box 7 (queuing <code>overarching_only</code> background synthesis at <code>0T</code> when Scene &ge; 2).</li>
                                     <li><span className="text-zinc-300">Zero-Pollution Rejection:</span> Unverified Escape Hatch inputs rejected inline; zero unverified stubs written.</li>
@@ -809,7 +809,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V47.12 Full-Stack Regression Runbook
+                    V47.13 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -965,7 +965,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         ))}
                     </nav>
                     <div className="mt-8 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono pl-2">
-                        Zcene V47.12 Blueprint<br/>
+                        Zcene V47.13 Blueprint<br/>
                         100% Anti-Regression
                     </div>
                 </aside>
@@ -979,7 +979,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.12 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.13 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -1069,7 +1069,7 @@ LOCKED SEMANTIC TOPOLOGY & ZERO READ-ONLY WRITES (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.12 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.13 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

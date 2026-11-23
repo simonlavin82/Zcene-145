@@ -161,16 +161,13 @@ export async function resolveSceneTopologyBackend(
         console.warn(`[resolveSceneTopologyBackend] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
       }
 
-      const originalQuery = originalQueries && (originalQueries[resolvedSeedNorm] || originalQueries[seedNorm]);
-      if (originalQuery) {
-          const bareNormId = normalizeArtistId(originalQuery);
-          if (bareNormId !== resolvedSeedNorm && (!expectedSeedIso || areCountryIsosCompatible(expectedSeedIso, extractTrailingCountryIso(resolvedSeedNorm)))) {
-              await upsertBareRouterStub(db, bareNormId, resolvedSeedNorm, {
-                  name: seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || originalQuery,
-                  origin: hintCountry || undefined,
-                  genre: hintGenre || undefined,
-              });
-          }
+      const canonicalBareId = stripIsoCountrySlug(resolvedSeedNorm);
+      if (canonicalBareId && canonicalBareId !== resolvedSeedNorm && (!expectedSeedIso || areCountryIsosCompatible(expectedSeedIso, extractTrailingCountryIso(resolvedSeedNorm)))) {
+          await upsertBareRouterStub(db, canonicalBareId, resolvedSeedNorm, {
+              name: seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seed,
+              origin: hintCountry || undefined,
+              genre: hintGenre || undefined,
+          });
       }
 
      let hasGraphData = false;
@@ -266,7 +263,11 @@ export async function resolveSceneTopologyBackend(
         
          let validationResult: any = null;
          const effectiveGenreHint = hintGenre || "Unknown";
-         const rawId = (originalQueries && (originalQueries[seedNorm] || originalQueries[strippedSeed])) || strippedSeed;
+         const rawId =
+           seedNamesMap[resolvedSeedNorm] ||
+           seedNamesMap[seedNorm] ||
+           (originalQueries && (originalQueries[seedNorm] || originalQueries[strippedSeed])) ||
+           strippedSeed;
 
          const valResult = await validateSeedOriginBackend(
             rawId || seed,
@@ -501,10 +502,14 @@ export const validateSeedOriginCallable = onCall({
     apiUsage: validationResult.apiUsage,
   });
 
-  // V11.6 Fix 2: Programmatically enforce correctedInput for typos
-  if (validationResult.isValid && seed.toLowerCase() !== validationResult.id.toLowerCase()) {
+  // V11.6 Fix 2 / V47.13: Programmatically enforce correctedInput for single-artist canonical name / typo / article normalization
+  if (
+    validationResult.isValid &&
+    !validationResult.hasCollision &&
+    String(seed).trim().toLowerCase() !== String(validationResult.id || "").trim().toLowerCase()
+  ) {
     validationResult.correctedInput = true;
-    console.log(`[validateSeedOriginCallable] Case-insensitive mismatch: "${seed}" → "${validationResult.id}"`);
+    console.log(`[validateSeedOriginCallable] Canonical normalization applied: "${seed}" → "${validationResult.id}"`);
   }
 
   // V11.6 Fix 2B (Rule 11): Hard-block the pipeline for unrecognizable entities or failed bouncer re-queries.
@@ -524,10 +529,13 @@ export const validateSeedOriginCallable = onCall({
   // Gated: If an originHint is provided (Escape Hatch Re-Query in Column 1), do NOT mint premature stubs before human confirms in Node 4.
   if (!originHint) {
     try {
-      const bareNormId = normalizeArtistId(seed);
-      const stubDocRef = db.collection("artists").doc(bareNormId);
       const isAmbiguous = !!(validationResult.hasCollision && validationResult.candidates && validationResult.candidates.length > 1);
       const candidates = validationResult.candidates || [];
+      // V47.13: Key single-artist bare router stubs strictly by the validated canonical name (validationResult.id)
+      // so typos ("the-rocking-horse-winer") and dropped articles ("rocking-horse-winner") never mint
+      // orphan/typo stub docs in /artists.
+      const bareNormId = normalizeArtistId(!isAmbiguous && validationResult.id ? validationResult.id : seed);
+      const stubDocRef = db.collection("artists").doc(bareNormId);
 
       if (isAmbiguous) {
         const existingSnap = await stubDocRef.get();

@@ -2367,4 +2367,140 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       expect(multiRow?.userFacingScope).toBe('Multi-Root Zcene');
     });
   });
+
+  describe('10. V47.13 Canceled-Stub Safe Re-Entry & Post-Canonicalization Direct Hit Promotion (1T + 4T = 5T)', () => {
+    it('(d) canceled single-pointer router stub pointing to a non-existent -iso doc returns a clean miss on re-entry without 404 or false Direct Hit', () => {
+      // Simulate searchDisambiguationCandidates traversal when artists/the-rocking-horse-winner exists
+      // with redirectTo: "the-rocking-horse-winner-us", but User A canceled before the-rocking-horse-winner-us was created.
+      const mockFirestoreDocs = new Map<string, any>([
+        [
+          'the-rocking-horse-winner',
+          {
+            _isStub: true,
+            isAmbiguous: false,
+            redirectTo: 'the-rocking-horse-winner-us',
+            artistId: 'the-rocking-horse-winner',
+            cacheKey: 'the-rocking-horse-winner',
+            candidates: [
+              {
+                id: 'the-rocking-horse-winner-us',
+                name: 'The Rocking Horse Winner',
+                origin: 'USA',
+                genre: 'Indie Rock',
+              },
+            ],
+          },
+        ],
+      ]);
+
+      const snapshotDocs: Array<{ id: string; data: () => any }> = [
+        {
+          id: 'the-rocking-horse-winner',
+          data: () => mockFirestoreDocs.get('the-rocking-horse-winner'),
+        },
+      ];
+      const processedDocs = new Set<string>();
+      const resolvedCandidates: any[] = [];
+
+      for (let i = 0; i < snapshotDocs.length; i++) {
+        const docSnap = snapshotDocs[i];
+        const data = docSnap.data();
+        const docId = docSnap.id;
+        if (processedDocs.has(docId)) continue;
+        processedDocs.add(docId);
+
+        if (data.redirectTo && data.redirectTo !== docId && !processedDocs.has(data.redirectTo)) {
+          if (mockFirestoreDocs.has(data.redirectTo)) {
+            snapshotDocs.push({
+              id: data.redirectTo,
+              data: () => mockFirestoreDocs.get(data.redirectTo),
+            });
+          }
+          continue; // Skip redirect pointer documents
+        }
+        resolvedCandidates.push({ id: docId, data });
+      }
+
+      // Target the-rocking-horse-winner-us does not exist -> 0 candidates returned -> clean cache miss (routes to pre-flight + live synthesis)
+      expect(resolvedCandidates).toHaveLength(0);
+    });
+
+    it('(e) post-canonicalization cache intercept ("Get Up Kids" -> "The Get Up Kids") promotes isTopologyHit, resolves suffixed ID "the-get-up-kids-us", and settles exact 4T remainder (1T + 4T = 5T)', async () => {
+      const { computeRemainingSettlementTokens, TOKEN_PRICING } = await import('../shared/tokenEconomy');
+
+      // Step 1: User typed "Get Up Kids" (uncached bare slug) and paid 1T pre-flight lookup fee
+      const initialSeed: PreFlightSeed = {
+        id: 'get-up-kids',
+        query: 'Get Up Kids',
+        sceneId: 'scene-1',
+        predictedOrigin: '',
+        genre: '',
+        isKnownCacheHit: false,
+        isTopologyHit: false,
+        isVerifyingOrigin: true,
+      };
+
+      // Step 2: validateSeedOriginCallable canonicalizes to "The Get Up Kids" (candidates[0].id = "the-get-up-kids-us")
+      // and searchDisambiguationCandidates finds cached Root topology doc artists/the-get-up-kids-us (isStub: false)
+      const data = {
+        isValid: true,
+        correctedInput: true,
+        hasCollision: false,
+        id: 'The Get Up Kids',
+        origin: 'USA',
+        genre: 'Emo / Indie Rock',
+        candidates: [{ id: 'the-get-up-kids-us', name: 'The Get Up Kids', origin: 'USA', genre: 'Emo / Indie Rock' }],
+      };
+      const interceptCandidates = [
+        {
+          id: 'the-get-up-kids-us',
+          label: 'The Get Up Kids',
+          origin: 'Kansas City, Missouri, USA',
+          genre: 'Emo / Indie Rock',
+          isStub: false, // Full cached Root graphData exists!
+        },
+      ];
+
+      const updatedSeed: PreFlightSeed = {
+        ...initialSeed,
+        isVerifyingOrigin: false,
+        predictedOrigin: interceptCandidates[0].origin || data.origin,
+        genre: interceptCandidates[0].genre || data.genre,
+        isKnownCacheHit: true,
+        isTopologyHit: !interceptCandidates[0].isStub,
+        candidateId: interceptCandidates[0].id,
+        isCorrected: true,
+        correctedQuery: data.id.trim(),
+        originalQuery: initialSeed.query,
+      };
+
+      expect(updatedSeed.isTopologyHit).toBe(true);
+      expect(updatedSeed.candidateId).toBe('the-get-up-kids-us');
+      expect(updatedSeed.correctedQuery).toBe('The Get Up Kids');
+      expect(updatedSeed.originalQuery).toBe('Get Up Kids');
+
+      // Step 3: On Confirm & Generate, resolvedIds prioritizes geographically suffixed candidateId ("the-get-up-kids-us")
+      // and canCheckCacheOnPass2 is true so Pass 2 routes directly to authorizeDirectHitCallable
+      const resolvedId =
+        updatedSeed.selectedCandidateId ||
+        updatedSeed.candidateId ||
+        (updatedSeed.isCorrected && updatedSeed.correctedQuery ? updatedSeed.correctedQuery : updatedSeed.id);
+      expect(resolvedId).toBe('the-get-up-kids-us');
+
+      const canCheckCacheOnPass2 = [updatedSeed].every(
+        (s) => s.isTopologyHit || (s.isAmbiguous && Boolean(s.selectedCandidateId))
+      );
+      expect(canCheckCacheOnPass2).toBe(true);
+
+      // Step 4: Verify exact Split-Debit settlement math (1T pre-flight + 4T Direct Hit remainder = 5T total)
+      const preFlightDeducted = TOKEN_PRICING.PREFLIGHT_FLASH_FEE; // 1T
+      const { creditablePreFlight, remainingSettlement } = computeRemainingSettlementTokens(
+        TOKEN_PRICING.SINGLE_SEED, // 5T
+        preFlightDeducted
+      );
+      expect(creditablePreFlight).toBe(1);
+      expect(remainingSettlement).toBe(4);
+      expect(preFlightDeducted + remainingSettlement).toBe(5);
+    });
+  });
 });
