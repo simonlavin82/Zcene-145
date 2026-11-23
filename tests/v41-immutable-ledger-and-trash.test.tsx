@@ -579,7 +579,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
   });
 
   describe('Part 5: Architecture & Master Blueprint Parity Gate', () => {
-    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V47.10', () => {
+    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V47.11', () => {
       const truthPath = path.resolve(__dirname, '../architecture_truth.md');
       const truthContent = fs.readFileSync(truthPath, 'utf8');
 
@@ -589,13 +589,13 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       const runbookPath = path.resolve(__dirname, '../docs/backend-regression-runbook.ts');
       const runbookContent = fs.readFileSync(runbookPath, 'utf8');
 
-      // Check V47.10 headers & badges (48 Laws)
-      expect(truthContent).toContain('V47.10 — 48 Laws');
-      expect(engineContent).toContain('Zcene V47.10 Blueprint');
-      expect(engineContent).toContain('V47.10 Locked');
+      // Check V47.11 headers & badges (48 Laws)
+      expect(truthContent).toContain('V47.11 — 48 Laws');
+      expect(engineContent).toContain('Zcene V47.11 Blueprint');
+      expect(engineContent).toContain('V47.11 Locked');
       expect(engineContent).toContain('48 Laws');
-      expect(engineContent).toContain('V47.10 Full-Stack Regression Runbook');
-      expect(runbookContent).toContain('# V47.10 Regression Suite (Full-Stack)');
+      expect(engineContent).toContain('V47.11 Full-Stack Regression Runbook');
+      expect(runbookContent).toContain('# V47.11 Regression Suite (Full-Stack)');
       expect(runbookContent).toContain('28 test suites (583 unit/integration tests)');
       expect(runbookContent).toContain('npx vitest run tests/v47-zine-print-pdf.test.tsx');
       expect(runbookContent).toContain('npx vitest run functions/tests/deleteUserAccount.test.ts');

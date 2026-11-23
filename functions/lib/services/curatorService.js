@@ -3610,7 +3610,9 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
             // V47.10 Multi-Album Reissue Year-Drift Relaxation (>=2 distinct albums -> same unambiguous artistId)
             const reissueArtistAlbums = new Map();
             let hasReissuePerQueryAmbiguity = false;
-            // V47.10 Conflation-Pinned Compilation Track-Match Rescue (>=2 distinct albums & tracks -> same unambiguous artistId + collectionId)
+            // V47.10 / V47.11 Conflation-Pinned Compilation Track-Match Rescue:
+            // Keyed by `${artistId}::${collectionId}` -> distinct matched Gemini album norms, track norms,
+            // and collection-title album norms corroborated on the exact same compilation release.
             const compilationCandidates = new Map();
             for (const alb of cappedAlbums) {
                 const queryTerm = `${cleanArtistName} ${alb.raw}`.trim();
@@ -3658,13 +3660,7 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
                         if (qualifyingDiscography.length >= 2 && exports.COMPILATION_COLLECTION_RE.test(trackCollectionName)) {
                             const numericCollectionId = Number(track.collectionId);
                             if (numericCollectionId > 0 && !isNaN(numericCollectionId)) {
-                                const rawTrackName = String(track.trackName || '').trim();
-                                const cleanTrack = (0, exports.cleanCollectionTitle)(rawTrackName).toLowerCase().trim();
-                                const normTrack = normalizeAlbumTitle(rawTrackName);
-                                if (normTrack.length >= 4 &&
-                                    !GENERIC_ALBUM_TITLES.has(cleanTrack) &&
-                                    !GENERIC_ALBUM_TITLES.has(rawTrackName.toLowerCase()) &&
-                                    titlesMatchFuzzy(rawTrackName, alb.raw)) {
+                                const getOrCreateCompEntry = () => {
                                     const pairKey = `${numericArtistId}::${numericCollectionId}`;
                                     let entry = compilationCandidates.get(pairKey);
                                     if (!entry) {
@@ -3673,11 +3669,44 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
                                             collectionId: numericCollectionId,
                                             albumNorms: new Set(),
                                             trackNorms: new Set(),
+                                            trackAlbumNorms: new Set(),
+                                            collectionAlbumNorms: new Set(),
                                         };
                                         compilationCandidates.set(pairKey, entry);
                                     }
-                                    entry.albumNorms.add(alb.norm);
-                                    entry.trackNorms.add(normTrack);
+                                    return entry;
+                                };
+                                // 1. V47.11: Check if the compilation's collectionName itself matches any qualifying Gemini title
+                                const cleanColl = (0, exports.cleanCollectionTitle)(trackCollectionName).toLowerCase().trim();
+                                const normColl = normalizeAlbumTitle(trackCollectionName);
+                                if (normColl.length >= 4 &&
+                                    !GENERIC_ALBUM_TITLES.has(cleanColl) &&
+                                    !GENERIC_ALBUM_TITLES.has(trackCollectionName.toLowerCase()) &&
+                                    !(normColl === targetNorm && !hasQualifyingDescriptor(trackCollectionName))) {
+                                    for (const qAlb of qualifyingDiscography) {
+                                        if (titlesMatchFuzzy(trackCollectionName, qAlb.raw)) {
+                                            const entry = getOrCreateCompEntry();
+                                            entry.albumNorms.add(qAlb.norm);
+                                            entry.collectionAlbumNorms.add(qAlb.norm);
+                                        }
+                                    }
+                                }
+                                // 2. V47.11: Cross-match returned compilation song row against all qualifying Gemini titles
+                                const rawTrackName = String(track.trackName || '').trim();
+                                const cleanTrack = (0, exports.cleanCollectionTitle)(rawTrackName).toLowerCase().trim();
+                                const normTrack = normalizeAlbumTitle(rawTrackName);
+                                if (normTrack.length >= 4 &&
+                                    !GENERIC_ALBUM_TITLES.has(cleanTrack) &&
+                                    !GENERIC_ALBUM_TITLES.has(rawTrackName.toLowerCase()) &&
+                                    !(normTrack === targetNorm && !hasQualifyingDescriptor(rawTrackName))) {
+                                    for (const qAlb of qualifyingDiscography) {
+                                        if (titlesMatchFuzzy(rawTrackName, qAlb.raw)) {
+                                            const entry = getOrCreateCompEntry();
+                                            entry.albumNorms.add(qAlb.norm);
+                                            entry.trackAlbumNorms.add(qAlb.norm);
+                                            entry.trackNorms.add(normTrack);
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -3738,9 +3767,17 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
                     }
                 }
             }
-            // V47.10 Fallback 2: Conflation-Pinned Compilation Track-Match Rescue
+            // V47.10 / V47.11 Fallback 2: Conflation-Pinned Compilation Track-Match Rescue
             if (qualifyingDiscography.length >= 2) {
-                const compilationWinners = Array.from(compilationCandidates.values()).filter((c) => c.albumNorms.size >= 2 && c.trackNorms.size >= 2);
+                const compilationWinners = Array.from(compilationCandidates.values()).filter((c) => {
+                    if (c.albumNorms.size < 2)
+                        return false;
+                    if (c.trackNorms.size >= 2)
+                        return true;
+                    // V47.11: Allow 1 compilation collectionName match + >=1 distinct trackName match on the exact same (artistId, collectionId)
+                    const hasDistinctCollectionMatch = Array.from(c.collectionAlbumNorms).some((colNorm) => !c.trackAlbumNorms.has(colNorm));
+                    return c.trackNorms.size >= 1 && hasDistinctCollectionMatch;
+                });
                 if (compilationWinners.length === 1) {
                     const { artistId: compArtistId, collectionId: compCollectionId } = compilationWinners[0];
                     try {

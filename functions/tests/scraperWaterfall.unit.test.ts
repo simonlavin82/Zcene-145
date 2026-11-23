@@ -1768,4 +1768,293 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
       }
     });
   });
+
+  describe('V47.11 Rule 38: Tier 3B Compilation Rescue — Collection+Track Corroboration & Cross-Title Track Scanning', () => {
+    it('1. rescues mouthpiece-us (#161072028 -> pinned strictly to #300974664) on live 4-album payload ["Mouthpiece" (1991), "Demo" (1991), "What Was Said" (1994), "Can\'t Kill What\'s Inside" (1995)] via 1 collectionName + 1 distinct trackName', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('term=Mouthpiece&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 161072028, artistName: 'Mouthpiece', primaryGenreName: 'Hip-Hop/Rap' },
+                { wrapperType: 'artist', artistId: 174787020, artistName: 'Mouthpiece', primaryGenreName: 'Hip-Hop/Rap' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=161072028&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 161072028,
+                  collectionId: 300974664,
+                  collectionName: "Can't Kill What's Inside: The Complete Discography",
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                  trackCount: 38,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/mouthpiece/cant-kill/100x100bb.jpg',
+                },
+                {
+                  wrapperType: 'collection',
+                  artistId: 161072028,
+                  collectionId: 1214141023,
+                  collectionName: 'Disperse',
+                  primaryGenreName: 'Christian',
+                  releaseDate: '2017-03-10T08:00:00Z',
+                  trackCount: 10,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/mouthpiece/disperse/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('entity=song')) {
+          if (url.includes('What%20Was%20Said')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 161072028,
+                    artistName: 'Mouthpiece',
+                    collectionId: 300974664,
+                    collectionName: "Can't Kill What's Inside: The Complete Discography",
+                    trackName: 'What Was Said',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2009-01-20T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          if (url.includes('Can%27t%20Kill%20What%27s%20Inside')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 161072028,
+                    artistName: 'Mouthpiece',
+                    collectionId: 300974664,
+                    collectionName: "Can't Kill What's Inside: The Complete Discography",
+                    trackName: 'Abandon',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2009-01-20T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=300974664&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 161072028,
+                  collectionId: 300974664,
+                  collectionName: "Can't Kill What's Inside: The Complete Discography",
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                  trackCount: 38,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/mouthpiece/cant-kill/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Mouthpiece',
+          'artist',
+          'Hardcore Punk',
+          'Mouthpiece bridged early 90s youth crew with modern straight edge hardcore.',
+          'United States',
+          [
+            { albumName: 'Mouthpiece', releaseYear: '1991' },
+            { albumName: 'Demo', releaseYear: '1991' },
+            { albumName: 'What Was Said', releaseYear: '1994' },
+            { albumName: "Can't Kill What's Inside", releaseYear: '1995' },
+          ],
+          'us',
+          '1991'
+        );
+
+        expect(res.itunesArtistId).toBe(161072028);
+        expect(res.imageUrl).toBe('https://is1-ssl.mzstatic.com/mouthpiece/cant-kill/600x600bb.jpg');
+        expect(res.reconciledDiscography).toEqual([
+          {
+            albumName: "Can't Kill What's Inside: The Complete Discography",
+            releaseYear: '2009',
+            itunesCollectionId: 300974664,
+          },
+        ]);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('2. cross-matches returned compilation song rows against a 4th qualifying title beyond .slice(0, 3) at 0 extra HTTP cost', async () => {
+      let songQueryCount = 0;
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=song')) {
+          songQueryCount++;
+          if (url.includes('What%20Was%20Said')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 161072028,
+                    artistName: 'Mouthpiece',
+                    collectionId: 300974664,
+                    collectionName: 'Complete Anthology 1991-1995',
+                    trackName: 'What Was Said',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2009-01-20T08:00:00Z',
+                  },
+                  // 4th qualifying title ("Face Tomorrow") appears inside the 15 song rows returned for query #3
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 161072028,
+                    artistName: 'Mouthpiece',
+                    collectionId: 300974664,
+                    collectionName: 'Complete Anthology 1991-1995',
+                    trackName: 'Face Tomorrow',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2009-01-20T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=300974664&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 161072028,
+                  collectionId: 300974664,
+                  collectionName: 'Complete Anthology 1991-1995',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                  trackCount: 24,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/mouthpiece/anthology/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Mouthpiece',
+          'artist',
+          'Hardcore Punk',
+          'New Jersey straight edge youth crew hardcore band.',
+          'United States',
+          [
+            { albumName: 'New Horizons', releaseYear: '1992' },
+            { albumName: 'Lost Tape Sessions', releaseYear: '1993' },
+            { albumName: 'What Was Said', releaseYear: '1994' },
+            { albumName: 'Face Tomorrow', releaseYear: '1995' }, // 4th qualifying title (beyond .slice(0, 3))
+          ],
+          'us',
+          '1991'
+        );
+
+        expect(songQueryCount).toBe(3); // Capped strictly at 3 entity=song HTTP calls
+        expect(res.itunesArtistId).toBe(161072028);
+        expect(res.reconciledDiscography).toEqual([
+          {
+            albumName: 'Complete Anthology 1991-1995',
+            releaseYear: '2009',
+            itunesCollectionId: 300974664,
+          },
+        ]);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('3. negative guard: 1 compilation collectionName match with 0 trackName matches still fails closed to Tier 4', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=song')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'track',
+                  kind: 'song',
+                  artistId: 161072028,
+                  artistName: 'Mouthpiece',
+                  collectionId: 300974664,
+                  collectionName: "Can't Kill What's Inside: The Complete Discography",
+                  trackName: 'Unrelated Song Title',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Mouthpiece',
+          'artist',
+          'Hardcore Punk',
+          'New Jersey straight edge youth crew hardcore band.',
+          'United States',
+          [
+            { albumName: 'New Horizons', releaseYear: '1993' },
+            { albumName: "Can't Kill What's Inside", releaseYear: '1995' },
+          ],
+          'us',
+          '1991'
+        );
+
+        expect(res).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
 });
