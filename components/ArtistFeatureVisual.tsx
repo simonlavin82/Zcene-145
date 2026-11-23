@@ -1,5 +1,4 @@
 import React from 'react';
-import { Mic, Music, Plus, ChevronLeft, CheckCircle2, MinusCircle } from 'lucide-react';
 
 const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) => {
     return (
@@ -18,7 +17,7 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                 <div className="h-12 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between px-4 bg-zinc-900 relative z-[60]">
                     <div className="flex items-center gap-2 overflow-hidden">
                         <h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Roots</h2>
-                        <span className="h-5 w-5 rounded-lg flex items-center justify-center text-[9px] font-semibold border transition-all duration-500 bg-zinc-900 text-white border-white/20">
+                        <span className="h-5 w-5 rounded-md flex items-center justify-center text-[9px] font-bold border transition-all duration-500 shadow-sm bg-zinc-900 text-white border-white/20">
                             2
                         </span>
                     </div>
@@ -29,6 +28,50 @@ const ArtistFeatureVisual: React.FC<{ className?: string }> = ({ className }) =>
                 
                 <div className="flex-grow flex flex-col min-h-0 bg-zinc-900 overflow-hidden">
                     <div className="flex-grow overflow-y-auto scrollbar-none">
+                        {/* V43/V44 Multi-Scene Switcher Strip (Matching GraphPage.tsx) */}
+                        <div className="px-4 pt-4 pb-2 border-b border-zinc-800/80 relative z-20">
+                            <div className="flex items-center justify-between mb-2">
+                                <h3 className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">
+                                    Scenes
+                                </h3>
+                                <button
+                                    type="button"
+                                    className="h-7 flex items-center gap-1.5 px-2.5 rounded-xl border border-zinc-700 bg-zinc-900 hover:bg-zinc-800 hover:border-zinc-600 text-zinc-300 hover:text-white transition-all text-[11px] font-medium leading-none cursor-pointer active:scale-95 group"
+                                >
+                                    <span className="material-symbols-outlined !text-[14px]">add</span>
+                                    <span>Add Scene</span>
+                                </button>
+                            </div>
+                            <div className="flex flex-wrap gap-1.5 relative" role="tablist" aria-label="Project Scenes">
+                                <div
+                                    role="tab"
+                                    aria-selected={true}
+                                    className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all select-none bg-zinc-800 text-primary border border-zinc-700 ring-1 ring-primary/30 shadow-sm"
+                                >
+                                    <span>Scene 1</span>
+                                    <span className="text-[10px] font-mono px-1 rounded bg-primary/15 text-primary">
+                                        2
+                                    </span>
+                                    <span className="w-5 h-5 -mr-1 rounded flex items-center justify-center text-zinc-400">
+                                        <span className="material-symbols-outlined !text-[15px]">more_vert</span>
+                                    </span>
+                                </div>
+                                <div
+                                    role="tab"
+                                    aria-selected={false}
+                                    className="relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all select-none bg-zinc-950 text-zinc-400 border border-zinc-800"
+                                >
+                                    <span>Scene 2</span>
+                                    <span className="text-[10px] font-mono px-1 rounded bg-zinc-900 text-zinc-500">
+                                        1
+                                    </span>
+                                    <span className="w-5 h-5 -mr-1 rounded flex items-center justify-center text-zinc-400">
+                                        <span className="material-symbols-outlined !text-[15px]">more_vert</span>
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+
                         <div className="px-4 pt-4 pb-2">
                             <div className="flex items-center justify-between mb-3">
                                 <h3 className="text-[10px] font-medium uppercase tracking-widest text-zinc-500">Artists</h3>

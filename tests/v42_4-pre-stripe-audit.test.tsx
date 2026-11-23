@@ -1,6 +1,9 @@
+import React from 'react';
 import fs from 'fs';
 import path from 'path';
-import { describe, it, expect } from 'vitest';
+import { render, screen, act } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import CollectionIntelligenceVisual from '../components/CollectionIntelligenceVisual';
 import {
   ZCENE_SUPPORT_EMAIL,
   ZCENE_SUPPORT_MAILTO,
@@ -245,6 +248,88 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     expect(detailsPanelSrc).toContain('{data.matches}/{data.totalActive} Hits');
     expect(detailsPanelSrc).toContain('!isStaticMockup && links.purchase.length > 0');
     expect(detailsPanelSrc).toContain('!isStaticMockup && !isMagazineViewOpen && isProfileGenuinelyDisplayed');
+  });
+
+  it('8. Architecture V47.7 (Phase 1): Locks Multi-Scene ROOTS visual, Get Up Kids live-parity Deep Cuts, updated HomePage copy & zero mount-time iTunes fetches', async () => {
+    const homeSrc = fs.readFileSync(path.resolve(__dirname, '../components/HomePage.tsx'), 'utf-8');
+    const rootsVisualSrc = fs.readFileSync(path.resolve(__dirname, '../components/ArtistFeatureVisual.tsx'), 'utf-8');
+    const deepCutsSrc = fs.readFileSync(path.resolve(__dirname, '../components/CollectionIntelligenceVisual.tsx'), 'utf-8');
+    const detailsPanelSrc = fs.readFileSync(path.resolve(__dirname, '../components/DetailsPanel.tsx'), 'utf-8');
+
+    // HomePage updated Roots & Deep Cuts copy (zero em-dashes, no legacy "Core Taste")
+    expect(homeSrc).toContain('Multi-Scene boards (up to 5 scenes)');
+    expect(homeSrc).toContain('Style resonance');
+    expect(homeSrc).not.toContain('Core Taste');
+    expect(homeSrc).toContain('Essential Listening');
+    expect(homeSrc).not.toContain('—');
+
+    // ArtistFeatureVisual V43/V44 Multi-Scene Switcher Strip parity & cleanup
+    expect(rootsVisualSrc).not.toContain("from 'lucide-react'");
+    expect(rootsVisualSrc).toContain('Scenes');
+    expect(rootsVisualSrc).toContain('Add Scene');
+    expect(rootsVisualSrc).toContain('Scene 1');
+    expect(rootsVisualSrc).toContain('Scene 2');
+    expect(rootsVisualSrc).toContain('more_vert');
+    expect(rootsVisualSrc).toContain('rounded-md');
+
+    // CollectionIntelligenceVisual live-parity source locks
+    expect(deepCutsSrc).toContain('Matt Pryor (Lead Vocals, Guitar)');
+    expect(deepCutsSrc).toContain('notableArtists');
+    expect(deepCutsSrc).toContain('Four Minute Mile');
+    expect(deepCutsSrc).toContain('Something to Write Home About');
+    expect(deepCutsSrc).toContain('On a Wire');
+    expect(deepCutsSrc).toContain('Guilt Show');
+    expect(deepCutsSrc).toContain('There Are Rules');
+    expect(deepCutsSrc).toContain('Problems');
+    expect(deepCutsSrc).toContain('itunesCollectionId: 1450931751');
+
+    // DetailsPanel AudioPreviewPlayer guarded off on static landing mockups
+    expect(detailsPanelSrc).toContain('{!isStaticMockup && (() => {');
+
+    // Real render assertion: Members, Scene Circle, 6 Essential Listening rows & ZERO mount-time fetch calls
+    const originalFetch = global.fetch;
+    const fetchMock = vi.fn();
+    global.fetch = fetchMock as any;
+
+    try {
+      render(<CollectionIntelligenceVisual />);
+      await act(async () => {
+        await new Promise((resolve) => setTimeout(resolve, 25));
+      });
+
+      expect(screen.getByText('Members')).toBeDefined();
+      expect(screen.getByText('Matt Pryor (Lead Vocals, Guitar)')).toBeDefined();
+      const sceneCircleHeading = screen.getByText('Scene Circle');
+      expect(sceneCircleHeading).toBeDefined();
+      const sceneCircleContainer = sceneCircleHeading.parentElement!;
+      expect(sceneCircleContainer.textContent).toContain('Jimmy Eat World');
+      expect(sceneCircleContainer.textContent).toContain('The Promise Ring');
+      expect(sceneCircleContainer.textContent).toContain('Braid');
+      expect(sceneCircleContainer.textContent).toContain('Saves The Day');
+      expect(sceneCircleContainer.textContent).toContain('The Anniversary');
+      expect(sceneCircleContainer.textContent).toContain('The Appleseed Cast');
+
+      expect(screen.getByText('Four Minute Mile')).toBeDefined();
+      expect(screen.getByText('Something to Write Home About')).toBeDefined();
+      expect(screen.getByText('On a Wire')).toBeDefined();
+      expect(screen.getByText('Guilt Show')).toBeDefined();
+      expect(screen.getByText('There Are Rules')).toBeDefined();
+      expect(screen.getByText('Problems')).toBeDefined();
+
+      // Empty catalog fallback must be eradicated on the demo card
+      expect(screen.queryByTestId('essential-listening-empty')).toBeNull();
+      expect(screen.queryByText(/No verified releases found in the digital catalog/i)).toBeNull();
+
+      // All 6 JIT per-album preview buttons render cleanly
+      for (let i = 0; i < 6; i++) {
+        expect(screen.getByTestId(`album-preview-btn-${i}`)).toBeDefined();
+      }
+
+      // Strictly zero unsolicited iTunes network calls on landing-page mount
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      global.fetch = originalFetch;
+    }
   });
 });
 

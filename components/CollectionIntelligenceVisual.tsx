@@ -50,13 +50,36 @@ const mockGetUpKidsDetails: NodeDetails = {
   summary: "Formed in Kansas City, Missouri in 1995, The Get Up Kids became one of the defining acts of the second-wave Midwest emo movement. Their seminal 1999 album 'Something to Write Home About' bridged underground punk intensity with infectious melodic power-pop, creating a sonic blueprint that influenced an entire generation of alternative rock bands.",
   recommendationReason: "Essential listening for understanding how second-wave emo bridged underground punk intensity with wide open pop melodicism.",
   imageUrl: "https://is1-ssl.mzstatic.com/image/thumb/Music/54/81/df/mzi.hvbwtrse.jpg/600x600bb.jpg",
+  members: [
+    "Matt Pryor (Lead Vocals, Guitar)",
+    "Jim Suptic (Guitar, Vocals)",
+    "Rob Pope (Bass)",
+    "Ryan Pope (Drums)",
+    "James Dewees (Keyboards)"
+  ],
   details: {
     artist: "The Get Up Kids",
     genre: "Emo / Indie Rock",
     style: "Midwest",
     origin: "Kansas City, USA",
-    founded: "1995"
+    founded: "1995",
+    notableArtists: [
+      "Jimmy Eat World",
+      "The Promise Ring",
+      "Braid",
+      "Saves The Day",
+      "The Anniversary",
+      "The Appleseed Cast"
+    ]
   },
+  discography: [
+    { albumName: "Four Minute Mile", releaseYear: "1997", itunesCollectionId: 1646482253 },
+    { albumName: "Something to Write Home About", releaseYear: "1999", itunesCollectionId: 1450931751 },
+    { albumName: "On a Wire", releaseYear: "2002", itunesCollectionId: 1441452370 },
+    { albumName: "Guilt Show", releaseYear: "2004", itunesCollectionId: 1441451072 },
+    { albumName: "There Are Rules", releaseYear: "2011", itunesCollectionId: 1651281423 },
+    { albumName: "Problems", releaseYear: "2019", itunesCollectionId: 1651299125 }
+  ],
   links: [
     { site: 'Bandcamp', url: 'https://thegetupkids.bandcamp.com' }
   ]

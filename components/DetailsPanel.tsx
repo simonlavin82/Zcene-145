@@ -1648,8 +1648,8 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                     onError={handleImageError}
                                                 />
 
-                                                {/* Architecture V40/V45.19: 30-Second iTunes Audio Preview Player (Aligned with displayed hero album when collectionId is verified) */}
-                                                {(() => {
+                                                {/* Architecture V40/V45.19: 30-Second iTunes Audio Preview Player (Aligned with displayed hero album when collectionId is verified; guarded off on static landing mockups to prevent mount-time fetches) */}
+                                                {!isStaticMockup && (() => {
                                                     const stampedDiscog = (details?.discography || []).filter(
                                                         (alb) => typeof alb?.itunesCollectionId === 'number' && alb.itunesCollectionId > 0
                                                     );
@@ -1686,24 +1686,26 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                             <span className="text-8xl font-black text-white/5 uppercase select-none absolute bottom-0 right-0 translate-y-[14%] translate-x-[8%] leading-none">
                                                 {extractInitials(getArtistDisplayName(details, node))}
                                             </span>
-                                            {/* Architecture V40: 30-Second iTunes Audio Preview Player (Overlaid on initials) */}
-                                            <AudioPreviewPlayer
-                                                key={node.id}
-                                                nodeId={node.id}
-                                                artistName={getArtistDisplayName(details, node)}
-                                                previewUrl={details?.previewUrl}
-                                                previewTrackName={details?.previewTrackName}
-                                                itunesArtistId={details?.itunesArtistId}
-                                                onPreviewResolved={(res) => {
-                                                    if (details) {
-                                                        details.previewUrl = res.previewUrl;
-                                                        details.previewTrackName = res.previewTrackName;
-                                                        if (res.itunesArtistId) {
-                                                            details.itunesArtistId = res.itunesArtistId;
+                                            {/* Architecture V40: 30-Second iTunes Audio Preview Player (Overlaid on initials; guarded off on static landing mockups) */}
+                                            {!isStaticMockup && (
+                                                <AudioPreviewPlayer
+                                                    key={node.id}
+                                                    nodeId={node.id}
+                                                    artistName={getArtistDisplayName(details, node)}
+                                                    previewUrl={details?.previewUrl}
+                                                    previewTrackName={details?.previewTrackName}
+                                                    itunesArtistId={details?.itunesArtistId}
+                                                    onPreviewResolved={(res) => {
+                                                        if (details) {
+                                                            details.previewUrl = res.previewUrl;
+                                                            details.previewTrackName = res.previewTrackName;
+                                                            if (res.itunesArtistId) {
+                                                                details.itunesArtistId = res.itunesArtistId;
+                                                            }
                                                         }
-                                                    }
-                                                }}
-                                            />
+                                                    }}
+                                                />
+                                            )}
                                         </div>
                                     )}
                                 </div>

@@ -367,7 +367,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                 <div className="max-w-3xl mx-auto text-center space-y-8">
                     <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Roots</h2>
                     <h3 className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                        Define the genesis of your taste. Start with your <span className="text-white font-medium">favorite root artists</span> or select from your personal library to anchor the exploration engine.
+                        Define the genesis of your taste. Start with your <span className="text-white font-medium">favorite root artists</span>, select from your personal library, or build <span className="text-white font-medium">Multi-Scene boards (up to 5 scenes)</span> to anchor the exploration engine.
                     </h3>
                 </div>
                 <div 
@@ -406,7 +406,7 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                     <div className="space-y-8">
                         <h2 className="text-4xl sm:text-6xl font-medium text-white tracking-tighter uppercase">Deep Cuts</h2>
                         <h3 className="text-zinc-400 text-lg max-w-2xl mx-auto leading-relaxed">
-                            Dig deeper into the artists you love, explore <span className="text-white font-medium">editorial insights, Core Taste resonance</span>, release artwork, and instant audio previews. This is how you <span className="text-white font-medium">curate</span> your next musical obsession.
+                            Dig deeper into the artists you love, explore <span className="text-white font-medium">editorial insights, Style resonance</span>, release artwork, and <span className="text-white font-medium">Essential Listening</span> audio previews. This is how you <span className="text-white font-medium">curate</span> your next musical obsession.
                         </h3>
                     </div>
                 </div>
