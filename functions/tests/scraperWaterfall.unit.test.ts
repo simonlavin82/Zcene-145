@@ -1,10 +1,14 @@
+import fs from 'fs';
+import path from 'path';
 import { describe, it, expect, vi } from 'vitest';
 import {
   scrapeImageUrlBackend,
   reconcileDiscographyWithITunes,
   cleanCollectionTitle,
   evaluateGenreDistanceScore,
-  selectBestArtistArtwork
+  selectBestArtistArtwork,
+  CURRENT_ITUNES_SCRAPE_VERSION,
+  shouldRunRule38NotFoundUpgrade
 } from '../src/services/curatorService';
 
 describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & iTunes Resilience', () => {
@@ -367,6 +371,475 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
         },
       ];
       expect(selectBestArtistArtwork(holidayOnlyAlbums, [])).toBe('https://example.com/yuletide/600x600bb.jpg');
+    });
+  });
+
+  describe('V47.8 Rule 38: Tier 3B Album-Anchored Fallback, Conflation Guard & One-Time Upgrade', () => {
+    it('1. Tier 3B album-anchored entity=song recovery rescues buried bare-name artists and caps at 3 album queries', async () => {
+      const songQueries: string[] = [];
+      const fetchSpy = vi.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        // Bare artist search & Tier 2 geographic search both miss (buried homonym)
+        if (url.includes('entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 9001, artistName: 'Exhibition Tribute', primaryGenreName: 'Pop' },
+              ],
+            }),
+          } as any;
+        }
+        // Tier 3B album-anchored entity=song query
+        if (url.includes('entity=song&limit=15')) {
+          songQueries.push(url);
+          if (url.includes('The%20Last%20Laugh')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 1511350574,
+                    artistName: 'Exhibition',
+                    collectionId: 1670765896,
+                    collectionName: 'The Last Laugh',
+                    primaryGenreName: 'Punk',
+                    releaseDate: '2023-02-17T08:00:00Z',
+                    previewUrl: 'https://audio-ssl.itunes.apple.com/last-laugh.m4a',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=1511350574&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 1511350574, artistName: 'Exhibition', primaryGenreName: 'Punk' },
+                {
+                  wrapperType: 'collection',
+                  artistId: 1511350574,
+                  collectionId: 1670765896,
+                  collectionName: 'The Last Laugh',
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2023-02-17T08:00:00Z',
+                  trackCount: 10,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/exhibition/last-laugh/100x100bb.jpg',
+                },
+                {
+                  wrapperType: 'collection',
+                  artistId: 1511350574,
+                  collectionId: 1587594003,
+                  collectionName: "You'll Be Next - EP",
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2021-10-01T07:00:00Z',
+                  trackCount: 4,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/exhibition/youll-be-next/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        // Supply 4 non-generic albums to verify Tier 3B strictly caps at 3 queries
+        const result = await scrapeImageUrlBackend(
+          'Exhibition',
+          'artist',
+          'Hardcore Punk',
+          'Buffalo NY metallic hardcore band on Triple B Records.',
+          'Buffalo, USA',
+          [
+            { albumName: 'Unindexed Promo Tape', releaseYear: '2020' },
+            { albumName: 'The Last Laugh', releaseYear: '2023' },
+            { albumName: 'Another Unindexed Split', releaseYear: '2022' },
+            { albumName: 'Fourth Release Beyond Cap', releaseYear: '2024' },
+          ],
+          'us',
+          '2021'
+        );
+
+        expect(songQueries.length).toBe(3);
+        expect(songQueries.some((u) => u.includes('Fourth%20Release'))).toBe(false);
+        expect(result.itunesArtistId).toBe(1511350574);
+        expect(result.imageUrl).toBe('https://is1-ssl.mzstatic.com/exhibition/last-laugh/600x600bb.jpg');
+        expect(result.reconciledDiscography.some((d) => d.albumName === 'The Last Laugh' && d.itunesCollectionId === 1670765896)).toBe(true);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('2. Tier 3B fail-closed guards reject Various Artists, substring artists, hostile genres, year drift & multi-artistId ambiguity', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=musicArtist')) {
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('entity=song&limit=15')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                // Various Artists must be rejected
+                {
+                  wrapperType: 'track',
+                  kind: 'song',
+                  artistId: 36270,
+                  artistName: 'Various Artists',
+                  collectionName: 'The Last Laugh',
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2023-02-17T08:00:00Z',
+                },
+                // Substring / tribute artist must be rejected
+                {
+                  wrapperType: 'track',
+                  kind: 'song',
+                  artistId: 88801,
+                  artistName: 'Exhibition Tribute Band',
+                  collectionName: 'The Last Laugh',
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2023-02-17T08:00:00Z',
+                },
+                // Hostile genre must be rejected
+                {
+                  wrapperType: 'track',
+                  kind: 'song',
+                  artistId: 88802,
+                  artistName: 'Exhibition',
+                  collectionName: 'The Last Laugh',
+                  primaryGenreName: 'Classical',
+                  releaseDate: '2023-02-17T08:00:00Z',
+                },
+                // Release-year drift (>2 years) & pre-formation must be rejected
+                {
+                  wrapperType: 'track',
+                  kind: 'song',
+                  artistId: 88803,
+                  artistName: 'Exhibition',
+                  collectionName: 'The Last Laugh',
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2015-01-01T08:00:00Z',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const rejected = await scrapeImageUrlBackend(
+          'Exhibition',
+          'artist',
+          'Hardcore Punk',
+          'Buffalo NY hardcore band.',
+          'Buffalo, USA',
+          [{ albumName: 'The Last Laugh', releaseYear: '2023' }],
+          'us',
+          '2021'
+        );
+        expect(rejected).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+
+      // Ambiguous multi-artistId collision on the same query must fail closed to Tier 4
+      const ambigSpy = vi.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=musicArtist')) {
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('entity=song&limit=15')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'track',
+                  kind: 'song',
+                  artistId: 111111,
+                  artistName: 'Exhibition',
+                  collectionName: 'The Last Laugh',
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2023-02-17T08:00:00Z',
+                },
+                {
+                  wrapperType: 'track',
+                  kind: 'song',
+                  artistId: 222222,
+                  artistName: 'Exhibition',
+                  collectionName: 'The Last Laugh',
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2023-03-01T08:00:00Z',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const ambigResult = await scrapeImageUrlBackend(
+          'Exhibition',
+          'artist',
+          'Hardcore Punk',
+          'Buffalo NY hardcore band.',
+          'Buffalo, USA',
+          [{ albumName: 'The Last Laugh', releaseYear: '2023' }],
+          'us',
+          '2021'
+        );
+        expect(ambigResult).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        ambigSpy.mockRestore();
+      }
+    });
+
+    it('3. Exact #1511350574 Exhibition conflated catalog defense strips 1994-2003 Christian/New Age 1-track singles and surfaces Punk LP/EPs', () => {
+      const exhibitionConflatedCatalog = [
+        // 4 genuine Buffalo hardcore Punk releases
+        {
+          wrapperType: 'collection',
+          artistId: 1511350574,
+          collectionId: 1670765896,
+          collectionName: 'The Last Laugh',
+          primaryGenreName: 'Punk',
+          releaseDate: '2023-02-17T08:00:00Z',
+          trackCount: 10,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/exhibition/last-laugh/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 1511350574,
+          collectionId: 1666377208,
+          collectionName: 'On the Run - EP',
+          primaryGenreName: 'Punk',
+          releaseDate: '2023-01-20T08:00:00Z',
+          trackCount: 4,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/exhibition/on-the-run/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 1511350574,
+          collectionId: 1587594003,
+          collectionName: "You'll Be Next - EP",
+          primaryGenreName: 'Punk',
+          releaseDate: '2021-10-01T07:00:00Z',
+          trackCount: 4,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/exhibition/youll-be-next/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 1511350574,
+          collectionId: 1641164901,
+          collectionName: 'Back For More - Single',
+          primaryGenreName: 'Punk',
+          releaseDate: '2022-08-24T07:00:00Z',
+          trackCount: 3,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/exhibition/back-for-more/100x100bb.jpg',
+        },
+        // Merged/conflated Apple Music 1994-2003 Christian & New Age 1-track singles
+        {
+          wrapperType: 'collection',
+          artistId: 1511350574,
+          collectionId: 1851895731,
+          collectionName: 'Etude of Memory - Single',
+          primaryGenreName: 'New Age',
+          releaseDate: '1994-05-01T07:00:00Z',
+          trackCount: 1,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/conflated/etude/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 1511350574,
+          collectionId: 1851886828,
+          collectionName: 'Stranger - Single',
+          primaryGenreName: 'New Age',
+          releaseDate: '1996-04-01T08:00:00Z',
+          trackCount: 1,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/conflated/stranger/100x100bb.jpg',
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 1511350574,
+          collectionId: 1864404156,
+          collectionName: 'American Life - Single',
+          primaryGenreName: 'Christian',
+          releaseDate: '2003-11-04T08:00:00Z',
+          trackCount: 1,
+          artworkUrl100: 'https://is1-ssl.mzstatic.com/conflated/american-life/100x100bb.jpg',
+        },
+      ];
+
+      const sanityContext = {
+        genre: 'Hardcore Punk',
+        summary: 'Buffalo NY hardcore punk band on Triple B Records.',
+        foundedYear: '2021',
+      };
+
+      const reconciled = reconcileDiscographyWithITunes([], exhibitionConflatedCatalog, 'Exhibition', sanityContext);
+      const titles = reconciled.map((r) => r.albumName);
+
+      expect(titles).toEqual(["You'll Be Next", 'On the Run', 'The Last Laugh']);
+      expect(reconciled.find((r) => r.albumName === 'The Last Laugh')?.itunesCollectionId).toBe(1670765896);
+      expect(titles).not.toContain('Etude of Memory');
+      expect(titles).not.toContain('Stranger');
+      expect(titles).not.toContain('American Life');
+      expect(titles).not.toContain('Back For More');
+
+      const heroArtwork = selectBestArtistArtwork(exhibitionConflatedCatalog, reconciled, sanityContext);
+      expect(heroArtwork).not.toContain('conflated');
+      expect(heroArtwork).toContain('exhibition');
+    });
+
+    it('4. Generic-only "Demo" Tier 1 safeguard preserves clear Tier 1 Genre-Distance winner while non-generic wrong titles still fail Mandatory Catalog Corroboration', async () => {
+      const fetchSpy = vi.spyOn(global, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('term=Exhibition&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 1511350574, artistName: 'Exhibition', primaryGenreName: 'Punk' },
+                { wrapperType: 'artist', artistId: 5903214, artistName: 'Exhibition', primaryGenreName: 'Rock' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=1511350574&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 1511350574, artistName: 'Exhibition', primaryGenreName: 'Punk' },
+                {
+                  wrapperType: 'collection',
+                  artistId: 1511350574,
+                  collectionId: 1670765896,
+                  collectionName: 'The Last Laugh',
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2023-02-17T08:00:00Z',
+                  trackCount: 10,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/exhibition/last-laugh/100x100bb.jpg',
+                },
+                {
+                  wrapperType: 'collection',
+                  artistId: 1511350574,
+                  collectionId: 1587594003,
+                  collectionName: "You'll Be Next - EP",
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2021-10-01T07:00:00Z',
+                  trackCount: 4,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/exhibition/youll-be-next/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('term=Reason%20to%20Believe&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 999999, artistName: 'Reason to Believe', primaryGenreName: 'Punk' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=999999&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 999999,
+                  collectionId: 555555,
+                  collectionName: 'Live from Snake River',
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2025-10-11T07:00:00Z',
+                  trackCount: 9,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/impostor/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        // Generic-only "Demo" must NOT sabotage clear Tier 1 Genre-Distance winner (Punk=8 vs Rock=3)
+        const demoSafeResult = await scrapeImageUrlBackend(
+          'Exhibition',
+          'artist',
+          'Hardcore Punk',
+          'Buffalo NY hardcore punk band.',
+          'Buffalo, USA',
+          [{ albumName: 'Demo', releaseYear: '2020' }],
+          'us',
+          '2021'
+        );
+        expect(demoSafeResult.itunesArtistId).toBe(1511350574);
+        expect(demoSafeResult.imageUrl).toContain('exhibition');
+        expect(demoSafeResult.reconciledDiscography.some((d) => d.albumName === 'The Last Laugh')).toBe(true);
+
+        // Non-generic wrong/unindexed titles MUST still fail Mandatory Catalog Corroboration (Reason to Believe defense)
+        const uncorroboratedResult = await scrapeImageUrlBackend(
+          'Reason to Believe',
+          'artist',
+          'Hardcore Punk',
+          'Classic 1980s California melodic hardcore band.',
+          'California, USA',
+          [{ albumName: 'Next Time From the Heart', releaseYear: '1988' }],
+          'us',
+          '1986'
+        );
+        expect(uncorroboratedResult).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('5. Step 2 itunesScrapeVersion: 2 one-time $0.00 upgrade runs once for legacy not-found artists, never loops, and leaves healOrphanedAsset untouched', () => {
+      expect(CURRENT_ITUNES_SCRAPE_VERSION).toBe(2);
+
+      // Legacy artist doc with not-found and no itunesScrapeVersion -> eligible
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', discography: [] }, false)).toBe(true);
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 1 }, false)).toBe(true);
+
+      // Already stamped v2 -> strictly bypassed (no repeat scraping on genuinely unindexed underground bands)
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 2 }, false)).toBe(false);
+
+      // Already has verified https:// imageUrl -> strictly bypassed
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'https://is1-ssl.mzstatic.com/art/600x600bb.jpg' }, false)).toBe(false);
+
+      // Label entities -> strictly bypassed
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found' }, true)).toBe(false);
+
+      // Verify Step 2 wiring in processCurationJob.ts and zero JIT healer bloat in healOrphanedAsset.ts
+      const workerSrc = fs.readFileSync(path.resolve(__dirname, '../src/processCurationJob.ts'), 'utf-8');
+      const jitSrc = fs.readFileSync(path.resolve(__dirname, '../src/healOrphanedAsset.ts'), 'utf-8');
+      expect(workerSrc).toContain('shouldRunRule38NotFoundUpgrade(details, isLabel)');
+      expect(workerSrc).toContain('details.itunesScrapeVersion = CURRENT_ITUNES_SCRAPE_VERSION');
+      expect(jitSrc).not.toContain('itunesScrapeVersion');
     });
   });
 });

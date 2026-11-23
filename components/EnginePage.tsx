@@ -224,7 +224,7 @@ export const ARCHITECTURE_RULES = [
     { 
         id: 38, 
         title: "4-Tier Asset Disambiguation Waterfall", 
-        desc: "Third-party media scraping (Artists ONLY; Record Labels strictly excluded and locked to imageUrl: null & itunesArtistId: null) executes a 4-tier cascade: (1) Strict taxonomy match & distance scoring with Mandatory Catalog Corroboration (when discography is provided, candidates require >=1 verified album match; 0-match candidates escalate to Tier 2/3 to prevent out-of-print bands locking onto modern homonyms), (2) Geographic suffix fallback, (3) Resilient Discography Tie-Breaker with Zero-Match Backfill Prohibition (100% unverified catalogs never backfill impostor releases), Tightened Substring Matching (requires <=1-year release proximity AND >=0.70 length ratio), and Hostile Genre Defense (blocks single partial matches on conflicting genres like Dance for Post-Hardcore unless >=2 album matches), deterministically stamping itunesArtistId onto detailsCache (0 added HTTP calls) for on-demand client audio streaming (entity=song&limit=1). (4) Fail-fast reject to terminal monogram quarantine (imageUrl: 'not-found', discography: [], itunesArtistId: null)." 
+        desc: "Third-party media scraping (Artists ONLY; Record Labels strictly excluded and locked to imageUrl: null & itunesArtistId: null) executes a fail-closed cascade: (1) Strict taxonomy match & distance scoring with Generic-Safe Mandatory Catalog Corroboration (non-generic discography titles require >=1 verified album match; bare stripped 'Demo' titles never sabotage a clear Tier 1 Genre-Distance winner) and Collection-Level Apple Music Conflation Guard (filters merged iTunes artist profiles by evaluateGenreMatch, albYear >= foundedYear - 1, and multi-track trackCount >= 4 preference), (2) Geographic suffix fallback, (3A) Resilient Discography Tie-Breaker with Zero-Match Backfill Prohibition, Tightened Substring Matching, and Hostile Genre Defense, (3B) Album-Anchored entity=song Fallback (capped at 3 non-generic titles; requires exact normalized whole-word artistName, fuzzy collectionName, genre + year sanity, and a single unambiguous artistId), stamping itunesArtistId & itunesScrapeVersion: 2 (with one-time $0.00 Step 2 iTunes-only upgrade for legacy not-found docs). (4) Fail-fast reject to terminal monogram quarantine (imageUrl: 'not-found', discography: [], itunesArtistId: null, itunesScrapeVersion: 2)." 
     },
     { 
         id: 39, 
@@ -383,7 +383,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 <span className="text-primary font-medium">2. Hydrate Node Batch | 3.6 Flash (low) [Rules 8, 38 & 40]</span>
                                 <ul className="list-disc pl-4 mt-1 space-y-1 text-zinc-500 text-[10px]">
                                     <li>Read Gate (isFullyQualifiedEntityProfile with requireMembersAndPeers: true + Origin-Suffix Parity): Requires complete structured schema (summary, genre, origin, founded, canonical style, non-empty members and notableArtists peer circle free of member pollution), origin matching <code>-iso</code> suffix. Rejects stale docs missing members/peers, foreign homonyms, and member-polluted profiles to trigger full re-hydration self-healing.</li>
-                                    <li>Miss: Enforces <code>lockedSeeds</code> / <code>-iso</code> identity lock, canonical <code>node.id</code> scene context, and strict <code>ARTIST/LABEL_NODE_DETAILS_SCHEMA</code> (3x retry). ARTIST schema requires <code>members</code> (Name (Role) for bands/soloists; honest [] for obscure underground acts [Rule 8]) and strictly bars band members or self-references in <code>notableArtists</code> (deterministically scrubbed via <code>sanitizeNotableArtists</code>). Rule 38 4-Tier Scraper queries regional <code>country=ISO</code> storefronts first before US fallback with <code>fetchItunesJsonWithRetry</code> (4000ms timeout + up to 2 jittered retries on HTTP <code>403/429</code>) and Tier 1 spacing-collapsed fallback (e.g. <code>"LungLeg"</code>); selects hero artwork via <code>selectBestArtistArtwork</code> (prioritizing reconciled Essential Listening studio LPs over soundtracks/compilations/singles); enforces Tier 1 mandatory catalog corroboration, Tier 3 zero-match backfill prohibition (<code>canBackfill</code>), tightened substring matching (&ge;0.70 ratio + year proximity), and hostile genre defense (&ge;2 albums required for hostile profiles); unverified artists fail fast to terminal quarantine <code>imageUrl: 'not-found'</code>, <code>discography: []</code>, <code>itunesArtistId: null</code> (with an intentional <code>Essential Listening</code> empty state on Artist cards).</li>
+                                    <li>Miss: Enforces <code>lockedSeeds</code> / <code>-iso</code> identity lock, canonical <code>node.id</code> scene context, and strict <code>ARTIST/LABEL_NODE_DETAILS_SCHEMA</code> (3x retry). ARTIST schema requires <code>members</code> (Name (Role) for bands/soloists; honest [] for obscure underground acts [Rule 8]) and strictly bars band members or self-references in <code>notableArtists</code> (deterministically scrubbed via <code>sanitizeNotableArtists</code>). Rule 38 Waterfall queries regional <code>country=ISO</code> storefronts first before US fallback with <code>fetchItunesJsonWithRetry</code> (4000ms timeout + up to 2 jittered retries on HTTP <code>403/429</code>), Tier 1 spacing-collapsed fallback &amp; generic-safe catalog corroboration, Tier 3B album-anchored <code>entity=song</code> fallback (capped at 3 non-generic titles; strict whole-word artist, fuzzy album, genre/year sanity &amp; single <code>artistId</code>), and Collection-Level Apple Music Conflation Guard (<code>evaluateGenreMatch</code>, <code>foundedYear - 1</code>, <code>trackCount &gt;= 4</code>); stamps <code>itunesScrapeVersion: 2</code> (with one-time $0.00 Step 2 upgrade for legacy <code>not-found</code> docs); unverified artists fail fast to terminal quarantine <code>imageUrl: 'not-found'</code>, <code>discography: []</code>, <code>itunesArtistId: null</code>.</li>
                                     <li>Slug deduplication skips stubs, ambiguous multi-ISO collisions, and cross-scene foreign homonyms (<code>sceneAnchorIsos</code>); falls back to <code>seedStubs</code> if retries fail. Dynamic cooldown skips sleep on 100% cache-hit batches.</li>
                                 </ul>
                             </li>
@@ -809,7 +809,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V47.4 Full-Stack Regression Runbook
+                    V47.8 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -965,7 +965,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         ))}
                     </nav>
                     <div className="mt-8 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono pl-2">
-                        Zcene V47.4 Blueprint<br/>
+                        Zcene V47.8 Blueprint<br/>
                         100% Anti-Regression
                     </div>
                 </aside>
@@ -979,7 +979,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.4 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.8 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -1069,7 +1069,7 @@ LOCKED SEMANTIC TOPOLOGY & ZERO READ-ONLY WRITES (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.4 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.8 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

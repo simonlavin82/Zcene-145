@@ -12,6 +12,8 @@ import {
   scrapeVideoIdBackend,
   checkVideoPlayability,
   scrapeImageUrlBackend,
+  CURRENT_ITUNES_SCRAPE_VERSION,
+  shouldRunRule38NotFoundUpgrade,
   extractArtistSubGraph,
   validateSeedOriginBackend,
   extractCountrySlug,
@@ -1207,11 +1209,17 @@ export const processCurationJob = onDocumentCreated({
               } else {
                 // Complete canonical cache hit -> STRICT BYPASS
                 // Note: details.imageUrl is guaranteed non-empty (either https:// or terminal 'not-found'
-                // after a verified 4-tier discography scrape). We do not mutate or re-scrape existing global records.
+                // after a verified 4-tier discography scrape). Legacy 'not-found' docs with
+                // (itunesScrapeVersion ?? 0) < CURRENT_ITUNES_SCRAPE_VERSION qualify for a single
+                // $0.00 iTunes-only re-scrape (zero Gemini spend) and are stamped itunesScrapeVersion: 2.
                 let isReadOnly = true;
-                if (!details.imageUrl && !isLabel) {
+                const needsRule38Upgrade = shouldRunRule38NotFoundUpgrade(details, isLabel);
+                if ((!details.imageUrl || needsRule38Upgrade) && !isLabel) {
                   requiresImageScraping = true;
                   isReadOnly = false;
+                  if (needsRule38Upgrade) {
+                    console.log(`[Image Scraper / Rule 38 V47.8] Queuing one-time $0.00 iTunes-only upgrade for legacy not-found doc: ${artistNormId}`);
+                  }
                 }
                 if (!details.youtubeVideoId && !isLabel) {
                   requiresVideoScraping = true;
@@ -1322,7 +1330,8 @@ export const processCurationJob = onDocumentCreated({
                       details.summary || "",
                       lockedOriginForScrape,
                       details.discography || [],
-                      expectedNodeIso
+                      expectedNodeIso,
+                      details.details.founded
                     );
                     if (scrapeResult && scrapeResult.imageUrl) {
                       details.imageUrl = scrapeResult.imageUrl;
@@ -1332,11 +1341,14 @@ export const processCurationJob = onDocumentCreated({
                       if (scrapeResult.itunesArtistId) {
                         details.itunesArtistId = scrapeResult.itunesArtistId;
                       }
+                      details.itunesScrapeVersion = CURRENT_ITUNES_SCRAPE_VERSION;
                     } else {
                       // ⚠️ STRICT FAIL-FAST RULE & TIER 4 QUARANTINE (Rule 38):
                       console.warn(`[Image Scraper / Rule 38] No verified image for ${searchArtistName}. Setting not-found and quarantining discography to [].`);
                       details.imageUrl = 'not-found';
                       details.discography = [];
+                      details.itunesArtistId = null;
+                      details.itunesScrapeVersion = CURRENT_ITUNES_SCRAPE_VERSION;
                     }
                   } catch (e) {
                     console.warn(`[Image Scraper / Rule 38] Timeout/Error for ${searchArtistName}. Enforcing fail-fast quarantine.`);

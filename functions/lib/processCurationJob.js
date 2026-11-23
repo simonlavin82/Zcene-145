@@ -1081,11 +1081,17 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         else {
                             // Complete canonical cache hit -> STRICT BYPASS
                             // Note: details.imageUrl is guaranteed non-empty (either https:// or terminal 'not-found'
-                            // after a verified 4-tier discography scrape). We do not mutate or re-scrape existing global records.
+                            // after a verified 4-tier discography scrape). Legacy 'not-found' docs with
+                            // (itunesScrapeVersion ?? 0) < CURRENT_ITUNES_SCRAPE_VERSION qualify for a single
+                            // $0.00 iTunes-only re-scrape (zero Gemini spend) and are stamped itunesScrapeVersion: 2.
                             let isReadOnly = true;
-                            if (!details.imageUrl && !isLabel) {
+                            const needsRule38Upgrade = (0, curatorService_1.shouldRunRule38NotFoundUpgrade)(details, isLabel);
+                            if ((!details.imageUrl || needsRule38Upgrade) && !isLabel) {
                                 requiresImageScraping = true;
                                 isReadOnly = false;
+                                if (needsRule38Upgrade) {
+                                    console.log(`[Image Scraper / Rule 38 V47.8] Queuing one-time $0.00 iTunes-only upgrade for legacy not-found doc: ${artistNormId}`);
+                                }
                             }
                             if (!details.youtubeVideoId && !isLabel) {
                                 requiresVideoScraping = true;
@@ -1184,7 +1190,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                     const lockedOriginForScrape = (expectedNodeIso && !(0, isoCountries_1.doesOriginMatchExpectedIso)(details.details.origin, expectedNodeIso))
                                         ? (resolvedOriginHint || isoCountries_1.ISO_TO_COUNTRY_NAME[expectedNodeIso] || details.details.origin)
                                         : (details.details.origin || resolvedOriginHint || "");
-                                    const scrapeResult = await (0, curatorService_1.scrapeImageUrlBackend)(attemptName, 'artist', details.details.genre || resolvedGenreHint || "", details.summary || "", lockedOriginForScrape, details.discography || [], expectedNodeIso);
+                                    const scrapeResult = await (0, curatorService_1.scrapeImageUrlBackend)(attemptName, 'artist', details.details.genre || resolvedGenreHint || "", details.summary || "", lockedOriginForScrape, details.discography || [], expectedNodeIso, details.details.founded);
                                     if (scrapeResult && scrapeResult.imageUrl) {
                                         details.imageUrl = scrapeResult.imageUrl;
                                         if (Array.isArray(scrapeResult.reconciledDiscography)) {
@@ -1193,12 +1199,15 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         if (scrapeResult.itunesArtistId) {
                                             details.itunesArtistId = scrapeResult.itunesArtistId;
                                         }
+                                        details.itunesScrapeVersion = curatorService_1.CURRENT_ITUNES_SCRAPE_VERSION;
                                     }
                                     else {
                                         // ⚠️ STRICT FAIL-FAST RULE & TIER 4 QUARANTINE (Rule 38):
                                         console.warn(`[Image Scraper / Rule 38] No verified image for ${searchArtistName}. Setting not-found and quarantining discography to [].`);
                                         details.imageUrl = 'not-found';
                                         details.discography = [];
+                                        details.itunesArtistId = null;
+                                        details.itunesScrapeVersion = curatorService_1.CURRENT_ITUNES_SCRAPE_VERSION;
                                     }
                                 }
                                 catch (e) {

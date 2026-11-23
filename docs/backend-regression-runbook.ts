@@ -1,12 +1,12 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
-# V47.4 Regression Suite (Full-Stack)
+# V47.8 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (577 unit/integration tests).
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (583 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
-# Run entire full-stack regression test suite (28 test files, 577 offline deterministic tests)
+# Run entire full-stack regression test suite (28 test files, 583 offline deterministic tests)
 npm test
 
 # Run backend pipeline tests
@@ -104,7 +104,7 @@ npx vitest --ui
 *   **Static Fixtures:** External Gemini API calls are bypassed. Tests use pre-validated JSON topologies from \`tests/__fixtures__/\` to guarantee deterministic, zero-latency execution.
 *   **Payload Assertions (Split NODE_DETAILS_SCHEMA & Lineup/Peer Grounding):** Mock validations for Gemini API intercepts MUST assert on the correct \`thinking_level\` parameter (minimal, low, medium, high), \`responseMimeType: "application/json"\`, and the **split \`NODE_DETAILS_SCHEMA\`** (for Artists: \`style\` and \`members\` are in \`required\`, locking \`style\` to \`CANONICAL_STYLES_FLAT\` enum and \`members\` to \`'Name (Role)'\` format while permitting honest \`[]\` strictly for unindexed underground acts [Rule 8]; for Labels: \`style\` and \`imageUrl\` are strictly omitted from properties and required arrays with zero prose fallback), ensuring negative constraints ban band members and self-references from \`notableArtists\`, and that no legacy sampling parameters (temperature, top_p) are present.
 *   **Payload Assertions (Label Integrity, 3-Tier Anchors & Deep Cut Qualification):** Mock validations MUST explicitly validate that label IDs have been correctly stripped of suffixes via \`normalizeLabelId\` before being written to the mock database, that \`hasActiveDiscoveryFilters\` ignores empty arrays while forcing Complex Generation when Level 2 or Level 3 anchors are active, and that \`isFullyQualifiedEntityProfile\` unconditionally rejects member-polluted and self-polluted \`notableArtists\` while accepting legitimate underground profiles with terminal \`imageUrl: "not-found"\` when \`Array.isArray(profile.discography)\` (including honest empty arrays \`[]\`).
-*   **Image Scraper Assertions (4-Tier Waterfall, Taxonomic Distance & Discography Reconciliation):** Asserts that \`scrapeImageUrlBackend\` resolves clear genre distances at Tier 1 (e.g. Punk vs Alternative for hardcore bands), preserves qualified releases (e.g. \`(Demo)\`, \`[EP]\`), strictly gates distinctive fuzzy token matches on exact release-year correlation, resolves multi-candidate Tier 3 collisions via taxonomy genre-affinity scoring (\`evaluateGenreMatch\`), reconciles and backfills verified releases from iTunes while purging hallucinated albums, and enforces Tier 4 fail-fast quarantine returning \`imageUrl: 'not-found'\` and \`discography: []\` while immunizing label entities.
+*   **Image Scraper Assertions (4-Tier Waterfall, Tier 3B Album-Anchored Fallback, Conflation Guard & One-Time Upgrade):** Asserts that \`scrapeImageUrlBackend\` resolves clear genre distances at Tier 1 with generic-only \`"Demo"\` non-sabotage, preserves qualified releases, enforces Tier 3B album-anchored \`entity=song\` fallback (3-query cap, exact whole-word artist, fuzzy album, genre/year sanity, single unambiguous \`artistId\`, fail-closed), defends against merged/conflated Apple Music catalogs (filtering by \`evaluateGenreMatch\`, \`foundedYear - 1\`, and multi-track \`trackCount >= 4\` preference), reconciles and backfills verified releases with \`itunesCollectionId\`, enforces Tier 4 fail-fast quarantine (\`imageUrl: 'not-found'\`, \`discography: []\`, \`itunesScrapeVersion: 2\`), gates Step 2 one-time \`$0.00\` iTunes-only upgrades on \`itunesScrapeVersion < 2\` without touching \`healOrphanedAsset.ts\`, and immunizes label entities.
 
 ## Core Pathways Validated
 
@@ -142,10 +142,13 @@ npx vitest --ui
 11. **Server-Side Account Deletion, GDPR Art. 17 Erasure & Anonymised P&L Preservation (\`v47.4\`):**
     *   *Assertion (Recency, Concurrency, Sole Admin Protection & Rules Lockdown):* Validates \`deleteUserAccount\` fail-closed sole Admin self-deletion hard-block (\`isProtectedAdminIdentity\` -> \`permission-denied\` / \`ADMIN_ACCOUNT_PROTECTED\` before any DB/Auth calls, with \`Delete Account\` hidden for Admin in \`Header.tsx\` and guarded in \`App.tsx\`), \`auth_time <= 300s\` (\`REQUIRES_RECENT_LOGIN\` + seamless Google popup re-auth retry), active curation lock guard (\`ACTIVE_CURATION_IN_PROGRESS\`), Admin-only \`users/{userId}\` delete lock (excluding the sole Admin UID) in \`firestore.rules\`, and Admin-read/server-write-only \`adminLedger/system/deletedAccountTelemetry/{archiveId}\`.
     *   *Assertion (Full Erasure & Zero-PII P&L Reconciliation):* Validates chunk-deletion of all user subcollections, legacy projects, \`sharedZcenes\`, locks, sessions, jobs, and Firebase Auth user, \`curationFailures\` PII scrubbing to \`"deleted_account"\`, zero-PII financial archive creation, and exact \`computeAggregateMetrics\` P&L reconciliation excluding forfeited balances from active unspent float.
+12. **Landing Page Demo Parity (\`v47.7\`) & Rule 38 Two-Layer Album-Anchored iTunes Fallback (\`v47.8\`):**
+    *   *Assertion (HomePage Live-Parity Mockups & Zero Mount-Time Fetches):* Validates Multi-Scene Switcher Strip in \`ArtistFeatureVisual.tsx\`, live-parity The Get Up Kids Members, Scene Circle & 6 Essential Listening albums in \`CollectionIntelligenceVisual.tsx\`, \`Style resonance\` copy without em-dashes, and zero mount-time iTunes fetches via \`!isStaticMockup\`.
+    *   *Assertion (Tier 3B Album-Anchored Fallback, Conflation Guard & One-Time Upgrade):* Validates 3-query-capped \`entity=song\` recovery, fail-closed guards (Various Artists, substring artists, hostile genres, year drift, multi-\`artistId\` ambiguity), exact \`#1511350574\` Exhibition conflated catalog filtering (blocking 1994–2003 Christian/New Age 1-track singles), generic-only \`"Demo"\` Tier 1 safeguard vs. \`Reason to Believe\` corroboration rejection, and Step 2 \`itunesScrapeVersion: 2\` one-time \`$0.00\` upgrade check.
 
-## Database Purge Runbook Protocol (V47.4 Multi-Scene Architecture)
+## Database Purge Runbook Protocol (V47.8 Multi-Scene Architecture)
 
-Note: The V47.4 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V47.4 operations.
+Note: The V47.8 Multi-Scene Infinite Board & Layered Zine architecture retains backward-compatible \`schemaVersion: 43\` across all Firestore project documents. Zero database purge is required for V47.8 operations.
 
 When rolling out structural schema migrations, Tier 1 Global Assets (\`/artists\` and \`/labels\`) remain canonical and 100% unchanged. Legacy purge automation (\`scripts/execute_v43_purge.cjs\`) is retained for emergency reset procedures only, while **strictly preserving Tier 1 \`/artists\` and \`/labels\`**, user wallets, and financial ledgers.
 

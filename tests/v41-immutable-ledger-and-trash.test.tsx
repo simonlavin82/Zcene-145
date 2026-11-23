@@ -579,7 +579,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
   });
 
   describe('Part 5: Architecture & Master Blueprint Parity Gate', () => {
-    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V47.4', () => {
+    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V47.8', () => {
       const truthPath = path.resolve(__dirname, '../architecture_truth.md');
       const truthContent = fs.readFileSync(truthPath, 'utf8');
 
@@ -589,14 +589,14 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       const runbookPath = path.resolve(__dirname, '../docs/backend-regression-runbook.ts');
       const runbookContent = fs.readFileSync(runbookPath, 'utf8');
 
-      // Check V47.4 headers & badges (48 Laws)
-      expect(truthContent).toContain('V47.4 — 48 Laws');
-      expect(engineContent).toContain('Zcene V47.4 Blueprint');
-      expect(engineContent).toContain('V47.4 Locked');
+      // Check V47.8 headers & badges (48 Laws)
+      expect(truthContent).toContain('V47.8 — 48 Laws');
+      expect(engineContent).toContain('Zcene V47.8 Blueprint');
+      expect(engineContent).toContain('V47.8 Locked');
       expect(engineContent).toContain('48 Laws');
-      expect(engineContent).toContain('V47.4 Full-Stack Regression Runbook');
-      expect(runbookContent).toContain('# V47.4 Regression Suite (Full-Stack)');
-      expect(runbookContent).toContain('28 test suites (577 unit/integration tests)');
+      expect(engineContent).toContain('V47.8 Full-Stack Regression Runbook');
+      expect(runbookContent).toContain('# V47.8 Regression Suite (Full-Stack)');
+      expect(runbookContent).toContain('28 test suites (583 unit/integration tests)');
       expect(runbookContent).toContain('npx vitest run tests/v47-zine-print-pdf.test.tsx');
       expect(runbookContent).toContain('npx vitest run functions/tests/deleteUserAccount.test.ts');
       expect(runbookContent).toContain('cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts');
