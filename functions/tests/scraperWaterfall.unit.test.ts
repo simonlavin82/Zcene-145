@@ -5,7 +5,10 @@ import {
   scrapeImageUrlBackend,
   reconcileDiscographyWithITunes,
   cleanCollectionTitle,
+  evaluateGenreMatch,
   evaluateGenreDistanceScore,
+  isAppleElectronicHardcoreGenre,
+  passesUncorroboratedEraGate,
   selectBestArtistArtwork,
   CURRENT_ITUNES_SCRAPE_VERSION,
   shouldRunRule38NotFoundUpgrade
@@ -818,21 +821,26 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
       }
     });
 
-    it('5. Step 2 itunesScrapeVersion: 2 one-time $0.00 upgrade runs once for legacy not-found artists, never loops, and leaves healOrphanedAsset untouched', () => {
+    it('5. Step 2 itunesScrapeVersion: 2 one-time $0.00 upgrade runs once for anchored legacy not-found artists, never loops, and leaves healOrphanedAsset untouched', () => {
       expect(CURRENT_ITUNES_SCRAPE_VERSION).toBe(2);
 
-      // Legacy artist doc with not-found and no itunesScrapeVersion -> eligible
-      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', discography: [] }, false)).toBe(true);
-      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 1 }, false)).toBe(true);
+      // Legacy artist doc with not-found and valid founded year (or qualifying discography) -> eligible
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', discography: [], details: { founded: '2021' } }, false)).toBe(true);
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 1, details: { founded: '1993' } }, false)).toBe(true);
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', discography: [{ albumName: 'The Last Laugh', releaseYear: '2023' }] }, false)).toBe(true);
+
+      // Unanchored legacy doc with empty discography AND missing founded year -> strictly bypassed (V47.9)
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', discography: [] }, false)).toBe(false);
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 1, details: { founded: 'Unknown' } }, false)).toBe(false);
 
       // Already stamped v2 -> strictly bypassed (no repeat scraping on genuinely unindexed underground bands)
-      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 2 }, false)).toBe(false);
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 2, details: { founded: '2021' } }, false)).toBe(false);
 
       // Already has verified https:// imageUrl -> strictly bypassed
-      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'https://is1-ssl.mzstatic.com/art/600x600bb.jpg' }, false)).toBe(false);
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'https://is1-ssl.mzstatic.com/art/600x600bb.jpg', details: { founded: '2021' } }, false)).toBe(false);
 
       // Label entities -> strictly bypassed
-      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found' }, true)).toBe(false);
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', details: { founded: '2007' } }, true)).toBe(false);
 
       // Verify Step 2 wiring in processCurationJob.ts and zero JIT healer bloat in healOrphanedAsset.ts
       const workerSrc = fs.readFileSync(path.resolve(__dirname, '../src/processCurationJob.ts'), 'utf-8');
@@ -840,6 +848,385 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
       expect(workerSrc).toContain('shouldRunRule38NotFoundUpgrade(details, isLabel)');
       expect(workerSrc).toContain('details.itunesScrapeVersion = CURRENT_ITUNES_SCRAPE_VERSION');
       expect(jitSrc).not.toContain('itunesScrapeVersion');
+    });
+  });
+
+  describe('V47.9 Rule 38 Guard Hardening: Apple Electronic "Hardcore", Uncorroborated Debut-Era Gate & Empty-Catalog Fail-Closed', () => {
+    it('1. Apple bare "Hardcore" maps exclusively to Electronic/Dance/Gabber and blocks panic-us (#15241026) false positive', async () => {
+      expect(isAppleElectronicHardcoreGenre('Hardcore')).toBe(true);
+      expect(isAppleElectronicHardcoreGenre('Hardcore Punk')).toBe(false);
+
+      // Non-electronic hardcore subgenres must NEVER match bare Apple "Hardcore" (even with "hardcore" in summary)
+      const nonElectronicGenres = [
+        'Hardcore Punk',
+        'Post-Hardcore',
+        'Melodic Hardcore',
+        'Youth Crew Hardcore',
+        'Metalcore',
+        'Hardcore Rap',
+      ];
+      for (const zceneGenre of nonElectronicGenres) {
+        expect(evaluateGenreMatch('Hardcore', zceneGenre, 'Seminal hardcore band from Boston.')).toBe(false);
+        expect(evaluateGenreDistanceScore('Hardcore', zceneGenre, 'Seminal hardcore band from Boston.')).toBe(0);
+      }
+
+      // Authentic Electronic/Gabber/Happy Hardcore artists STILL match bare Apple "Hardcore"
+      expect(evaluateGenreMatch('Hardcore', 'Gabber / Happy Hardcore', '')).toBe(true);
+      expect(evaluateGenreDistanceScore('Hardcore', 'Gabber / Happy Hardcore', '')).toBe(10);
+      expect(evaluateGenreMatch('Hardcore', 'Electronic', '')).toBe(true);
+      expect(evaluateGenreDistanceScore('Hardcore', 'Electronic', '')).toBe(8);
+
+      // Zero regressions on real hardcore punk bands tagged "Punk" / "Rock" / "Alternative" by Apple
+      expect(evaluateGenreMatch('Punk', 'Hardcore Punk', '')).toBe(true);
+      expect(evaluateGenreDistanceScore('Punk', 'Hardcore Punk', '')).toBe(8);
+      expect(evaluateGenreMatch('Punk', 'Youth Crew Hardcore', '')).toBe(true);
+      expect(evaluateGenreMatch('Alternative', 'Hardcore Punk', '')).toBe(true);
+
+      // Full panic-us offline scrape regression: #15241026 ('Hardcore' Gabber DJ) must NOT win Tier 1 Genre-Distance
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('term=Panic&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 15241026, artistName: 'Panic', primaryGenreName: 'Hardcore' },
+                { wrapperType: 'artist', artistId: 200001, artistName: 'Panic', primaryGenreName: 'Rock' },
+                { wrapperType: 'artist', artistId: 200002, artistName: 'Panic', primaryGenreName: 'Alternative' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=15241026&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 15241026,
+                  collectionId: 1728272549,
+                  collectionName: 'Early Rave Addict',
+                  primaryGenreName: 'Hardcore',
+                  releaseDate: '2024-05-01T07:00:00Z',
+                  trackCount: 6,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/panic-gabber/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const result = await scrapeImageUrlBackend(
+          'Panic',
+          'artist',
+          'Hardcore Punk',
+          'Panic was a Boston hardcore punk band founded in 2000 on Bridge Nine Records.',
+          'Boston, USA',
+          [],
+          'us',
+          '2000'
+        );
+        expect(result).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('2. passesUncorroboratedEraGate enforces both debut-era ceiling (<=10 yrs), pre-formation floor (>=founded-1), non-empty catalog, and valid foundedYear', () => {
+      // Valid debut-era lags
+      expect(passesUncorroboratedEraGate([{ albumName: "You'll Be Next", releaseYear: '2021' }], '2021')).toBe(true);
+      expect(passesUncorroboratedEraGate([{ albumName: 'Stereo', releaseYear: '1997' }], '1993')).toBe(true);
+      expect(passesUncorroboratedEraGate([{ albumName: 'Pre-Formation Promo', releaseYear: '1992' }], '1993')).toBe(true);
+      expect(passesUncorroboratedEraGate([{ albumName: 'Ten Year Debut', releaseYear: '2003' }], '1993')).toBe(true);
+
+      // Exceeds 10-year debut-era ceiling
+      expect(passesUncorroboratedEraGate([{ albumName: 'Through the Wreckage EP', releaseYear: '2010' }], '1996')).toBe(false);
+      expect(passesUncorroboratedEraGate([{ albumName: 'Absolute Clarity', releaseYear: '2016' }], '1995')).toBe(false);
+      expect(passesUncorroboratedEraGate([{ albumName: 'Declaration Of Faith / The Empty Sea', releaseYear: '2026' }], '2001')).toBe(false);
+      expect(passesUncorroboratedEraGate([{ albumName: 'Live from Snake River', releaseYear: '2025' }], '1986')).toBe(false);
+
+      // Violates pre-formation floor (< founded - 1, older homonym)
+      expect(passesUncorroboratedEraGate([{ albumName: '1995 Homonym LP', releaseYear: '1995' }], '2021')).toBe(false);
+
+      // Empty reconciled catalog or missing/invalid foundedYear fails closed
+      expect(passesUncorroboratedEraGate([], '2012')).toBe(false);
+      expect(passesUncorroboratedEraGate([{ albumName: 'Some LP', releaseYear: '2021' }], undefined)).toBe(false);
+      expect(passesUncorroboratedEraGate([{ albumName: 'Some LP', releaseYear: '2021' }], 'Unknown')).toBe(false);
+    });
+
+    it('3. Uncorroborated debut-era gate rejects reason-to-believe-us, sunrise-pl, hands-tied-us, zwan-us, pre-formation homonyms & missing foundedYear', async () => {
+      const falsePositiveCases = [
+        {
+          name: 'Reason To Believe',
+          genre: 'Hardcore Punk',
+          origin: 'Orange County, California, USA',
+          iso: 'us',
+          founded: '1986',
+          artistId: 1832738374,
+          itunesGenre: 'Rock',
+          albumName: 'Live from Snake River',
+          releaseDate: '2025-10-11T07:00:00Z',
+        },
+        {
+          name: 'Sunrise',
+          genre: 'Metalcore',
+          origin: 'Poznań, Poland',
+          iso: 'pl',
+          founded: '1995',
+          artistId: 1490229573,
+          itunesGenre: 'Metal',
+          albumName: 'Absolute Clarity (Japan Edition)',
+          releaseDate: '2016-01-15T08:00:00Z',
+        },
+        {
+          name: 'Hands Tied',
+          genre: 'Hardcore Punk',
+          origin: 'New Jersey, USA',
+          iso: 'us',
+          founded: '1996',
+          artistId: 39275704,
+          itunesGenre: 'Alternative',
+          albumName: 'Through the Wreckage EP',
+          releaseDate: '2010-05-01T07:00:00Z',
+        },
+        {
+          name: 'Zwan',
+          genre: 'Alternative Rock',
+          origin: 'Chicago, USA',
+          iso: 'us',
+          founded: '2001',
+          artistId: 2092397,
+          itunesGenre: 'Rock',
+          albumName: 'Declaration Of Faith / The Empty Sea',
+          releaseDate: '2026-01-01T08:00:00Z',
+        },
+        {
+          // Pre-formation floor check: modern 2021 band vs 1995 homonym (-26 yrs)
+          name: 'PreFormationHomonym',
+          genre: 'Hardcore Punk',
+          origin: 'Chicago, USA',
+          iso: 'us',
+          founded: '2021',
+          artistId: 777001,
+          itunesGenre: 'Punk',
+          albumName: 'Ancient Cassette LP',
+          releaseDate: '1995-03-01T08:00:00Z',
+        },
+        {
+          // Missing foundedYear with empty discography must fail closed
+          name: 'NoFoundedBand',
+          genre: 'Hardcore Punk',
+          origin: 'Boston, USA',
+          iso: 'us',
+          founded: undefined,
+          artistId: 777002,
+          itunesGenre: 'Punk',
+          albumName: 'Unverified Record',
+          releaseDate: '2022-03-01T08:00:00Z',
+        },
+      ];
+
+      for (const tc of falsePositiveCases) {
+        const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+          const url = String(input);
+          if (url.includes(`term=${encodeURIComponent(tc.name)}&entity=musicArtist`)) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  { wrapperType: 'artist', artistId: tc.artistId, artistName: tc.name, primaryGenreName: tc.itunesGenre },
+                ],
+              }),
+            } as any;
+          }
+          if (url.includes(`lookup?id=${tc.artistId}&entity=album`)) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  { wrapperType: 'artist', artistId: tc.artistId, artistName: tc.name, primaryGenreName: tc.itunesGenre },
+                  {
+                    wrapperType: 'collection',
+                    artistId: tc.artistId,
+                    collectionId: 990001,
+                    collectionName: tc.albumName,
+                    primaryGenreName: tc.itunesGenre,
+                    releaseDate: tc.releaseDate,
+                    trackCount: 8,
+                    artworkUrl100: 'https://is1-ssl.mzstatic.com/false-pos/100x100bb.jpg',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        });
+
+        try {
+          const res = await scrapeImageUrlBackend(
+            tc.name,
+            'artist',
+            tc.genre,
+            `${tc.name} is an underground band from ${tc.origin}.`,
+            tc.origin,
+            [],
+            tc.iso,
+            tc.founded
+          );
+          expect(res).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        } finally {
+          fetchSpy.mockRestore();
+        }
+      }
+    });
+
+    it('4. Verified legacy not-found positives (exhibition-us & christie-front-drive-us) pass uncorroborated debut-era gate cleanly', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('term=Exhibition&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 1511350574, artistName: 'Exhibition', primaryGenreName: 'Punk' },
+                { wrapperType: 'artist', artistId: 5903214, artistName: 'Exhibition', primaryGenreName: 'Rock' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=1511350574&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'collection', artistId: 1511350574, collectionId: 1587594003, collectionName: "You'll Be Next - EP", primaryGenreName: 'Punk', releaseDate: '2021-10-01T07:00:00Z', trackCount: 4, artworkUrl100: 'https://is1-ssl.mzstatic.com/exhibition/100x100bb.jpg' },
+                { wrapperType: 'collection', artistId: 1511350574, collectionId: 1670765896, collectionName: 'The Last Laugh', primaryGenreName: 'Punk', releaseDate: '2023-02-17T08:00:00Z', trackCount: 10, artworkUrl100: 'https://is1-ssl.mzstatic.com/exhibition/last-laugh/100x100bb.jpg' },
+                { wrapperType: 'collection', artistId: 1511350574, collectionId: 1851895731, collectionName: 'Etude of Memory - Single', primaryGenreName: 'New Age', releaseDate: '1994-05-01T07:00:00Z', trackCount: 1, artworkUrl100: 'https://is1-ssl.mzstatic.com/conflated/100x100bb.jpg' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('term=Christie%20Front%20Drive&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 18380995, artistName: 'Christie Front Drive', primaryGenreName: 'Rock' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=18380995&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'collection', artistId: 18380995, collectionId: 363669509, collectionName: 'Stereo', primaryGenreName: 'Rock', releaseDate: '1997-01-01T08:00:00Z', trackCount: 9, artworkUrl100: 'https://is1-ssl.mzstatic.com/cfd/stereo/100x100bb.jpg' },
+                { wrapperType: 'collection', artistId: 18380995, collectionId: 367490902, collectionName: 'S/T', primaryGenreName: 'Rock', releaseDate: '2010-01-01T08:00:00Z', trackCount: 8, artworkUrl100: 'https://is1-ssl.mzstatic.com/cfd/st/100x100bb.jpg' },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const exhibitionRes = await scrapeImageUrlBackend(
+          'Exhibition',
+          'artist',
+          'Hardcore Punk',
+          'Buffalo hardcore band on Triple B Records.',
+          'Buffalo, USA',
+          [],
+          'us',
+          '2021'
+        );
+        expect(exhibitionRes.itunesArtistId).toBe(1511350574);
+        expect(exhibitionRes.imageUrl).toContain('exhibition');
+        expect(exhibitionRes.reconciledDiscography.map((d) => d.albumName)).toEqual(["You'll Be Next", 'The Last Laugh']);
+
+        const cfdRes = await scrapeImageUrlBackend(
+          'Christie Front Drive',
+          'artist',
+          'Emo / Post-Hardcore',
+          'Denver 1990s emo pioneers.',
+          'Denver, USA',
+          [],
+          'us',
+          '1993'
+        );
+        expect(cfdRes.itunesArtistId).toBe(18380995);
+        expect(cfdRes.imageUrl).toContain('cfd');
+        expect(cfdRes.reconciledDiscography.map((d) => d.albumName)).toEqual(['Stereo', 'S/T']);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('5. Empty-catalog artwork-only fail-closed: certain-people-i-know-us (#551925469) fails closed when 0 collections survive reconciliation', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('term=Certain%20People%20I%20Know&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 551925469, artistName: 'Certain People I Know', primaryGenreName: 'Alternative' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=551925469&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 551925469,
+                  collectionId: 551925470,
+                  collectionName: 'Certain People I Know',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2012-08-01T07:00:00Z',
+                  trackCount: 7,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/cpik/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Certain People I Know',
+          'artist',
+          'Emo / Indie Rock',
+          'Chicago emo band founded in 2012.',
+          'Chicago, Illinois, USA',
+          [],
+          'us',
+          '2012'
+        );
+        expect(res).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
   });
 });
