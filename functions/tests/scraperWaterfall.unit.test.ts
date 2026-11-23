@@ -5,6 +5,7 @@ import {
   scrapeImageUrlBackend,
   reconcileDiscographyWithITunes,
   cleanCollectionTitle,
+  cleanSongQueryAlbumTitle,
   evaluateGenreMatch,
   evaluateGenreDistanceScore,
   isAppleElectronicHardcoreGenre,
@@ -456,7 +457,7 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
       });
 
       try {
-        // Supply 4 non-generic albums to verify Tier 3B strictly caps at 3 queries
+        // Supply 5 non-generic albums to verify Tier 3B strictly caps at 4 queries (V47.12)
         const result = await scrapeImageUrlBackend(
           'Exhibition',
           'artist',
@@ -467,14 +468,15 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
             { albumName: 'Unindexed Promo Tape', releaseYear: '2020' },
             { albumName: 'The Last Laugh', releaseYear: '2023' },
             { albumName: 'Another Unindexed Split', releaseYear: '2022' },
-            { albumName: 'Fourth Release Beyond Cap', releaseYear: '2024' },
+            { albumName: 'Third Unindexed Tape', releaseYear: '2022' },
+            { albumName: 'Fifth Release Beyond Cap', releaseYear: '2024' },
           ],
           'us',
           '2021'
         );
 
-        expect(songQueries.length).toBe(3);
-        expect(songQueries.some((u) => u.includes('Fourth%20Release'))).toBe(false);
+        expect(songQueries.length).toBe(4);
+        expect(songQueries.some((u) => u.includes('Fifth%20Release'))).toBe(false);
         expect(result.itunesArtistId).toBe(1511350574);
         expect(result.imageUrl).toBe('https://is1-ssl.mzstatic.com/exhibition/last-laugh/600x600bb.jpg');
         expect(result.reconciledDiscography.some((d) => d.albumName === 'The Last Laugh' && d.itunesCollectionId === 1670765896)).toBe(true);
@@ -1914,7 +1916,7 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
       }
     });
 
-    it('2. cross-matches returned compilation song rows against a 4th qualifying title beyond .slice(0, 3) at 0 extra HTTP cost', async () => {
+    it('2. cross-matches returned compilation song rows against a 5th qualifying title beyond .slice(0, 4) at 0 extra HTTP cost', async () => {
       let songQueryCount = 0;
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
         const url = String(input);
@@ -1937,7 +1939,7 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
                     primaryGenreName: 'Alternative',
                     releaseDate: '2009-01-20T08:00:00Z',
                   },
-                  // 4th qualifying title ("Face Tomorrow") appears inside the 15 song rows returned for query #3
+                  // 5th qualifying title ("Face Tomorrow") appears inside the 15 song rows returned for query #4
                   {
                     wrapperType: 'track',
                     kind: 'song',
@@ -1988,14 +1990,15 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           [
             { albumName: 'New Horizons', releaseYear: '1992' },
             { albumName: 'Lost Tape Sessions', releaseYear: '1993' },
+            { albumName: 'Out of the Shadows', releaseYear: '1993' },
             { albumName: 'What Was Said', releaseYear: '1994' },
-            { albumName: 'Face Tomorrow', releaseYear: '1995' }, // 4th qualifying title (beyond .slice(0, 3))
+            { albumName: 'Face Tomorrow', releaseYear: '1995' }, // 5th qualifying title (beyond .slice(0, 4))
           ],
           'us',
           '1991'
         );
 
-        expect(songQueryCount).toBe(3); // Capped strictly at 3 entity=song HTTP calls
+        expect(songQueryCount).toBe(4); // Capped strictly at 4 entity=song HTTP calls
         expect(res.itunesArtistId).toBe(161072028);
         expect(res.reconciledDiscography).toEqual([
           {
@@ -2054,6 +2057,255 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
         expect(res).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
       } finally {
         fetchSpy.mockRestore();
+      }
+    });
+  });
+
+  describe('V47.12 Rule 38: Tier 3B Format-Stripping, Core Release Prioritization & Straight Edge / Youth Crew Taxonomy', () => {
+    it('1. cleanSongQueryAlbumTitle strips trailing/parenthetical format descriptors (EP, LP, 7", 7-inch, (EP)) and rescues format-suffixed Mouthpiece payload', async () => {
+      expect(cleanSongQueryAlbumTitle('What Was Said EP')).toBe('What Was Said');
+      expect(cleanSongQueryAlbumTitle('What Was Said LP')).toBe('What Was Said');
+      expect(cleanSongQueryAlbumTitle('What Was Said (LP)')).toBe('What Was Said');
+      expect(cleanSongQueryAlbumTitle('Face Tomorrow 7-inch')).toBe('Face Tomorrow');
+      expect(cleanSongQueryAlbumTitle('Face Tomorrow (EP)')).toBe('Face Tomorrow');
+      expect(cleanSongQueryAlbumTitle('Face Tomorrow 7"')).toBe('Face Tomorrow');
+      expect(cleanSongQueryAlbumTitle('Mouthpiece EP')).toBe('Mouthpiece');
+
+      const songUrlsQueried: string[] = [];
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=song')) {
+          songUrlsQueried.push(url);
+          // Simulate Apple's strict token-AND behavior: returns 0 if "EP", "LP", or "7-inch" is in term!
+          if (url.includes('EP') || url.includes('LP') || url.includes('7-inch')) {
+            return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+          }
+          if (url.includes('term=Mouthpiece%20What%20Was%20Said&')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 161072028,
+                    artistName: 'Mouthpiece',
+                    collectionId: 300974664,
+                    collectionName: "Can't Kill What's Inside: The Complete Discography",
+                    trackName: 'What Was Said',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2009-01-20T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          if (url.includes('term=Mouthpiece%20Face%20Tomorrow&')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 161072028,
+                    artistName: 'Mouthpiece',
+                    collectionId: 300974664,
+                    collectionName: "Can't Kill What's Inside: The Complete Discography",
+                    trackName: 'Face Tomorrow',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2009-01-20T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=300974664&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 161072028,
+                  collectionId: 300974664,
+                  collectionName: "Can't Kill What's Inside: The Complete Discography",
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                  trackCount: 38,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/mouthpiece/cant-kill/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Mouthpiece',
+          'artist',
+          'Straight Edge Hardcore',
+          'Mouthpiece bridged early 90s youth crew with modern straight edge hardcore.',
+          'United States',
+          [
+            { albumName: 'What Was Said EP', releaseYear: '1994' },
+            { albumName: 'Face Tomorrow 7-inch', releaseYear: '1995' },
+          ],
+          'us',
+          '1991'
+        );
+
+        expect(songUrlsQueried.some((u) => u.includes('term=Mouthpiece%20What%20Was%20Said&'))).toBe(true);
+        expect(songUrlsQueried.some((u) => u.includes('term=Mouthpiece%20Face%20Tomorrow&'))).toBe(true);
+        expect(res.itunesArtistId).toBe(161072028);
+        expect(res.reconciledDiscography).toEqual([
+          {
+            albumName: "Can't Kill What's Inside: The Complete Discography",
+            releaseYear: '2009',
+            itunesCollectionId: 300974664,
+          },
+        ]);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('2. chronological 4-item payload ["Mouthpiece EP" (1991), "Demo 1991" (1991), "What Was Said" (1994), "Face Tomorrow" (1995)] blocks collapsed self-titled/demo entries and rescues via "What Was Said" + "Face Tomorrow"', async () => {
+      const songUrlsQueried: string[] = [];
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=song')) {
+          songUrlsQueried.push(url);
+          if (url.includes('term=Mouthpiece%20What%20Was%20Said&')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 161072028,
+                    artistName: 'Mouthpiece',
+                    collectionId: 300974664,
+                    collectionName: "Can't Kill What's Inside: The Complete Discography",
+                    trackName: 'What Was Said',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2009-01-20T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          if (url.includes('term=Mouthpiece%20Face%20Tomorrow&')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 161072028,
+                    artistName: 'Mouthpiece',
+                    collectionId: 300974664,
+                    collectionName: "Can't Kill What's Inside: The Complete Discography",
+                    trackName: 'Face Tomorrow',
+                    primaryGenreName: 'Alternative',
+                    releaseDate: '2009-01-20T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=300974664&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 161072028,
+                  collectionId: 300974664,
+                  collectionName: "Can't Kill What's Inside: The Complete Discography",
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2009-01-20T08:00:00Z',
+                  trackCount: 38,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/mouthpiece/cant-kill/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Mouthpiece',
+          'artist',
+          'Straight Edge Hardcore',
+          'Mouthpiece bridged early 90s youth crew with modern straight edge hardcore.',
+          'United States',
+          [
+            { albumName: 'Mouthpiece EP', releaseYear: '1991' },
+            { albumName: 'Demo 1991', releaseYear: '1991' },
+            { albumName: 'What Was Said', releaseYear: '1994' },
+            { albumName: 'Face Tomorrow', releaseYear: '1995' },
+          ],
+          'us',
+          '1991'
+        );
+
+        // Collapsed "Mouthpiece EP" and "Demo 1991" must NOT be queried in Tier 3B
+        expect(songUrlsQueried).toHaveLength(2);
+        expect(songUrlsQueried.some((u) => u.includes('Mouthpiece%20EP') || u.includes('Demo'))).toBe(false);
+        expect(res.itunesArtistId).toBe(161072028);
+        expect(res.reconciledDiscography).toEqual([
+          {
+            albumName: "Can't Kill What's Inside: The Complete Discography",
+            releaseYear: '2009',
+            itunesCollectionId: 300974664,
+          },
+        ]);
+
+        // Negative check: ["Mouthpiece EP" (1991), "What Was Said" (1994)] must NOT use "Mouthpiece EP" as a 2nd proof even if a track is named "Mouthpiece"
+        const negativeRes = await scrapeImageUrlBackend(
+          'Mouthpiece',
+          'artist',
+          'Straight Edge Hardcore',
+          'Mouthpiece bridged early 90s youth crew with modern straight edge hardcore.',
+          'United States',
+          [
+            { albumName: 'Mouthpiece EP', releaseYear: '1991' },
+            { albumName: 'What Was Said', releaseYear: '1994' },
+          ],
+          'us',
+          '1991'
+        );
+        expect(negativeRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('3. bare "Straight Edge" and "Youth Crew" genres match Apple "Alternative" / "Punk" / "Rock" while returning false / 0 against bare Apple Electronic "Hardcore"', () => {
+      for (const bareGenre of ['Straight Edge', 'Youth Crew', 'Straight Edge Hardcore', 'Youth Crew Hardcore']) {
+        expect(evaluateGenreMatch('Alternative', bareGenre, '')).toBe(true);
+        expect(evaluateGenreMatch('Punk', bareGenre, '')).toBe(true);
+        expect(evaluateGenreMatch('Rock', bareGenre, '')).toBe(true);
+        expect(evaluateGenreMatch('Hardcore', bareGenre, 'Straight edge youth crew band.')).toBe(false);
+        expect(evaluateGenreDistanceScore('Hardcore', bareGenre, 'Straight edge youth crew band.')).toBe(0);
       }
     });
   });

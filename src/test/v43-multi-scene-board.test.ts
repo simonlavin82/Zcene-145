@@ -1314,10 +1314,10 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(canvasLayout.some(c => c.nodeId === 'scene-1::founded-1991')).toBe(true);
     });
 
-    it('verifies V47.11 Runbook Protocol specifies schemaVersion: 43 backward compatibility with 0 database purge required', () => {
-      expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V47.11 Regression Suite (Full-Stack)');
+    it('verifies V47.12 Runbook Protocol specifies schemaVersion: 43 backward compatibility with 0 database purge required', () => {
+      expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V47.12 Regression Suite (Full-Stack)');
       expect(BACKEND_REGRESSION_RUNBOOK).toContain('schemaVersion: 43');
-      expect(BACKEND_REGRESSION_RUNBOOK).toContain('Zero database purge is required for V47.11 operations');
+      expect(BACKEND_REGRESSION_RUNBOOK).toContain('Zero database purge is required for V47.12 operations');
     });
 
     it('verifies ARCHITECTURE_RULES contains all 48 contiguous laws with Rule 22 as Deep Cloning Isolation', () => {
