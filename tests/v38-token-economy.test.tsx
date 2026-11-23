@@ -658,7 +658,7 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
 
   it('harmonizes primary CTA buttons and spinners across MyTasteDialog, SimulatedStripeModal, and TokenConfirmationDialog', async () => {
     // 1. MyTasteDialog (Style Profiles "Done" button)
-    let resolveSave: () => void = () => {};
+    let resolveSave: () => void = () => { };
     const mockSave = vi.fn().mockImplementation(() => new Promise<void>((resolve) => { resolveSave = resolve; }));
     const mockTaste = [{ id: 'p1', name: 'Jars Of Clay', color: 'purple', isActive: true }];
 
