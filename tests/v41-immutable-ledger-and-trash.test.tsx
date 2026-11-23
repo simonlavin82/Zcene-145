@@ -596,7 +596,20 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       expect(engineContent).toContain('48 Laws');
       expect(engineContent).toContain('V47.12 Full-Stack Regression Runbook');
       expect(runbookContent).toContain('# V47.12 Regression Suite (Full-Stack)');
-      expect(runbookContent).toContain('28 test suites (583 unit/integration tests)');
+      expect(runbookContent).toContain('28 test suites (599 unit/integration tests)');
+      expect(runbookContent).not.toContain('583 unit/integration tests');
+
+      // Content-level Rule 38 parity locks across EnginePage.tsx, architecture_truth.md, and runbook
+      for (const docSurface of [truthContent, engineContent, runbookContent]) {
+        expect(docSurface).toContain('isAppleElectronicHardcoreGenre');
+        expect(docSurface).toContain('passesUncorroboratedEraGate');
+        expect(docSurface).toContain('cleanSongQueryAlbumTitle');
+        expect(docSurface).toContain('COMPILATION_COLLECTION_RE');
+        expect(docSurface).toContain('shouldRunRule38NotFoundUpgrade');
+        expect(docSurface).not.toContain('capped at 3 non-generic titles');
+        expect(docSurface).not.toContain('3-query cap');
+        expect(docSurface).not.toContain('3-query-capped');
+      }
       expect(runbookContent).toContain('npx vitest run tests/v47-zine-print-pdf.test.tsx');
       expect(runbookContent).toContain('npx vitest run functions/tests/deleteUserAccount.test.ts');
       expect(runbookContent).toContain('cd functions && npx vitest run tests/v42-iso-disambiguation.test.ts');
