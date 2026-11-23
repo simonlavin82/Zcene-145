@@ -3076,17 +3076,23 @@ const GENRE_TAXONOMY: Record<string, string[]> = {
     'metal', 'heavy metal', 'death metal', 'black metal', 'doom metal',
     'deathcore', 'metalcore', 'mathcore', 'grindcore', 'cybergrind',
     'powerviolence', 'sludge', 'crust', 'thrash', 'groove metal', 'nu metal',
-    'extreme metal', 'industrial metal', 'progressive metal'
+    'extreme metal', 'industrial metal', 'progressive metal', 'post metal', 'blackgaze'
   ],
   'punk': [
-    'punk', 'hardcore', 'hardcore punk', 'post hardcore', 'emo',
+    'punk', 'hardcore', 'hardcore punk', 'post hardcore', 'emo', 'midwest emo',
     'skate punk', 'pop punk', 'crust punk', 'd beat', 'anarcho punk',
-    'grindcore', 'powerviolence', 'screamo', 'melodic hardcore',
-    'straight edge', 'youth crew'
+    'grindcore', 'powerviolence', 'screamo', 'skramz', 'emoviolence', 'melodic hardcore',
+    'straight edge', 'youth crew', 'post punk', 'riot grrrl', 'queercore', 'psychobilly'
   ],
   'rock': [
     'rock', 'alternative', 'indie', 'grunge', 'post rock',
     'garage rock', 'psychedelic', 'noise rock', 'hard rock', 'space rock',
+    'emo', 'midwest emo', 'screamo', 'skramz', 'emoviolence', 'post hardcore', 'hardcore punk',
+    'pop punk', 'skate punk', 'melodic hardcore', 'shoegaze', 'math rock', 'post punk',
+    'dream pop', 'slowcore', 'britpop', 'new wave', 'no wave', 'darkwave', 'coldwave',
+    'goth', 'gothic', 'industrial', 'krautrock', 'stoner', 'sludge', 'doom', 'thrash',
+    'crust', 'powerviolence', 'metalcore', 'deathcore', 'mathcore', 'post metal', 'blackgaze',
+    'riot grrrl', 'queercore', 'psychobilly',
     // Umbrella bridge: iTunes frequently tags extreme metal/punk as generic 'Rock'
     'grindcore', 'punk', 'metal', 'hardcore', 'straight edge', 'youth crew'
   ],
@@ -3099,7 +3105,7 @@ const GENRE_TAXONOMY: Record<string, string[]> = {
     'dance', 'idm', 'drum and bass', 'jungle', 'ambient', 'synthwave'
   ],
   'r b soul': ['rnb', 'r b', 'soul', 'funk', 'motown', 'neo soul'],
-  'pop': ['pop', 'synthpop', 'electropop', 'k pop', 'indie pop'],
+  'pop': ['pop', 'synthpop', 'electropop', 'k pop', 'indie pop', 'dream pop', 'britpop', 'new wave'],
   'country': ['country', 'bluegrass', 'americana', 'alt country'],
   'jazz': ['jazz', 'bebop', 'swing', 'fusion', 'free jazz']
 };
@@ -3201,8 +3207,86 @@ const APPLE_ELECTRONIC_HARDCORE_ZCENE_TERMS = [
 const NON_ELECTRONIC_HARDCORE_EXCLUDE_TERMS = [
   'punk', 'post hardcore', 'hardcore punk', 'melodic hardcore', 'youth crew', 'straight edge',
   'metalcore', 'deathcore', 'mathcore', 'grindcore', 'powerviolence', 'metal', 'rock', 'emo',
-  'screamo', 'alternative', 'indie', 'rap', 'hip hop', 'hardcore rap'
+  'screamo', 'skramz', 'emoviolence', 'shoegaze', 'math rock', 'post punk', 'pop punk', 'skate punk',
+  'alternative', 'indie', 'rap', 'hip hop', 'hardcore rap'
 ];
+
+const HOSTILE_APPLE_GENRE_TOKENS = [
+  'hip hop', 'rap', 'afrobeats', 'country', 'bluegrass', 'americana',
+  'christian', 'gospel', 'inspirational', 'classical', 'opera',
+  'new age', 'meditation', 'fitness', 'workout', 'children', 'lullabies',
+  'comedy', 'spoken word', 'podcast', 'audiobook', 'holiday', 'christmas',
+  'soundtrack', 'musical', 'easy listening', 'lounge', 'reggaeton', 'salsa',
+  'bachata', 'enka', 'bollywood', 'karaoke', 'tribute'
+];
+
+const CATALOG_CORROBORATED_APPLE_UMBRELLA_TOKENS = [
+  'rock', 'alternative', 'punk', 'indie', 'metal', 'pop', 'grunge', 'new wave'
+];
+
+const INCOMPATIBLE_NON_UMBRELLA_ZCENE_GENRE_TOKENS = [
+  'hip hop', 'rap', 'boom bap', 'g funk', 'trap', 'drill', 'crunk', 'grime', 'afrobeats',
+  'classical', 'opera', 'chamber', 'symphony', 'orchestral',
+  'country', 'bluegrass', 'americana',
+  'jazz', 'bebop', 'swing', 'free jazz',
+  'electronic', 'techno', 'house', 'trance', 'dubstep', 'edm', 'drum and bass', 'jungle',
+  'gabber', 'happy hardcore', 'hardcore techno', 'uk hardcore', 'hardstyle', 'rave', 'ambient',
+  'rnb', 'r b', 'soul', 'funk', 'motown', 'neo soul',
+  'christian', 'gospel', 'new age', 'meditation', 'children', 'comedy', 'spoken word',
+  'reggaeton', 'salsa', 'bachata', 'enka', 'bollywood'
+];
+
+const ZCENE_UMBRELLA_CROSSOVER_TOKENS = [
+  'rock', 'alternative', 'punk', 'indie', 'metal', 'pop', 'grunge', 'new wave',
+  'no wave', 'darkwave', 'coldwave', 'emo', 'screamo', 'skramz', 'emoviolence',
+  'hardcore punk', 'post hardcore', 'melodic hardcore', 'youth crew', 'straight edge',
+  'metalcore', 'deathcore', 'mathcore', 'grindcore', 'powerviolence', 'thrash', 'crust',
+  'sludge', 'doom', 'stoner', 'shoegaze', 'blackgaze', 'slowcore', 'britpop', 'synthpop',
+  'electropop', 'krautrock', 'goth', 'gothic', 'industrial', 'garage', 'psychedelic',
+  'ska', 'psychobilly', 'riot grrrl', 'queercore', 'sasscore', 'orgcore'
+];
+
+/**
+ * V47.14: Mutual Non-Hostility Catalog-Corroborated Genre Guard.
+ * Returns true when an Apple Music genre is a non-hostile coarse umbrella bucket
+ * ('Rock', 'Alternative', 'Punk', 'Indie', 'Metal', 'Pop', etc.) AND the Zcene artist's
+ * genre is not an incompatible pure non-umbrella family (Hip-Hop/Rap, Classical, Country,
+ * Jazz, Electronic/Techno/House/EDM/Gabber, R&B/Soul, etc., unless an explicit rock/punk/metal/pop
+ * crossover token is present). Strictly blocks bare Apple Electronic "Hardcore" (ID 1050).
+ */
+export const isCatalogCorroboratedNonHostileGenre = (
+  itunesGenreRaw: string,
+  zceneGenreRaw?: string
+): boolean => {
+  const itunesGenre = normalizeGenreText(itunesGenreRaw);
+  if (!itunesGenre || itunesGenre === 'undefined') return false;
+  if (isAppleElectronicHardcoreGenre(itunesGenre)) return false;
+  if (HOSTILE_APPLE_GENRE_TOKENS.some((token) => containsWord(itunesGenre, token))) {
+    return false;
+  }
+  const isAppleUmbrella = CATALOG_CORROBORATED_APPLE_UMBRELLA_TOKENS.some((token) =>
+    containsWord(itunesGenre, token)
+  );
+  if (!isAppleUmbrella) return false;
+
+  if (zceneGenreRaw !== undefined) {
+    const zceneGenre = normalizeGenreText(zceneGenreRaw);
+    if (!zceneGenre || zceneGenre === 'unknown') return false;
+    const hasIncompatibleFamily = INCOMPATIBLE_NON_UMBRELLA_ZCENE_GENRE_TOKENS.some((token) =>
+      containsWord(zceneGenre, token)
+    );
+    if (hasIncompatibleFamily) {
+      const hasUmbrellaCrossover = ZCENE_UMBRELLA_CROSSOVER_TOKENS.some((token) =>
+        containsWord(zceneGenre, token)
+      );
+      if (!hasUmbrellaCrossover) {
+        return false;
+      }
+    }
+  }
+
+  return true;
+};
 
 /**
  * Apple Music / iTunes Genre ID 1050 ("Hardcore") is exclusively a Dance/Electronic/Gabber subgenre.
@@ -3414,7 +3498,8 @@ export const passesUncorroboratedEraGate = (
  */
 export const filterConflatedArtistCollections = (
   itunesAlbums: any[],
-  context?: CollectionSanityContext
+  context?: CollectionSanityContext,
+  llmDiscography?: DiscographyItem[]
 ): any[] => {
   const collections = (itunesAlbums || []).filter((alb) => alb && alb.wrapperType === 'collection');
   if (collections.length === 0 || !context) return collections;
@@ -3423,12 +3508,37 @@ export const filterConflatedArtistCollections = (
 
   const targetGenre = (context.genre || '').trim();
   const targetSummary = (context.summary || '').trim();
+
+  const isTitleCorroboratedNonHostile = (alb: any): boolean => {
+    if (!Array.isArray(llmDiscography) || llmDiscography.length === 0) return false;
+    const rawGenre = String(alb?.primaryGenreName || '');
+    if (!isCatalogCorroboratedNonHostileGenre(rawGenre, targetGenre || undefined)) return false;
+    const rawTitle = String(alb?.collectionName || '');
+    if (!rawTitle) return false;
+    const albYear = alb?.releaseDate ? new Date(alb.releaseDate).getFullYear() : undefined;
+    const validAlbYear = albYear && !isNaN(albYear) ? albYear : undefined;
+    return llmDiscography.some((item) => {
+      if (!item?.albumName) return false;
+      const zceneYear = item.releaseYear ? parseInt(item.releaseYear, 10) : undefined;
+      return titlesMatchFuzzy(rawTitle, item.albumName, validAlbYear, isNaN(zceneYear as number) ? undefined : zceneYear);
+    });
+  };
+
   if (targetGenre || targetSummary) {
-    const genreMatched = filtered.filter((alb) =>
-      evaluateGenreMatch(String(alb.primaryGenreName || ''), targetGenre, targetSummary)
+    const genreMatched = filtered.filter(
+      (alb) =>
+        evaluateGenreMatch(String(alb.primaryGenreName || ''), targetGenre, targetSummary) ||
+        isTitleCorroboratedNonHostile(alb)
     );
     if (genreMatched.length > 0) {
       filtered = genreMatched;
+    } else {
+      const nonHostileMatched = filtered.filter((alb) =>
+        isCatalogCorroboratedNonHostileGenre(String(alb.primaryGenreName || ''), targetGenre || undefined)
+      );
+      if (nonHostileMatched.length > 0) {
+        filtered = nonHostileMatched;
+      }
     }
   }
 
@@ -3604,6 +3714,67 @@ export const cleanSongQueryAlbumTitle = (title: string): string => {
   return cleaned.length >= 2 ? cleaned : title.trim();
 };
 
+/**
+ * V47.14: Year-Aware Deterministic Discography Deduplication.
+ * Deduplicates Essential Listening items by:
+ * 1. `itunesCollectionId` (when present and > 0)
+ * 2. `${normClean}::${releaseYear}` (clean normalized title + release year, preserving multi-year self-titled albums)
+ * 3. Empty-year guard: prevents a yearless duplicate from slipping past a dated item of the same title
+ *    (and upgrades a prior yearless item in-place if a dated duplicate arrives later).
+ */
+export const deduplicateDiscographyItems = (items: DiscographyItem[]): DiscographyItem[] => {
+  if (!Array.isArray(items) || items.length === 0) return [];
+  const seenCollectionIds = new Set<number>();
+  const seenTitleYearKeys = new Set<string>();
+  const seenNormToIndex = new Map<string, number>();
+  const deduped: DiscographyItem[] = [];
+
+  for (const item of items) {
+    if (!item || typeof item.albumName !== 'string' || !item.albumName.trim()) continue;
+    const cid =
+      typeof item.itunesCollectionId === 'number' && item.itunesCollectionId > 0
+        ? item.itunesCollectionId
+        : undefined;
+    if (cid !== undefined && seenCollectionIds.has(cid)) continue;
+
+    const cleanName = cleanCollectionTitle(item.albumName) || item.albumName.trim();
+    const normClean = normalizeAlbumTitle(cleanName) || cleanName.toLowerCase().trim();
+    const year = String(item.releaseYear || '').trim();
+    const titleYearKey = `${normClean}::${year}`;
+
+    if (year.length > 0) {
+      if (seenTitleYearKeys.has(titleYearKey)) continue;
+      if (seenTitleYearKeys.has(`${normClean}::`)) {
+        const prevIdx = seenNormToIndex.get(normClean);
+        if (prevIdx !== undefined && !deduped[prevIdx].releaseYear) {
+          deduped[prevIdx] = {
+            ...deduped[prevIdx],
+            releaseYear: year,
+            ...(cid !== undefined && !deduped[prevIdx].itunesCollectionId
+              ? { itunesCollectionId: cid }
+              : {}),
+          };
+          seenTitleYearKeys.delete(`${normClean}::`);
+          seenTitleYearKeys.add(titleYearKey);
+          if (cid !== undefined) seenCollectionIds.add(cid);
+          continue;
+        }
+      }
+    } else {
+      if (seenNormToIndex.has(normClean)) continue;
+    }
+
+    if (cid !== undefined) seenCollectionIds.add(cid);
+    seenTitleYearKeys.add(titleYearKey);
+    if (!seenNormToIndex.has(normClean)) {
+      seenNormToIndex.set(normClean, deduped.length);
+    }
+    deduped.push(item);
+  }
+
+  return deduped;
+};
+
 export const reconcileDiscographyWithITunes = (
   llmDiscography: DiscographyItem[],
   itunesAlbums: any[],
@@ -3611,11 +3782,11 @@ export const reconcileDiscographyWithITunes = (
   context?: CollectionSanityContext
 ): DiscographyItem[] => {
   if (!Array.isArray(itunesAlbums) || itunesAlbums.length === 0) {
-    return llmDiscography || [];
+    return deduplicateDiscographyItems(llmDiscography || []);
   }
 
   const normArtist = (cleanArtistName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
-  const sanityAlbums = filterConflatedArtistCollections(itunesAlbums, context);
+  const sanityAlbums = filterConflatedArtistCollections(itunesAlbums, context, llmDiscography);
 
   const validItunesCollections: {
     rawTitle: string;
@@ -3627,7 +3798,9 @@ export const reconcileDiscographyWithITunes = (
     collectionId?: number;
   }[] = [];
 
-  const seenNorms = new Set<string>();
+  const seenCollectionIds = new Set<number>();
+  const seenTitleYearKeys = new Set<string>();
+  const seenAnyTitleNorms = new Set<string>();
 
   for (const alb of sanityAlbums) {
     if (alb.wrapperType !== 'collection') continue;
@@ -3639,11 +3812,24 @@ export const reconcileDiscographyWithITunes = (
     if (GENERIC_ALBUM_TITLES.has(cleanTitle.toLowerCase().trim())) continue;
     if (normTitle === normArtist && !hasQualifyingDescriptor(rawTitle)) continue;
 
-    if (seenNorms.has(normTitle)) continue;
-    seenNorms.add(normTitle);
-
-    const year = alb.releaseDate ? String(new Date(alb.releaseDate).getFullYear()) : undefined;
+    const rawYear = alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : undefined;
+    const year = rawYear && !isNaN(rawYear) ? String(rawYear) : undefined;
     const numericCollectionId = Number(alb.collectionId);
+    const validCollectionId =
+      numericCollectionId > 0 && !isNaN(numericCollectionId) ? numericCollectionId : undefined;
+
+    if (validCollectionId !== undefined && seenCollectionIds.has(validCollectionId)) continue;
+    const titleYearKey = `${normTitle}::${year || ''}`;
+    if (year) {
+      if (seenTitleYearKeys.has(titleYearKey)) continue;
+    } else {
+      if (seenAnyTitleNorms.has(normTitle)) continue;
+    }
+
+    if (validCollectionId !== undefined) seenCollectionIds.add(validCollectionId);
+    seenTitleYearKeys.add(titleYearKey);
+    seenAnyTitleNorms.add(normTitle);
+
     validItunesCollections.push({
       rawTitle,
       cleanTitle,
@@ -3651,24 +3837,58 @@ export const reconcileDiscographyWithITunes = (
       year,
       trackCount: Number(alb.trackCount) || 0,
       releaseDate: alb.releaseDate,
-      collectionId: numericCollectionId > 0 && !isNaN(numericCollectionId) ? numericCollectionId : undefined
+      collectionId: validCollectionId
     });
   }
 
   const reconciled: DiscographyItem[] = [];
-  const matchedItunesNorms = new Set<string>();
+  const consumedCollectionIds = new Set<number>();
+  const consumedTitleYearKeys = new Set<string>();
+
+  const isItunesAlbConsumed = (alb: typeof validItunesCollections[0]): boolean => {
+    if (alb.collectionId !== undefined && consumedCollectionIds.has(alb.collectionId)) return true;
+    const key = `${alb.normTitle}::${alb.year || ''}`;
+    if (consumedTitleYearKeys.has(key)) return true;
+    if (!alb.year && Array.from(consumedTitleYearKeys).some((k) => k.startsWith(`${alb.normTitle}::`))) {
+      return true;
+    }
+    return false;
+  };
+
+  const markItunesAlbConsumed = (alb: typeof validItunesCollections[0]): void => {
+    if (alb.collectionId !== undefined) consumedCollectionIds.add(alb.collectionId);
+    consumedTitleYearKeys.add(`${alb.normTitle}::${alb.year || ''}`);
+  };
 
   if (Array.isArray(llmDiscography)) {
     for (const item of llmDiscography) {
       if (!item || !item.albumName) continue;
       const zceneYear = item.releaseYear ? parseInt(item.releaseYear, 10) : undefined;
+      const itemNorm = normalizeAlbumTitle(item.albumName);
 
       let matchedItunes: typeof validItunesCollections[0] | null = null;
+
+      // Pass 1: Prefer unconsumed exact normalized title match (with year agreement when multiple years exist)
       for (const itunesAlb of validItunesCollections) {
-        const itunesYear = itunesAlb.year ? parseInt(itunesAlb.year, 10) : undefined;
-        if (titlesMatchFuzzy(itunesAlb.rawTitle, item.albumName, itunesYear, zceneYear)) {
-          matchedItunes = itunesAlb;
-          break;
+        if (isItunesAlbConsumed(itunesAlb)) continue;
+        if (itunesAlb.normTitle === itemNorm) {
+          const itunesYear = itunesAlb.year ? parseInt(itunesAlb.year, 10) : undefined;
+          if (!zceneYear || !itunesYear || Math.abs(itunesYear - zceneYear) <= 1) {
+            matchedItunes = itunesAlb;
+            break;
+          }
+        }
+      }
+
+      // Pass 2: Fallback to unconsumed fuzzy match (prevents multi-volume prefix collisions from re-matching consumed Volume One)
+      if (!matchedItunes) {
+        for (const itunesAlb of validItunesCollections) {
+          if (isItunesAlbConsumed(itunesAlb)) continue;
+          const itunesYear = itunesAlb.year ? parseInt(itunesAlb.year, 10) : undefined;
+          if (titlesMatchFuzzy(itunesAlb.rawTitle, item.albumName, itunesYear, zceneYear)) {
+            matchedItunes = itunesAlb;
+            break;
+          }
         }
       }
 
@@ -3678,7 +3898,7 @@ export const reconcileDiscographyWithITunes = (
           releaseYear: matchedItunes.year || item.releaseYear || '',
           ...(matchedItunes.collectionId ? { itunesCollectionId: matchedItunes.collectionId } : {})
         });
-        matchedItunesNorms.add(matchedItunes.normTitle);
+        markItunesAlbConsumed(matchedItunes);
       } else {
         console.warn(`[reconcileDiscographyWithITunes] Dropping unverified hallucinated album "${item.albumName}" (${item.releaseYear}) for ${cleanArtistName}.`);
       }
@@ -3706,19 +3926,19 @@ export const reconcileDiscographyWithITunes = (
 
     for (const alb of validItunesCollections) {
       if (reconciled.length >= 3) break;
-      if (!matchedItunesNorms.has(alb.normTitle)) {
+      if (!isItunesAlbConsumed(alb)) {
         reconciled.push({
           albumName: alb.cleanTitle || alb.rawTitle,
           releaseYear: alb.year || '',
           ...(alb.collectionId ? { itunesCollectionId: alb.collectionId } : {})
         });
-        matchedItunesNorms.add(alb.normTitle);
+        markItunesAlbConsumed(alb);
       }
     }
     console.log(`[reconcileDiscographyWithITunes] Reconciled/Backfilled ${reconciled.length} verified collections from iTunes for ${cleanArtistName}: [${reconciled.map(r => `"${r.albumName}"`).join(', ')}]`);
   }
 
-  return reconciled;
+  return deduplicateDiscographyItems(reconciled);
 };
 
 export interface ScrapeImageResult {
@@ -3739,10 +3959,14 @@ const verifyCandidateDiscography = async (
   candidate: any,
   cleanArtistName: string,
   discography: DiscographyItem[],
-  storefrontCountry?: string
+  storefrontCountry?: string,
+  context?: CollectionSanityContext
 ): Promise<CandidateVerification> => {
   const normArtist = (cleanArtistName || "").toLowerCase().replace(/[^a-z0-9]/g, '');
   const validZceneAlbums = getQualifyingDiscographyTitles(discography, cleanArtistName);
+  const targetGenre = (context?.genre || '').trim();
+  const targetSummary = (context?.summary || '').trim();
+  const parsedFoundedYear = parseFoundedYear(context?.foundedYear);
 
   if (validZceneAlbums.length === 0) {
     return { candidate, matchCount: 0, matchedTitles: [], bestArtwork: null, albums: [] };
@@ -3767,7 +3991,21 @@ const verifyCandidateDiscography = async (
         if (GENERIC_ALBUM_TITLES.has(albTitle.toLowerCase().trim())) continue;
         if (normItunes === normArtist && !hasQualifyingDescriptor(albTitle)) continue;
 
-        const albYear = alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : undefined;
+        const albGenre = String(alb.primaryGenreName || '').trim();
+        if (
+          albGenre &&
+          (targetGenre || targetSummary) &&
+          !evaluateGenreMatch(albGenre, targetGenre, targetSummary) &&
+          !isCatalogCorroboratedNonHostileGenre(albGenre, targetGenre || undefined)
+        ) {
+          continue;
+        }
+
+        const rawAlbYear = alb.releaseDate ? new Date(alb.releaseDate).getFullYear() : undefined;
+        const albYear = rawAlbYear && !isNaN(rawAlbYear) ? rawAlbYear : undefined;
+        if (parsedFoundedYear !== undefined && albYear !== undefined && albYear < parsedFoundedYear - 1) {
+          continue;
+        }
 
         for (const zceneAlb of validZceneAlbums) {
           if (titlesMatchFuzzy(albTitle, zceneAlb.raw, albYear, zceneAlb.year)) {
@@ -4022,7 +4260,7 @@ export const scrapeImageUrlBackend = async (
       console.log(`[scrapeImageUrlBackend] [Tier 3 Escalation | ${storefrontLabel}] "${cleanArtistName}": Evaluating ${cappedCandidates.length} candidate(s) against ${discography!.length} known album(s).`);
 
       const verificationResults = await Promise.allSettled(
-        cappedCandidates.map(cand => verifyCandidateDiscography(cand, cleanArtistName, discography!, storefront))
+        cappedCandidates.map(cand => verifyCandidateDiscography(cand, cleanArtistName, discography!, storefront, sanityContext))
       );
 
       const verifiedWinners: CandidateVerification[] = [];
@@ -4070,7 +4308,17 @@ export const scrapeImageUrlBackend = async (
             console.warn(`[scrapeImageUrlBackend] [Tier 3 Ambiguity | ${storefrontLabel}] "${cleanArtistName}" has ${genreMatchedWinners.length} genre-matched candidates with tied score (${scored[0].score}). Aborting storefront to prevent homonym pollution.`);
           }
         } else {
-          console.warn(`[scrapeImageUrlBackend] [Tier 3 Ambiguity | ${storefrontLabel}] "${cleanArtistName}" has ${verifiedWinners.length} candidates matching discography, but 0 matched genre taxonomy ('${genre}'). Aborting storefront to prevent homonym pollution.`);
+          const catalogCorroboratedWinners = verifiedWinners.filter(
+            (w) =>
+              w.matchCount >= 2 &&
+              isCatalogCorroboratedNonHostileGenre(String(w.candidate.primaryGenreName || ''), genre || undefined)
+          );
+          if (catalogCorroboratedWinners.length === 1) {
+            finalWinner = catalogCorroboratedWinners[0];
+            console.log(`[scrapeImageUrlBackend] [Tier 3 Catalog-Corroborated Tie-Breaker Hit | ${storefrontLabel}] "${cleanArtistName}" resolved via ${finalWinner.matchCount} non-hostile album matches. Winner iTunes ID: ${finalWinner.candidate.artistId} ('${finalWinner.candidate.primaryGenreName}')`);
+          } else {
+            console.warn(`[scrapeImageUrlBackend] [Tier 3 Ambiguity | ${storefrontLabel}] "${cleanArtistName}" has ${verifiedWinners.length} candidates matching discography, but 0 matched genre taxonomy ('${genre}'). Aborting storefront to prevent homonym pollution.`);
+          }
         }
       } else {
         console.warn(`[scrapeImageUrlBackend] [Tier 3 Miss | ${storefrontLabel}] "${cleanArtistName}": 0 candidates matched discography.`);
@@ -4204,7 +4452,11 @@ export const scrapeImageUrlBackend = async (
             const trackYear = track.releaseDate ? new Date(track.releaseDate).getFullYear() : undefined;
             const validTrackYear = trackYear && !isNaN(trackYear) ? trackYear : undefined;
 
-            if (!evaluateGenreMatch(String(track.primaryGenreName || ''), genre, summary)) {
+            const trackGenre = String(track.primaryGenreName || '');
+            const isStrictTrackGenre = evaluateGenreMatch(trackGenre, genre, summary);
+            const isNonHostileTrackGenre =
+              tier3bQualifying.length >= 2 && isCatalogCorroboratedNonHostileGenre(trackGenre, genre || undefined);
+            if (!isStrictTrackGenre && !isNonHostileTrackGenre) {
               genreRejectCount++;
               continue;
             }
@@ -4222,11 +4474,11 @@ export const scrapeImageUrlBackend = async (
               titleMatchCount++;
               reissueIdsForQuery.add(numericArtistId);
 
-              // Strict single-album year proximity (|itunesYear - zceneYear| <= 2)
+              // Strict single-album year proximity (|itunesYear - zceneYear| <= 2) + strict genre match
               const withinStrictYearWindow =
                 alb.year === undefined ||
                 (validTrackYear !== undefined && Math.abs(validTrackYear - alb.year) <= 2);
-              if (withinStrictYearWindow) {
+              if (isStrictTrackGenre && withinStrictYearWindow) {
                 matchedIdsForQuery.add(numericArtistId);
               }
             }
@@ -4394,7 +4646,8 @@ export const scrapeImageUrlBackend = async (
                 collName &&
                 COMPILATION_COLLECTION_RE.test(collName) &&
                 collTrackCount >= 8 &&
-                evaluateGenreMatch(collGenre, genre, summary) &&
+                (evaluateGenreMatch(collGenre, genre, summary) ||
+                  isCatalogCorroboratedNonHostileGenre(collGenre, genre || undefined)) &&
                 passesEraFloor &&
                 collArtwork100.length > 0
               ) {

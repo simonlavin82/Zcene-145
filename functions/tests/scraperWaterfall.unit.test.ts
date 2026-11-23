@@ -4,11 +4,13 @@ import { describe, it, expect, vi } from 'vitest';
 import {
   scrapeImageUrlBackend,
   reconcileDiscographyWithITunes,
+  deduplicateDiscographyItems,
   cleanCollectionTitle,
   cleanSongQueryAlbumTitle,
   evaluateGenreMatch,
   evaluateGenreDistanceScore,
   isAppleElectronicHardcoreGenre,
+  isCatalogCorroboratedNonHostileGenre,
   passesUncorroboratedEraGate,
   COMPILATION_COLLECTION_RE,
   selectBestArtistArtwork,
@@ -2307,6 +2309,462 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
         expect(evaluateGenreMatch('Hardcore', bareGenre, 'Straight edge youth crew band.')).toBe(false);
         expect(evaluateGenreDistanceScore('Hardcore', bareGenre, 'Straight edge youth crew band.')).toBe(0);
       }
+    });
+  });
+
+  describe('V47.14 Rule 38: Mutual Non-Hostile Catalog-Corroborated Genre Guard, Emo/Rock Taxonomy Parity & Year-Aware Discography Deduplication', () => {
+    it('1. rescues live Fairweather (#31535979, genre="Emo", founded="1999") across mixed "Rock"/"Punk" iTunes catalog, preserving Alaska (2001) + Lusitania (2003)', async () => {
+      expect(evaluateGenreMatch('Rock', 'Emo', 'East Coast emo band on Equal Vision.')).toBe(true);
+      expect(evaluateGenreMatch('Alternative', 'Emo', 'East Coast emo band on Equal Vision.')).toBe(true);
+      expect(evaluateGenreMatch('Rock', 'Screamo', '')).toBe(true);
+      expect(evaluateGenreMatch('Rock', 'Post-Hardcore', '')).toBe(true);
+      expect(evaluateGenreMatch('Rock', 'Shoegaze', '')).toBe(true);
+      expect(evaluateGenreMatch('Rock', 'Math Rock', '')).toBe(true);
+      expect(evaluateGenreMatch('Rock', 'Pop Punk', '')).toBe(true);
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('term=Fairweather&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 31535979, artistName: 'Fairweather', primaryGenreName: 'Rock' },
+                { wrapperType: 'artist', artistId: 1502437416, artistName: 'Fairweather', primaryGenreName: 'Singer/Songwriter' },
+                { wrapperType: 'artist', artistId: 342696241, artistName: 'Fairweather', primaryGenreName: 'Rock' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=31535979&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 31535979,
+                  collectionId: 493670001,
+                  collectionName: 'Alaska',
+                  primaryGenreName: 'Rock',
+                  releaseDate: '2001-03-20T08:00:00Z',
+                  trackCount: 11,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/fairweather/alaska/100x100bb.jpg',
+                },
+                {
+                  wrapperType: 'collection',
+                  artistId: 31535979,
+                  collectionId: 493670002,
+                  collectionName: 'Lusitania',
+                  primaryGenreName: 'Rock',
+                  releaseDate: '2003-10-07T07:00:00Z',
+                  trackCount: 12,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/fairweather/lusitania/100x100bb.jpg',
+                },
+                {
+                  wrapperType: 'collection',
+                  artistId: 31535979,
+                  collectionId: 840123456,
+                  collectionName: 'Fairweather',
+                  primaryGenreName: 'Punk',
+                  releaseDate: '2014-04-01T07:00:00Z',
+                  trackCount: 10,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/fairweather/st/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Fairweather',
+          'artist',
+          'Emo',
+          'Their work on major independent punk imprints cemented their reputation as a beloved fixture of the early 2000s East Coast emo scene.',
+          'Virginia, USA',
+          [
+            { albumName: 'Alaska', releaseYear: '2001' },
+            { albumName: 'Lusitania', releaseYear: '2003' },
+            { albumName: 'Fairweather', releaseYear: '2014' },
+          ],
+          'us',
+          '1999'
+        );
+
+        expect(res.itunesArtistId).toBe(31535979);
+        expect(res.imageUrl).toBe('https://is1-ssl.mzstatic.com/fairweather/alaska/600x600bb.jpg');
+        expect(res.reconciledDiscography).toEqual([
+          { albumName: 'Alaska', releaseYear: '2001', itunesCollectionId: 493670001 },
+          { albumName: 'Lusitania', releaseYear: '2003', itunesCollectionId: 493670002 },
+        ]);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('2. Mutual Non-Hostility Catalog-Corroborated Genre Guard rescues unmapped editorial subgenres (>=2 albums) in Tier 3A & Tier 3B while blocking cross-family Zcene genres, hostile Apple genres, bare Hardcore 1050 & 1-album unmapped matches', async () => {
+      // Unmapped underground subgenres pass against non-hostile Apple umbrella buckets
+      expect(isCatalogCorroboratedNonHostileGenre('Rock', 'Sasscore / Nintendocore')).toBe(true);
+      expect(isCatalogCorroboratedNonHostileGenre('Alternative', 'Orgcore / Egg Punk')).toBe(true);
+      expect(isCatalogCorroboratedNonHostileGenre('Metal', 'Djent / Thall')).toBe(true);
+
+      // Legitimate crossover genres pass
+      expect(isCatalogCorroboratedNonHostileGenre('Rock', 'Rap Rock')).toBe(true);
+      expect(isCatalogCorroboratedNonHostileGenre('Rock', 'Jazz Rock')).toBe(true);
+      expect(isCatalogCorroboratedNonHostileGenre('Rock', 'Electronic Rock')).toBe(true);
+      expect(isCatalogCorroboratedNonHostileGenre('Rock', 'Folk Rock')).toBe(true);
+      expect(isCatalogCorroboratedNonHostileGenre('Rock', 'Post-Rock')).toBe(true);
+      expect(isCatalogCorroboratedNonHostileGenre('Alternative', 'Soul Punk')).toBe(true);
+
+      // Pure non-umbrella Zcene genres MUST return false against Apple 'Rock' / 'Pop' / 'Alternative'
+      for (const incompatibleZceneGenre of [
+        'Hip-Hop',
+        'Rap',
+        'Hardcore Rap',
+        'Classical',
+        'Opera',
+        'Country',
+        'Bluegrass',
+        'Jazz',
+        'Bebop',
+        'Electronic',
+        'Techno',
+        'House',
+        'EDM',
+        'Happy Hardcore',
+        'Hardcore Techno',
+        'UK Hardcore',
+        'R&B',
+        'Neo-Soul',
+      ]) {
+        expect(isCatalogCorroboratedNonHostileGenre('Rock', incompatibleZceneGenre)).toBe(false);
+        expect(isCatalogCorroboratedNonHostileGenre('Pop', incompatibleZceneGenre)).toBe(false);
+        expect(isCatalogCorroboratedNonHostileGenre('Alternative', incompatibleZceneGenre)).toBe(false);
+      }
+
+      // Hostile Apple genres and bare Apple Electronic 'Hardcore' (ID 1050) always return false
+      for (const hostileAppleGenre of [
+        'Hip-Hop/Rap',
+        'Country',
+        'Christian',
+        'Classical',
+        'New Age',
+        "Children's Music",
+        'Comedy',
+        'Holiday',
+        'Soundtrack',
+        'Hardcore',
+      ]) {
+        expect(isCatalogCorroboratedNonHostileGenre(hostileAppleGenre, 'Sasscore')).toBe(false);
+      }
+
+      // Tier 3B rescue with unmapped editorial subgenre ("Sasscore / Nintendocore") + 2 distinct albums on 1 unambiguous artistId
+      const tier3bUnmappedSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('entity=musicArtist')) {
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('entity=song')) {
+          if (url.includes('Alaska')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 31535979,
+                    artistName: 'Fairweather',
+                    collectionId: 493670001,
+                    collectionName: 'Alaska',
+                    trackName: 'If They Move... Kill Them',
+                    primaryGenreName: 'Rock',
+                    releaseDate: '2001-03-20T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          if (url.includes('Lusitania')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 31535979,
+                    artistName: 'Fairweather',
+                    collectionId: 493670002,
+                    collectionName: 'Lusitania',
+                    trackName: ' Lusitania',
+                    primaryGenreName: 'Rock',
+                    releaseDate: '2003-10-07T07:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=31535979&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 31535979,
+                  collectionId: 493670001,
+                  collectionName: 'Alaska',
+                  primaryGenreName: 'Rock',
+                  releaseDate: '2001-03-20T08:00:00Z',
+                  trackCount: 11,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/fairweather/alaska/100x100bb.jpg',
+                },
+                {
+                  wrapperType: 'collection',
+                  artistId: 31535979,
+                  collectionId: 493670002,
+                  collectionName: 'Lusitania',
+                  primaryGenreName: 'Rock',
+                  releaseDate: '2003-10-07T07:00:00Z',
+                  trackCount: 12,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/fairweather/lusitania/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        // 2 distinct albums with unmapped subgenre -> succeeds via multi-album catalog proof
+        const multiAlbumUnmappedRes = await scrapeImageUrlBackend(
+          'Fairweather',
+          'artist',
+          'Sasscore / Nintendocore',
+          'Underground DIY band founded in 1999.',
+          'Virginia, USA',
+          [
+            { albumName: 'Alaska', releaseYear: '2001' },
+            { albumName: 'Lusitania', releaseYear: '2003' },
+          ],
+          'us',
+          '1999'
+        );
+        expect(multiAlbumUnmappedRes.itunesArtistId).toBe(31535979);
+        expect(multiAlbumUnmappedRes.reconciledDiscography.map((d) => d.albumName)).toEqual(['Alaska', 'Lusitania']);
+
+        // Single-album (1 album only) with unmapped subgenre -> MUST still fail closed!
+        const singleAlbumUnmappedRes = await scrapeImageUrlBackend(
+          'Fairweather',
+          'artist',
+          'Sasscore / Nintendocore',
+          'Underground DIY band founded in 1999.',
+          'Virginia, USA',
+          [{ albumName: 'Alaska', releaseYear: '2001' }],
+          'us',
+          '1999'
+        );
+        expect(singleAlbumUnmappedRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+
+        // Cross-family Zcene genre ('Hip-Hop') against 'Rock' homonym with 2 matching album titles -> MUST fail closed!
+        const crossFamilyRejectRes = await scrapeImageUrlBackend(
+          'Fairweather',
+          'artist',
+          'Hip-Hop',
+          'Underground boom bap duo founded in 1999.',
+          'Virginia, USA',
+          [
+            { albumName: 'Alaska', releaseYear: '2001' },
+            { albumName: 'Lusitania', releaseYear: '2003' },
+          ],
+          'us',
+          '1999'
+        );
+        expect(crossFamilyRejectRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+      } finally {
+        tier3bUnmappedSpy.mockRestore();
+      }
+    });
+
+    it('3. Year-Aware Deterministic Discography Deduplication eliminates duplicate Horizon (#493669654), Turning Point (#1537004455), Good Apollo Vol 1/2 collisions & yearless duplicates while preserving multi-year self-titled albums (American Football / Weezer)', () => {
+      // Case A: The Rocking Horse Winner — duplicate Horizon (#493669654) in llmDiscography deduplicates and backfills State of Feeling Concentration (#555153017)
+      const trhwItunesAlbums = [
+        {
+          wrapperType: 'collection',
+          artistId: 31536457,
+          collectionId: 493669654,
+          collectionName: 'Horizon',
+          primaryGenreName: 'Rock',
+          releaseDate: '2002-04-09T07:00:00Z',
+          trackCount: 10,
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 31536457,
+          collectionId: 555153017,
+          collectionName: 'State of Feeling Concentration',
+          primaryGenreName: 'Rock',
+          releaseDate: '2000-06-12T07:00:00Z',
+          trackCount: 10,
+        },
+      ];
+      const trhwReconciled = reconcileDiscographyWithITunes(
+        [
+          { albumName: 'Horizon', releaseYear: '2002' },
+          { albumName: 'Horizon EP', releaseYear: '2002' },
+        ],
+        trhwItunesAlbums,
+        'The Rocking Horse Winner',
+        { genre: 'Indie Rock', foundedYear: '1999' }
+      );
+      expect(trhwReconciled).toEqual([
+        { albumName: 'Horizon', releaseYear: '2002', itunesCollectionId: 493669654 },
+        { albumName: 'State of Feeling Concentration', releaseYear: '2000', itunesCollectionId: 555153017 },
+      ]);
+
+      // Case B: Turning Point — two LLM variants matching compilation #1537004455 output #1537004455 exactly once
+      const tpItunesAlbums = [
+        {
+          wrapperType: 'collection',
+          artistId: 20112233,
+          collectionId: 1537004455,
+          collectionName: '1988-1991 Discography',
+          primaryGenreName: 'Punk',
+          releaseDate: '2000-01-01T08:00:00Z',
+          trackCount: 25,
+        },
+      ];
+      const tpReconciled = reconcileDiscographyWithITunes(
+        [
+          { albumName: '1988-1991', releaseYear: '2000' },
+          { albumName: '1988-1991 Discography', releaseYear: '2000' },
+        ],
+        tpItunesAlbums,
+        'Turning Point',
+        { genre: 'Youth Crew Hardcore', foundedYear: '1988' }
+      );
+      expect(tpReconciled).toEqual([
+        { albumName: '1988-1991 Discography', releaseYear: '2000', itunesCollectionId: 1537004455 },
+      ]);
+
+      // Case C: Coheed and Cambria — Good Apollo Volume One (2005) vs. Volume Two (2007) sharing 12-char prefix
+      const coheedItunesAlbums = [
+        {
+          wrapperType: 'collection',
+          artistId: 547891,
+          collectionId: 100001,
+          collectionName: "Good Apollo, I'm Burning Star IV, Volume One: From Fear Through the Eyes of Madness",
+          primaryGenreName: 'Rock',
+          releaseDate: '2005-09-20T07:00:00Z',
+          trackCount: 15,
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 547891,
+          collectionId: 100002,
+          collectionName: "Good Apollo, I'm Burning Star IV, Volume Two: No World for Tomorrow",
+          primaryGenreName: 'Rock',
+          releaseDate: '2007-10-23T07:00:00Z',
+          trackCount: 13,
+        },
+      ];
+      const coheedReconciled = reconcileDiscographyWithITunes(
+        [
+          {
+            albumName: "Good Apollo, I'm Burning Star IV, Volume One: From Fear Through the Eyes of Madness",
+            releaseYear: '2005',
+          },
+          {
+            albumName: "Good Apollo, I'm Burning Star IV, Volume Two: No World for Tomorrow",
+            releaseYear: '2007',
+          },
+        ],
+        coheedItunesAlbums,
+        'Coheed and Cambria',
+        { genre: 'Progressive Rock', foundedYear: '1995' }
+      );
+      expect(coheedReconciled).toEqual([
+        {
+          albumName: "Good Apollo, I'm Burning Star IV, Volume One: From Fear Through the Eyes of Madness",
+          releaseYear: '2005',
+          itunesCollectionId: 100001,
+        },
+        {
+          albumName: "Good Apollo, I'm Burning Star IV, Volume Two: No World for Tomorrow",
+          releaseYear: '2007',
+          itunesCollectionId: 100002,
+        },
+      ]);
+
+      // Case D: Empty-year guard in deduplicateDiscographyItems (dated-then-yearless AND yearless-then-dated)
+      expect(
+        deduplicateDiscographyItems([
+          { albumName: 'Horizon', releaseYear: '2002', itunesCollectionId: 493669654 },
+          { albumName: 'Horizon', releaseYear: '' },
+        ])
+      ).toEqual([{ albumName: 'Horizon', releaseYear: '2002', itunesCollectionId: 493669654 }]);
+
+      expect(
+        deduplicateDiscographyItems([
+          { albumName: 'Horizon', releaseYear: '' },
+          { albumName: 'Horizon', releaseYear: '2002', itunesCollectionId: 493669654 },
+        ])
+      ).toEqual([{ albumName: 'Horizon', releaseYear: '2002', itunesCollectionId: 493669654 }]);
+
+      // Case E: Multi-year self-titled / same-title albums (American Football 1999 vs 2016 vs 2019; Weezer 1994 vs 2001) are preserved!
+      const multiYearSelfTitled = deduplicateDiscographyItems([
+        { albumName: 'American Football', releaseYear: '1999', itunesCollectionId: 3001 },
+        { albumName: 'American Football', releaseYear: '2016', itunesCollectionId: 3002 },
+        { albumName: 'American Football', releaseYear: '2019', itunesCollectionId: 3003 },
+      ]);
+      expect(multiYearSelfTitled).toHaveLength(3);
+      expect(multiYearSelfTitled.map((d) => d.releaseYear)).toEqual(['1999', '2016', '2019']);
+
+      const weezerItunesAlbums = [
+        {
+          wrapperType: 'collection',
+          artistId: 115234,
+          collectionId: 9001,
+          collectionName: 'Weezer - EP',
+          primaryGenreName: 'Rock',
+          releaseDate: '1994-05-10T07:00:00Z',
+          trackCount: 10,
+        },
+        {
+          wrapperType: 'collection',
+          artistId: 115234,
+          collectionId: 9002,
+          collectionName: 'Weezer (Live)',
+          primaryGenreName: 'Rock',
+          releaseDate: '2001-05-15T07:00:00Z',
+          trackCount: 10,
+        },
+      ];
+      const weezerReconciled = reconcileDiscographyWithITunes(
+        [
+          { albumName: 'Weezer - EP', releaseYear: '1994' },
+          { albumName: 'Weezer (Live)', releaseYear: '2001' },
+        ],
+        weezerItunesAlbums,
+        'Weezer',
+        { genre: 'Alternative Rock', foundedYear: '1992' }
+      );
+      expect(weezerReconciled).toEqual([
+        { albumName: 'Weezer', releaseYear: '1994', itunesCollectionId: 9001 },
+        { albumName: 'Weezer', releaseYear: '2001', itunesCollectionId: 9002 },
+      ]);
     });
   });
 });

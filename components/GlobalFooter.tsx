@@ -185,7 +185,7 @@ export const GlobalFooter: React.FC<GlobalFooterProps> = ({
         {/* 4. Base / Legal Divider */}
         <div className="mt-12 pt-8 border-t border-zinc-900 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-zinc-600">
           <p>© 2026 Zcene. All Rights Reserved.</p>
-          <p className="font-mono text-[11px] text-zinc-600">v47.13 • Own Music Discovery</p>
+          <p className="font-mono text-[11px] text-zinc-600">v47.14 • Own Music Discovery</p>
         </div>
       </div>
     </footer>
