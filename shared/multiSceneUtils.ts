@@ -11,7 +11,7 @@ import {
   ZineEditorialImageEntry,
   OverarchingHistoryEntry,
 } from '../types';
-import { stripCountrySlug, extractTrailingCountryIso, areCountryIsosCompatible } from './isoCountries';
+import { stripCountrySlug, extractTrailingCountryIso, areCountryIsosCompatible, stripLeadingTheFromSlug } from './isoCountries';
 
 export const SCENE_BASE_CENTER_X = 1000;
 export const SCENE_BASE_CENTER_Y = 1000;
@@ -279,6 +279,8 @@ export function isCanonicalSeedMatch(nodeIdOrLabel: string, seedList: string[]):
   const cleanTarget = stripSceneNamespace(nodeIdOrLabel).trim();
   const targetNorm = normalizeCanonicalEntityId(cleanTarget);
   const targetBare = normalizeCanonicalEntityId(stripCountrySlug(cleanTarget));
+  const targetNormNoThe = stripLeadingTheFromSlug(targetNorm);
+  const targetBareNoThe = stripLeadingTheFromSlug(targetBare);
   const targetIso = extractTrailingCountryIso(cleanTarget);
   if (!targetNorm) return false;
 
@@ -287,19 +289,26 @@ export function isCanonicalSeedMatch(nodeIdOrLabel: string, seedList: string[]):
     const cleanSeed = stripSceneNamespace(seed).trim();
     const seedNorm = normalizeCanonicalEntityId(cleanSeed);
     const seedBare = normalizeCanonicalEntityId(stripCountrySlug(cleanSeed));
+    const seedNormNoThe = stripLeadingTheFromSlug(seedNorm);
+    const seedBareNoThe = stripLeadingTheFromSlug(seedBare);
     const seedIso = extractTrailingCountryIso(cleanSeed);
     if (!seedNorm) return false;
     if (targetNorm === seedNorm) return true;
     if (
       (targetBare && targetBare === seedNorm && targetNorm.length > seedNorm.length) ||
-      (seedBare && seedBare === targetNorm && seedNorm.length > targetNorm.length)
+      (seedBare && seedBare === targetNorm && seedNorm.length > targetNorm.length) ||
+      (targetBareNoThe && targetBareNoThe === seedNormNoThe && targetNormNoThe.length > seedNormNoThe.length) ||
+      (seedBareNoThe && seedBareNoThe === targetNormNoThe && seedNormNoThe.length > targetNormNoThe.length)
     ) {
       return true;
     }
     if (targetIso && seedIso && !areCountryIsosCompatible(targetIso, seedIso)) {
       return false;
     }
-    return Boolean(targetBare) && Boolean(seedBare) && targetBare === seedBare;
+    if (Boolean(targetBare) && Boolean(seedBare) && targetBare === seedBare) {
+      return true;
+    }
+    return Boolean(targetBareNoThe) && Boolean(seedBareNoThe) && targetBareNoThe === seedBareNoThe;
   });
 }
 
@@ -2392,16 +2401,17 @@ function resolveSceneRootDisplayNames(
     if (!strippedSeed) continue;
 
     // Extract canonical slug and strip ISO country codes (-us, -gb, etc.)
-    const bareSlug = strippedSeed
-      .toLowerCase()
-      .replace(/-(?:us|gb|uk|de|fr|ca|au|jp|se|no|fi|nl|be|ch|at|es|it|br|mx|nz|ie|pl|za)$/i, '')
-      .trim();
+    const cleanSeedNoCountry = stripCountrySlug(strippedSeed).trim();
+    if (!cleanSeedNoCountry) continue;
+    const bareSlug = cleanSeedNoCountry.toLowerCase();
 
-    const canonNorm = bareSlug.replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+    const canonNorm = normalizeCanonicalEntityId(cleanSeedNoCountry);
     if (!canonNorm) continue;
+    const canonNormNoThe = stripLeadingTheFromSlug(canonNorm);
     if (seenCanonicalIds) {
-      if (seenCanonicalIds.has(canonNorm)) continue;
+      if (seenCanonicalIds.has(canonNorm) || (canonNormNoThe && seenCanonicalIds.has(canonNormNoThe))) continue;
       seenCanonicalIds.add(canonNorm);
+      if (canonNormNoThe) seenCanonicalIds.add(canonNormNoThe);
     }
 
     let displayName: string | null = null;
@@ -2413,7 +2423,14 @@ function resolveSceneRootDisplayNames(
       const nNorm = normalizeCanonicalEntityId(n.canonicalId || n.id);
       const nLabelNorm = n.label ? normalizeCanonicalEntityId(n.label) : '';
       const bareNode = stripCountrySlug(nNorm);
-      return nNorm === canonNorm || nLabelNorm === canonNorm || bareNode === canonNorm;
+      const bareNodeNoThe = stripLeadingTheFromSlug(bareNode);
+      const nLabelNoThe = stripLeadingTheFromSlug(nLabelNorm);
+      return (
+        nNorm === canonNorm ||
+        nLabelNorm === canonNorm ||
+        bareNode === canonNorm ||
+        (Boolean(canonNormNoThe) && (bareNodeNoThe === canonNormNoThe || nLabelNoThe === canonNormNoThe))
+      );
     });
     if (matchingNode && matchingNode.label && matchingNode.label.trim()) {
       const candidateLabel = matchingNode.label.trim();
@@ -2432,7 +2449,8 @@ function resolveSceneRootDisplayNames(
       if (!entry) {
         for (const [k, v] of cacheMap.entries()) {
           const strippedK = stripCountrySlug(normalizeCanonicalEntityId(k));
-          if (strippedK === canonNorm) {
+          const strippedKNoThe = stripLeadingTheFromSlug(strippedK);
+          if (strippedK === canonNorm || (Boolean(canonNormNoThe) && strippedKNoThe === canonNormNoThe)) {
             entry = v;
             break;
           }
@@ -2444,11 +2462,11 @@ function resolveSceneRootDisplayNames(
     }
 
     if (!displayName) {
-      // If the seed was already formatted in Title/Mixed Case (e.g. "Sense Field" or "Jimmy Eat World")
-      if (strippedSeed.includes(' ') && !strippedSeed.includes('-') && strippedSeed !== strippedSeed.toLowerCase()) {
-        displayName = strippedSeed;
+      // If the seed was already formatted as a human display name (contains uppercase characters, e.g. "At the Drive-In", "Sense Field", "Lo-Fi"), preserve internal hyphens and casing intact
+      if (cleanSeedNoCountry !== cleanSeedNoCountry.toLowerCase()) {
+        displayName = cleanSeedNoCountry;
       } else {
-        // Format slug into Title Case
+        // Format raw lowercase slug into Title Case
         displayName = bareSlug
           .split(/[\s-_]+/)
           .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
@@ -2555,13 +2573,34 @@ export function isAutoGeneratedProjectTitle(
   if (!trimmed || trimmed === 'Untitled Zcene') return true;
   if (!scenes || !Array.isArray(scenes) || scenes.length === 0) return false;
 
+  const normalizeAutoTitleForComparison = (title: string): string =>
+    title
+      .split(/\s*\+\s*/)
+      .map((scenePart) =>
+        scenePart
+          .split(/\s*,\s*/)
+          .map((artistPart) => stripLeadingTheFromSlug(normalizeCanonicalEntityId(stripCountrySlug(artistPart))))
+          .filter(Boolean)
+          .join(',')
+      )
+      .filter(Boolean)
+      .join('+');
+
+  const matchesAutoCandidate = (candidate: string): boolean => {
+    if (!candidate || candidate === 'Untitled Zcene') return false;
+    if (trimmed.toLowerCase() === candidate.trim().toLowerCase()) return true;
+    const normTrimmed = normalizeAutoTitleForComparison(trimmed);
+    const normCandidate = normalizeAutoTitleForComparison(candidate);
+    return Boolean(normTrimmed) && normTrimmed === normCandidate;
+  };
+
   const currentGenerated = generateProjectTitleFromScenes(scenes, detailsCache);
-  if (currentGenerated && currentGenerated !== 'Untitled Zcene' && trimmed.toLowerCase() === currentGenerated.trim().toLowerCase()) {
+  if (matchesAutoCandidate(currentGenerated)) {
     return true;
   }
 
   const legacyFlat = generateLegacyFlatProjectTitle(scenes, detailsCache);
-  if (legacyFlat && legacyFlat !== 'Untitled Zcene' && trimmed.toLowerCase() === legacyFlat.trim().toLowerCase()) {
+  if (matchesAutoCandidate(legacyFlat)) {
     return true;
   }
 
@@ -2569,11 +2608,11 @@ export function isAutoGeneratedProjectTitle(
   const curatedScenes = scenes.filter(s => (s.graphData?.nodes?.length || 0) > 0);
   if (curatedScenes.length > 0 && curatedScenes.length < scenes.length) {
     const curatedGenerated = generateProjectTitleFromScenes(curatedScenes, detailsCache);
-    if (curatedGenerated && curatedGenerated !== 'Untitled Zcene' && trimmed.toLowerCase() === curatedGenerated.trim().toLowerCase()) {
+    if (matchesAutoCandidate(curatedGenerated)) {
       return true;
     }
     const curatedLegacy = generateLegacyFlatProjectTitle(curatedScenes, detailsCache);
-    if (curatedLegacy && curatedLegacy !== 'Untitled Zcene' && trimmed.toLowerCase() === curatedLegacy.trim().toLowerCase()) {
+    if (matchesAutoCandidate(curatedLegacy)) {
       return true;
     }
   }

@@ -147,7 +147,7 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
             synthesizedDetails.details = {};
         }
         // Guarantee human-readable artist display name in payload
-        const cleanTitle = (synthesizedDetails.details.artist || cleanSearchName).trim();
+        let cleanTitle = (synthesizedDetails.details.artist || cleanSearchName).trim();
         synthesizedDetails.details.artist = cleanTitle;
         if (isLabel) {
             delete synthesizedDetails.details.style;
@@ -178,6 +178,10 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
                     }
                     if (scrapeResult.itunesArtistId) {
                         synthesizedDetails.itunesArtistId = scrapeResult.itunesArtistId;
+                    }
+                    if (scrapeResult.verifiedArtistName) {
+                        cleanTitle = scrapeResult.verifiedArtistName;
+                        synthesizedDetails.details.artist = scrapeResult.verifiedArtistName;
                     }
                 }
                 else {

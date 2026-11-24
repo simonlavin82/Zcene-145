@@ -22,6 +22,7 @@ import {
   inspectSlugDedupAmbiguity,
   inferNodeOriginsFromCountryLinks,
   isEntitySeedMatch,
+  stripLeadingTheFromSlug,
 } from "./shared/isoCountries";
 import { upsertBareRouterStub } from "./services/routerStubService";
 import { computeBaseProjectTokenCost } from "./shared/tokenEconomy";
@@ -134,19 +135,31 @@ export async function resolveSceneTopologyBackend(
 
      let resolvedSeedNorm = seedNorm;
      try {
-       const dedupQuery = await db.collection("artists")
+       let effectiveStrippedSeed = strippedSeed;
+       let dedupQuery = await db.collection("artists")
          .where("artistId", ">=", strippedSeed)
          .where("artistId", "<=", `${strippedSeed}\uf8ff`)
          .limit(10)
          .get();
+       if (dedupQuery.empty) {
+         const strippedSeedNoThe = stripLeadingTheFromSlug(strippedSeed);
+         if (strippedSeedNoThe && strippedSeedNoThe !== strippedSeed) {
+           effectiveStrippedSeed = strippedSeedNoThe;
+           dedupQuery = await db.collection("artists")
+             .where("artistId", ">=", strippedSeedNoThe)
+             .where("artistId", "<=", `${strippedSeedNoThe}\uf8ff`)
+             .limit(10)
+             .get();
+         }
+       }
        if (!dedupQuery.empty) {
          const hasAmbiguousSibling = inspectSlugDedupAmbiguity(
            dedupQuery.docs.map(d => ({ id: d.id, data: d.data() })),
-           strippedSeed
+           effectiveStrippedSeed
          );
          for (const snap of dedupQuery.docs) {
            const snapData = snap.data();
-           if (!shouldAdoptCanonicalSlugCandidate(expectedSeedIso, snap.id, snapData, strippedSeed, { hasAmbiguousSibling, isSeed: true })) {
+           if (!shouldAdoptCanonicalSlugCandidate(expectedSeedIso, snap.id, snapData, effectiveStrippedSeed, { hasAmbiguousSibling, isSeed: true })) {
              continue;
            }
            if (snap.id !== seedNorm && snapData.artistId) {
@@ -236,7 +249,13 @@ export async function resolveSceneTopologyBackend(
       
       const qualificationIso = expectedSeedIso || extractTrailingCountryIso(resolvedSeedNorm);
       if (isFullyQualifiedEntityProfile(cachedDetails, false, qualificationIso, { requireMembersAndPeers: true })) {
-         const cleanHitName = seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || seed;
+         const cachedArtistName =
+           typeof cachedDetails?.details?.artist === 'string' && cachedDetails.details.artist.trim()
+             ? cachedDetails.details.artist.trim()
+             : null;
+         const cleanHitName = cachedArtistName || seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || seed;
+         seedNamesMap[resolvedSeedNorm] = cleanHitName;
+         seedNamesMap[seedNorm] = cleanHitName;
          if (hasGraphData) {
             resolvedSeedArray.push({
                id: resolvedSeedNorm,
@@ -429,16 +448,21 @@ export async function resolveSceneTopologyBackend(
       const sluggedSeedNorm = resolvedSeed ? resolvedSeed.id : seedNorm;
 
       const seedNode = finalGraph.nodes.find((n: any) => isEntitySeedMatch(sluggedSeedNorm, n.id) || isEntitySeedMatch(seedNorm, n.id) || isEntitySeedMatch(seedNorm, n.label || ''));
-      if (seedNode && seedNode.id !== sluggedSeedNorm) {
-         const oldId = seedNode.id;
-         seedNode.id = sluggedSeedNorm;
-         seedNode.label = resolvedSeed ? resolvedSeed.name : seed;
-         if (resolvedSeed?.origin) seedNode.origin = resolvedSeed.origin;
-         
-         if (finalGraph.links) {
-            for (const link of finalGraph.links) {
-               if (link.source === oldId) link.source = sluggedSeedNorm;
-               if (link.target === oldId) link.target = sluggedSeedNorm;
+      if (seedNode) {
+         if (resolvedSeed?.name) {
+            seedNode.label = resolvedSeed.name;
+         }
+         if (seedNode.id !== sluggedSeedNorm) {
+            const oldId = seedNode.id;
+            seedNode.id = sluggedSeedNorm;
+            seedNode.label = resolvedSeed ? resolvedSeed.name : seed;
+            if (resolvedSeed?.origin) seedNode.origin = resolvedSeed.origin;
+            
+            if (finalGraph.links) {
+               for (const link of finalGraph.links) {
+                  if (link.source === oldId) link.source = sluggedSeedNorm;
+                  if (link.target === oldId) link.target = sluggedSeedNorm;
+               }
             }
          }
       }

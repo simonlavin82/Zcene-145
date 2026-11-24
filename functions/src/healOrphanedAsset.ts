@@ -186,7 +186,7 @@ export const healOrphanedAsset = onCall({
     }
 
     // Guarantee human-readable artist display name in payload
-    const cleanTitle = (synthesizedDetails.details.artist || cleanSearchName).trim();
+    let cleanTitle = (synthesizedDetails.details.artist || cleanSearchName).trim();
     synthesizedDetails.details.artist = cleanTitle;
 
     if (isLabel) {
@@ -227,6 +227,10 @@ export const healOrphanedAsset = onCall({
           }
           if (scrapeResult.itunesArtistId) {
             synthesizedDetails.itunesArtistId = scrapeResult.itunesArtistId;
+          }
+          if (scrapeResult.verifiedArtistName) {
+            cleanTitle = scrapeResult.verifiedArtistName;
+            synthesizedDetails.details.artist = scrapeResult.verifiedArtistName;
           }
         } else {
           // Tier 4 Reject & Text-Only Discography Preservation (Rule 38 V47.16)

@@ -16,6 +16,8 @@ import {
   selectBestArtistArtwork,
   CURRENT_ITUNES_SCRAPE_VERSION,
   shouldRunRule38NotFoundUpgrade,
+  shouldRunRule38ArtistNameUpgrade,
+  resolveVerifiedItunesArtistDisplayName,
   artistNamesMatchWithOptionalThe,
   sanitizeTextOnlyDiscography,
 } from '../src/services/curatorService';
@@ -847,8 +849,8 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
       }
     });
 
-    it('5. Step 2 itunesScrapeVersion: 3 one-time $0.00 upgrade runs once for anchored legacy not-found artists, never loops, and leaves healOrphanedAsset untouched', () => {
-      expect(CURRENT_ITUNES_SCRAPE_VERSION).toBe(3);
+    it('5. Step 2 itunesScrapeVersion: 4 one-time $0.00 upgrade runs once for anchored legacy not-found artists, never loops, and leaves healOrphanedAsset untouched', () => {
+      expect(CURRENT_ITUNES_SCRAPE_VERSION).toBe(4);
 
       // Legacy artist doc with not-found and valid founded year (or qualifying discography) -> eligible
       expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', discography: [], details: { founded: '2021' } }, false)).toBe(true);
@@ -3189,6 +3191,119 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
       expect(CANONICAL_STYLES_FLAT).not.toContain('Proto-');
       expect(CANONICAL_STYLES_FLAT).toContain('Midwest');
       expect(CANONICAL_STYLES_FLAT).toContain('Underground');
+    });
+
+    it('6. V47.17 Canonical Verified iTunes artistName Adoption & v3 -> v4 Self-Heal: adopts "The Murder City Devils" (#3116895) and "At the Drive-In" (#159444), skips "Various Artists", rejects Tier 2 geo suffixes ("Klear TH") and multi-artist credits, and gates shouldRunRule38ArtistNameUpgrade strictly on itunesScrapeVersion === 3', async () => {
+      // 1. resolveVerifiedItunesArtistDisplayName unit guards
+      expect(
+        resolveVerifiedItunesArtistDisplayName(
+          ['The Murder City Devils', 'Murder City Devils'],
+          'Murder City Devils'
+        )
+      ).toBe('The Murder City Devils');
+      expect(
+        resolveVerifiedItunesArtistDisplayName(
+          ['At the Drive-In'],
+          'At The Drive-In'
+        )
+      ).toBe('At the Drive-In');
+      // Skips "Various Artists" on compilation albums and rescues the real track artistName
+      expect(
+        resolveVerifiedItunesArtistDisplayName(
+          ['Various Artists', 'The Murder City Devils'],
+          'Murder City Devils'
+        )
+      ).toBe('The Murder City Devils');
+      // Rejects Tier 2 geographic suffix tags ("Klear TH") and multi-artist collaborations
+      expect(resolveVerifiedItunesArtistDisplayName(['Klear TH'], 'Klear')).toBeNull();
+      expect(resolveVerifiedItunesArtistDisplayName(['Klear', 'Klear TH'], 'Klear')).toBe('Klear');
+      expect(
+        resolveVerifiedItunesArtistDisplayName(
+          ['At the Drive-In & The Mars Volta'],
+          'At the Drive-In'
+        )
+      ).toBeNull();
+
+      // 2. shouldRunRule38ArtistNameUpgrade gates strictly on imaged artist docs at itunesScrapeVersion === 3
+      expect(
+        shouldRunRule38ArtistNameUpgrade(
+          { imageUrl: 'https://is1-ssl.mzstatic.com/mcd/600x600bb.jpg', itunesScrapeVersion: 3 },
+          false
+        )
+      ).toBe(true);
+      expect(
+        shouldRunRule38ArtistNameUpgrade(
+          { imageUrl: 'https://is1-ssl.mzstatic.com/mcd/600x600bb.jpg', itunesScrapeVersion: 4 },
+          false
+        )
+      ).toBe(false);
+      expect(
+        shouldRunRule38ArtistNameUpgrade(
+          { imageUrl: 'not-found', itunesScrapeVersion: 3 },
+          false
+        )
+      ).toBe(false);
+      expect(
+        shouldRunRule38ArtistNameUpgrade(
+          { imageUrl: 'https://is1-ssl.mzstatic.com/mcd/600x600bb.jpg', itunesScrapeVersion: 3 },
+          true
+        )
+      ).toBe(false);
+
+      // 3. End-to-end scrapeImageUrlBackend returns verifiedArtistName: "The Murder City Devils" when queried with "Murder City Devils"
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('term=Murder%20City%20Devils&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 3116895, artistName: 'The Murder City Devils', primaryGenreName: 'Alternative' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=3116895&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 3116895,
+                  artistName: 'The Murder City Devils',
+                  collectionId: 3116901,
+                  collectionName: 'Empty Bottles, Broken Hearts',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '1998-05-05T07:00:00Z',
+                  trackCount: 10,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/mcd/empty-bottles/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Murder City Devils',
+          'artist',
+          'Garage Punk',
+          'Seattle garage punk band founded in 1996 on Sub Pop.',
+          'Seattle, Washington, United States',
+          [{ albumName: 'Empty Bottles, Broken Hearts', releaseYear: '1998' }],
+          'us',
+          '1996'
+        );
+        expect(res.itunesArtistId).toBe(3116895);
+        expect(res.verifiedArtistName).toBe('The Murder City Devils');
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
   });
 });

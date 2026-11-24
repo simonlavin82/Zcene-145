@@ -12,6 +12,7 @@ import {
   scrapeImageUrlBackend,
   CURRENT_ITUNES_SCRAPE_VERSION,
   shouldRunRule38NotFoundUpgrade,
+  shouldRunRule38ArtistNameUpgrade,
   sanitizeTextOnlyDiscography,
   extractArtistSubGraph,
   validateSeedOriginBackend,
@@ -40,6 +41,7 @@ import {
   inferNodeOriginsFromCountryLinks,
   inspectSlugDedupAmbiguity,
   isEntitySeedMatch,
+  stripLeadingTheFromSlug,
 } from "./shared/isoCountries";
 import {
   shouldAdoptCanonicalSlugCandidate,
@@ -821,19 +823,31 @@ export const processCurationJob = onDocumentCreated({
           const strippedSeed = normalizeArtistId(stripCountrySlug(seed, expectedSeedIso || seedLock?.origin));
           let canonicalId = (seedNorm === strippedSeed && expectedSeedIso) ? (strippedSeed + '-' + expectedSeedIso) : seedNorm;
           try {
-            const dedupQuery = await db.collection('artists')
+            let effectiveStrippedSeed = strippedSeed;
+            let dedupQuery = await db.collection('artists')
               .where('artistId', '>=', strippedSeed)
               .where('artistId', '<=', strippedSeed + '\uf8ff')
               .limit(10)
               .get();
+            if (dedupQuery.empty) {
+              const strippedSeedNoThe = stripLeadingTheFromSlug(strippedSeed);
+              if (strippedSeedNoThe && strippedSeedNoThe !== strippedSeed) {
+                effectiveStrippedSeed = strippedSeedNoThe;
+                dedupQuery = await db.collection('artists')
+                  .where('artistId', '>=', strippedSeedNoThe)
+                  .where('artistId', '<=', strippedSeedNoThe + '\uf8ff')
+                  .limit(10)
+                  .get();
+              }
+            }
             if (!dedupQuery.empty) {
               const hasAmbiguousSibling = inspectSlugDedupAmbiguity(
                 dedupQuery.docs.map(d => ({ id: d.id, data: d.data() })),
-                strippedSeed
+                effectiveStrippedSeed
               );
               for (const snap of dedupQuery.docs) {
                 const snapData = snap.data();
-                if (!shouldAdoptCanonicalSlugCandidate(expectedSeedIso, snap.id, snapData, strippedSeed, { hasAmbiguousSibling, isSeed: true })) {
+                if (!shouldAdoptCanonicalSlugCandidate(expectedSeedIso, snap.id, snapData, effectiveStrippedSeed, { hasAmbiguousSibling, isSeed: true })) {
                   continue;
                 }
                 if (snap.id !== seedNorm && snapData.artistId) {
@@ -893,9 +907,14 @@ export const processCurationJob = onDocumentCreated({
 
           if (isFullyQualifiedEntityProfile(cachedDetails, false, expectedSeedIso, { requireMembersAndPeers: true })) {
             console.log(`[Phase 1] Cache Hit for seed: ${seed}`);
+            const canonicalCachedSeedName =
+              (typeof cachedDetails?.details?.artist === 'string' && cachedDetails.details.artist.trim()) ||
+              cleanSeedDisplayName;
+            seedNamesMap[canonicalSeedId] = canonicalCachedSeedName;
+            seedNamesMap[seedNorm] = canonicalCachedSeedName;
             resolvedSeedArray.push({
               id: canonicalSeedId,
-              name: cleanSeedDisplayName,
+              name: canonicalCachedSeedName,
               origin: cachedDetails.details.origin || "",
               genre: cachedDetails.details.genre || "",
               isCacheHit: true
@@ -1200,8 +1219,8 @@ export const processCurationJob = onDocumentCreated({
                 seedNamesMap[normalizeArtistId(rawName)] ||
                 stripCountrySlug(rawName, expectedNodeIso || resolvedOriginHint);
 
-              if (details && details.details && details.details.artist && details.details.artist !== rawName) {
-                searchArtistName = seedNamesMap[artistNormId] || details.details.artist;
+              if (details && details.details && details.details.artist) {
+                searchArtistName = details.details.artist;
               }
 
               if (!details || !isFullyQualifiedEntityProfile(details, isLabel, expectedNodeIso, { requireMembersAndPeers: true })) {
@@ -1210,11 +1229,12 @@ export const processCurationJob = onDocumentCreated({
               } else {
                 // Complete canonical cache hit -> STRICT BYPASS
                 // Note: details.imageUrl is guaranteed non-empty (either https:// or terminal 'not-found'
-                // after a verified 4-tier discography scrape). Legacy 'not-found' docs with
-                // (itunesScrapeVersion ?? 0) < CURRENT_ITUNES_SCRAPE_VERSION qualify for a single
-                // $0.00 iTunes-only re-scrape (zero Gemini spend) and are stamped itunesScrapeVersion: 2.
+                // after a verified 4-tier discography scrape). Legacy 'not-found' docs or V47.16 v3 docs
+                // qualify for a single $0.00 iTunes-only re-scrape (zero Gemini spend) and are stamped itunesScrapeVersion: 4.
                 let isReadOnly = true;
-                const needsRule38Upgrade = shouldRunRule38NotFoundUpgrade(details, isLabel);
+                const needsRule38Upgrade =
+                  shouldRunRule38NotFoundUpgrade(details, isLabel) ||
+                  shouldRunRule38ArtistNameUpgrade(details, isLabel);
                 if ((!details.imageUrl || needsRule38Upgrade) && !isLabel) {
                   requiresImageScraping = true;
                   isReadOnly = false;
@@ -1290,8 +1310,14 @@ export const processCurationJob = onDocumentCreated({
                   details.details = { genre: "", origin: "", founded: "", notableArtists: [] };
                 }
 
+                let verifiedItunesArtistName: string | null = null;
                 // 4. Scrape dedicated Image URL & Reconcile Discography (Artists Only, Rule 38)
                 if (requiresImageScraping && searchArtistName && !isLabel) {
+                  const hadExistingVerifiedArtwork = Boolean(
+                    details.imageUrl &&
+                    typeof details.imageUrl === 'string' &&
+                    details.imageUrl.startsWith('http')
+                  );
                   try {
                     let attemptName = searchArtistName;
                     const lockedOriginForScrape = (expectedNodeIso && !doesOriginMatchExpectedIso(details.details.origin, expectedNodeIso))
@@ -1315,7 +1341,15 @@ export const processCurationJob = onDocumentCreated({
                       if (scrapeResult.itunesArtistId) {
                         details.itunesArtistId = scrapeResult.itunesArtistId;
                       }
+                      if (scrapeResult.verifiedArtistName) {
+                        verifiedItunesArtistName = scrapeResult.verifiedArtistName;
+                      }
                       details.itunesScrapeVersion = CURRENT_ITUNES_SCRAPE_VERSION;
+                    } else if (hadExistingVerifiedArtwork) {
+                      console.warn(`[Image Scraper / Rule 38 V47.17] Non-destructive fallback for ${searchArtistName}: preserving existing verified artwork and discography on transient miss.`);
+                      if (!requiresTextHydration) {
+                        details._isReadOnly = true;
+                      }
                     } else {
                       // ⚠️ TIER 4 FALLBACK (Rule 38 V47.16): Preserve sanitized text-only discography stripped of iTunes IDs
                       const preservedDiscography = Array.isArray(scrapeResult?.reconciledDiscography)
@@ -1328,20 +1362,33 @@ export const processCurationJob = onDocumentCreated({
                       details.itunesScrapeVersion = CURRENT_ITUNES_SCRAPE_VERSION;
                     }
                   } catch (e) {
-                    console.warn(`[Image Scraper / Rule 38] Timeout/Error for ${searchArtistName}. Setting not-found and preserving sanitized text-only discography.`);
-                    details.imageUrl = 'not-found';
-                    details.discography = sanitizeTextOnlyDiscography(details.discography);
-                    details.itunesArtistId = null;
+                    if (hadExistingVerifiedArtwork) {
+                      console.warn(`[Image Scraper / Rule 38 V47.17] Non-destructive fallback on error for ${searchArtistName}: preserving existing verified artwork and discography.`);
+                      if (!requiresTextHydration) {
+                        details._isReadOnly = true;
+                      }
+                    } else {
+                      console.warn(`[Image Scraper / Rule 38] Timeout/Error for ${searchArtistName}. Setting not-found and preserving sanitized text-only discography.`);
+                      details.imageUrl = 'not-found';
+                      details.discography = sanitizeTextOnlyDiscography(details.discography);
+                      details.itunesArtistId = null;
+                    }
                   }
                 } else if (isLabel) {
                   details.imageUrl = null;
                 }
 
-                const finalCleanArtistName = seedNamesMap[artistNormId] ||
+                const finalCleanArtistName =
+                  verifiedItunesArtistName ||
+                  (typeof details.details.artist === 'string' && details.details.artist.trim()) ||
+                  seedNamesMap[artistNormId] ||
                   seedNamesMap[normalizeArtistId(rawName)] ||
-                  details.details.artist ||
                   searchArtistName;
                 details.details.artist = finalCleanArtistName;
+                if (isSeedEntity && finalCleanArtistName) {
+                  seedNamesMap[artistNormId] = finalCleanArtistName;
+                  seedNamesMap[normalizeArtistId(rawName)] = finalCleanArtistName;
+                }
                 // Note: synthesisRationale is NOT stamped here. The real Root Breakdown is
                 // generated after all hydration completes (Step 4) and written back to the
                 // seed artist doc explicitly. Pre-stamping a stub would pollute the artist
@@ -2638,7 +2685,8 @@ export const processCurationJob = onDocumentCreated({
               cacheVersion: 4,
               [idFieldKey]: recNorm,
               cacheKey: cleanCanonicalId,
-              isDeep: true
+              isDeep: true,
+              ...(!isLabel && finalRecDetails?.details?.artist ? { seedArtists: finalRecDetails.details.artist } : {}),
             };
 
             if (matchingSeedNorm) {
@@ -2717,13 +2765,20 @@ export const processCurationJob = onDocumentCreated({
         }
 
         // Topology already rewritten and deduplicated in the pre-computation block before Step 5.
-        // Final Node Label Lock: Guarantee that seed nodes in the graph carry the clean display name
+        // Final Node Label Lock: Guarantee that artist nodes in the graph carry the canonical verified display name
         if (finalGraph && finalGraph.nodes && Array.isArray(finalGraph.nodes)) {
           finalGraph.nodes.forEach((node: any) => {
             if (node.type === 'artist' || !node.type) {
               const nodeNorm = normalizeArtistId(node.id);
               const canonical = resolvedSeedNormMap.get(nodeNorm) ?? nodeNorm;
-              const cleanName = seedNamesMap[canonical] || seedNamesMap[nodeNorm] || seedNamesMap[node.id];
+              const detailsEntry = detailsCacheEntries.find(
+                (entry: any) => entry[0] === node.id || entry[0] === canonical || isEntitySeedMatch(nodeNorm, entry[0])
+              );
+              const hydratedArtistName =
+                typeof detailsEntry?.[1]?.details?.artist === 'string' && detailsEntry[1].details.artist.trim()
+                  ? detailsEntry[1].details.artist.trim()
+                  : null;
+              const cleanName = hydratedArtistName || seedNamesMap[canonical] || seedNamesMap[nodeNorm] || seedNamesMap[node.id];
               if (cleanName) {
                 node.label = cleanName;
               }

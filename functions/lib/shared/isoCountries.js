@@ -9,6 +9,7 @@
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.shouldAdoptCanonicalSlugCandidate = exports.inferNodeOriginsFromCountryLinks = exports.inspectSlugDedupAmbiguity = exports.canonicalizeArtistSlugWithOrigin = exports.canonicalizeEntitySlugWithCountry = exports.isCanonicalCountrySlugOrCode = exports.areCountryIsosCompatible = exports.doesOriginMatchExpectedIso = exports.stripCountrySlug = exports.extractTrailingCountryIso = exports.resolveExpectedOriginIsos = exports.normalizeIsoCode = exports.extractAllOriginIsos = exports.extractCountrySlug = exports.COUNTRY_ISO_MAP = exports.ISO_TO_COUNTRY_NAME = void 0;
+exports.stripLeadingTheFromSlug = stripLeadingTheFromSlug;
 exports.isEntitySeedMatch = isEntitySeedMatch;
 exports.ISO_TO_COUNTRY_NAME = {
     ad: 'Andorra',
@@ -957,6 +958,19 @@ const normalizeEntitySlugInternal = (name) => {
         .substring(0, 256);
 };
 /**
+ * Strips a leading `"the-"` article from a normalized lowercase slug (e.g. `"the-murder-city-devils"` -> `"murder-city-devils"`),
+ * protecting `"the-the"` -> `"the-the"` and short 1-2 character slugs so `"The The"` never collides with `"The"`.
+ */
+function stripLeadingTheFromSlug(slug) {
+    if (!slug || typeof slug !== 'string')
+        return '';
+    const trimmed = slug.trim();
+    if (!trimmed.toLowerCase().startsWith('the-'))
+        return trimmed;
+    const rest = trimmed.slice(4);
+    return rest.length >= 3 && rest.toLowerCase() !== 'the' ? rest : trimmed;
+}
+/**
  * Robust matching helper to reconcile disambiguated seed strings (e.g., "vein-fm-us", "klear-th")
  * with canonical AI node IDs, bare names, or search queries (e.g., "vein-fm", "klear").
  *
@@ -976,6 +990,8 @@ function isEntitySeedMatch(seedNorm, candidateNorm) {
         return true;
     const strippedS = (0, exports.stripCountrySlug)(rawS);
     const strippedC = (0, exports.stripCountrySlug)(rawC);
+    const noTheS = stripLeadingTheFromSlug(strippedS);
+    const noTheC = stripLeadingTheFromSlug(strippedC);
     // Base-to-Suffixed ISO Parity Inoculation ([Rule 2], [Rule 36]):
     // If one is literally the country-suffixed version of the other base slug
     // (e.g. rawC="vein-fm-us" and rawS="vein-fm", or rawC="end-it-us" and rawS="end-it"),
@@ -989,6 +1005,8 @@ function isEntitySeedMatch(seedNorm, candidateNorm) {
         return false;
     }
     if (strippedS === strippedC)
+        return true;
+    if (noTheS && noTheC && noTheS === noTheC)
         return true;
     if (strippedS.startsWith(`${strippedC}-`) || strippedC.startsWith(`${strippedS}-`))
         return true;

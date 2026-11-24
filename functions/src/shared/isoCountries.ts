@@ -994,6 +994,18 @@ const normalizeEntitySlugInternal = (name: string): string => {
 };
 
 /**
+ * Strips a leading `"the-"` article from a normalized lowercase slug (e.g. `"the-murder-city-devils"` -> `"murder-city-devils"`),
+ * protecting `"the-the"` -> `"the-the"` and short 1-2 character slugs so `"The The"` never collides with `"The"`.
+ */
+export function stripLeadingTheFromSlug(slug?: string | null): string {
+  if (!slug || typeof slug !== 'string') return '';
+  const trimmed = slug.trim();
+  if (!trimmed.toLowerCase().startsWith('the-')) return trimmed;
+  const rest = trimmed.slice(4);
+  return rest.length >= 3 && rest.toLowerCase() !== 'the' ? rest : trimmed;
+}
+
+/**
  * Robust matching helper to reconcile disambiguated seed strings (e.g., "vein-fm-us", "klear-th")
  * with canonical AI node IDs, bare names, or search queries (e.g., "vein-fm", "klear").
  *
@@ -1012,6 +1024,8 @@ export function isEntitySeedMatch(seedNorm: string, candidateNorm: string): bool
 
   const strippedS = stripCountrySlug(rawS);
   const strippedC = stripCountrySlug(rawC);
+  const noTheS = stripLeadingTheFromSlug(strippedS);
+  const noTheC = stripLeadingTheFromSlug(strippedC);
 
   // Base-to-Suffixed ISO Parity Inoculation ([Rule 2], [Rule 36]):
   // If one is literally the country-suffixed version of the other base slug
@@ -1028,6 +1042,7 @@ export function isEntitySeedMatch(seedNorm: string, candidateNorm: string): bool
   }
 
   if (strippedS === strippedC) return true;
+  if (noTheS && noTheC && noTheS === noTheC) return true;
   if (strippedS.startsWith(`${strippedC}-`) || strippedC.startsWith(`${strippedS}-`)) return true;
   if (
     strippedS.includes(`-${strippedC}-`) ||
