@@ -5285,6 +5285,9 @@ const App: React.FC = () => {
         }));
 
         // Phase 1.5: Pre-Flight Flash Lookup running concurrently inside ConsolidatedValidationModal
+        const isMultiSceneOverarching = (scenesRef.current || []).filter(
+          s => (s.sceneId || s.id) !== lockedTargetSceneId && (s.graphData?.nodes?.length ?? 0) > 0
+        ).length >= 1;
         const uncachedSeeds = initialModalSeeds.filter(s => s.isVerifyingOrigin);
         if (!skipCacheLookup && uncachedSeeds.length > 0) {
           (async () => {
@@ -5438,9 +5441,6 @@ const App: React.FC = () => {
           })();
         }
 
-        const isMultiSceneOverarching = (scenesRef.current || []).filter(
-          s => (s.sceneId || s.id) !== lockedTargetSceneId && (s.graphData?.nodes?.length ?? 0) > 0
-        ).length >= 1;
         const allSeedsTopologyCached = cacheCandidatesPerSeed.length > 0 && cacheCandidatesPerSeed.every(s => s.isTopologyHit);
 
         let calculatedExpectedSpeed = classifyCurationSpeed({

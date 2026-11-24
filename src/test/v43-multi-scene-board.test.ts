@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
 import {
@@ -44,7 +44,7 @@ import {
   SCENE_MULTI_SEED_MAX_DX,
   SCENE_MULTI_SEED_CENTROID_MAX_D,
 } from '../../shared/multiSceneUtils';
-import { normalizeArtistId, normalizeLabelId, normalizeGraphData, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList, getProjectDisplayTitle } from '../../services/artistCacheService';
+import { normalizeArtistId, normalizeLabelId, normalizeGraphData, stripCountrySlug, cleanArtistDisplayName, isNodeInSeedList, getProjectDisplayTitle, getEntityDocWithRedirect } from '../../services/artistCacheService';
 import { TOKEN_PRICING, computeBaseProjectTokenCost } from '../../shared/tokenEconomy';
 import { sanitizeDiscoveryFilters, hasActiveDiscoveryFilters } from '../../services/cacheQualification';
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
@@ -5087,6 +5087,80 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       const appSrc = fs.readFileSync(path.resolve(__dirname, '../../App.tsx'), 'utf-8');
       expect(appSrc).toContain('buildBaseProjectPayload({ preserveCuratedScenesOnly: projectStatus !== \'curating\' })');
       expect(appSrc).toContain('(options?.preserveCuratedScenesOnly && curatedScenes.length > 0) ? curatedScenes : scenesRef.current');
+    });
+
+    it('V47.16 P1.1: getEntityDocWithRedirect enforces origin/target compatibility gate on bare-ID fallbacks and honors allowBareFallback: false', async () => {
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        // 1. Compatible bare fallback: korn-us -> miss -> korn (redirectTo -> korn-us, stringified JSON detailsCache)
+        if (url === '/api/artist/korn-us') {
+          return { ok: true, status: 200, json: async () => ({ found: false }) } as any;
+        }
+        if (url === '/api/artist/korn') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              cacheKey: 'korn-us',
+              detailsCache: JSON.stringify({ details: { origin: 'Bakersfield, California, USA' } }),
+            }),
+          } as any;
+        }
+        // 2. Conflicting ISO fallback: nirvana-gb -> miss -> nirvana (resolves to nirvana-us with US origin)
+        if (url === '/api/artist/nirvana-gb') {
+          return { ok: true, status: 200, json: async () => ({ found: false }) } as any;
+        }
+        if (url === '/api/artist/nirvana') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              cacheKey: 'nirvana-us',
+              detailsCache: { details: { origin: 'Aberdeen, Washington, USA' } },
+            }),
+          } as any;
+        }
+        // 3. Bare band slug ending in 2-letter ISO code: end-it -> miss -> end (resolves to end-us with US origin, malformed detailsCache string safe)
+        if (url === '/api/artist/end-it') {
+          return { ok: true, status: 200, json: async () => ({ found: false }) } as any;
+        }
+        if (url === '/api/artist/end') {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              cacheKey: 'end-us',
+              origin: 'New Jersey, USA',
+              detailsCache: '{malformed-json',
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ found: false }) } as any;
+      });
+
+      try {
+        // Case 1: Valid bare-ID fallback (korn-us -> korn with compatible US origin/target) succeeds
+        const kornSnap = await getEntityDocWithRedirect('korn-us', 'artist');
+        expect(kornSnap.exists()).toBe(true);
+        expect(kornSnap.id).toBe('korn-us');
+
+        // Case 2A: Conflicting ISO fallback (nirvana-gb -> nirvana / nirvana-us) is rejected
+        const nirvanaGbSnap = await getEntityDocWithRedirect('nirvana-gb', 'artist');
+        expect(nirvanaGbSnap.exists()).toBe(false);
+
+        // Case 2B: Bare band slug ending in -it (end-it -> end / end-us) is rejected (and malformed detailsCache does not throw)
+        const endItSnap = await getEntityDocWithRedirect('end-it', 'artist');
+        expect(endItSnap.exists()).toBe(false);
+
+        // Case 3: { allowBareFallback: false } skips bare-ID fallback completely (only 1 fetch call)
+        fetchSpy.mockClear();
+        const noFallbackSnap = await getEntityDocWithRedirect('korn-us', 'artist', 0, { allowBareFallback: false });
+        expect(noFallbackSnap.exists()).toBe(false);
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        expect(fetchSpy).toHaveBeenCalledWith('/api/artist/korn-us');
+      } finally {
+        fetchSpy.mockRestore();
+      }
     });
   });
 });
