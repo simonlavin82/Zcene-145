@@ -50,6 +50,7 @@ import { sanitizeDiscoveryFilters, hasActiveDiscoveryFilters } from '../../servi
 import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature } from '../../utils/projectHydrationFingerprint';
 import { BACKEND_REGRESSION_RUNBOOK } from '../../docs/backend-regression-runbook';
 import { ARCHITECTURE_RULES } from '../../components/EnginePage';
+import { getArtistDisplayName } from '../../components/DetailsPanel';
 import { computeRestingLinkOpacity } from '../../components/MusicGraph';
 import {
   applyShareBlacklistMutation,
@@ -5161,6 +5162,41 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       } finally {
         fetchSpy.mockRestore();
       }
+    });
+
+    it('V47.16 P1.1: cleanArtistDisplayName and getArtistDisplayName preserve hyphenated display names ("At the Drive-In", "Lo-Fi") while stripping explicit country suffixes', () => {
+      expect(cleanArtistDisplayName('At the Drive-In')).toBe('At the Drive-In');
+      expect(cleanArtistDisplayName('At the Drive-In United States')).toBe('At the Drive-In');
+      expect(cleanArtistDisplayName('at-the-drive-in-us')).toBe('At The Drive In');
+      expect(
+        cleanArtistDisplayName('at-the-drive-in-us', [
+          { id: 'scene-1::at-the-drive-in-us', canonicalId: 'at-the-drive-in-us', label: 'At the Drive-In', type: 'artist', group: 1 } as any,
+        ])
+      ).toBe('At the Drive-In');
+      expect(cleanArtistDisplayName('Against Me!')).toBe('Against Me!');
+      expect(cleanArtistDisplayName('End It')).toBe('End It');
+      expect(cleanArtistDisplayName('Lo-Fi')).toBe('Lo-Fi');
+      expect(cleanArtistDisplayName('Vein.fm')).toBe('Vein.fm');
+      expect(cleanArtistDisplayName('Klear - TH')).toBe('Klear');
+      expect(cleanArtistDisplayName('Buggin United States')).toBe('Buggin');
+
+      const atdiNode = {
+        id: 'scene-1::at-the-drive-in-us',
+        canonicalId: 'at-the-drive-in-us',
+        label: 'At the Drive-In',
+        type: 'artist',
+        group: 1,
+      };
+      const atdiDetails = {
+        details: {
+          artist: 'At the Drive-In',
+          genre: 'Post-Hardcore',
+          origin: 'El Paso, Texas, United States',
+          founded: '1994',
+        },
+      };
+      expect(getArtistDisplayName(atdiDetails, atdiNode)).toBe('At the Drive-In');
+      expect(getArtistDisplayName(null, atdiNode)).toBe('At the Drive-In');
     });
   });
 });

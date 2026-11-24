@@ -596,7 +596,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       expect(engineContent).toContain('48 Laws');
       expect(engineContent).toContain('V47.16 Full-Stack Regression Runbook');
       expect(runbookContent).toContain('# V47.16 Regression Suite (Full-Stack)');
-      expect(runbookContent).toContain('28 test suites (616 unit/integration tests)');
+      expect(runbookContent).toContain('28 test suites (617 unit/integration tests)');
       expect(runbookContent).not.toContain('583 unit/integration tests');
       expect(runbookContent).not.toContain('599 unit/integration tests');
       expect(runbookContent).not.toContain('604 unit/integration tests');

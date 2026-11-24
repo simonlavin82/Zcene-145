@@ -293,8 +293,9 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
 
   // 1. Strip hyphen/underscore country routing suffixes via the unified 249-country ISO registry
   let cleaned = stripCountrySlug(trimmed);
-  if (cleaned === trimmed) {
-    // Also check spaced full-word country routing suffixes (e.g. "Buggin United States", "Klear Thailand", "Klear - TH")
+  const didStripSlugSuffix = cleaned !== trimmed;
+  if (!didStripSlugSuffix) {
+    // Also check spaced full-word country routing suffixes (e.g. "Buggin United States", "Klear Thailand", "Klear - TH", "At the Drive-In United States")
     const spaced = trimmed.replace(/[-_]+/g, ' ').trim();
     const lowerSpaced = spaced.toLowerCase();
     const lowerTrimmed = trimmed.toLowerCase();
@@ -307,14 +308,22 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
 
     for (const suffix of fullCountryNames) {
       if (lowerSpaced.endsWith(` ${suffix}`)) {
-        // BOUNDARY CHECK: Prevent erroneously stripping short words like "It" from normal titles like "End It"
+        // BOUNDARY CHECK: Short ISO/country codes (<= 3 chars, e.g. "TH", "US", "UK", "IN", "IT", "FI", "ME")
+        // on display names are ONLY stripped when separated by an explicit spaced dash delimiter (" - XX", e.g. "Klear - TH"),
+        // never when attached as a hyphenated title word ("At the Drive-In", "Lo-Fi") or normal title word ("End It", "As It Is").
+        // Canonical lowercase slugs ("at-the-drive-in-us", "klear-th") are already handled by stripCountrySlug above.
         const isShortCode = suffix.length <= 3;
-        const originalEndsWithHyphenSuffix =
-          lowerTrimmed.endsWith(`-${suffix}`) ||
-          lowerTrimmed.endsWith(`_${suffix}`) ||
-          lowerTrimmed.endsWith(` - ${suffix}`);
-        if (isShortCode && !originalEndsWithHyphenSuffix) {
+        const hasExplicitSpacedDashSuffix = lowerTrimmed.endsWith(` - ${suffix}`);
+        if (isShortCode && !hasExplicitSpacedDashSuffix) {
           continue;
+        }
+        // Preserve internal hyphens (e.g. "At the Drive-In United States" -> "At the Drive-In")
+        const escapedSuffix = suffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '[\\s\\-_]+');
+        const trailingRe = new RegExp(`(?:\\s+-\\s+|[\\s\\-_]+)${escapedSuffix}$`, 'i');
+        const baseOriginal = trimmed.replace(trailingRe, '').trim();
+        if (baseOriginal.length > 0 && baseOriginal !== trimmed) {
+          cleaned = baseOriginal;
+          break;
         }
         const suffixLen = suffix.length;
         const baseSpaced = spaced.slice(0, spaced.length - suffixLen).trim().replace(/[-_]$/, '').trim();
@@ -334,14 +343,14 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
     }
   }
 
-  // If the result contains kebab-case or snake-case slug delimiters (and is a raw slug rather than a human display name with spaces or mixed case), format it
+  // Format raw lowercase slugs or slug inputs that had a country suffix stripped, while preserving mixed-case human display names (including internal hyphens like "At the Drive-In" and "Lo-Fi")
   const isRawSlug = !/\s/.test(cleaned) && cleaned === cleaned.toLowerCase();
-  if ((cleaned.includes('-') || cleaned.includes('_')) && (isRawSlug || cleaned !== trimmed)) {
-    return titleCaseArtistId(cleaned);
-  }
-
-  // If a country routing suffix was stripped or the string is purely lowercase, title-case it so raw slugs do not leak
-  if (cleaned !== trimmed || (cleaned === cleaned.toLowerCase() && /[a-z]/.test(cleaned))) {
+  const wasSlugWithoutSpaces = !/\s/.test(trimmed) && didStripSlugSuffix;
+  if (
+    isRawSlug ||
+    wasSlugWithoutSpaces ||
+    (cleaned === cleaned.toLowerCase() && /[a-z]/.test(cleaned))
+  ) {
     return titleCaseArtistId(cleaned);
   }
 
