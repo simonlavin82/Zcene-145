@@ -125,10 +125,11 @@ export async function resolveSceneTopologyBackend(
 
   for (const seed of artistList) {
      const seedNorm = normalizeArtistId(seed);
-     const strippedSeed = stripIsoCountrySlug(seedNorm);
-     const hintCountry = (disambiguationHints && (disambiguationHints[seedNorm] || disambiguationHints[strippedSeed] || disambiguationHints[seed])) || null;
-     const hintGenre = (disambiguationGenres && (disambiguationGenres[seedNorm] || disambiguationGenres[strippedSeed] || disambiguationGenres[seed])) || null;
-     const expectedSeedIso = (hintCountry ? normalizeIsoCode(extractCountrySlug(hintCountry)) : null) || extractTrailingCountryIso(seedNorm);
+     const preliminaryBare = normalizeArtistId(stripIsoCountrySlug(seed));
+     const hintCountry = (disambiguationHints && (disambiguationHints[seedNorm] || disambiguationHints[preliminaryBare] || disambiguationHints[seed])) || null;
+     const strippedSeed = normalizeArtistId(stripIsoCountrySlug(seed, hintCountry));
+     const hintGenre = (disambiguationGenres && (disambiguationGenres[seedNorm] || disambiguationGenres[strippedSeed] || disambiguationGenres[preliminaryBare] || disambiguationGenres[seed])) || null;
+     const expectedSeedIso = (hintCountry ? normalizeIsoCode(extractCountrySlug(hintCountry)) : null) || extractTrailingCountryIso(seed);
      let cachedDetails: any = null;
 
      let resolvedSeedNorm = seedNorm;
@@ -161,7 +162,7 @@ export async function resolveSceneTopologyBackend(
         console.warn(`[resolveSceneTopologyBackend] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
       }
 
-      const canonicalBareId = stripIsoCountrySlug(resolvedSeedNorm);
+      const canonicalBareId = stripIsoCountrySlug(resolvedSeedNorm, expectedSeedIso || hintCountry);
       if (canonicalBareId && canonicalBareId !== resolvedSeedNorm && (!expectedSeedIso || areCountryIsosCompatible(expectedSeedIso, extractTrailingCountryIso(resolvedSeedNorm)))) {
           await upsertBareRouterStub(db, canonicalBareId, resolvedSeedNorm, {
               name: seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seed,

@@ -11,7 +11,7 @@ import {
   ZineEditorialImageEntry,
   OverarchingHistoryEntry,
 } from '../types';
-import { stripCountrySlug } from './isoCountries';
+import { stripCountrySlug, extractTrailingCountryIso, areCountryIsosCompatible } from './isoCountries';
 
 export const SCENE_BASE_CENTER_X = 1000;
 export const SCENE_BASE_CENTER_Y = 1000;
@@ -276,18 +276,30 @@ export function toSeedArtistsString(raw: unknown): string {
 
 export function isCanonicalSeedMatch(nodeIdOrLabel: string, seedList: string[]): boolean {
   if (!nodeIdOrLabel || !Array.isArray(seedList) || seedList.length === 0) return false;
-  const targetNorm = normalizeCanonicalEntityId(nodeIdOrLabel);
-  const targetBare = stripCountrySlug(targetNorm);
+  const cleanTarget = stripSceneNamespace(nodeIdOrLabel).trim();
+  const targetNorm = normalizeCanonicalEntityId(cleanTarget);
+  const targetBare = normalizeCanonicalEntityId(stripCountrySlug(cleanTarget));
+  const targetIso = extractTrailingCountryIso(cleanTarget);
   if (!targetNorm) return false;
 
   return seedList.some((seed) => {
-    const seedNorm = normalizeCanonicalEntityId(seed);
-    const seedBare = stripCountrySlug(seedNorm);
+    if (!seed) return false;
+    const cleanSeed = stripSceneNamespace(seed).trim();
+    const seedNorm = normalizeCanonicalEntityId(cleanSeed);
+    const seedBare = normalizeCanonicalEntityId(stripCountrySlug(cleanSeed));
+    const seedIso = extractTrailingCountryIso(cleanSeed);
     if (!seedNorm) return false;
-    return (
-      targetNorm === seedNorm ||
-      (targetBare && seedBare && targetBare === seedBare)
-    );
+    if (targetNorm === seedNorm) return true;
+    if (
+      (targetBare && targetBare === seedNorm && targetNorm.length > seedNorm.length) ||
+      (seedBare && seedBare === targetNorm && seedNorm.length > targetNorm.length)
+    ) {
+      return true;
+    }
+    if (targetIso && seedIso && !areCountryIsosCompatible(targetIso, seedIso)) {
+      return false;
+    }
+    return Boolean(targetBare) && Boolean(seedBare) && targetBare === seedBare;
   });
 }
 

@@ -48,10 +48,11 @@ async function resolveSceneTopologyBackend(params) {
     const cachedDocsData = {};
     for (const seed of artistList) {
         const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
-        const strippedSeed = (0, isoCountries_1.stripCountrySlug)(seedNorm);
-        const hintCountry = (disambiguationHints && (disambiguationHints[seedNorm] || disambiguationHints[strippedSeed] || disambiguationHints[seed])) || null;
-        const hintGenre = (disambiguationGenres && (disambiguationGenres[seedNorm] || disambiguationGenres[strippedSeed] || disambiguationGenres[seed])) || null;
-        const expectedSeedIso = (hintCountry ? (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(hintCountry)) : null) || (0, isoCountries_1.extractTrailingCountryIso)(seedNorm);
+        const preliminaryBare = (0, curatorService_1.normalizeArtistId)((0, isoCountries_1.stripCountrySlug)(seed));
+        const hintCountry = (disambiguationHints && (disambiguationHints[seedNorm] || disambiguationHints[preliminaryBare] || disambiguationHints[seed])) || null;
+        const strippedSeed = (0, curatorService_1.normalizeArtistId)((0, isoCountries_1.stripCountrySlug)(seed, hintCountry));
+        const hintGenre = (disambiguationGenres && (disambiguationGenres[seedNorm] || disambiguationGenres[strippedSeed] || disambiguationGenres[preliminaryBare] || disambiguationGenres[seed])) || null;
+        const expectedSeedIso = (hintCountry ? (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(hintCountry)) : null) || (0, isoCountries_1.extractTrailingCountryIso)(seed);
         let cachedDetails = null;
         let resolvedSeedNorm = seedNorm;
         try {
@@ -80,7 +81,7 @@ async function resolveSceneTopologyBackend(params) {
         catch (dedupErr) {
             console.warn(`[resolveSceneTopologyBackend] Seed slug dedup query failed for "${seedNorm}", proceeding with derived ID:`, dedupErr);
         }
-        const canonicalBareId = (0, isoCountries_1.stripCountrySlug)(resolvedSeedNorm);
+        const canonicalBareId = (0, isoCountries_1.stripCountrySlug)(resolvedSeedNorm, expectedSeedIso || hintCountry);
         if (canonicalBareId && canonicalBareId !== resolvedSeedNorm && (!expectedSeedIso || (0, isoCountries_1.areCountryIsosCompatible)(expectedSeedIso, (0, isoCountries_1.extractTrailingCountryIso)(resolvedSeedNorm)))) {
             await (0, routerStubService_1.upsertBareRouterStub)(db, canonicalBareId, resolvedSeedNorm, {
                 name: seedNamesMap[resolvedSeedNorm] || seedNamesMap[seedNorm] || seed,

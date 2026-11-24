@@ -634,7 +634,7 @@ const tokenEconomy_1 = require("../shared/tokenEconomy");
             (0, vitest_1.expect)(isIntermediateChainedHop3).toBe(false);
             (0, vitest_1.expect)(remainingUncuratedHop3.length).toBe(0);
         });
-        (0, vitest_1.it)('cleanses foregroundApiUsage, lockedSeeds, and seedStubs when constructing chained job inputPayload (Guard 1)', () => {
+        (0, vitest_1.it)('cleanses foregroundApiUsage, lockedSeeds, seedStubs, and duplicate existingDetailsCache when constructing chained job inputPayload (Guard 1 & V47.16 P2.6)', () => {
             const mockInputPayload = {
                 projectId: 'proj-123',
                 userId: 'user-456',
@@ -642,16 +642,20 @@ const tokenEconomy_1 = require("../shared/tokenEconomy");
                 foregroundApiUsage: { 'gemini-3.1-pro-preview': { prompt: 1000, candidates: 200, total: 1200 } },
                 lockedSeeds: [{ id: 'korn-us', label: 'Korn' }],
                 seedStubs: { korn: { id: 'korn-us' } },
+                detailsCache: '[["korn-us",{"summary":"old"}]]',
+                existingDetailsCache: '[["korn-us",{"summary":"old"}]]',
                 tokensSpent: 15,
                 targetSceneId: 'scene-1',
             };
-            const { foregroundApiUsage: _fa, lockedSeeds: _ls, seedStubs: _ss, ...cleanInputPayload } = mockInputPayload;
+            const { foregroundApiUsage: _fa, lockedSeeds: _ls, seedStubs: _ss, detailsCache: _dc, existingDetailsCache: _edc, ...cleanInputPayload } = mockInputPayload;
             (0, vitest_1.expect)(cleanInputPayload.foregroundApiUsage).toBeUndefined();
             (0, vitest_1.expect)(cleanInputPayload.lockedSeeds).toBeUndefined();
             (0, vitest_1.expect)(cleanInputPayload.seedStubs).toBeUndefined();
+            (0, vitest_1.expect)(cleanInputPayload.detailsCache).toBeUndefined();
+            (0, vitest_1.expect)(cleanInputPayload.existingDetailsCache).toBeUndefined();
             (0, vitest_1.expect)(cleanInputPayload.projectId).toBe('proj-123');
             (0, vitest_1.expect)(cleanInputPayload.userId).toBe('user-456');
-            // Firestore nextJobRef inputPayload shape
+            // Firestore nextJobRef inputPayload shape (serializes detailsCache once, never existingDetailsCache)
             const nextHopInputPayload = {
                 ...cleanInputPayload,
                 targetSceneId: 'scene-2',
@@ -662,9 +666,12 @@ const tokenEconomy_1 = require("../shared/tokenEconomy");
                 tokensSpent: 0,
                 seedStubs: {},
                 baseGraph: { nodes: [], links: [] },
+                detailsCache: '[["korn-us",{"summary":"updated"}]]',
             };
             (0, vitest_1.expect)(nextHopInputPayload.foregroundApiUsage).toBeUndefined();
             (0, vitest_1.expect)(nextHopInputPayload.lockedSeeds).toBeUndefined();
+            (0, vitest_1.expect)(nextHopInputPayload.existingDetailsCache).toBeUndefined();
+            (0, vitest_1.expect)(nextHopInputPayload.detailsCache).toBe('[["korn-us",{"summary":"updated"}]]');
             (0, vitest_1.expect)(nextHopInputPayload.tokensSpent).toBe(0);
             (0, vitest_1.expect)(nextHopInputPayload.isChainedHop).toBe(true);
             (0, vitest_1.expect)(Object.keys(nextHopInputPayload.seedStubs)).toHaveLength(0);

@@ -12,6 +12,7 @@ import {
   scrapeImageUrlBackend,
   CURRENT_ITUNES_SCRAPE_VERSION,
   shouldRunRule38NotFoundUpgrade,
+  sanitizeTextOnlyDiscography,
   extractArtistSubGraph,
   validateSeedOriginBackend,
   extractCountrySlug,
@@ -363,6 +364,7 @@ export const processCurationJob = onDocumentCreated({
 
     let result: any = null;
     let nextChainedJobId: string | null = null;
+    let didRunSelfContainedPhase1 = false;
     let existingProjectCanvasLayout: any[] | undefined;
     if (inputPayload?.canvasLayout) {
       try {
@@ -785,14 +787,14 @@ export const processCurationJob = onDocumentCreated({
         const getSeedLock = (idOrName: string): { origin: string | null; countryIso: string | null; genre: string | null } | null => {
           if (!idOrName) return null;
           const norm = normalizeArtistId(idOrName);
-          const bare = stripCountrySlug(norm);
+          const bare = normalizeArtistId(stripCountrySlug(idOrName));
           const direct = lockedSeedsMap[norm] || lockedSeedsMap[bare] || lockedSeedsMap[idOrName];
           const stub = seedStubsMap[norm] || seedStubsMap[bare];
           const hintOrigin = direct?.origin || disambigHintsMap[norm] || disambigHintsMap[bare] || disambigHintsMap[idOrName] || stub?.details?.origin || null;
           const cleanOrigin = hintOrigin && hintOrigin !== 'Unknown' ? String(hintOrigin) : null;
           const hintGenre = direct?.genre || disambigGenresMap[norm] || disambigGenresMap[bare] || disambigGenresMap[idOrName] || stub?.details?.genre || null;
           const cleanGenre = hintGenre && hintGenre !== 'Unknown' ? String(hintGenre) : null;
-          const countryIso = direct?.countryIso || extractTrailingCountryIso(norm) || (cleanOrigin ? normalizeIsoCode(extractCountrySlug(cleanOrigin)) : null);
+          const countryIso = direct?.countryIso || extractTrailingCountryIso(idOrName) || (cleanOrigin ? normalizeIsoCode(extractCountrySlug(cleanOrigin)) : null);
           if (!cleanOrigin && !countryIso && !cleanGenre) return null;
           return { origin: cleanOrigin, countryIso, genre: cleanGenre };
         };
@@ -814,8 +816,9 @@ export const processCurationJob = onDocumentCreated({
         const resolvedSeedNormMap = new Map<string, string>();
         for (const seed of artistList) {
           const seedNorm = normalizeArtistId(seed);
-          const strippedSeed = stripCountrySlug(seedNorm);
-          const expectedSeedIso = getSeedLock(seed)?.countryIso || extractTrailingCountryIso(seedNorm);
+          const seedLock = getSeedLock(seed);
+          const expectedSeedIso = seedLock?.countryIso || extractTrailingCountryIso(seed);
+          const strippedSeed = normalizeArtistId(stripCountrySlug(seed, expectedSeedIso || seedLock?.origin));
           let canonicalId = (seedNorm === strippedSeed && expectedSeedIso) ? (strippedSeed + '-' + expectedSeedIso) : seedNorm;
           try {
             const dedupQuery = await db.collection('artists')
@@ -931,6 +934,7 @@ export const processCurationJob = onDocumentCreated({
         // generate Phase 1 topology right here inside the worker.
         let finalGraph = inputPayload.baseGraph;
         if (!finalGraph || !Array.isArray(finalGraph.nodes) || finalGraph.nodes.length === 0) {
+          didRunSelfContainedPhase1 = true;
           console.log(`[Curation Backend] [Phase 1 Self-Contained] Generating Phase 1 topology inside worker for scene ${targetSceneId}...`);
           const topoResult = await resolveSceneTopologyBackend({
             db,
@@ -1084,7 +1088,7 @@ export const processCurationJob = onDocumentCreated({
 
               if (!isLabel) {
                 try {
-                  const baseNormId = normalizeArtistId(stripCountrySlug(rawName)); // without country suffix
+                  const baseNormId = normalizeArtistId(stripCountrySlug(rawName, expectedNodeIso || resolvedOriginHint)); // without country suffix
                   const existingQuery = await db.collection("artists")
                     .where("artistId", ">=", baseNormId)
                     .where("artistId", "<=", baseNormId + "\uf8ff")
@@ -1194,7 +1198,7 @@ export const processCurationJob = onDocumentCreated({
               // Extract clean human-readable name for APIs by prioritizing seedNamesMap, then stripping known country slugs
               let searchArtistName = seedNamesMap[artistNormId] ||
                 seedNamesMap[normalizeArtistId(rawName)] ||
-                stripCountrySlug(rawName);
+                stripCountrySlug(rawName, expectedNodeIso || resolvedOriginHint);
 
               if (details && details.details && details.details.artist && details.details.artist !== rawName) {
                 searchArtistName = seedNamesMap[artistNormId] || details.details.artist;
@@ -1313,17 +1317,21 @@ export const processCurationJob = onDocumentCreated({
                       }
                       details.itunesScrapeVersion = CURRENT_ITUNES_SCRAPE_VERSION;
                     } else {
-                      // ⚠️ STRICT FAIL-FAST RULE & TIER 4 QUARANTINE (Rule 38):
-                      console.warn(`[Image Scraper / Rule 38] No verified image for ${searchArtistName}. Setting not-found and quarantining discography to [].`);
+                      // ⚠️ TIER 4 FALLBACK (Rule 38 V47.16): Preserve sanitized text-only discography stripped of iTunes IDs
+                      const preservedDiscography = Array.isArray(scrapeResult?.reconciledDiscography)
+                        ? scrapeResult.reconciledDiscography
+                        : sanitizeTextOnlyDiscography(details.discography);
+                      console.warn(`[Image Scraper / Rule 38] No verified image for ${searchArtistName}. Setting not-found and preserving ${preservedDiscography.length} text-only discography item(s).`);
                       details.imageUrl = 'not-found';
-                      details.discography = [];
+                      details.discography = preservedDiscography;
                       details.itunesArtistId = null;
                       details.itunesScrapeVersion = CURRENT_ITUNES_SCRAPE_VERSION;
                     }
                   } catch (e) {
-                    console.warn(`[Image Scraper / Rule 38] Timeout/Error for ${searchArtistName}. Enforcing fail-fast quarantine.`);
+                    console.warn(`[Image Scraper / Rule 38] Timeout/Error for ${searchArtistName}. Setting not-found and preserving sanitized text-only discography.`);
                     details.imageUrl = 'not-found';
-                    details.discography = [];
+                    details.discography = sanitizeTextOnlyDiscography(details.discography);
+                    details.itunesArtistId = null;
                   }
                 } else if (isLabel) {
                   details.imageUrl = null;
@@ -1822,7 +1830,7 @@ export const processCurationJob = onDocumentCreated({
                       id: canonCountryId,
                       type: 'country',
                       label: canonCountryName,
-                      group: node.group || 1
+                      group: 6
                     };
                     finalGraph.nodes.push(newCountryNode);
                     existingNodeMap.set(canonCountryId, newCountryNode);
@@ -1872,7 +1880,7 @@ export const processCurationJob = onDocumentCreated({
                     id: foundedNodeId,
                     type: 'founded',
                     label: foundedYear,
-                    group: node.group || 1
+                    group: 7
                   };
                   finalGraph.nodes.push(newFoundedNode);
                   existingNodeMap.set(foundedNodeId, newFoundedNode);
@@ -2947,7 +2955,13 @@ export const processCurationJob = onDocumentCreated({
             total: safeUsage.total || 0,
           };
         }
-      } else if (inputPayload?.mode !== 'overarching_only' && inputPayload?.generationType !== 'Direct Hit') {
+      } else if (
+        inputPayload?.mode !== 'overarching_only' &&
+        inputPayload?.generationType !== 'Direct Hit' &&
+        !didRunSelfContainedPhase1 &&
+        !inputPayload?.deferPhase1ToWorker &&
+        !inputPayload?.isChainedHop
+      ) {
         console.warn(`[Curation Backend] CRITICAL WARNING: inputPayload.foregroundApiUsage is empty or missing! Tokens dropped from Phase 1. Payload:`, inputPayload?.foregroundApiUsage);
       }
 
@@ -3092,6 +3106,8 @@ export const processCurationJob = onDocumentCreated({
           foregroundApiUsage: _fa,
           lockedSeeds: _ls,
           seedStubs: _ss,
+          detailsCache: _dc,
+          existingDetailsCache: _edc,
           ...cleanInputPayload
         } = inputPayload || {};
 
@@ -3113,7 +3129,6 @@ export const processCurationJob = onDocumentCreated({
             seedStubs: {},
             baseGraph: { nodes: [], links: [] },
             detailsCache: result.detailsCache,
-            existingDetailsCache: result.detailsCache,
           }
         });
         await refreshCurationLock(jobData.userId, inputPayload?.curationSessionId, nextChainedJobId);

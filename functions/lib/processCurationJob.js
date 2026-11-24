@@ -283,6 +283,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
         console.log(`[Curation Backend] Executing ${jobType} for user ${jobData.userId} with payload:`, inputPayload);
         let result = null;
         let nextChainedJobId = null;
+        let didRunSelfContainedPhase1 = false;
         let existingProjectCanvasLayout;
         if (inputPayload?.canvasLayout) {
             try {
@@ -690,14 +691,14 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     if (!idOrName)
                         return null;
                     const norm = (0, curatorService_1.normalizeArtistId)(idOrName);
-                    const bare = (0, isoCountries_1.stripCountrySlug)(norm);
+                    const bare = (0, curatorService_1.normalizeArtistId)((0, isoCountries_1.stripCountrySlug)(idOrName));
                     const direct = lockedSeedsMap[norm] || lockedSeedsMap[bare] || lockedSeedsMap[idOrName];
                     const stub = seedStubsMap[norm] || seedStubsMap[bare];
                     const hintOrigin = direct?.origin || disambigHintsMap[norm] || disambigHintsMap[bare] || disambigHintsMap[idOrName] || stub?.details?.origin || null;
                     const cleanOrigin = hintOrigin && hintOrigin !== 'Unknown' ? String(hintOrigin) : null;
                     const hintGenre = direct?.genre || disambigGenresMap[norm] || disambigGenresMap[bare] || disambigGenresMap[idOrName] || stub?.details?.genre || null;
                     const cleanGenre = hintGenre && hintGenre !== 'Unknown' ? String(hintGenre) : null;
-                    const countryIso = direct?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(norm) || (cleanOrigin ? (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(cleanOrigin)) : null);
+                    const countryIso = direct?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(idOrName) || (cleanOrigin ? (0, isoCountries_1.normalizeIsoCode)((0, curatorService_1.extractCountrySlug)(cleanOrigin)) : null);
                     if (!cleanOrigin && !countryIso && !cleanGenre)
                         return null;
                     return { origin: cleanOrigin, countryIso, genre: cleanGenre };
@@ -716,8 +717,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 const resolvedSeedNormMap = new Map();
                 for (const seed of artistList) {
                     const seedNorm = (0, curatorService_1.normalizeArtistId)(seed);
-                    const strippedSeed = (0, isoCountries_1.stripCountrySlug)(seedNorm);
-                    const expectedSeedIso = getSeedLock(seed)?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(seedNorm);
+                    const seedLock = getSeedLock(seed);
+                    const expectedSeedIso = seedLock?.countryIso || (0, isoCountries_1.extractTrailingCountryIso)(seed);
+                    const strippedSeed = (0, curatorService_1.normalizeArtistId)((0, isoCountries_1.stripCountrySlug)(seed, expectedSeedIso || seedLock?.origin));
                     let canonicalId = (seedNorm === strippedSeed && expectedSeedIso) ? (strippedSeed + '-' + expectedSeedIso) : seedNorm;
                     try {
                         const dedupQuery = await db.collection('artists')
@@ -827,6 +829,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 // generate Phase 1 topology right here inside the worker.
                 let finalGraph = inputPayload.baseGraph;
                 if (!finalGraph || !Array.isArray(finalGraph.nodes) || finalGraph.nodes.length === 0) {
+                    didRunSelfContainedPhase1 = true;
                     console.log(`[Curation Backend] [Phase 1 Self-Contained] Generating Phase 1 topology inside worker for scene ${targetSceneId}...`);
                     const topoResult = await (0, executeCurationPipeline_1.resolveSceneTopologyBackend)({
                         db,
@@ -966,7 +969,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         const resolvedGenreHint = entitySeedLock?.genre || entityObj.genre || null;
                         if (!isLabel) {
                             try {
-                                const baseNormId = (0, curatorService_1.normalizeArtistId)((0, isoCountries_1.stripCountrySlug)(rawName)); // without country suffix
+                                const baseNormId = (0, curatorService_1.normalizeArtistId)((0, isoCountries_1.stripCountrySlug)(rawName, expectedNodeIso || resolvedOriginHint)); // without country suffix
                                 const existingQuery = await db.collection("artists")
                                     .where("artistId", ">=", baseNormId)
                                     .where("artistId", "<=", baseNormId + "\uf8ff")
@@ -1070,7 +1073,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         // Extract clean human-readable name for APIs by prioritizing seedNamesMap, then stripping known country slugs
                         let searchArtistName = seedNamesMap[artistNormId] ||
                             seedNamesMap[(0, curatorService_1.normalizeArtistId)(rawName)] ||
-                            (0, isoCountries_1.stripCountrySlug)(rawName);
+                            (0, isoCountries_1.stripCountrySlug)(rawName, expectedNodeIso || resolvedOriginHint);
                         if (details && details.details && details.details.artist && details.details.artist !== rawName) {
                             searchArtistName = seedNamesMap[artistNormId] || details.details.artist;
                         }
@@ -1176,18 +1179,22 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         details.itunesScrapeVersion = curatorService_1.CURRENT_ITUNES_SCRAPE_VERSION;
                                     }
                                     else {
-                                        // ⚠️ STRICT FAIL-FAST RULE & TIER 4 QUARANTINE (Rule 38):
-                                        console.warn(`[Image Scraper / Rule 38] No verified image for ${searchArtistName}. Setting not-found and quarantining discography to [].`);
+                                        // ⚠️ TIER 4 FALLBACK (Rule 38 V47.16): Preserve sanitized text-only discography stripped of iTunes IDs
+                                        const preservedDiscography = Array.isArray(scrapeResult?.reconciledDiscography)
+                                            ? scrapeResult.reconciledDiscography
+                                            : (0, curatorService_1.sanitizeTextOnlyDiscography)(details.discography);
+                                        console.warn(`[Image Scraper / Rule 38] No verified image for ${searchArtistName}. Setting not-found and preserving ${preservedDiscography.length} text-only discography item(s).`);
                                         details.imageUrl = 'not-found';
-                                        details.discography = [];
+                                        details.discography = preservedDiscography;
                                         details.itunesArtistId = null;
                                         details.itunesScrapeVersion = curatorService_1.CURRENT_ITUNES_SCRAPE_VERSION;
                                     }
                                 }
                                 catch (e) {
-                                    console.warn(`[Image Scraper / Rule 38] Timeout/Error for ${searchArtistName}. Enforcing fail-fast quarantine.`);
+                                    console.warn(`[Image Scraper / Rule 38] Timeout/Error for ${searchArtistName}. Setting not-found and preserving sanitized text-only discography.`);
                                     details.imageUrl = 'not-found';
-                                    details.discography = [];
+                                    details.discography = (0, curatorService_1.sanitizeTextOnlyDiscography)(details.discography);
+                                    details.itunesArtistId = null;
                                 }
                             }
                             else if (isLabel) {
@@ -1639,7 +1646,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                             id: canonCountryId,
                                             type: 'country',
                                             label: canonCountryName,
-                                            group: node.group || 1
+                                            group: 6
                                         };
                                         finalGraph.nodes.push(newCountryNode);
                                         existingNodeMap.set(canonCountryId, newCountryNode);
@@ -1684,7 +1691,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                         id: foundedNodeId,
                                         type: 'founded',
                                         label: foundedYear,
-                                        group: node.group || 1
+                                        group: 7
                                     };
                                     finalGraph.nodes.push(newFoundedNode);
                                     existingNodeMap.set(foundedNodeId, newFoundedNode);
@@ -2665,7 +2672,11 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     };
                 }
             }
-            else if (inputPayload?.mode !== 'overarching_only' && inputPayload?.generationType !== 'Direct Hit') {
+            else if (inputPayload?.mode !== 'overarching_only' &&
+                inputPayload?.generationType !== 'Direct Hit' &&
+                !didRunSelfContainedPhase1 &&
+                !inputPayload?.deferPhase1ToWorker &&
+                !inputPayload?.isChainedHop) {
                 console.warn(`[Curation Backend] CRITICAL WARNING: inputPayload.foregroundApiUsage is empty or missing! Tokens dropped from Phase 1. Payload:`, inputPayload?.foregroundApiUsage);
             }
             for (const [model, usage] of Object.entries(collectedTokens)) {
@@ -2794,7 +2805,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                 const nextScene = result.remainingUncuratedScenes[0];
                 const nextJobRef = db.collection("curationJobs").doc();
                 nextChainedJobId = nextJobRef.id;
-                const { foregroundApiUsage: _fa, lockedSeeds: _ls, seedStubs: _ss, ...cleanInputPayload } = inputPayload || {};
+                const { foregroundApiUsage: _fa, lockedSeeds: _ls, seedStubs: _ss, detailsCache: _dc, existingDetailsCache: _edc, ...cleanInputPayload } = inputPayload || {};
                 await nextJobRef.set({
                     status: "pending",
                     jobType: "graph_generation",
@@ -2813,7 +2824,6 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         seedStubs: {},
                         baseGraph: { nodes: [], links: [] },
                         detailsCache: result.detailsCache,
-                        existingDetailsCache: result.detailsCache,
                     }
                 });
                 await (0, tokenWallet_1.refreshCurationLock)(jobData.userId, inputPayload?.curationSessionId, nextChainedJobId);

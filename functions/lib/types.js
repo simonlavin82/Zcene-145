@@ -110,7 +110,7 @@ exports.CANONICAL_STYLE_TAXONOMY = {
     ],
     'Scene & Era Modifiers': [
         'Midwest', 'Revival', 'Old School', 'Modern', 'First-Wave',
-        'Second-Wave', 'Post-', 'Proto-', 'Contemporary', 'Traditional',
+        'Second-Wave', 'Contemporary', 'Traditional',
         'Underground', 'Mainstream'
     ]
 };

@@ -7,6 +7,7 @@ import {
   normalizeLabelId, 
   titleCaseArtistId,
   scrapeImageUrlBackend,
+  sanitizeTextOnlyDiscography,
   fetchNodeDetailsBackend,
   UsageCollector
 } from "./services/curatorService";
@@ -228,14 +229,16 @@ export const healOrphanedAsset = onCall({
             synthesizedDetails.itunesArtistId = scrapeResult.itunesArtistId;
           }
         } else {
-          // Tier 4 Reject & Discography Quarantine (Rule 38)
+          // Tier 4 Reject & Text-Only Discography Preservation (Rule 38 V47.16)
           synthesizedDetails.imageUrl = 'not-found';
-          synthesizedDetails.discography = [];
+          synthesizedDetails.discography = Array.isArray(scrapeResult?.reconciledDiscography)
+            ? scrapeResult.reconciledDiscography
+            : sanitizeTextOnlyDiscography(synthesizedDetails.discography);
         }
       } catch (scrapeErr: any) {
         console.warn(`[JIT Healer] Image scraper error for "${searchArtistName}":`, scrapeErr.message);
         synthesizedDetails.imageUrl = 'not-found';
-        synthesizedDetails.discography = [];
+        synthesizedDetails.discography = sanitizeTextOnlyDiscography(synthesizedDetails.discography);
       }
     } else {
       synthesizedDetails.imageUrl = null;

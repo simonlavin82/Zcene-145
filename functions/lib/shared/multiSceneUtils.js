@@ -313,17 +313,31 @@ function toSeedArtistsString(raw) {
 function isCanonicalSeedMatch(nodeIdOrLabel, seedList) {
     if (!nodeIdOrLabel || !Array.isArray(seedList) || seedList.length === 0)
         return false;
-    const targetNorm = normalizeCanonicalEntityId(nodeIdOrLabel);
-    const targetBare = (0, isoCountries_1.stripCountrySlug)(targetNorm);
+    const cleanTarget = stripSceneNamespace(nodeIdOrLabel).trim();
+    const targetNorm = normalizeCanonicalEntityId(cleanTarget);
+    const targetBare = normalizeCanonicalEntityId((0, isoCountries_1.stripCountrySlug)(cleanTarget));
+    const targetIso = (0, isoCountries_1.extractTrailingCountryIso)(cleanTarget);
     if (!targetNorm)
         return false;
     return seedList.some((seed) => {
-        const seedNorm = normalizeCanonicalEntityId(seed);
-        const seedBare = (0, isoCountries_1.stripCountrySlug)(seedNorm);
+        if (!seed)
+            return false;
+        const cleanSeed = stripSceneNamespace(seed).trim();
+        const seedNorm = normalizeCanonicalEntityId(cleanSeed);
+        const seedBare = normalizeCanonicalEntityId((0, isoCountries_1.stripCountrySlug)(cleanSeed));
+        const seedIso = (0, isoCountries_1.extractTrailingCountryIso)(cleanSeed);
         if (!seedNorm)
             return false;
-        return (targetNorm === seedNorm ||
-            (targetBare && seedBare && targetBare === seedBare));
+        if (targetNorm === seedNorm)
+            return true;
+        if ((targetBare && targetBare === seedNorm && targetNorm.length > seedNorm.length) ||
+            (seedBare && seedBare === targetNorm && seedNorm.length > targetNorm.length)) {
+            return true;
+        }
+        if (targetIso && seedIso && !(0, isoCountries_1.areCountryIsosCompatible)(targetIso, seedIso)) {
+            return false;
+        }
+        return Boolean(targetBare) && Boolean(seedBare) && targetBare === seedBare;
     });
 }
 /**

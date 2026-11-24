@@ -181,15 +181,17 @@ exports.healOrphanedAsset = (0, https_1.onCall)({
                     }
                 }
                 else {
-                    // Tier 4 Reject & Discography Quarantine (Rule 38)
+                    // Tier 4 Reject & Text-Only Discography Preservation (Rule 38 V47.16)
                     synthesizedDetails.imageUrl = 'not-found';
-                    synthesizedDetails.discography = [];
+                    synthesizedDetails.discography = Array.isArray(scrapeResult?.reconciledDiscography)
+                        ? scrapeResult.reconciledDiscography
+                        : (0, curatorService_1.sanitizeTextOnlyDiscography)(synthesizedDetails.discography);
                 }
             }
             catch (scrapeErr) {
                 console.warn(`[JIT Healer] Image scraper error for "${searchArtistName}":`, scrapeErr.message);
                 synthesizedDetails.imageUrl = 'not-found';
-                synthesizedDetails.discography = [];
+                synthesizedDetails.discography = (0, curatorService_1.sanitizeTextOnlyDiscography)(synthesizedDetails.discography);
             }
         }
         else {

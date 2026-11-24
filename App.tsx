@@ -1230,6 +1230,9 @@ const App: React.FC = () => {
 
   const [graphData, setGraphData] = useState<GraphData | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const isLoadingRef = useRef<boolean>(false);
+  isLoadingRef.current = isLoading;
+  const lastRehydratedStatusKeyRef = useRef<string>('');
   const [error, setError] = useState<string | null>(null);
   const [toast, setToast] = useState<{ message: string; id: number } | null>(null);
   const [libraryArtists, setLibraryArtists] = useState<ParsedArtist[]>([]);
@@ -4912,7 +4915,7 @@ const App: React.FC = () => {
     }
 
     // Edge Case 2 Fix: Helper to determine if a scene has uncurated seeds or dirty changes
-    const normalizeSeedSlug = (s: string) => stripCountrySlug(normalizeArtistId(s));
+    const normalizeSeedSlug = (s: string) => normalizeArtistId(stripCountrySlug(s));
     const isSceneDirtyOrUncurated = (s: ProjectScene): boolean => {
       const sSeeds = toSeedArtistsArray(s.seedArtists);
       if (sSeeds.length === 0) return false;
@@ -5113,10 +5116,11 @@ const App: React.FC = () => {
           let correctedQuery = undefined;
           let originalQuery = undefined;
 
-          // Silent DB Check
-          let cacheDoc = await getAnyEntityDocWithRedirect(searchId);
-          if (!cacheDoc.exists()) {
-            cacheDoc = await getAnyEntityDocWithRedirect(searchIdLower);
+          // Silent DB Check (Root seeds in ROOTS are always artists; only allow bare-ID suffix fallback if rawInput carried a country suffix)
+          const hasExplicitCountrySuffix = stripCountrySlug(rawInput) !== rawInput.trim();
+          let cacheDoc = await getArtistDocWithRedirect(searchId, 0, { allowBareFallback: hasExplicitCountrySuffix });
+          if (!cacheDoc.exists() && searchIdLower !== searchId) {
+            cacheDoc = await getArtistDocWithRedirect(searchIdLower, 0, { allowBareFallback: hasExplicitCountrySuffix });
           }
 
           let isAmbiguous = false;
@@ -9365,8 +9369,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
     if (!user || !currentProjectId || !isFirebaseReady || isGuest) return;
+    const statusKey = `${currentProjectId}::${projectStatus || 'idle'}`;
 
     if (projectStatus === 'completed') {
+      lastRehydratedStatusKeyRef.current = statusKey;
       const hasGraphNodes = graphData && graphData.nodes && graphData.nodes.length > 0;
       if (hasGraphNodes) {
         // Deadlock Safeguard 1: Do NOT clear loading state if client setup is in flight
@@ -9374,6 +9380,7 @@ const App: React.FC = () => {
           return;
         }
         console.log(`[Re-hydration Hook] Project completed with graph. Clearing loading state.`);
+        isLoadingRef.current = false;
         setIsLoading(false);
 
         // Auto-hydrate the Deep Cut panel on load if nothing is selected
@@ -9413,20 +9420,31 @@ const App: React.FC = () => {
         }
       } else {
         console.log(`[Re-hydration Hook] Project status is completed but local graphData state is empty. Falling back to curation loading state.`);
+        isLoadingRef.current = true;
         setIsLoading(true);
       }
     } else if (projectStatus === 'curating') {
+      lastRehydratedStatusKeyRef.current = statusKey;
       console.log(`[Re-hydration Hook] Project status: curating. Ensuring loading spinner is active.`);
+      isLoadingRef.current = true;
       setIsLoading(true);
     } else if (projectStatus === 'failed') {
+      lastRehydratedStatusKeyRef.current = statusKey;
       console.log(`[Re-hydration Hook] Project status: failed. Clearing loading state.`);
+      isLoadingRef.current = false;
       setIsLoading(false);
     } else if (!projectStatus || projectStatus === 'idle') {
       if (isHydratingSessionRef.current || isProjectLoadingRef.current || activeJobIdRef.current || !!consolidatedValidationDialog?.isOpen || !!tokenConfirmation) {
         return;
       }
-      console.log(`[Re-hydration Hook] Project status: idle/null. Clearing loading state.`);
-      setIsLoading(false);
+      if (isLoadingRef.current || lastRehydratedStatusKeyRef.current !== statusKey) {
+        lastRehydratedStatusKeyRef.current = statusKey;
+        if (isLoadingRef.current) {
+          console.log(`[Re-hydration Hook] Project status: idle/null. Clearing loading state.`);
+        }
+        isLoadingRef.current = false;
+        setIsLoading(false);
+      }
     }
   }, [user, currentProjectId, isFirebaseReady, isGuest, projectStatus, graphData, seedArtists, handleNodeClick]);
 

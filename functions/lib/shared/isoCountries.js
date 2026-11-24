@@ -8,7 +8,7 @@
  * resolving strictly to a 2-letter lowercase ISO-3166-1 alpha-2 code or 'global'.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.shouldAdoptCanonicalSlugCandidate = exports.inferNodeOriginsFromCountryLinks = exports.inspectSlugDedupAmbiguity = exports.canonicalizeArtistSlugWithOrigin = exports.canonicalizeEntitySlugWithCountry = exports.isCanonicalCountrySlugOrCode = exports.areCountryIsosCompatible = exports.doesOriginMatchExpectedIso = exports.stripCountrySlug = exports.extractTrailingCountryIso = exports.normalizeIsoCode = exports.extractAllOriginIsos = exports.extractCountrySlug = exports.COUNTRY_ISO_MAP = exports.ISO_TO_COUNTRY_NAME = void 0;
+exports.shouldAdoptCanonicalSlugCandidate = exports.inferNodeOriginsFromCountryLinks = exports.inspectSlugDedupAmbiguity = exports.canonicalizeArtistSlugWithOrigin = exports.canonicalizeEntitySlugWithCountry = exports.isCanonicalCountrySlugOrCode = exports.areCountryIsosCompatible = exports.doesOriginMatchExpectedIso = exports.stripCountrySlug = exports.extractTrailingCountryIso = exports.resolveExpectedOriginIsos = exports.normalizeIsoCode = exports.extractAllOriginIsos = exports.extractCountrySlug = exports.COUNTRY_ISO_MAP = exports.ISO_TO_COUNTRY_NAME = void 0;
 exports.isEntitySeedMatch = isEntitySeedMatch;
 exports.ISO_TO_COUNTRY_NAME = {
     ad: 'Andorra',
@@ -678,7 +678,8 @@ const resolveSingleOriginSegmentToIso = (segment) => {
         if (partAscii.length > 2 && exports.COUNTRY_ISO_MAP[partAscii]) {
             return exports.COUNTRY_ISO_MAP[partAscii];
         }
-        if (partLower.length === 2 && i === parts.length - 1 && exports.COUNTRY_ISO_MAP[partLower]) {
+        // Only match a 2-letter code when it is the sole segment (e.g. "US", "SE") or "UK" — never a 2-letter state abbreviation after a comma (e.g. "Indianapolis, IN", "Portland, ME")
+        if (partLower.length === 2 && i === parts.length - 1 && (parts.length === 1 || partLower === 'uk') && exports.COUNTRY_ISO_MAP[partLower]) {
             return exports.COUNTRY_ISO_MAP[partLower];
         }
     }
@@ -761,25 +762,52 @@ const normalizeIsoCode = (isoOrCode) => {
     return resolved !== 'global' ? resolved : null;
 };
 exports.normalizeIsoCode = normalizeIsoCode;
+const isCanonicalLowercaseSlug = (s) => Boolean(s) && typeof s === 'string' && !/\s/.test(s) && s === s.toLowerCase();
+/**
+ * Resolves an explicit 2-letter ISO code ("us", "gb", "se") or origin string
+ * ("El Paso, Texas, United States", "Umeå, Sweden", "La Calamine, Belgium / Kelmis, Germany")
+ * into its expected 2-letter ISO code(s), returning [] when undefined, empty, "Unknown", or a bare US city+state ("Indianapolis, IN").
+ */
+const resolveExpectedOriginIsos = (expectedOriginOrIso) => {
+    if (!expectedOriginOrIso || typeof expectedOriginOrIso !== 'string')
+        return [];
+    const trimmed = expectedOriginOrIso.trim();
+    if (!trimmed)
+        return [];
+    const lower = trimmed.toLowerCase();
+    if (lower === 'global' || lower === 'unknown' || lower === 'n/a' || lower === 'none') {
+        return [];
+    }
+    if (/^[a-z]{2}$/i.test(trimmed)) {
+        const norm = (0, exports.normalizeIsoCode)(lower);
+        return norm ? [norm] : [];
+    }
+    return (0, exports.extractAllOriginIsos)(trimmed);
+};
+exports.resolveExpectedOriginIsos = resolveExpectedOriginIsos;
 /**
  * Extracts the trailing ISO-3166-1 alpha-2 code from an entity ID, supporting both
  * canonical 2-letter suffixes (`klear-th` -> `'th'`, `architects-uk` -> `'gb'`) AND
  * legacy full-country-word recovery (`klear-thailand` -> `'th'`, `buggin-united-states` -> `'us'`).
+ * Never extracts a 2-letter suffix from a human display name containing spaces or uppercase letters.
  */
 const extractTrailingCountryIso = (id) => {
     if (!id || typeof id !== 'string')
         return null;
-    const clean = id.trim().toLowerCase();
+    const trimmed = id.trim();
+    const clean = trimmed.toLowerCase();
     if (!clean || clean.endsWith('-global'))
         return null;
-    // 1. Check 2-letter trailing suffix (-th, -us, -gb, -uk)
-    const twoLetterMatch = clean.match(/^.+[-_]([a-z]{2})$/);
-    if (twoLetterMatch) {
-        const code = twoLetterMatch[1];
-        if (code === 'uk')
-            return 'gb';
-        if (exports.ISO_TO_COUNTRY_NAME[code])
-            return code;
+    // 1. Check 2-letter trailing suffix (-th, -us, -gb, -uk) ONLY on canonical lowercase slugs
+    if (isCanonicalLowercaseSlug(trimmed)) {
+        const twoLetterMatch = clean.match(/^.+[-_]([a-z]{2})$/);
+        if (twoLetterMatch) {
+            const code = twoLetterMatch[1];
+            if (code === 'uk')
+                return 'gb';
+            if (exports.ISO_TO_COUNTRY_NAME[code])
+                return code;
+        }
     }
     // 2. Check legacy full-country-word suffix (-thailand, -united-states, -south-korea, etc.)
     for (const { suffix, iso } of FULL_WORD_COUNTRY_SUFFIXES) {
@@ -790,7 +818,7 @@ const extractTrailingCountryIso = (id) => {
     return null;
 };
 exports.extractTrailingCountryIso = extractTrailingCountryIso;
-const stripSingleCountrySlugPass = (cleanName) => {
+const stripSingleCountrySlugPass = (cleanName, allowedIsos) => {
     const lower = cleanName.toLowerCase();
     if (lower.length > 7 && (lower.endsWith('-global') || lower.endsWith('_global'))) {
         return { prefix: cleanName.slice(0, cleanName.length - 7), strippedIso: 'global' };
@@ -801,29 +829,39 @@ const stripSingleCountrySlugPass = (cleanName) => {
             return { prefix: cleanName.slice(0, cleanName.length - suffix.length), strippedIso: iso };
         }
     }
-    const twoLetterMatch = cleanName.match(/^(.+)[-_]([a-zA-Z]{2})$/);
-    if (twoLetterMatch) {
-        const prefix = twoLetterMatch[1];
-        const code = twoLetterMatch[2].toLowerCase();
-        if (prefix.length > 0 && (code === 'uk' || Boolean(exports.ISO_TO_COUNTRY_NAME[code]))) {
-            return { prefix, strippedIso: code === 'uk' ? 'gb' : code };
+    // 2-letter hyphen/underscore ISO suffixes ONLY apply to canonical lowercase slugs
+    if (isCanonicalLowercaseSlug(cleanName)) {
+        const twoLetterMatch = cleanName.match(/^(.+)[-_]([a-z]{2})$/);
+        if (twoLetterMatch) {
+            const prefix = twoLetterMatch[1];
+            const code = twoLetterMatch[2].toLowerCase();
+            const normalizedCode = code === 'uk' ? 'gb' : code;
+            if (prefix.length > 0 && (code === 'uk' || Boolean(exports.ISO_TO_COUNTRY_NAME[code]))) {
+                if (!allowedIsos ||
+                    allowedIsos.length === 0 ||
+                    allowedIsos.some((iso) => (0, exports.areCountryIsosCompatible)(normalizedCode, iso))) {
+                    return { prefix, strippedIso: normalizedCode };
+                }
+            }
         }
     }
     return { prefix: cleanName, strippedIso: null };
 };
 /**
  * Strips trailing country routing suffix(es) (`-th`, `-us`, `-uk`, `-global`, `-thailand`,
- * `-usa`, `-usa-us`, `-united-states`, etc.) from an entity slug or label when preceded by `-` or `_`.
- * Preserves normal spaced artist names like "End It" (since ' It' is space-separated, not '-it')
- * and hyphenated artist names like `end-it-us` -> `end-it` (stops because `-it` != `-us`).
+ * `-usa`, `-usa-us`, `-united-states`, etc.) from a canonical entity slug when preceded by `-` or `_`.
+ * - Never strips 2-letter hyphenated title words from human display names (`"At the Drive-In"`, `"Lo-Fi"`).
+ * - When `expectedOriginOrIso` is provided (e.g., `"El Paso, Texas, United States"` or `"us"`), only strips
+ *   2-letter suffixes compatible with that origin (preserving bare slugs like `"at-the-drive-in"` or `"end-it"`).
  */
-const stripCountrySlug = (name) => {
+const stripCountrySlug = (name, expectedOriginOrIso) => {
     if (!name || typeof name !== 'string')
         return '';
     const cleanName = name.trim();
     if (!cleanName)
         return '';
-    const firstPass = stripSingleCountrySlugPass(cleanName);
+    const allowedIsos = (0, exports.resolveExpectedOriginIsos)(expectedOriginOrIso);
+    const firstPass = stripSingleCountrySlugPass(cleanName, allowedIsos);
     if (!firstPass.strippedIso || firstPass.prefix === cleanName) {
         return cleanName;
     }
@@ -831,7 +869,7 @@ const stripCountrySlug = (name) => {
     const targetIso = firstPass.strippedIso;
     let guard = 0;
     while (guard++ < 3) {
-        const nextPass = stripSingleCountrySlugPass(current);
+        const nextPass = stripSingleCountrySlugPass(current, allowedIsos);
         if (!nextPass.strippedIso || nextPass.prefix === current)
             break;
         const isNonTwoLetter = !/[-_][a-zA-Z]{2}$/.test(current);

@@ -721,7 +721,7 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
       expect(remainingUncuratedHop3.length).toBe(0);
     });
 
-    it('cleanses foregroundApiUsage, lockedSeeds, and seedStubs when constructing chained job inputPayload (Guard 1)', () => {
+    it('cleanses foregroundApiUsage, lockedSeeds, seedStubs, and duplicate existingDetailsCache when constructing chained job inputPayload (Guard 1 & V47.16 P2.6)', () => {
       const mockInputPayload: Record<string, any> = {
         projectId: 'proj-123',
         userId: 'user-456',
@@ -729,6 +729,8 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
         foregroundApiUsage: { 'gemini-3.1-pro-preview': { prompt: 1000, candidates: 200, total: 1200 } },
         lockedSeeds: [{ id: 'korn-us', label: 'Korn' }],
         seedStubs: { korn: { id: 'korn-us' } },
+        detailsCache: '[["korn-us",{"summary":"old"}]]',
+        existingDetailsCache: '[["korn-us",{"summary":"old"}]]',
         tokensSpent: 15,
         targetSceneId: 'scene-1',
       };
@@ -737,16 +739,20 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
         foregroundApiUsage: _fa,
         lockedSeeds: _ls,
         seedStubs: _ss,
+        detailsCache: _dc,
+        existingDetailsCache: _edc,
         ...cleanInputPayload
       } = mockInputPayload;
 
       expect(cleanInputPayload.foregroundApiUsage).toBeUndefined();
       expect(cleanInputPayload.lockedSeeds).toBeUndefined();
       expect(cleanInputPayload.seedStubs).toBeUndefined();
+      expect(cleanInputPayload.detailsCache).toBeUndefined();
+      expect(cleanInputPayload.existingDetailsCache).toBeUndefined();
       expect(cleanInputPayload.projectId).toBe('proj-123');
       expect(cleanInputPayload.userId).toBe('user-456');
 
-      // Firestore nextJobRef inputPayload shape
+      // Firestore nextJobRef inputPayload shape (serializes detailsCache once, never existingDetailsCache)
       const nextHopInputPayload = {
         ...cleanInputPayload,
         targetSceneId: 'scene-2',
@@ -757,10 +763,13 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
         tokensSpent: 0,
         seedStubs: {},
         baseGraph: { nodes: [], links: [] },
+        detailsCache: '[["korn-us",{"summary":"updated"}]]',
       };
 
       expect((nextHopInputPayload as any).foregroundApiUsage).toBeUndefined();
       expect((nextHopInputPayload as any).lockedSeeds).toBeUndefined();
+      expect((nextHopInputPayload as any).existingDetailsCache).toBeUndefined();
+      expect(nextHopInputPayload.detailsCache).toBe('[["korn-us",{"summary":"updated"}]]');
       expect(nextHopInputPayload.tokensSpent).toBe(0);
       expect(nextHopInputPayload.isChainedHop).toBe(true);
       expect(Object.keys(nextHopInputPayload.seedStubs)).toHaveLength(0);

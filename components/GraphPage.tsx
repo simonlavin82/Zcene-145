@@ -1821,7 +1821,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   }, [isSceneCurated, activeScene?.curatedSeedArtists, activeScene?.graphData?.nodes, activeScene?.seedArtists, seedArtists]);
 
   const isArtistPending = useMemo(() => {
-    const normalizeSeedSlug = (s: string) => stripCountrySlug(normalizeArtistId(s));
+    const normalizeSeedSlug = (s: string) => normalizeArtistId(stripCountrySlug(s));
     const currentEnabled = selectedSeedArtists
       .filter(a => a.enabled)
       .map(a => normalizeSeedSlug(a.name))

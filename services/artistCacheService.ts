@@ -332,8 +332,9 @@ export const cleanArtistDisplayName = (rawIdOrName?: string | null, graphNodes?:
     }
   }
 
-  // If the result contains kebab-case or snake-case slug delimiters, format it
-  if (cleaned.includes('-') || cleaned.includes('_')) {
+  // If the result contains kebab-case or snake-case slug delimiters (and is a raw slug rather than a human display name with spaces or mixed case), format it
+  const isRawSlug = !/\s/.test(cleaned) && cleaned === cleaned.toLowerCase();
+  if ((cleaned.includes('-') || cleaned.includes('_')) && (isRawSlug || cleaned !== trimmed)) {
     return titleCaseArtistId(cleaned);
   }
 
@@ -1395,6 +1396,10 @@ export const isCacheExpired = (dataOrTimestamp: any): boolean => {
   return (Date.now() - date.getTime()) > oneYearMs;
 };
 
+export interface EntityRedirectFetchOptions {
+  allowBareFallback?: boolean;
+}
+
 /**
  * Reads a document from the global entity cache ('artists' or 'labels'), resolving redirects.
  * If the doc has a `redirectTo` field, fetches and returns the canonical doc snapshot instead.
@@ -1403,7 +1408,8 @@ export const isCacheExpired = (dataOrTimestamp: any): boolean => {
 export const getEntityDocWithRedirect = async (
   rawEntityId: string,
   entityType = 'artist',
-  depth = 0
+  depth = 0,
+  options?: EntityRedirectFetchOptions
 ): Promise<DocumentSnapshot> => {
   const entityId = (depth === 0 && entityType !== 'label')
     ? (canonicalizeEntitySlugWithCountry(rawEntityId) || rawEntityId)
@@ -1431,15 +1437,41 @@ export const getEntityDocWithRedirect = async (
       // Fix 3 — Suffix Fallback: If the country-disambiguated ID (e.g. 'korn-usa')
       // returns a cache miss, the doc may only exist as a bare ID alias with a redirectTo pointer
       // (e.g. 'korn'). Strip the last country-suffix segment and retry once so the
-      // redirect chain can resolve correctly. This eliminates the miss waterfall on page
-      // load for graph nodes whose IDs include an origin suffix.
-      if (depth === 0) {
-        // Match both full country name suffixes (e.g. -thailand, -japan, -germany) AND
-        // ISO 3166-1 alpha-2 two-letter country codes across all 249 countries via stripCountrySlug.
+      // redirect chain can resolve correctly, verifying that any resolved bare doc actually matches
+      // the stripped country suffix so bare band slugs ending in ISO codes (e.g. 'end-it') never
+      // resolve to unrelated artists ('end').
+      if (depth === 0 && options?.allowBareFallback !== false) {
         const bareId = stripCountrySlug(entityId);
+        const strippedIso = extractTrailingCountryIso(entityId);
         if (bareId && bareId !== entityId) {
           console.log(`[Proxy Fetch] Cache miss for ${entityId} — retrying with bare ID: ${bareId}`);
-          return getEntityDocWithRedirect(bareId, entityType, depth + 1);
+          const bareSnap = await getEntityDocWithRedirect(bareId, entityType, depth + 1, options);
+          if (bareSnap.exists()) {
+            if (!strippedIso) {
+              return bareSnap;
+            }
+            const bareData = bareSnap.data();
+            const isAmbiguousStub = Boolean(
+              bareData?._isStub &&
+              (bareData.isAmbiguous || (Array.isArray(bareData.candidates) && bareData.candidates.length > 1))
+            );
+            const targetCanonicalId = String(bareData?.redirectTo || bareData?.cacheKey || bareSnap.id || '').trim();
+            const targetIso = extractTrailingCountryIso(targetCanonicalId);
+            const parsedDetails = parseDetailsCacheSafely(bareData?.detailsCache);
+            const cachedOrigin = parsedDetails?.details?.origin || parsedDetails?.origin || bareData?.origin || '';
+            const matchesOriginOrTarget =
+              isAmbiguousStub ||
+              targetCanonicalId === entityId ||
+              (Boolean(targetIso) && areCountryIsosCompatible(strippedIso, targetIso)) ||
+              (Boolean(cachedOrigin) && doesOriginMatchExpectedIso(cachedOrigin, strippedIso)) ||
+              (!targetIso && !cachedOrigin);
+            if (matchesOriginOrTarget) {
+              return bareSnap;
+            }
+            console.warn(
+              `[Proxy Fetch] Rejecting bare-ID fallback "${bareId}" (resolved "${targetCanonicalId}", origin="${cachedOrigin}") for "${entityId}" (expected ISO "${strippedIso}").`
+            );
+          }
         }
       }
       
@@ -1496,21 +1528,24 @@ export const getEntityDocWithRedirect = async (
 
 export const getArtistDocWithRedirect = async (
   artistId: string,
-  depth = 0
-): Promise<DocumentSnapshot> => getEntityDocWithRedirect(artistId, 'artist', depth);
+  depth = 0,
+  options?: EntityRedirectFetchOptions
+): Promise<DocumentSnapshot> => getEntityDocWithRedirect(artistId, 'artist', depth, options);
 
 export const getLabelDocWithRedirect = async (
   labelId: string,
-  depth = 0
-): Promise<DocumentSnapshot> => getEntityDocWithRedirect(labelId, 'label', depth);
+  depth = 0,
+  options?: EntityRedirectFetchOptions
+): Promise<DocumentSnapshot> => getEntityDocWithRedirect(labelId, 'label', depth, options);
 
 export const getAnyEntityDocWithRedirect = async (
   entityId: string,
-  depth = 0
+  depth = 0,
+  options?: EntityRedirectFetchOptions
 ): Promise<DocumentSnapshot> => {
-  let snap = await getArtistDocWithRedirect(entityId, depth);
+  let snap = await getArtistDocWithRedirect(entityId, depth, options);
   if (!snap.exists()) {
-    const labelSnap = await getLabelDocWithRedirect(entityId, depth);
+    const labelSnap = await getLabelDocWithRedirect(entityId, depth, options);
     if (labelSnap.exists()) {
       snap = labelSnap;
     }

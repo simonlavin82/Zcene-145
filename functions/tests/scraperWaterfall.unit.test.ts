@@ -15,8 +15,17 @@ import {
   COMPILATION_COLLECTION_RE,
   selectBestArtistArtwork,
   CURRENT_ITUNES_SCRAPE_VERSION,
-  shouldRunRule38NotFoundUpgrade
+  shouldRunRule38NotFoundUpgrade,
+  artistNamesMatchWithOptionalThe,
+  sanitizeTextOnlyDiscography,
 } from '../src/services/curatorService';
+import {
+  stripCountrySlug,
+  extractTrailingCountryIso,
+  resolveExpectedOriginIsos,
+} from '../src/shared/isoCountries';
+import { isCanonicalSeedMatch } from '../src/shared/multiSceneUtils';
+import { CANONICAL_STYLES_FLAT } from '../src/types';
 
 describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & iTunes Resilience', () => {
   it('Guardrails: Label entities bypass image scraping and retain catalog releases unchanged', async () => {
@@ -557,7 +566,11 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           'us',
           '2021'
         );
-        expect(rejected).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        expect(rejected).toEqual({
+          imageUrl: null,
+          reconciledDiscography: [{ albumName: 'The Last Laugh', releaseYear: '2023' }],
+          itunesArtistId: null,
+        });
       } finally {
         fetchSpy.mockRestore();
       }
@@ -610,7 +623,11 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           'us',
           '2021'
         );
-        expect(ambigResult).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        expect(ambigResult).toEqual({
+          imageUrl: null,
+          reconciledDiscography: [{ albumName: 'The Last Laugh', releaseYear: '2023' }],
+          itunesArtistId: null,
+        });
       } finally {
         ambigSpy.mockRestore();
       }
@@ -820,26 +837,31 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           'us',
           '1986'
         );
-        expect(uncorroboratedResult).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        expect(uncorroboratedResult).toEqual({
+          imageUrl: null,
+          reconciledDiscography: [{ albumName: 'Next Time From the Heart', releaseYear: '1988' }],
+          itunesArtistId: null,
+        });
       } finally {
         fetchSpy.mockRestore();
       }
     });
 
-    it('5. Step 2 itunesScrapeVersion: 2 one-time $0.00 upgrade runs once for anchored legacy not-found artists, never loops, and leaves healOrphanedAsset untouched', () => {
-      expect(CURRENT_ITUNES_SCRAPE_VERSION).toBe(2);
+    it('5. Step 2 itunesScrapeVersion: 3 one-time $0.00 upgrade runs once for anchored legacy not-found artists, never loops, and leaves healOrphanedAsset untouched', () => {
+      expect(CURRENT_ITUNES_SCRAPE_VERSION).toBe(3);
 
       // Legacy artist doc with not-found and valid founded year (or qualifying discography) -> eligible
       expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', discography: [], details: { founded: '2021' } }, false)).toBe(true);
       expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 1, details: { founded: '1993' } }, false)).toBe(true);
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 2, details: { founded: '1994' } }, false)).toBe(true);
       expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', discography: [{ albumName: 'The Last Laugh', releaseYear: '2023' }] }, false)).toBe(true);
 
       // Unanchored legacy doc with empty discography AND missing founded year -> strictly bypassed (V47.9)
       expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', discography: [] }, false)).toBe(false);
       expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 1, details: { founded: 'Unknown' } }, false)).toBe(false);
 
-      // Already stamped v2 -> strictly bypassed (no repeat scraping on genuinely unindexed underground bands)
-      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 2, details: { founded: '2021' } }, false)).toBe(false);
+      // Already stamped v3 -> strictly bypassed (no repeat scraping on genuinely unindexed underground bands)
+      expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'not-found', itunesScrapeVersion: 3, details: { founded: '2021' } }, false)).toBe(false);
 
       // Already has verified https:// imageUrl -> strictly bypassed
       expect(shouldRunRule38NotFoundUpgrade({ imageUrl: 'https://is1-ssl.mzstatic.com/art/600x600bb.jpg', details: { founded: '2021' } }, false)).toBe(false);
@@ -1529,7 +1551,14 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           'us',
           '1991'
         );
-        expect(oneMatchRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        expect(oneMatchRes).toEqual({
+          imageUrl: null,
+          reconciledDiscography: [
+            { albumName: 'Face Tomorrow', releaseYear: '1995' },
+            { albumName: 'Nonexistent Second Record', releaseYear: '1996' },
+          ],
+          itunesArtistId: null,
+        });
       } finally {
         oneOfTwoSpy.mockRestore();
       }
@@ -1596,7 +1625,14 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           'us',
           '1991'
         );
-        expect(shortEpRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        expect(shortEpRes).toEqual({
+          imageUrl: null,
+          reconciledDiscography: [
+            { albumName: 'Track Alpha', releaseYear: '1994' },
+            { albumName: 'Track Bravo', releaseYear: '1995' },
+          ],
+          itunesArtistId: null,
+        });
       } finally {
         shortEpSpy.mockRestore();
       }
@@ -1698,7 +1734,11 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           'us',
           '1996'
         );
-        expect(singleDriftRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        expect(singleDriftRes).toEqual({
+          imageUrl: null,
+          reconciledDiscography: [{ albumName: "This Afternoon's Malady", releaseYear: '1998' }],
+          itunesArtistId: null,
+        });
       } finally {
         fetchSpy.mockRestore();
       }
@@ -2056,7 +2096,14 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           '1991'
         );
 
-        expect(res).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        expect(res).toEqual({
+          imageUrl: null,
+          reconciledDiscography: [
+            { albumName: 'New Horizons', releaseYear: '1993' },
+            { albumName: "Can't Kill What's Inside", releaseYear: '1995' },
+          ],
+          itunesArtistId: null,
+        });
       } finally {
         fetchSpy.mockRestore();
       }
@@ -2295,7 +2342,14 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           'us',
           '1991'
         );
-        expect(negativeRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        expect(negativeRes).toEqual({
+          imageUrl: null,
+          reconciledDiscography: [
+            { albumName: 'Mouthpiece EP', releaseYear: '1991' },
+            { albumName: 'What Was Said', releaseYear: '1994' },
+          ],
+          itunesArtistId: null,
+        });
       } finally {
         fetchSpy.mockRestore();
       }
@@ -2576,7 +2630,11 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           'us',
           '1999'
         );
-        expect(singleAlbumUnmappedRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        expect(singleAlbumUnmappedRes).toEqual({
+          imageUrl: null,
+          reconciledDiscography: [{ albumName: 'Alaska', releaseYear: '2001' }],
+          itunesArtistId: null,
+        });
 
         // Cross-family Zcene genre ('Hip-Hop') against 'Rock' homonym with 2 matching album titles -> MUST fail closed!
         const crossFamilyRejectRes = await scrapeImageUrlBackend(
@@ -2592,7 +2650,14 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           'us',
           '1999'
         );
-        expect(crossFamilyRejectRes).toEqual({ imageUrl: null, reconciledDiscography: [], itunesArtistId: null });
+        expect(crossFamilyRejectRes).toEqual({
+          imageUrl: null,
+          reconciledDiscography: [
+            { albumName: 'Alaska', releaseYear: '2001' },
+            { albumName: 'Lusitania', releaseYear: '2003' },
+          ],
+          itunesArtistId: null,
+        });
       } finally {
         tier3bUnmappedSpy.mockRestore();
       }
@@ -2765,6 +2830,365 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
         { albumName: 'Weezer', releaseYear: '1994', itunesCollectionId: 9001 },
         { albumName: 'Weezer', releaseYear: '2001', itunesCollectionId: 9002 },
       ]);
+    });
+  });
+
+  describe('V47.16 Rule 38 & Structural Country-Suffix / Seed Boundary Suite', () => {
+    it('1. P1.1 Structural Country-Suffix Boundary & US State Guard: preserves display names ("At the Drive-In", "Lo-Fi"), guards bare slugs with origin locks, rejects 2-letter US state tokens ("Indianapolis, IN", "Portland, ME"), and enforces collision-free isCanonicalSeedMatch', () => {
+      // Check 3: 2-letter US state abbreviations after a comma must NOT resolve to India ('in'), Montenegro ('me'), Germany ('de'), or Canada ('ca')
+      expect(resolveExpectedOriginIsos('Indianapolis, IN')).toEqual([]);
+      expect(resolveExpectedOriginIsos('Portland, ME')).toEqual([]);
+      expect(resolveExpectedOriginIsos('Wilmington, DE')).toEqual([]);
+      expect(resolveExpectedOriginIsos('Los Angeles, CA')).toEqual(['us']);
+      expect(resolveExpectedOriginIsos('Brighton, UK')).toEqual(['gb']);
+      expect(resolveExpectedOriginIsos('El Paso, USA')).toEqual(['us']);
+      expect(resolveExpectedOriginIsos('El Paso, Texas, United States')).toEqual(['us']);
+      expect(resolveExpectedOriginIsos('Umeå, Sweden')).toEqual(['se']);
+      expect(resolveExpectedOriginIsos('us')).toEqual(['us']);
+      expect(resolveExpectedOriginIsos('Unknown')).toEqual([]);
+
+      // Rule 1A: Human display names are NEVER stripped of 2-letter hyphenated title words
+      expect(stripCountrySlug('At the Drive-In')).toBe('At the Drive-In');
+      expect(stripCountrySlug('Lo-Fi')).toBe('Lo-Fi');
+      expect(stripCountrySlug('End It')).toBe('End It');
+      expect(stripCountrySlug('As It Is')).toBe('As It Is');
+      expect(stripCountrySlug('Against Me!')).toBe('Against Me!');
+      expect(extractTrailingCountryIso('At the Drive-In')).toBeNull();
+      expect(extractTrailingCountryIso('Lo-Fi')).toBeNull();
+
+      // Rule 1B: Context-aware stripCountrySlug preserves bare lowercase slugs when trailing token != known origin ISO
+      expect(stripCountrySlug('at-the-drive-in', 'El Paso, Texas, United States')).toBe('at-the-drive-in');
+      expect(stripCountrySlug('at-the-drive-in-us', 'El Paso, Texas, United States')).toBe('at-the-drive-in');
+      expect(stripCountrySlug('end-it', 'us')).toBe('end-it');
+      expect(stripCountrySlug('end-it-us', 'us')).toBe('end-it');
+      expect(stripCountrySlug('as-it-is', 'Brighton, United Kingdom')).toBe('as-it-is');
+      expect(stripCountrySlug('refused-se')).toBe('refused');
+      expect(stripCountrySlug('refused-se', 'Umeå, Sweden')).toBe('refused');
+
+      // Check 1: isCanonicalSeedMatch matches canonical IDs <-> display names & legacy bare slugs without "End It" vs "END" collisions
+      expect(isCanonicalSeedMatch('at-the-drive-in-us', ['At the Drive-In'])).toBe(true);
+      expect(isCanonicalSeedMatch('At the Drive-In', ['at-the-drive-in-us'])).toBe(true);
+      expect(isCanonicalSeedMatch('at-the-drive-in-us', ['at-the-drive-in'])).toBe(true);
+      expect(isCanonicalSeedMatch('end-it-us', ['End It'])).toBe(true);
+      expect(isCanonicalSeedMatch('End It', ['END'])).toBe(false);
+      expect(isCanonicalSeedMatch('end-it-us', ['END'])).toBe(false);
+      expect(isCanonicalSeedMatch('end-us', ['end-it'])).toBe(false);
+      expect(isCanonicalSeedMatch('Cave In', ['Cave'])).toBe(false);
+      expect(isCanonicalSeedMatch('cave-in-us', ['Cave'])).toBe(false);
+      expect(isCanonicalSeedMatch('Against Me!', ['Against'])).toBe(false);
+    });
+
+    it('2. P1.2 Bidirectional Leading "The " Matching rescues "Murder City Devils" <-> "The Murder City Devils" (#3116895) in Tier 1 (even past a 0-album bare stub) and Tier 3B while guarding "The The" and 1-word uncorroborated names', async () => {
+      expect(artistNamesMatchWithOptionalThe('The Murder City Devils', 'Murder City Devils')).toBe(true);
+      expect(artistNamesMatchWithOptionalThe('Murder City Devils', 'The Murder City Devils')).toBe(true);
+      expect(artistNamesMatchWithOptionalThe('The The', 'The')).toBe(false);
+      expect(artistNamesMatchWithOptionalThe('The The', 'The The')).toBe(true);
+      expect(artistNamesMatchWithOptionalThe('The Band', 'Band', { requireMultiWordForOptionalThe: true })).toBe(false);
+      expect(artistNamesMatchWithOptionalThe('The Who', 'Who', { requireMultiWordForOptionalThe: true })).toBe(false);
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        if (url.includes('term=Murder%20City%20Devils&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                // 0-album bare stub alongside the real "The Murder City Devils"
+                { wrapperType: 'artist', artistId: 99990001, artistName: 'Murder City Devils', primaryGenreName: 'Alternative' },
+                { wrapperType: 'artist', artistId: 3116895, artistName: 'The Murder City Devils', primaryGenreName: 'Alternative' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=99990001&entity=album')) {
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        }
+        if (url.includes('lookup?id=3116895&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 3116895,
+                  collectionId: 3116901,
+                  collectionName: 'Empty Bottles, Broken Hearts',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '1998-05-05T07:00:00Z',
+                  trackCount: 10,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/mcd/empty-bottles/100x100bb.jpg',
+                },
+                {
+                  wrapperType: 'collection',
+                  artistId: 3116895,
+                  collectionId: 3116902,
+                  collectionName: 'In Name and Blood',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2000-06-06T07:00:00Z',
+                  trackCount: 11,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/mcd/in-name/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        const res = await scrapeImageUrlBackend(
+          'Murder City Devils',
+          'artist',
+          'Garage Punk',
+          'Seattle garage punk band founded in 1996 on Sub Pop.',
+          'Seattle, Washington, United States',
+          [
+            { albumName: 'Empty Bottles, Broken Hearts', releaseYear: '1998' },
+            { albumName: 'In Name and Blood', releaseYear: '2000' },
+          ],
+          'us',
+          '1996'
+        );
+        expect(res.itunesArtistId).toBe(3116895);
+        expect(res.imageUrl).toBe('https://is1-ssl.mzstatic.com/mcd/empty-bottles/600x600bb.jpg');
+        expect(res.reconciledDiscography.map((d) => d.albumName)).toEqual([
+          'Empty Bottles, Broken Hearts',
+          'In Name and Blood',
+        ]);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('3. P1.3 Rule 38 Relaxation & v3 Self-Heal: preserves sanitized text-only discography on Tier 4 miss and self-heals At the Drive-In (#159444) from a v2 empty-discography cache doc', async () => {
+      // sanitizeTextOnlyDiscography strips unverified itunesCollectionId and deduplicates
+      expect(
+        sanitizeTextOnlyDiscography([
+          { albumName: 'In/Casino/Out', releaseYear: '1998', itunesCollectionId: 999 },
+          { albumName: 'In/Casino/Out', releaseYear: '1998' },
+          { albumName: 'Relationship of Command', releaseYear: '2000' },
+        ])
+      ).toEqual([
+        { albumName: 'In/Casino/Out', releaseYear: '1998' },
+        { albumName: 'Relationship of Command', releaseYear: '2000' },
+      ]);
+
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        // Because stripCountrySlug("At the Drive-In", "us") preserves "At the Drive-In", iTunes receives the full name!
+        if (url.includes('term=At%20the%20Drive-In&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 159444, artistName: 'At the Drive-In', primaryGenreName: 'Alternative' },
+              ],
+            }),
+          } as any;
+        }
+        if (url.includes('lookup?id=159444&entity=album')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                {
+                  wrapperType: 'collection',
+                  artistId: 159444,
+                  collectionId: 1440850001,
+                  collectionName: 'Acrobatic Tenement',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '1997-08-18T07:00:00Z',
+                  trackCount: 11,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/atdi/acrobatic/100x100bb.jpg',
+                },
+                {
+                  wrapperType: 'collection',
+                  artistId: 159444,
+                  collectionId: 1440850002,
+                  collectionName: 'In/Casino/Out',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '1998-08-18T07:00:00Z',
+                  trackCount: 11,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/atdi/incasinoout/100x100bb.jpg',
+                },
+                {
+                  wrapperType: 'collection',
+                  artistId: 159444,
+                  collectionId: 1440850003,
+                  collectionName: 'Relationship of Command',
+                  primaryGenreName: 'Alternative',
+                  releaseDate: '2000-09-12T07:00:00Z',
+                  trackCount: 11,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/atdi/roc/100x100bb.jpg',
+                },
+              ],
+            }),
+          } as any;
+        }
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        // Simulate v2 poisoned doc with discography: [] and founded: "1994" running $0.00 v3 self-heal
+        const res = await scrapeImageUrlBackend(
+          'At the Drive-In',
+          'artist',
+          'Post-Hardcore',
+          'El Paso post-hardcore pioneers founded in 1994.',
+          'El Paso, Texas, United States',
+          [],
+          'us',
+          '1994'
+        );
+        expect(res.itunesArtistId).toBe(159444);
+        expect(res.imageUrl).toContain('atdi');
+        expect(res.reconciledDiscography).toHaveLength(3);
+        expect(res.reconciledDiscography.map((d) => d.albumName)).toEqual([
+          'Acrobatic Tenement',
+          'In/Casino/Out',
+          'Relationship of Command',
+        ]);
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('4. P1.4 Tier 3A -> Tier 3B Hostile-Profile Conflation Guard rescues Radon (#75264551) with >=2 verified non-hostile releases while blocking 1-release flukes and stripping Hip-Hop collections', async () => {
+      const makeRadonFetchMock = (includeSecondPunkAlbum: boolean) =>
+        vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+          const url = String(input);
+          if (url.includes('term=Radon&entity=musicArtist')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  // Conflated Apple Music profile flagged with artist-level 'Hip-Hop/Rap'
+                  { wrapperType: 'artist', artistId: 75264551, artistName: 'Radon', primaryGenreName: 'Hip-Hop/Rap' },
+                ],
+              }),
+            } as any;
+          }
+          if (url.includes('entity=song&limit=15') && url.includes('Radon')) {
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({
+                results: [
+                  {
+                    wrapperType: 'track',
+                    kind: 'song',
+                    artistId: 75264551,
+                    artistName: 'Radon',
+                    collectionId: 75264602,
+                    collectionName: 'Gainesville EP',
+                    trackName: 'Metric Buttload',
+                    primaryGenreName: 'Rock',
+                    releaseDate: '1999-06-01T08:00:00Z',
+                  },
+                ],
+              }),
+            } as any;
+          }
+          if (url.includes('lookup?id=75264551&entity=album')) {
+            const collections: any[] = [
+              {
+                wrapperType: 'collection',
+                artistId: 75264551,
+                collectionId: 75264602,
+                collectionName: 'Gainesville EP',
+                primaryGenreName: 'Rock',
+                releaseDate: '1999-06-01T08:00:00Z',
+                trackCount: 6,
+                artworkUrl100: 'https://is1-ssl.mzstatic.com/radon/ep/100x100bb.jpg',
+              },
+              // Conflated Hip-Hop collection on the same artistId
+              {
+                wrapperType: 'collection',
+                artistId: 75264551,
+                collectionId: 75264999,
+                collectionName: 'Trap Chronicles - Single',
+                primaryGenreName: 'Hip-Hop/Rap',
+                releaseDate: '2024-01-01T08:00:00Z',
+                trackCount: 1,
+                artworkUrl100: 'https://is1-ssl.mzstatic.com/radon/trap/100x100bb.jpg',
+              },
+            ];
+            if (includeSecondPunkAlbum) {
+              collections.push({
+                wrapperType: 'collection',
+                artistId: 75264551,
+                collectionId: 75264601,
+                collectionName: '28',
+                primaryGenreName: 'Alternative',
+                releaseDate: '1998-01-01T08:00:00Z',
+                trackCount: 12,
+                artworkUrl100: 'https://is1-ssl.mzstatic.com/radon/28/100x100bb.jpg',
+              });
+            }
+            return {
+              ok: true,
+              status: 200,
+              json: async () => ({ results: collections }),
+            } as any;
+          }
+          return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+        });
+
+      // Case A: Conflated profile with >=2 verified non-hostile releases (like Radon #75264551) -> RESCUED, Hip-Hop stripped!
+      const spyRescue = makeRadonFetchMock(true);
+      try {
+        const rescued = await scrapeImageUrlBackend(
+          'Radon',
+          'artist',
+          'Punk Rock',
+          'Gainesville, Florida punk rock band on No Idea Records.',
+          'Gainesville, Florida, USA',
+          [
+            { albumName: '28', releaseYear: '1998' },
+            { albumName: 'Gainesville EP', releaseYear: '1999' },
+          ],
+          'us',
+          '1991'
+        );
+        expect(rescued.itunesArtistId).toBe(75264551);
+        expect(rescued.imageUrl).toBe('https://is1-ssl.mzstatic.com/radon/28/600x600bb.jpg');
+        expect(rescued.reconciledDiscography.map((d) => d.albumName)).toEqual(['28', 'Gainesville EP']);
+        expect(rescued.reconciledDiscography.some((d) => d.albumName.includes('Trap'))).toBe(false);
+      } finally {
+        spyRescue.mockRestore();
+      }
+
+      // Case B: Conflated hostile profile with only 1 non-hostile release on the profile -> REJECTED in Tier 3B (<2 required)!
+      const spyFluke = makeRadonFetchMock(false);
+      try {
+        const blockedFluke = await scrapeImageUrlBackend(
+          'Radon',
+          'artist',
+          'Punk Rock',
+          'Gainesville, Florida punk rock band on No Idea Records.',
+          'Gainesville, Florida, USA',
+          [{ albumName: 'Gainesville EP', releaseYear: '1999' }],
+          'us',
+          '1991'
+        );
+        expect(blockedFluke.imageUrl).toBeNull();
+        expect(blockedFluke.itunesArtistId).toBeNull();
+        expect(blockedFluke.reconciledDiscography).toEqual([{ albumName: 'Gainesville EP', releaseYear: '1999' }]);
+      } finally {
+        spyFluke.mockRestore();
+      }
+    });
+
+    it('5. P2.5 removes truncated "Post-" and "Proto-" tokens from CANONICAL_STYLES_FLAT', () => {
+      expect(CANONICAL_STYLES_FLAT).not.toContain('Post-');
+      expect(CANONICAL_STYLES_FLAT).not.toContain('Proto-');
+      expect(CANONICAL_STYLES_FLAT).toContain('Midwest');
+      expect(CANONICAL_STYLES_FLAT).toContain('Underground');
     });
   });
 });
