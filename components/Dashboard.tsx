@@ -14,6 +14,7 @@ import { DashboardProjectCard } from './DashboardProjectCard';
 import { CreateProjectCard } from './CreateProjectCard';
 import { PROFILE_COLORS } from './SharedModals';
 import { computeProjectCardMetrics, parseProjectScenes, stripSceneNamespace } from '../shared/multiSceneUtils';
+import { ToolbarSearch } from './DesignSystem';
 
 
 interface DashboardProps {
@@ -119,7 +120,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [sortBy, setSortBy] = React.useState<'recent' | 'alphabetical'>('recent');
   const [searchQuery, setSearchQuery] = React.useState('');
   const [isSearchExpanded, setIsSearchExpanded] = React.useState(false);
-  const searchInputRef = React.useRef<HTMLInputElement | null>(null);
 
   const handleRenameClick = (project: Project) => {
     const displayTitle = getProjectDisplayTitle(project);
@@ -466,84 +466,57 @@ const Dashboard: React.FC<DashboardProps> = ({
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 pt-8 pb-24 sm:pb-32">
           <div className="w-full space-y-8">
           <div className="flex flex-col gap-6 w-full">
-            <div className="flex flex-row items-start sm:items-center justify-between w-full gap-4">
-              <div className="flex flex-row items-center gap-2 flex-wrap sm:flex-nowrap">
-                {/* Sort Selector Toggle */}
-                <ViewToggle 
-                  value={sortBy}
-                  onChange={(s) => setSortBy(s as 'recent' | 'alphabetical')}
-                  options={[
-                    { id: 'recent', icon: 'schedule', label: 'Sort by Recent' },
-                    { id: 'alphabetical', icon: 'sort_by_alpha', label: 'Sort Alphabetically' }
-                  ]}
-                />
-
-                {/* Grid/List View Toggle */}
-                <ViewToggle 
-                  value={view}
-                  onChange={(v) => setView(v as 'grid' | 'list')}
-                  options={[
-                    { id: 'grid', icon: 'grid_view', label: 'Grid View' },
-                    { id: 'list', icon: 'list', label: 'List View' }
-                  ]}
-                />
-
-                {/* Deep Search Input */}
-                <div 
-                  className={`group relative h-[38px] flex items-center transition-all duration-300 ease-in-out overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-md shadow-xl origin-left ${isSearchExpanded ? 'w-56 sm:w-64 focus-within:ring-1 focus-within:ring-primary' : 'w-[38px] cursor-pointer'}`}
-                  onClick={(e) => { 
-                    if (!isSearchExpanded) {
-                      e.stopPropagation(); 
-                      setIsSearchExpanded(true); 
-                      setTimeout(() => searchInputRef.current?.focus(), 50); 
-                    }
-                  }}
-                  title={!isSearchExpanded ? "Find in zcenes..." : undefined}
+            <div className="relative flex flex-row items-center justify-between w-full gap-2 md:gap-4 h-[38px]">
+              <div className="flex flex-row items-center gap-2 flex-1 min-w-0">
+                <div
+                  className={`flex flex-row items-center gap-2 shrink-0 transition-opacity duration-150 ${isSmallScreen && isSearchExpanded ? 'opacity-0 pointer-events-none' : ''}`}
+                  aria-hidden={isSmallScreen && isSearchExpanded ? true : undefined}
+                  inert={isSmallScreen && isSearchExpanded}
                 >
-                  <span className={`material-symbols-outlined absolute left-[9px] top-1/2 -translate-y-1/2 transition-colors duration-300 z-10 pointer-events-none ${isSearchExpanded ? 'text-zinc-500 !text-[20px]' : 'text-zinc-400 group-hover:text-white !text-[20px]'}`}>
-                    search
-                  </span>
-                  
-                  <input 
-                    autoComplete="off" 
-                    data-1p-ignore="true" 
-                    data-lpignore="true" 
-                    ref={searchInputRef}
-                    type="search" 
-                    placeholder="Find in zcenes..." 
-                    value={searchQuery} 
-                    onChange={(e) => setSearchQuery(e.target.value)} 
-                    onBlur={() => { if (!searchQuery.trim()) setIsSearchExpanded(false); }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Escape') {
-                        setSearchQuery('');
-                        setIsSearchExpanded(false);
-                        searchInputRef.current?.blur();
-                      }
-                    }}
-                    className={`w-full h-full appearance-none bg-transparent text-white placeholder:text-zinc-500 focus:outline-none transition-opacity duration-300 pl-10 pr-[38px] text-sm ${isSearchExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} 
+                  {/* Sort Selector Toggle */}
+                  <ViewToggle 
+                    value={sortBy}
+                    onChange={(s) => setSortBy(s as 'recent' | 'alphabetical')}
+                    options={[
+                      { id: 'recent', icon: 'schedule', label: 'Sort by Recent' },
+                      { id: 'alphabetical', icon: 'sort_by_alpha', label: 'Sort Alphabetically' }
+                    ]}
                   />
-                  
-                  <div className={`absolute right-[3px] top-1/2 -translate-y-1/2 flex items-center z-10 transition-opacity duration-300 ${isSearchExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                    {searchQuery && (
-                      <button 
-                        onMouseDown={(e) => { 
-                          e.preventDefault(); 
-                          setSearchQuery(''); 
-                          searchInputRef.current?.focus(); 
-                        }} 
-                        className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-[10px] text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors leading-none cursor-pointer" 
-                        aria-label="Clear search"
-                      >
-                        <span className="material-symbols-outlined !text-[18px]">close</span>
-                      </button>
-                    )}
-                  </div>
+
+                  {/* Grid/List View Toggle */}
+                  <ViewToggle 
+                    value={view}
+                    onChange={(v) => setView(v as 'grid' | 'list')}
+                    options={[
+                      { id: 'grid', icon: 'grid_view', label: 'Grid View' },
+                      { id: 'list', icon: 'list', label: 'List View' }
+                    ]}
+                  />
                 </div>
+
+                {/* Unified Toolbar Search */}
+                <ToolbarSearch
+                  value={searchQuery}
+                  onChange={setSearchQuery}
+                  placeholder="Find in zcenes..."
+                  isMobile={isSmallScreen}
+                  isMobileOpen={isSearchExpanded}
+                  onMobileOpenChange={setIsSearchExpanded}
+                  size="control"
+                  className="flex-1 min-w-0 max-w-sm lg:max-w-md"
+                  overlayClassName="z-30"
+                  triggerTestId="dashboard-search-trigger"
+                  inputTestId="dashboard-search-input"
+                  overlayTestId="dashboard-search-overlay"
+                />
               </div>
 
               {/* New Zcene Button */}
-              <div className="flex items-center flex-shrink-0">
+              <div
+                className={`flex items-center flex-shrink-0 transition-opacity duration-150 ${isSmallScreen && isSearchExpanded ? 'opacity-0 pointer-events-none' : ''}`}
+                aria-hidden={isSmallScreen && isSearchExpanded ? true : undefined}
+                inert={isSmallScreen && isSearchExpanded}
+              >
                 <button 
                   onClick={() => {
                     if (resolvedActiveCuratingProject) {

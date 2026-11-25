@@ -14,7 +14,7 @@ import { doc, updateDoc } from 'firebase/firestore';
 import { httpsCallable } from 'firebase/functions';
 import { TOKEN_PRICING } from '../shared/tokenEconomy';
 import { formatSystemTimestamp, extractInitials } from '../utils/formatters';
-import { Select, Input, InputSizes, LayoutSizes, Button } from './DesignSystem';
+import { Select, Input, InputSizes, LayoutSizes, Button, ToolbarSearch } from './DesignSystem';
 import { Flame, Pin } from 'lucide-react';
 import { useDominantColor } from '../hooks/useDominantColor';
 import { AudioPreviewPlayer, AlbumAudioPreviewButton, stopGlobalAudio, audioController } from './AudioPreviewPlayer';
@@ -3678,7 +3678,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [chatLoadingMap, setChatLoadingMap] = useState<Map<string, boolean>>(new Map());
     const [magazineSortBy, setMagazineSortBy] = useState<'none' | 'artist' | 'label'>('none');
     const [magazineSearchQuery, setMagazineSearchQuery] = useState('');
-    const [isListeningMagazineSearch, setIsListeningMagazineSearch] = useState(false);
+    const [isMagazineSearchOpen, setIsMagazineSearchOpen] = useState(false);
     const [hasSeenMagazineView, setHasSeenMagazineView] = useState(false);
     const [jitLoadingIds, setJitLoadingIds] = useState<Set<string>>(new Set());
 
@@ -3735,6 +3735,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     useEffect(() => {
         if (prevIsMagazineViewOpenRef.current && !isMagazineViewOpen) {
             stopGlobalAudio();
+            setIsMagazineSearchOpen(false);
         }
         prevIsMagazineViewOpenRef.current = isMagazineViewOpen;
     }, [isMagazineViewOpen]);
@@ -3853,21 +3854,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [selectedNode, detailsCache, isGlobalLoading, loadingNodeIds, jitLoadingIds, graphData, seedArtists, onUpdateDetailsCache]);
 
-    const handleMagazineSpeechToText = () => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            alert("Speech recognition is not supported in this browser.");
-            return;
-        }
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
-        setIsListeningMagazineSearch(true);
-        recognition.start();
-        recognition.onresult = (event: any) => setMagazineSearchQuery(event.results[0][0].transcript);
-        recognition.onerror = () => setIsListeningMagazineSearch(false);
-        recognition.onend = () => setIsListeningMagazineSearch(false);
-    };
-
     const [chatModes, setChatModes] = useState<Map<string, 'instant' | 'live'>>(new Map());
     const getChatMode = (nodeId: string) => chatModes.get(nodeId) || 'instant';
     const [liveMessageCount, setLiveMessageCount] = useState<number>(() => {
@@ -3957,6 +3943,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 });
                 if (!isPresent) {
                     setMagazineSearchQuery('');
+                    setIsMagazineSearchOpen(false);
                 }
             }
 
@@ -4545,24 +4532,25 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             } as React.CSSProperties}
         >
             {isSmallScreen ? (
-                <div className={`flex-shrink-0 z-[60] transition-all duration-300 print:hidden ${isMagazineViewOpen ? `bg-transparent ${LayoutSizes.topHeader} border-b border-zinc-700/50` : 'bg-zinc-900 h-0 overflow-hidden border-transparent'}`}>
-                    <div className="px-4 flex items-center justify-between gap-4 h-full">
-                        <div className="flex items-center gap-2 flex-grow animate-in fade-in slide-in-from-top-2 duration-500">
-                            <div className="relative flex-grow max-w-none">
-                                <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
-                                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
-                                    type="search"
-                                    placeholder="Search..."
-                                    value={magazineSearchQuery}
-                                    onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                    className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all py-2 pl-9 pr-8 text-sm"
-                                />
-                                <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                                    {magazineSearchQuery && (
-                                        <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.md.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.md.icon}`}>close</span></button>
-                                    )}
-                                </div>
-                            </div>
+                <div
+                    data-testid="zine-toolbar-mobile"
+                    className={`relative flex-shrink-0 z-[60] transition-all duration-300 print:hidden ${isMagazineViewOpen ? `bg-transparent ${LayoutSizes.topHeader} border-b border-zinc-700/50` : 'bg-zinc-900 h-0 overflow-hidden border-transparent'}`}
+                >
+                    <div className="px-4 flex items-center justify-between gap-2 h-full">
+                        <div className="flex items-center gap-2">
+                            <ToolbarSearch
+                                value={magazineSearchQuery}
+                                onChange={setMagazineSearchQuery}
+                                placeholder="Find in zine..."
+                                isMobile={true}
+                                isMobileOpen={isMagazineSearchOpen}
+                                onMobileOpenChange={setIsMagazineSearchOpen}
+                                size="toolbar"
+                                overlayClassName="z-20 px-4 bg-zinc-950/95 backdrop-blur-md"
+                                triggerTestId="zine-search-trigger-mobile"
+                                inputTestId="zine-search-input-mobile"
+                                overlayTestId="zine-search-overlay-mobile"
+                            />
 
                             <div className="relative shrink-0 w-[90px]">
                                 <Select
@@ -4575,6 +4563,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     <option value="label">Label</option>
                                 </Select>
                             </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
                             <Button
                                 variant="secondary"
                                 size="toolbar"
@@ -4612,36 +4603,26 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 isMagazineViewOpen ? (
                     <div className={`${LayoutSizes.topHeader} flex-shrink-0 border-b border-zinc-700/50 bg-transparent z-[60] relative px-4 md:px-6 lg:px-8 print:hidden`}>
                         <div className="max-w-[1400px] mx-auto w-full h-full flex items-center justify-between relative">
-                            <div className="flex items-center gap-4 overflow-hidden w-full h-full -mx-1 px-1">
-                                <div className="flex items-center gap-4 flex-grow animate-in fade-in slide-in-from-left-4 duration-500">
-                                    <div className="flex items-center gap-3 flex-grow max-w-none md:max-w-md">
-                                        <div className="relative flex-grow">
-                                            <span className={`material-symbols-outlined absolute top-1/2 -translate-y-1/2 text-zinc-500 ${InputSizes.md.leftIcon}`}>search</span>
-                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
-                                                type="search"
-                                                placeholder="Search..."
-                                                value={magazineSearchQuery}
-                                                onChange={(e) => setMagazineSearchQuery(e.target.value)}
-                                                className={`w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all ${InputSizes.md.magazineSearch}`}
-                                            />
-                                            <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                                                {magazineSearchQuery && (
-                                                    <button onClick={() => setMagazineSearchQuery('')} className={`flex items-center justify-center text-zinc-400 hover:text-white transition-colors leading-none ${InputSizes.md.iconBtn}`} aria-label="Clear search"><span className={`material-symbols-outlined ${InputSizes.md.icon}`}>close</span></button>
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2 shrink-0">
-                                            <Select
-                                                variant="md"
-                                                value={magazineSortBy}
-                                                onChange={(e) => setMagazineSortBy(e.target.value as any)}
-                                            >
-                                                <option value="none">Default</option>
-                                                <option value="artist">Artist</option>
-                                                <option value="label">Label</option>
-                                            </Select>
-                                        </div>
-                                    </div>
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <ToolbarSearch
+                                    value={magazineSearchQuery}
+                                    onChange={setMagazineSearchQuery}
+                                    placeholder="Find in zine..."
+                                    isMobile={false}
+                                    size="toolbar"
+                                    className="flex-1 min-w-0 max-w-md lg:max-w-lg"
+                                    inputTestId="zine-search-input"
+                                />
+                                <div className="flex items-center gap-2 shrink-0">
+                                    <Select
+                                        variant="md"
+                                        value={magazineSortBy}
+                                        onChange={(e) => setMagazineSortBy(e.target.value as any)}
+                                    >
+                                        <option value="none">Default</option>
+                                        <option value="artist">Artist</option>
+                                        <option value="label">Label</option>
+                                    </Select>
                                 </div>
                             </div>
                             {!isSmallScreen && (
@@ -5026,7 +5007,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </div>
                             ) : filteredAndSortedNodes.length === 0 || systemError ? (
                                 <div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none">
-                                    {(isReconciliationPending || (Boolean(graphData?.nodes && graphData.nodes.length > 0) && !magazineSearchQuery.trim() && seedArtists && seedArtists.length > 0)) && !systemError ? (
+                                    {!magazineSearchQuery.trim() && (isReconciliationPending || (Boolean(graphData?.nodes && graphData.nodes.length > 0) && seedArtists && seedArtists.length > 0)) && !systemError ? (
                                         <div className="flex flex-col items-center justify-center gap-6">
                                             <LoadingSpinner
                                                 steps={DETAIL_THINKING_STEPS}
@@ -5037,7 +5018,21 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         <div className="flex flex-col items-center gap-4">
                                             <ZceneEmptyState onNavigate={onNavigate} />
                                             {magazineSearchQuery && (
-                                                <p className="text-zinc-500 text-sm">No results matching "{magazineSearchQuery}"</p>
+                                                <div className="flex flex-col items-center gap-3 pointer-events-auto">
+                                                    <p className="text-zinc-500 text-sm">No results matching "{magazineSearchQuery}"</p>
+                                                    <button
+                                                        type="button"
+                                                        data-testid="zine-empty-clear-search-btn"
+                                                        onClick={() => {
+                                                            setMagazineSearchQuery('');
+                                                            setIsMagazineSearchOpen(false);
+                                                        }}
+                                                        className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-sm font-medium text-white transition-colors flex items-center gap-2 cursor-pointer"
+                                                    >
+                                                        <span className="material-symbols-outlined !text-[16px]">close</span>
+                                                        Clear Search
+                                                    </button>
+                                                </div>
                                             )}
                                         </div>
                                     )}

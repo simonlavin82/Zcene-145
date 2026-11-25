@@ -1,12 +1,12 @@
 export const BACKEND_REGRESSION_RUNBOOK = `
 # V47.19 Regression Suite (Full-Stack)
 
-This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (625 unit/integration tests).
+This suite locks down the Zcene generation engine locally without incurring Gemini API costs or requiring the heavy Java Firebase Emulator across 28 test suites (631 unit/integration tests).
 
 ## Execution Commands
 
 \`\`\`bash
-# Run entire full-stack regression test suite (28 test files, 625 offline deterministic tests)
+# Run entire full-stack regression test suite (28 test files, 631 offline deterministic tests)
 npm test
 
 # Run backend pipeline tests

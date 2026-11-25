@@ -3612,6 +3612,111 @@ describe('DetailsPanel', () => {
                     }
                 });
             });
+
+            describe('Unified ToolbarSearch — Zine Desktop Inline & Mobile In-Place Takeover', () => {
+                const artistA = { id: 'fugazi-us', label: 'Fugazi', type: 'artist' as const };
+                const artistB = { id: 'jawbox-us', label: 'Jawbox', type: 'artist' as const };
+
+                it('renders always-open inline "Find in zine..." input (h-10, bg-zinc-950) on desktop and filters Zine cards live', () => {
+                    render(
+                        <DetailsPanel
+                            {...baseProps({
+                                isMagazineViewOpen: true,
+                                isSmallScreen: false,
+                                activeNodes: [artistA, artistB],
+                                selectedNode: artistA,
+                            })}
+                        />
+                    );
+
+                    expect(screen.queryByTestId('zine-search-trigger-mobile')).not.toBeInTheDocument();
+                    const searchInput = screen.getByPlaceholderText('Find in zine...');
+                    expect(searchInput).toBeInTheDocument();
+                    expect(searchInput.className).toContain('h-10');
+                    expect(searchInput.className).toContain('bg-zinc-950');
+
+                    expect(document.getElementById('magazine-card-fugazi-us')).toBeInTheDocument();
+                    expect(document.getElementById('magazine-card-jawbox-us')).toBeInTheDocument();
+
+                    fireEvent.change(searchInput, { target: { value: 'jawbox' } });
+                    expect(document.getElementById('magazine-card-jawbox-us')).toBeInTheDocument();
+                    expect(document.getElementById('magazine-card-fugazi-us')).not.toBeInTheDocument();
+                });
+
+                it('renders mobile Zine toolbar with relative justify-between layout, collapses search to 40x40 icon trigger, and synchronously focuses absolute inset-0 takeover on tap', () => {
+                    render(
+                        <DetailsPanel
+                            {...baseProps({
+                                isMagazineViewOpen: true,
+                                isSmallScreen: true,
+                                activeNodes: [artistA, artistB],
+                                selectedNode: artistA,
+                            })}
+                        />
+                    );
+
+                    const mobileToolbar = screen.getByTestId('zine-toolbar-mobile');
+                    expect(mobileToolbar.className).toContain('relative');
+                    expect(mobileToolbar.firstElementChild?.className).toContain('justify-between');
+
+                    const trigger = screen.getByTestId('zine-search-trigger-mobile');
+                    expect(trigger).toBeInTheDocument();
+                    expect(trigger.className).toContain('w-10');
+                    expect(trigger.className).toContain('h-10');
+                    expect(screen.queryByPlaceholderText('Find in zine...')).not.toBeInTheDocument();
+
+                    // Tap opens full-width takeover synchronously with focus
+                    fireEvent.click(trigger);
+                    const overlay = screen.getByTestId('zine-search-overlay-mobile');
+                    expect(overlay.className).toContain('absolute');
+                    expect(overlay.className).toContain('inset-0');
+                    const input = screen.getByPlaceholderText('Find in zine...');
+                    expect(document.activeElement).toBe(input);
+
+                    fireEvent.change(input, { target: { value: 'fugazi' } });
+                    expect(document.getElementById('magazine-card-fugazi-us')).toBeInTheDocument();
+                    expect(document.getElementById('magazine-card-jawbox-us')).not.toBeInTheDocument();
+                });
+
+                it('handles mobile Zine blur, Escape, clear-vs-close X, and empty-state Clear Search cleanly', () => {
+                    render(
+                        <DetailsPanel
+                            {...baseProps({
+                                isMagazineViewOpen: true,
+                                isSmallScreen: true,
+                                activeNodes: [artistA, artistB],
+                                selectedNode: artistA,
+                            })}
+                        />
+                    );
+
+                    // Open -> blur while empty -> auto-collapses
+                    fireEvent.click(screen.getByTestId('zine-search-trigger-mobile'));
+                    const input1 = screen.getByPlaceholderText('Find in zine...');
+                    fireEvent.blur(input1);
+                    expect(screen.queryByTestId('zine-search-overlay-mobile')).not.toBeInTheDocument();
+
+                    // Open -> type non-matching query -> blur stays open -> empty-state Clear Search resets query & closes takeover
+                    fireEvent.click(screen.getByTestId('zine-search-trigger-mobile'));
+                    const input2 = screen.getByPlaceholderText('Find in zine...');
+                    fireEvent.change(input2, { target: { value: 'nonexistent-band-xyz' } });
+                    fireEvent.blur(input2);
+                    expect(screen.getByTestId('zine-search-overlay-mobile')).toBeInTheDocument();
+
+                    fireEvent.click(screen.getByTestId('zine-empty-clear-search-btn'));
+                    expect(screen.queryByTestId('zine-search-overlay-mobile')).not.toBeInTheDocument();
+                    expect(document.getElementById('magazine-card-fugazi-us')).toBeInTheDocument();
+                    expect(document.getElementById('magazine-card-jawbox-us')).toBeInTheDocument();
+
+                    // Open -> type query -> Escape clears and closes takeover
+                    fireEvent.click(screen.getByTestId('zine-search-trigger-mobile'));
+                    const input3 = screen.getByPlaceholderText('Find in zine...');
+                    fireEvent.change(input3, { target: { value: 'jawbox' } });
+                    fireEvent.keyDown(input3, { key: 'Escape' });
+                    expect(screen.queryByTestId('zine-search-overlay-mobile')).not.toBeInTheDocument();
+                    expect(document.getElementById('magazine-card-fugazi-us')).toBeInTheDocument();
+                });
+            });
         });
     });
 });

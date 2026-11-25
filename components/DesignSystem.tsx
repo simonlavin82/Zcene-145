@@ -13,6 +13,9 @@ import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
+import { ToolbarSearch } from './ui/ToolbarSearch';
+export { ToolbarSearch } from './ui/ToolbarSearch';
+export type { ToolbarSearchProps } from './ui/ToolbarSearch';
 import { Waypoints, Flame, Check, ArrowLeft, Pin } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown } from './SharedModals';
@@ -565,6 +568,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     const [selectedOnboardingStep, setSelectedOnboardingStep] = useState<string>('step1');
     const [demoGraphLinkActive, setDemoGraphLinkActive] = useState(false);
     const [demoBridgeLineActive, setDemoBridgeLineActive] = useState(false);
+    const [demoInlineSearchEmpty, setDemoInlineSearchEmpty] = useState('');
+    const [demoInlineSearchFilled, setDemoInlineSearchFilled] = useState('Spaced');
+    const [demoMobileSearchQuery, setDemoMobileSearchQuery] = useState('');
+    const [demoMobileSearchOpen, setDemoMobileSearchOpen] = useState(false);
+    const [demoMobileActiveQuery, setDemoMobileActiveQuery] = useState('Fugazi');
+    const [demoMobileActiveOpen, setDemoMobileActiveOpen] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -1914,7 +1923,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                                 <div className="space-y-2">
                                     <p className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Base Primitive</p>
-                                    <p className="text-sm text-zinc-400">All canvas controls utilize a standardized <code>w-12 h-12 rounded-xl bg-zinc-900/80 backdrop-blur-md border border-zinc-700</code> visual baseline, establishing a unified boxy aesthetic.</p>
+                                    <p className="text-sm text-zinc-400">All canvas controls utilize a standardized <code>w-[38px] h-[38px] rounded-xl bg-zinc-900/80 backdrop-blur-md border border-zinc-700</code> visual baseline, establishing a unified boxy aesthetic.</p>
                                 </div>
                             </div>
 
@@ -3614,41 +3623,99 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div>
                                 <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Fully-Featured Search Input</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 border border-primary/20 rounded-full">Component: ToolbarSearch</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Breakpoint: md (768px / isSmallScreen)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Sizes: toolbar (h-10) · control (h-[38px])</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Copy: &ldquo;Find in &lt;view&gt;...&rdquo;</span>
+                                    </div>
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
-                                    <div className="space-y-4">
-                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Empty State (Mic Available)</p>
-                                        <div className="relative">
-                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
-                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
-                                                type="search" 
-                                                placeholder="Search..." 
-                                                className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
-                                                disabled
+                                <div className="space-y-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
+                                    <p className="text-sm text-zinc-400 leading-relaxed max-w-3xl">
+                                        Unified toolbar search primitive used across <strong>Dashboard</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">size=&quot;control&quot;</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">h-[38px]</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">&quot;Find in zcenes...&quot;</code>) and <strong>Zine</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">size=&quot;toolbar&quot;</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">h-10</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">&quot;Find in zine...&quot;</code>). Built on <strong>The Void</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-zinc-950</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">border-zinc-700</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">focus:ring-1 focus:ring-primary</code>). Always open inline at <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">md:</code> (&ge;768px); collapses below <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">md:</code> into a secondary icon button that opens a full-width <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">absolute inset-0</code> toolbar takeover (<code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">z-20</code> / <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">z-30</code>) with zero vertical layout shift.
+                                    </p>
+
+                                    {/* Desktop Inline Specimens */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Desktop Inline — Empty State</p>
+                                            <ToolbarSearch
+                                                value={demoInlineSearchEmpty}
+                                                onChange={setDemoInlineSearchEmpty}
+                                                placeholder="Find in zcenes..."
+                                                isMobile={false}
+                                                size="toolbar"
                                             />
-                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                                                <button className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-500 hover:text-white transition-colors leading-none" title="Search by voice">
-                                                    <MicIcon className="!text-[18px]" />
-                                                </button>
-                                            </div>
+                                        </div>
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Desktop Inline — Filled State (Clear Available)</p>
+                                            <ToolbarSearch
+                                                value={demoInlineSearchFilled}
+                                                onChange={setDemoInlineSearchFilled}
+                                                placeholder="Find in zine..."
+                                                isMobile={false}
+                                                size="toolbar"
+                                            />
                                         </div>
                                     </div>
-                                    <div className="space-y-4">
-                                        <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Filled State (Clear Available)</p>
-                                        <div className="relative">
-                                            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px]">search</span>
-                                            <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
-                                                type="search" 
-                                                placeholder="Search..." 
-                                                defaultValue="Spaced"
-                                                className="w-full h-10 appearance-none rounded-xl border border-zinc-700 bg-zinc-950 py-2 pl-10 pr-12 text-sm text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none" 
-                                                disabled
-                                            />
-                                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-0.5">
-                                                <button className="w-8 h-8 flex items-center justify-center rounded-xl text-zinc-400 hover:text-white transition-colors leading-none" aria-label="Clear search">
-                                                    <span className="material-symbols-outlined !text-[18px]">close</span>
-                                                </button>
+
+                                    {/* Interactive Mobile In-Place Takeover Specimens */}
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 pt-4 border-t border-zinc-800/80">
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Mobile In-Place Takeover (375px Interactive Preview)</p>
+                                            <div className="relative h-16 max-w-[375px] rounded-xl border border-zinc-800 bg-zinc-950/70 px-4 flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <ToolbarSearch
+                                                        value={demoMobileSearchQuery}
+                                                        onChange={setDemoMobileSearchQuery}
+                                                        placeholder="Find in zine..."
+                                                        isMobile={true}
+                                                        isMobileOpen={demoMobileSearchOpen}
+                                                        onMobileOpenChange={setDemoMobileSearchOpen}
+                                                        size="toolbar"
+                                                        overlayClassName="z-20 px-4 rounded-xl bg-zinc-950/95 backdrop-blur-md"
+                                                    />
+                                                    <div className="w-[90px] shrink-0">
+                                                        <Select variant="md" defaultValue="none" aria-label="Demo sort">
+                                                            <option value="none">Sort</option>
+                                                            <option value="artist">Artist</option>
+                                                            <option value="label">Label</option>
+                                                        </Select>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-center gap-2 shrink-0">
+                                                    <Button variant="secondary" size="toolbar" type="button" className="w-10 !px-0 justify-center" aria-label="Demo Save as PDF">
+                                                        <span className="material-symbols-outlined !text-[18px]">picture_as_pdf</span>
+                                                    </Button>
+                                                    <Button variant="secondary" size="toolbar" iconPosition="left" type="button" className="w-[88px]">
+                                                        <span className="material-symbols-outlined !text-[18px] -ml-0.5">edit</span>
+                                                        <span>Edit</span>
+                                                    </Button>
+                                                </div>
                                             </div>
+                                            <p className="text-xs text-zinc-500">Tap the search icon to trigger the synchronous <code className="text-zinc-300 font-mono">absolute inset-0</code> takeover. Blurring while empty collapses automatically; blurring with an active query stays open.</p>
+                                        </div>
+
+                                        <div className="space-y-3">
+                                            <p className="text-xs text-zinc-500 uppercase tracking-widest font-semibold">Mobile Collapsed — Active Filter Indicator</p>
+                                            <div className="relative h-16 max-w-[375px] rounded-xl border border-zinc-800 bg-zinc-950/70 px-4 flex items-center justify-between gap-2">
+                                                <div className="flex items-center gap-2">
+                                                    <ToolbarSearch
+                                                        value={demoMobileActiveQuery}
+                                                        onChange={setDemoMobileActiveQuery}
+                                                        placeholder="Find in zine..."
+                                                        isMobile={true}
+                                                        isMobileOpen={demoMobileActiveOpen}
+                                                        onMobileOpenChange={setDemoMobileActiveOpen}
+                                                        size="toolbar"
+                                                        overlayClassName="z-20 px-4 rounded-xl bg-zinc-950/95 backdrop-blur-md"
+                                                    />
+                                                    <span className="text-xs text-zinc-400">
+                                                        Active query: <code className="text-primary font-mono">&ldquo;{demoMobileActiveQuery || 'none'}&rdquo;</code>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <p className="text-xs text-zinc-500">If collapsed while a query is active, the icon button elevates with <code className="text-zinc-300 font-mono">border-primary/70 text-primary bg-primary/10</code> and a <code className="text-zinc-300 font-mono">bg-primary</code> status dot so filters are never invisible.</p>
                                         </div>
                                     </div>
                                 </div>

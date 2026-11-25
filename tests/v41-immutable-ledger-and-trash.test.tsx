@@ -596,7 +596,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       expect(engineContent).toContain('48 Laws');
       expect(engineContent).toContain('V47.19 Full-Stack Regression Runbook');
       expect(runbookContent).toContain('# V47.19 Regression Suite (Full-Stack)');
-      expect(runbookContent).toContain('28 test suites (625 unit/integration tests)');
+      expect(runbookContent).toContain('28 test suites (631 unit/integration tests)');
       expect(runbookContent).not.toContain('583 unit/integration tests');
       expect(runbookContent).not.toContain('599 unit/integration tests');
       expect(runbookContent).not.toContain('604 unit/integration tests');
@@ -605,6 +605,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       expect(runbookContent).not.toContain('617 unit/integration tests');
       expect(runbookContent).not.toContain('619 unit/integration tests');
       expect(runbookContent).not.toContain('623 unit/integration tests');
+      expect(runbookContent).not.toContain('625 unit/integration tests');
 
       // Content-level Rule 38 & Rule 11/17 parity locks across EnginePage.tsx, architecture_truth.md, and runbook
       for (const docSurface of [truthContent, engineContent, runbookContent]) {

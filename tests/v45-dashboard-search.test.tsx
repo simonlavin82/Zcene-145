@@ -2,6 +2,7 @@ import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import Dashboard from '../components/Dashboard';
+import { ToolbarSearch } from '../components/DesignSystem';
 import { Project } from '../types';
 
 // Mock dependencies
@@ -41,7 +42,7 @@ describe('Architecture V45: Dashboard Search Parity (Artist & Label Nodes, Multi
     vi.clearAllMocks();
   });
 
-  const renderDashboard = (projects: Project[]) => {
+  const renderDashboard = (projects: Project[], isSmallScreen = false) => {
     return render(
       <Dashboard
         user={mockUser}
@@ -61,7 +62,7 @@ describe('Architecture V45: Dashboard Search Parity (Artist & Label Nodes, Multi
         setIsProfileOpen={vi.fn()}
         isDeleteAccountModalOpen={false}
         setIsDeleteAccountModalOpen={vi.fn()}
-        isSmallScreen={false}
+        isSmallScreen={isSmallScreen}
         onOpenStack={vi.fn()}
         onNavigate={vi.fn()}
         isMenuOpen={false}
@@ -280,5 +281,106 @@ describe('Architecture V45: Dashboard Search Parity (Artist & Label Nodes, Multi
     // Clear search returns project
     fireEvent.change(searchInput, { target: { value: '' } });
     expect(screen.getByText('Spaced Project')).toBeInTheDocument();
+  });
+
+  it('8. Desktop renders always-open inline Void search input (h-[38px], bg-zinc-950) and clears on Escape', () => {
+    const project = createMockProject({ id: 'proj-inline', name: 'Mouthpiece', seedArtists: 'Mouthpiece' });
+    renderDashboard([project], false);
+
+    expect(screen.queryByTestId('dashboard-search-trigger')).not.toBeInTheDocument();
+    const searchInput = screen.getByPlaceholderText('Find in zcenes...');
+    expect(searchInput).toBeInTheDocument();
+    expect(searchInput.className).toContain('bg-zinc-950');
+    expect(searchInput.className).toContain('h-[38px]');
+
+    fireEvent.change(searchInput, { target: { value: 'zzzz-no-match' } });
+    expect(screen.getByText(/No Zcenes found matching/i)).toBeInTheDocument();
+
+    fireEvent.keyDown(searchInput, { key: 'Escape' });
+    expect((searchInput as HTMLInputElement).value).toBe('');
+    expect(screen.getByText('Mouthpiece')).toBeInTheDocument();
+  });
+
+  it('9. Mobile collapses to icon trigger, synchronously focuses full-width takeover via flushSync, marks siblings inert, and preserves open state on blur when query is active', () => {
+    const project = createMockProject({ id: 'proj-mobile', name: 'Mouthpiece', seedArtists: 'Mouthpiece' });
+    renderDashboard([project], true);
+
+    // Collapsed by default: single trigger, zero search inputs mounted
+    const trigger = screen.getByTestId('dashboard-search-trigger');
+    expect(trigger).toBeInTheDocument();
+    expect(trigger.className).toContain('w-[38px]');
+    expect(trigger.className).toContain('h-[38px]');
+    expect(screen.queryByPlaceholderText('Find in zcenes...')).not.toBeInTheDocument();
+
+    // Tap opens takeover synchronously and focuses input inside user gesture
+    fireEvent.click(trigger);
+    const overlay = screen.getByTestId('dashboard-search-overlay');
+    expect(overlay.className).toContain('absolute');
+    expect(overlay.className).toContain('inset-0');
+    const searchInput = screen.getByPlaceholderText('Find in zcenes...');
+    expect(document.activeElement).toBe(searchInput);
+
+    // Sibling controls (ViewToggle group & toolbar + Create button) are marked inert while takeover is open
+    const sortToggleWrapper = screen.getByRole('button', { name: 'Sort by Recent', hidden: true }).closest('[inert]');
+    expect(sortToggleWrapper).not.toBeNull();
+    const toolbarCreateBtn = screen.getByRole('button', { name: /^add\s*create$/i, hidden: true });
+    expect(toolbarCreateBtn.parentElement?.hasAttribute('inert')).toBe(true);
+
+    // Blur while empty collapses back to trigger
+    fireEvent.blur(searchInput);
+    expect(screen.queryByPlaceholderText('Find in zcenes...')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-search-trigger')).toBeInTheDocument();
+
+    // Re-open, type query, blur -> MUST stay open so active filter is never invisible
+    fireEvent.click(screen.getByTestId('dashboard-search-trigger'));
+    const activeInput = screen.getByPlaceholderText('Find in zcenes...');
+    fireEvent.change(activeInput, { target: { value: 'no-match-xyz' } });
+    fireEvent.blur(activeInput);
+    expect(screen.getByTestId('dashboard-search-overlay')).toBeInTheDocument();
+
+    // Clicking empty-state "Clear Search" clears query AND closes mobile takeover
+    const emptyClearBtn = screen.getByText('Clear Search').closest('button')!;
+    fireEvent.click(emptyClearBtn);
+    expect(screen.queryByTestId('dashboard-search-overlay')).not.toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-search-trigger')).toBeInTheDocument();
+    expect(screen.getByText('Mouthpiece')).toBeInTheDocument();
+  });
+
+  it('10. Mobile clear/close X clears non-empty query keeping focus, closes when empty, and renders active dot when collapsed with query', () => {
+    const project = createMockProject({ id: 'proj-x', name: 'Spaced', seedArtists: 'Spaced' });
+    const { unmount } = renderDashboard([project], true);
+
+    fireEvent.click(screen.getByTestId('dashboard-search-trigger'));
+    const input = screen.getByPlaceholderText('Find in zcenes...');
+    fireEvent.change(input, { target: { value: 'Spaced' } });
+
+    // First X click clears text and keeps input open + focused
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect((input as HTMLInputElement).value).toBe('');
+    expect(document.activeElement).toBe(input);
+    expect(screen.getByTestId('dashboard-search-overlay')).toBeInTheDocument();
+
+    // Second X click (when empty) closes the takeover
+    fireEvent.click(screen.getByRole('button', { name: 'Close search' }));
+    expect(screen.queryByTestId('dashboard-search-overlay')).not.toBeInTheDocument();
+    unmount();
+
+    // Collapsed ToolbarSearch with active query displays unmistakable bg-primary indicator dot
+    render(
+      <ToolbarSearch
+        value="Fugazi"
+        onChange={vi.fn()}
+        placeholder="Find in zcenes..."
+        isMobile={true}
+        isMobileOpen={false}
+        onMobileOpenChange={vi.fn()}
+        size="control"
+        triggerTestId="collapsed-active-trigger"
+      />
+    );
+    const activeTrigger = screen.getByTestId('collapsed-active-trigger');
+    expect(activeTrigger.className).toContain('border-primary/70');
+    expect(activeTrigger.className).toContain('text-primary');
+    expect(screen.getByTestId('toolbar-search-active-dot')).toBeInTheDocument();
   });
 });
