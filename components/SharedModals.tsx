@@ -39,9 +39,8 @@ export const MyStackDialog: React.FC<{
   onView: (id: string | null) => void;
   onAddArtist: (artistName: string) => void;
   seedArtists: string[];
-  archivedCount?: number;
   onOpenStackArchive?: () => void;
-}> = ({ isOpen, onClose, stack, onRemove, onView, onAddArtist, seedArtists, archivedCount = 0, onOpenStackArchive }) => {
+}> = ({ isOpen, onClose, stack, onRemove, onView, onAddArtist, seedArtists, onOpenStackArchive }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = (id: string, name: string) => {
@@ -125,19 +124,9 @@ export const MyStackDialog: React.FC<{
                             type="button"
                             data-testid="my-stack-archive-link"
                             onClick={onOpenStackArchive}
-                            className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-primary transition-colors text-sm cursor-pointer whitespace-nowrap shrink-0 group"
+                            className="text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 hover:decoration-primary/60 cursor-pointer whitespace-nowrap shrink-0"
                         >
-                            <span className="underline underline-offset-4 decoration-zinc-700 group-hover:decoration-primary/60">
-                                Stack Archive
-                            </span>
-                            {archivedCount > 0 && (
-                                <span
-                                    data-testid="my-stack-archive-count"
-                                    className="h-4.5 min-w-[18px] px-1 rounded-lg inline-flex items-center justify-center text-[9px] font-semibold font-mono border bg-zinc-800 text-zinc-400 border-zinc-700 leading-none"
-                                >
-                                    {archivedCount}
-                                </span>
-                            )}
+                            Stack Archive
                         </button>
                     )}
                     <div className="flex items-center gap-2 shrink-0">

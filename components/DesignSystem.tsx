@@ -4243,7 +4243,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Header/Footer</h4>
-                                            <p className="text-sm text-zinc-400">Uses <strong>bg-zinc-900</strong> to provide visual anchoring against the main body. Features consistent 1px borders for separation. Split footers (e.g., <code className="text-xs text-zinc-300">MyStackDialog</code>) wrap a left-aligned Standard Text Link + passive Small Contextual Indicator opposite right-aligned <strong>Cancel</strong> + <strong>Done</strong> buttons via <code className="text-xs text-zinc-300">flex items-center justify-between w-full</code>.</p>
+                                            <p className="text-sm text-zinc-400">Uses <strong>bg-zinc-900</strong> to provide visual anchoring against the main body. Features consistent 1px borders for separation. Split footers (e.g., <code className="text-xs text-zinc-300">MyStackDialog</code>) wrap a left-aligned Standard Text Link opposite right-aligned <strong>Cancel</strong> + <strong>Done</strong> buttons via <code className="text-xs text-zinc-300">flex items-center justify-between w-full</code>.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Animation</h4>

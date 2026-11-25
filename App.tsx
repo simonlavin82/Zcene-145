@@ -12028,7 +12028,6 @@ const App: React.FC = () => {
           }
         }}
         stack={activeStack}
-        archivedCount={archivedStack.length}
         onOpenStackArchive={handleOpenStackArchive}
         onRemove={(docId) => handleArchiveStackItem(docId as string)}
         onView={(id) => {

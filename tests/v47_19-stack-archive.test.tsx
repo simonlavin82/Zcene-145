@@ -738,9 +738,9 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     });
   });
 
-  it('12. MyStackDialog renders left-aligned Stack Archive text link + passive contextual indicator alongside Cancel/Done, raises Toast to z-[10000], and fixes DesignSystem raw markdown', () => {
+  it('12. MyStackDialog renders plain left-aligned Stack Archive text link with no count indicator alongside Cancel/Done, raises Toast to z-[10000], and fixes DesignSystem raw markdown', () => {
     const onOpenStackArchive = vi.fn();
-    const { rerender } = render(
+    render(
       <MyStackDialog
         isOpen={true}
         onClose={vi.fn()}
@@ -749,7 +749,6 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
         onView={vi.fn()}
         onAddArtist={vi.fn()}
         seedArtists={[]}
-        archivedCount={0}
         onOpenStackArchive={onOpenStackArchive}
       />
     );
@@ -762,25 +761,6 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
 
     fireEvent.click(archiveLink);
     expect(onOpenStackArchive).toHaveBeenCalledTimes(1);
-
-    // 3-digit count displays passive contextual indicator cleanly without clipping
-    rerender(
-      <MyStackDialog
-        isOpen={true}
-        onClose={vi.fn()}
-        stack={[]}
-        onRemove={vi.fn()}
-        onView={vi.fn()}
-        onAddArtist={vi.fn()}
-        seedArtists={[]}
-        archivedCount={124}
-        onOpenStackArchive={onOpenStackArchive}
-      />
-    );
-    const countBadge = screen.getByTestId('my-stack-archive-count');
-    expect(countBadge).toHaveTextContent('124');
-    expect(countBadge.className).toContain('rounded-lg');
-    expect(countBadge.className).toContain('min-w-[18px]');
 
     // Toast z-index floats above MyStackDialog (z-[2000]) and mobile Zine (z-[9999])
     const appSrc = fs.readFileSync(path.resolve(__dirname, '../App.tsx'), 'utf-8');
