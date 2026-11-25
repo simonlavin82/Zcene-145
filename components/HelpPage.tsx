@@ -839,7 +839,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                     </li>
                                     <li className="flex items-start gap-4">
                                         <span className="material-symbols-outlined text-primary !text-[20px] flex-shrink-0 mt-0.5">content_copy</span>
-                                        <p className="text-sm text-zinc-400 leading-relaxed"><strong className="text-zinc-200">One-Tap Copy &amp; Clean Up:</strong> Open <strong>My Stack</strong> from the header to review your shortlist with timestamps and discovery provenance, tap any name to copy it instantly for your streaming app or record store search, or remove items once you have listened.</p>
+                                        <p className="text-sm text-zinc-400 leading-relaxed"><strong className="text-zinc-200">One-Tap Copy &amp; Stack Archive:</strong> Open <strong>My Stack</strong> from the header to review your shortlist with timestamps and discovery provenance, tap any name to copy it instantly for your streaming app or record store search, or archive items once you have listened. Archived discoveries remain searchable and restorable anytime inside your <strong>Discovery Ledger</strong>.</p>
                                     </li>
                                 </ul>
                             </div>

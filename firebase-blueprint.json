@@ -17,13 +17,17 @@
     },
     "Stack": {
       "title": "Stack",
-      "description": "User's saved artists and labels",
+      "description": "User's saved and archived artists and labels",
       "type": "object",
       "properties": {
         "id": { "type": "string" },
         "type": { "type": "string" },
         "dateSaved": { "type": "integer" },
-        "link": { "type": "string" }
+        "displayName": { "type": "string" },
+        "discoveredVia": { "type": "string" },
+        "docId": { "type": "string" },
+        "status": { "type": "string", "enum": ["active", "archived"] },
+        "archivedAt": { "type": "integer" }
       },
       "required": ["id", "type", "dateSaved"]
     },

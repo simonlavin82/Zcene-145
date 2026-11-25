@@ -104,10 +104,11 @@ export const MyStackDialog: React.FC<{
                                 <div className="flex items-center flex-shrink-0 pl-4">
                                     <button 
                                         onClick={() => onRemove(item.docId || item.id)}
-                                        className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-red-400 hover:bg-red-400/10 transition-colors"
-                                        title="Remove from stack"
+                                        className="w-7 h-7 flex items-center justify-center rounded-md text-zinc-500 hover:text-white hover:bg-zinc-800 transition-colors cursor-pointer"
+                                        title="Move to Stack Archive"
+                                        aria-label="Move to Stack Archive"
                                     >
-                                        <span className="material-symbols-outlined !text-[16px]">delete</span>
+                                        <span className="material-symbols-outlined !text-[16px]">archive</span>
                                     </button>
                                 </div>
                             </div>

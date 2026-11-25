@@ -14,7 +14,7 @@ import { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extract
 export { computeProjectHydrationFingerprint, computeAutosaveDocSnapshot, extractCanonicalGraphSignature };
 import { auth, signInWithGoogle, reauthenticateWithGoogle, logout, onAuthStateChanged, User, db, functions, handleFirestoreError, OperationType } from './services/firebase';
 import { translateError, translateToast } from './services/errorTranslationLayer';
-import { collection, doc, setDoc, deleteDoc, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit, Timestamp } from 'firebase/firestore';
+import { collection, doc, setDoc, deleteDoc, deleteField, onSnapshot, query, getDocFromServer, serverTimestamp, addDoc, getDoc, getDocs, orderBy, where, writeBatch, getDocFromCache, updateDoc, increment, limit, Timestamp } from 'firebase/firestore';
 const StyleGuidePage = React.lazy(() => import('./components/DesignSystem').then(m => ({ default: m.StyleGuidePage })));
 const EnginePage = React.lazy(() => import('./components/EnginePage').then(m => ({ default: m.EnginePage })));
 const UsageAnalyticsPage = React.lazy(() => import('./components/UsageAnalyticsPage').then(m => ({ default: m.UsageAnalyticsPage })));
@@ -1240,6 +1240,11 @@ const App: React.FC = () => {
   const [pinnedNodes, setPinnedNodes] = useState<Set<string>>(new Set());
   const [stack, setStack] = useState<StackItem[]>([]);
   const [lastViewedStackCount, setLastViewedStackCount] = useState<number>(0);
+  const activeStack = useMemo(() => stack.filter(item => item.status !== 'archived'), [stack]);
+  const archivedStack = useMemo(() => stack.filter(item => item.status === 'archived'), [stack]);
+  useEffect(() => {
+    setLastViewedStackCount(prev => Math.min(prev, activeStack.length));
+  }, [activeStack.length]);
   const [baseGraph, setBaseGraph] = useState<GraphData | null>(null);
   const hasAutoSelectedRef = useRef<string | null>(null);
   const healedDetailsCacheRef = useRef<Map<string, NodeDetails>>(new Map());
@@ -3491,8 +3496,8 @@ const App: React.FC = () => {
 
   const handleOpenStack = useCallback(() => {
     setIsStackDialogOpen(true);
-    setLastViewedStackCount(stack.length);
-  }, [stack.length]);
+    setLastViewedStackCount(activeStack.length);
+  }, [activeStack.length]);
 
   const handleCloseModals = useCallback(() => {
     setIsStackDialogOpen(false);
@@ -4043,26 +4048,27 @@ const App: React.FC = () => {
 
   }, [selectedNode, peekedNode, isSmallScreen, supportsLabelDeepCuts, showToast, isGuest, handleSelectScene]);
 
-  const handleAddToStack = useCallback(async (node: Node, link?: string) => {
+  const handleAddToStack = useCallback(async (node: Node) => {
     if (!user) {
-      setPendingAuthAction({ type: 'toggleStack', payload: { node, link } });
+      setPendingAuthAction({ type: 'toggleStack', payload: { node } });
       handleLogin();
       return;
     }
 
     const stackPath = `users/${user.uid}/stack`;
-    const safeNodeId = node.id.replace(/[^a-zA-Z0-9_\-]/g, '_');
+    const canonicalId = stripSceneNamespace(node.canonicalId || node.id);
+    const safeNodeId = canonicalId.replace(/[^a-zA-Z0-9_\-]/g, '_');
     const docId = `${safeNodeId}_${currentProjectId || 'global'}`;
     const itemRef = doc(db, stackPath, docId);
     const itemPath = `${stackPath}/${docId}`;
 
     try {
       const newItem: StackItem = {
-        id: node.id,
+        id: canonicalId,
         displayName: node.label,
         type: node.type || "artist",
         dateSaved: Date.now(),
-        link: link || "",
+        status: 'active',
         ...(projectName && { discoveredVia: projectName }),
         docId: docId
       };
@@ -4096,20 +4102,59 @@ const App: React.FC = () => {
     }
   }, [user, showToast, handleLogin, projectName, currentProjectId]);
 
-  const handleRemoveFromStack = useCallback(async (docId: string) => {
+  const handleArchiveStackItem = useCallback(async (docId: string) => {
     if (!user || !docId) return;
     const stackPath = `users/${user.uid}/stack`;
     const itemRef = doc(db, stackPath, docId);
-    
+
     try {
-      console.log(`[Database Reporter] Attempting DELETE | Path: ${stackPath}/${docId}`);
-      await deleteDoc(itemRef);
-      console.log(`[Database Reporter] SUCCESS: Item removed from Stack.`);
+      console.log(`[Database Reporter] Attempting SOFT-ARCHIVE | Path: ${stackPath}/${docId}`);
+      await updateDoc(itemRef, {
+        status: 'archived',
+        archivedAt: Date.now(),
+      });
+      console.log(`[Database Reporter] SUCCESS: Item moved to Stack Archive.`);
+      showToast('Moved to Stack Archive');
     } catch (err: any) {
-      console.error(`[Database Reporter] STACK REMOVE OPERATION FAILED at: ${stackPath}/${docId}`);
+      console.error(`[Database Reporter] STACK ARCHIVE OPERATION FAILED at: ${stackPath}/${docId}`);
+      handleFirestoreError(err, OperationType.UPDATE, `${stackPath}/${docId}`);
+    }
+  }, [user, showToast]);
+
+  const handleRestoreStackItem = useCallback(async (docId: string) => {
+    if (!user || !docId) return;
+    const stackPath = `users/${user.uid}/stack`;
+    const itemRef = doc(db, stackPath, docId);
+
+    try {
+      console.log(`[Database Reporter] Attempting RESTORE | Path: ${stackPath}/${docId}`);
+      await updateDoc(itemRef, {
+        status: 'active',
+        archivedAt: deleteField(),
+      });
+      console.log(`[Database Reporter] SUCCESS: Item restored to My Stack.`);
+      showToast('Restored to My Stack');
+    } catch (err: any) {
+      console.error(`[Database Reporter] STACK RESTORE OPERATION FAILED at: ${stackPath}/${docId}`);
+      handleFirestoreError(err, OperationType.UPDATE, `${stackPath}/${docId}`);
+    }
+  }, [user, showToast]);
+
+  const handlePermanentDeleteStackItem = useCallback(async (docId: string) => {
+    if (!user || !docId) return;
+    const stackPath = `users/${user.uid}/stack`;
+    const itemRef = doc(db, stackPath, docId);
+
+    try {
+      console.log(`[Database Reporter] Attempting PERMANENT DELETE | Path: ${stackPath}/${docId}`);
+      await deleteDoc(itemRef);
+      console.log(`[Database Reporter] SUCCESS: Item permanently deleted from Stack Archive.`);
+      showToast('Permanently deleted from Stack Archive');
+    } catch (err: any) {
+      console.error(`[Database Reporter] STACK PERMANENT DELETE FAILED at: ${stackPath}/${docId}`);
       handleFirestoreError(err, OperationType.DELETE, `${stackPath}/${docId}`);
     }
-  }, [user]);
+  }, [user, showToast]);
 
   // --- Rule 29: Universal Payload Serializer ---
   // A Single Source of Truth for "what constitutes a Zcene payload".
@@ -7765,7 +7810,7 @@ const App: React.FC = () => {
 
       console.log(`[Lazy Registration] Executing pending action: ${type}`);
       if (type === 'toggleStack') {
-        handleAddToStack(payload.node, payload.link);
+        handleAddToStack(payload.node);
       } else if (type === 'generateGraph') {
         handleGenerateGraph(payload.artists, payload.isRegeneration, payload.graphToEnhance);
       } else if (type === 'saveToDashboard') {
@@ -7828,7 +7873,7 @@ const App: React.FC = () => {
     const unsubscribe = onSnapshot(stackRef, (snapshot) => {
       const items: StackItem[] = [];
       snapshot.forEach((docSnap) => {
-        items.push({ ...docSnap.data() } as StackItem);
+        items.push({ ...docSnap.data(), docId: docSnap.id } as StackItem);
       });
       setStack(items);
       console.log(`[Stack Listener] Synchronized ${items.length} stack items.`);
@@ -11277,8 +11322,8 @@ const App: React.FC = () => {
           <Dashboard
             user={user}
             projects={projects}
-            stack={stack}
-            isStackNew={stack.length > lastViewedStackCount}
+            stack={activeStack}
+            isStackNew={activeStack.length > lastViewedStackCount}
             onSelectProject={(id) => {
               setIsPassiveSelection(true);
               setPeekedNode(null);
@@ -11645,7 +11690,7 @@ const App: React.FC = () => {
               }}
               onNavigate={handleMenuNavigate} onClearLibrary={handleClearLib} onClearZcene={handleClearZcene}
               isActive={currentView === View.Graph} chatHistories={chatHistories} onUpdateChatHistories={handleUpdateChatHistories}
-              onShowToast={showToast} onRefreshUI={handleRefreshUI} onAddToStack={handleAddToStack} stackCount={stack.length}
+              onShowToast={showToast} onRefreshUI={handleRefreshUI} onAddToStack={handleAddToStack} stackCount={activeStack.length}
               onShareZcene={handleTriggerShareModal} isSharingZcene={isSharing}
               onDeleteAccount={handleDeleteAccount}
               isAdmin={isAdmin}
@@ -11683,9 +11728,9 @@ const App: React.FC = () => {
             user={user}
             onLogoClick={handleLogoClick}
             isSmallScreen={isSmallScreen}
-            stackCount={stack.length}
-            isStackNew={stack.length > lastViewedStackCount}
-            onOpenStack={() => setIsStackDialogOpen(true)}
+            stackCount={activeStack.length}
+            isStackNew={activeStack.length > lastViewedStackCount}
+            onOpenStack={handleOpenStack}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
             isProfileOpen={isProfileOpen}
@@ -11708,9 +11753,9 @@ const App: React.FC = () => {
             user={user}
             onLogoClick={handleLogoClick}
             isSmallScreen={isSmallScreen}
-            stackCount={stack.length}
-            isStackNew={stack.length > lastViewedStackCount}
-            onOpenStack={() => setIsStackDialogOpen(true)}
+            stackCount={activeStack.length}
+            isStackNew={activeStack.length > lastViewedStackCount}
+            onOpenStack={handleOpenStack}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
             isAdmin={isAdmin}
@@ -11736,9 +11781,9 @@ const App: React.FC = () => {
             user={user}
             onLogoClick={handleLogoClick}
             isSmallScreen={isSmallScreen}
-            stackCount={stack.length}
-            isStackNew={stack.length > lastViewedStackCount}
-            onOpenStack={() => setIsStackDialogOpen(true)}
+            stackCount={activeStack.length}
+            isStackNew={activeStack.length > lastViewedStackCount}
+            onOpenStack={handleOpenStack}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
             isAdmin={isAdmin}
@@ -11761,9 +11806,9 @@ const App: React.FC = () => {
             user={user}
             onLogoClick={handleLogoClick}
             isSmallScreen={isSmallScreen}
-            stackCount={stack.length}
-            isStackNew={stack.length > lastViewedStackCount}
-            onOpenStack={() => setIsStackDialogOpen(true)}
+            stackCount={activeStack.length}
+            isStackNew={activeStack.length > lastViewedStackCount}
+            onOpenStack={handleOpenStack}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
             isAdmin={isAdmin}
@@ -11776,6 +11821,9 @@ const App: React.FC = () => {
             onRestartWalkthrough={handleDashboardRestartWalkthrough}
             onClose={handleSubpageClose}
             profile={profile}
+            archivedStack={archivedStack}
+            onRestoreStackItem={handleRestoreStackItem}
+            onPermanentDeleteStackItem={handlePermanentDeleteStackItem}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Trash ? 'z-10' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
@@ -11795,8 +11843,8 @@ const App: React.FC = () => {
             onPermanentDeleteProject={handlePermanentDeleteProject}
             onLogoClick={handleLogoClick}
             isSmallScreen={isSmallScreen}
-            stackCount={stack.length}
-            isStackNew={stack.length > lastViewedStackCount}
+            stackCount={activeStack.length}
+            isStackNew={activeStack.length > lastViewedStackCount}
             onOpenStack={handleOpenStack}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
@@ -11820,8 +11868,8 @@ const App: React.FC = () => {
             user={user}
             onLogoClick={handleLogoClick}
             isSmallScreen={isSmallScreen}
-            stackCount={stack.length}
-            isStackNew={stack.length > lastViewedStackCount}
+            stackCount={activeStack.length}
+            isStackNew={activeStack.length > lastViewedStackCount}
             onOpenStack={handleOpenStack}
             onLogout={handleLogout}
             onDeleteAccount={handleDeleteAccount}
@@ -11951,18 +11999,18 @@ const App: React.FC = () => {
         isOpen={isStackDialogOpen}
         onClose={() => {
           handleCloseModals();
-          if (stack.length !== lastViewedStackCount) {
-            setLastViewedStackCount(stack.length);
+          if (activeStack.length !== lastViewedStackCount) {
+            setLastViewedStackCount(activeStack.length);
             if (user && currentProjectId) {
               setDoc(doc(db, 'users', user.uid, 'projects', currentProjectId), {
-                lastViewedStackCount: stack.length,
+                lastViewedStackCount: activeStack.length,
                 updatedAt: serverTimestamp()
               }, { merge: true });
             }
           }
         }}
-        stack={stack}
-        onRemove={(docId) => handleRemoveFromStack(docId as string)}
+        stack={activeStack}
+        onRemove={(docId) => handleArchiveStackItem(docId as string)}
         onView={(id) => {
           if (id) {
             const node = graphData?.nodes.find(n => n.id.toLowerCase() === id.toLowerCase());

@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
-import { View, COST_PER_AI_CALL, RADIUS_TOKENS, TokenTransaction } from '../types';
-import { ZceneLogo } from './Icons';
+import { View, COST_PER_AI_CALL, RADIUS_TOKENS, TokenTransaction, StackItem } from '../types';
+import { ZceneLogo, StackIcon } from './Icons';
 import Header from './Header';
 import { db, functions } from '../services/firebase';
 import { httpsCallable } from 'firebase/functions';
@@ -8,6 +8,7 @@ import { collection, getDocs, doc, getDoc, setDoc, serverTimestamp, query, order
 import { motion } from 'motion/react';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { AdminViewToggle } from './ui/AdminViewToggle';
+import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 import { cleanArtistDisplayName } from '../services/artistCacheService';
 import {
     TOP_UP_TIER_LIST,
@@ -23,7 +24,7 @@ import {
     ZCENE_SUPPORT_EMAIL,
     ZCENE_SUPPORT_MAILTO,
 } from '../shared/tokenEconomy';
-import { BackButton } from './DesignSystem';
+import { BackButton, ToolbarSearch } from './DesignSystem';
 
 export const DEFAULT_CUSTOMER_EMAIL = 'simon.lavin1@gmail.com';
 
@@ -191,6 +192,52 @@ export interface TelemetryAggregateMetrics {
 }
 
 export type ActivityFilterCategory = 'all' | 'curations' | 'deep_connections' | 'topups_refunds';
+export type LedgerTabId = 'activity' | 'stack_archive';
+
+export interface AuthorStackCounts {
+    activeCount: number;
+    archivedCount: number;
+    isLoading?: boolean;
+}
+
+export interface AuthorStackCacheEntry {
+    items: StackItem[];
+    activeCount: number;
+    archivedCount: number;
+}
+
+export const LEDGER_PAGE_SIZE = 50;
+
+export const partitionStackItems = (items: StackItem[] = []): { active: StackItem[]; archived: StackItem[] } => {
+    const active: StackItem[] = [];
+    const archived: StackItem[] = [];
+    items.forEach((item) => {
+        if (item.status === 'archived') {
+            archived.push(item);
+        } else {
+            active.push(item);
+        }
+    });
+    return { active, archived };
+};
+
+export const filterAndSortArchivedStack = (items: StackItem[] = [], query: string = ''): StackItem[] => {
+    const q = query.trim().toLowerCase();
+    const filtered = q
+        ? items.filter((item) => {
+              const display = (item.displayName || cleanArtistDisplayName(item.id) || '').toLowerCase();
+              const via = (item.discoveredVia || '').toLowerCase();
+              const type = (item.type || '').toLowerCase();
+              return display.includes(q) || via.includes(q) || type.includes(q);
+          })
+        : [...items];
+
+    return filtered.sort((a, b) => {
+        const aTime = extractTimestampMs(a.archivedAt) || extractTimestampMs(a.dateSaved);
+        const bTime = extractTimestampMs(b.archivedAt) || extractTimestampMs(b.dateSaved);
+        return bTime - aTime;
+    });
+};
 
 export interface UnifiedActivityRow {
     id: string;
@@ -1325,6 +1372,7 @@ export interface DiscoveryLedgerTableProps {
     expandedRow: string | null;
     toggleRow: (email: string) => void;
     onInspectUser?: (user: UserTelemetry) => void;
+    getAuthorStackCounts?: (author: UserTelemetry) => AuthorStackCounts | null;
 }
 
 export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
@@ -1333,6 +1381,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
     expandedRow,
     toggleRow,
     onInspectUser,
+    getAuthorStackCounts,
 }) => {
     return (
         <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
@@ -1505,6 +1554,27 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                                                      </span>
                                                                  </div>
                                                              )}
+                                                             {(() => {
+                                                                 const stackCounts = getAuthorStackCounts?.(user);
+                                                                 if (!stackCounts) return null;
+                                                                 return (
+                                                                     <div
+                                                                         className="flex justify-between border-b border-zinc-800/50 pb-1"
+                                                                         data-testid={`author-stack-counts-${user.uid || user.email}`}
+                                                                     >
+                                                                         <span className="text-zinc-400">My Stack:</span>
+                                                                         <span className="text-white font-mono">
+                                                                             {stackCounts.isLoading ? (
+                                                                                 <span className="text-zinc-500">Loading...</span>
+                                                                             ) : (
+                                                                                 <>
+                                                                                     {stackCounts.activeCount} active <span className="text-zinc-500">·</span> {stackCounts.archivedCount} archived
+                                                                                 </>
+                                                                             )}
+                                                                         </span>
+                                                                     </div>
+                                                                 );
+                                                             })()}
                                                              <div className="flex justify-between">
                                                                  <span className="text-zinc-400">Total Actions:</span>
                                                                  <span className="text-white font-mono font-bold">{totalActions}</span>
@@ -1559,7 +1629,7 @@ interface UsageAnalyticsPageProps {
     isActive: boolean;
     user: any;
     onLogoClick: () => void;
-    isSmallScreen: boolean;
+    isSmallScreen?: boolean;
     stackCount: number;
     isStackNew: boolean;
     onOpenStack: () => void;
@@ -1576,6 +1646,9 @@ interface UsageAnalyticsPageProps {
     onClose?: () => void;
     onNavigateMenu?: (path: string) => void;
     profile?: any;
+    archivedStack?: StackItem[];
+    onRestoreStackItem?: (docId: string) => Promise<void> | void;
+    onPermanentDeleteStackItem?: (docId: string) => Promise<void> | void;
 }
 
 export const calculateTelemetryForUser = (
@@ -2047,7 +2120,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     isActive, 
     user,
     onLogoClick,
-    isSmallScreen,
+    isSmallScreen = false,
     stackCount,
     isStackNew,
     onOpenStack,
@@ -2063,13 +2136,29 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     onRestartWalkthrough,
     onClose,
     onNavigateMenu,
-    profile
+    profile,
+    archivedStack = [],
+    onRestoreStackItem,
+    onPermanentDeleteStackItem,
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const [simulateNormalUser, setSimulateNormalUser] = useState(false);
     const [inspectedAuthor, setInspectedAuthor] = useState<{ uid: string; email: string } | null>(null);
+    const [activeLedgerTab, setActiveLedgerTab] = useState<LedgerTabId>('activity');
     const [activityFilter, setActivityFilter] = useState<ActivityFilterCategory>('all');
+    const [activityVisibleCount, setActivityVisibleCount] = useState<number>(LEDGER_PAGE_SIZE);
+    const [archiveVisibleCount, setArchiveVisibleCount] = useState<number>(LEDGER_PAGE_SIZE);
+    const [archiveSearchQuery, setArchiveSearchQuery] = useState<string>('');
+    const [isArchiveSearchOpen, setIsArchiveSearchOpen] = useState<boolean>(false);
+    const [stackItemToDelete, setStackItemToDelete] = useState<StackItem | null>(null);
+    const [busyStackDocIds, setBusyStackDocIds] = useState<Record<string, boolean>>({});
+    const [authorStackCache, setAuthorStackCache] = useState<Record<string, AuthorStackCacheEntry>>({});
+    const [loadingStackUids, setLoadingStackUids] = useState<Record<string, boolean>>({});
+    const authorStackCacheRef = useRef<Record<string, AuthorStackCacheEntry>>({});
+    const loadingStackUidsRef = useRef<Record<string, boolean>>({});
+    const [inspectedUserStack, setInspectedUserStack] = useState<StackItem[]>([]);
+    const [isLoadingInspectedStack, setIsLoadingInspectedStack] = useState<boolean>(false);
     const [ledgerData, setLedgerData] = useState<UserTelemetry[]>([]);
     const [tokenTransactions, setTokenTransactions] = useState<TokenTransaction[]>([]);
     const [jitHeals, setJitHeals] = useState<JitHealRecord[]>([]);
@@ -2085,6 +2174,45 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    authorStackCacheRef.current = authorStackCache;
+
+    const loadAuthorStack = useCallback(async (uid: string): Promise<AuthorStackCacheEntry | null> => {
+        if (!uid) return null;
+        const cached = authorStackCacheRef.current[uid];
+        if (cached) return cached;
+        if (loadingStackUidsRef.current[uid]) return null;
+
+        loadingStackUidsRef.current[uid] = true;
+        setLoadingStackUids(prev => ({ ...prev, [uid]: true }));
+        try {
+            const stackSnap = await getDocs(collection(db, 'users', uid, 'stack'));
+            const items: StackItem[] = (stackSnap?.docs || []).map((d) => ({
+                ...(d.data() as StackItem),
+                docId: d.id,
+            }));
+            const { active, archived } = partitionStackItems(items);
+            const entry: AuthorStackCacheEntry = {
+                items,
+                activeCount: active.length,
+                archivedCount: archived.length,
+            };
+            authorStackCacheRef.current = { ...authorStackCacheRef.current, [uid]: entry };
+            setAuthorStackCache(prev => ({ ...prev, [uid]: entry }));
+            return entry;
+        } catch (err) {
+            console.warn('[UsageAnalyticsPage] Could not query author stack:', uid, err);
+            return null;
+        } finally {
+            delete loadingStackUidsRef.current[uid];
+            setLoadingStackUids(prev => {
+                if (!prev[uid]) return prev;
+                const next = { ...prev };
+                delete next[uid];
+                return next;
+            });
+        }
+    }, []);
 
     const activeUserEmail = user?.email || 'sandbox@zcene.online';
     const isNormalUserView = !isAdmin || simulateNormalUser;
@@ -2173,12 +2301,47 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     }
                 }
 
+                const shouldInspectOtherStack = Boolean(isAdmin && simulateNormalUser && targetUid && targetUid !== user.uid);
+                const cachedInspectedStack = shouldInspectOtherStack ? authorStackCacheRef.current[targetUid] : undefined;
+                if (shouldInspectOtherStack && !cachedInspectedStack) {
+                    setIsLoadingInspectedStack(true);
+                }
+
                 const userDocRef = doc(db, 'users', targetUid);
-                const [userDocSnap, projectsSnap, txSnap] = await Promise.all([
+                const [userDocSnap, projectsSnap, txSnap, inspectedStackSnap] = await Promise.all([
                     getDoc(userDocRef),
                     getDocs(collection(db, 'users', targetUid, 'projects')),
                     getDocs(query(collection(db, 'users', targetUid, 'tokenTransactions'), orderBy('createdAt', 'desc'), limit(500))).catch(() => null),
+                    shouldInspectOtherStack && !cachedInspectedStack
+                        ? getDocs(collection(db, 'users', targetUid, 'stack')).catch(() => null)
+                        : Promise.resolve(null),
                 ]);
+
+                if (shouldInspectOtherStack) {
+                    if (cachedInspectedStack) {
+                        setInspectedUserStack(cachedInspectedStack.items);
+                    } else if (inspectedStackSnap) {
+                        const parsedStack: StackItem[] = (inspectedStackSnap.docs || []).map((d) => ({
+                            ...(d.data() as StackItem),
+                            docId: d.id,
+                        }));
+                        const { active, archived } = partitionStackItems(parsedStack);
+                        const entry: AuthorStackCacheEntry = {
+                            items: parsedStack,
+                            activeCount: active.length,
+                            archivedCount: archived.length,
+                        };
+                        authorStackCacheRef.current = { ...authorStackCacheRef.current, [targetUid]: entry };
+                        setAuthorStackCache(prev => ({ ...prev, [targetUid]: entry }));
+                        setInspectedUserStack(parsedStack);
+                    } else {
+                        setInspectedUserStack([]);
+                    }
+                    setIsLoadingInspectedStack(false);
+                } else {
+                    setInspectedUserStack([]);
+                    setIsLoadingInspectedStack(false);
+                }
 
                 const uData = userDocSnap.exists() ? userDocSnap.data() : {
                     email: targetEmail,
@@ -2414,9 +2577,115 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         return unifiedUserRows.filter((r) => r.filterCategory === activityFilter);
     }, [unifiedUserRows, activityFilter]);
 
-    const toggleRow = (email: string) => {
-        setExpandedRow(prev => prev === email ? null : email);
-    };
+    const visibleActivityRows = useMemo(
+        () => filteredUserRows.slice(0, activityVisibleCount),
+        [filteredUserRows, activityVisibleCount]
+    );
+
+    const isInspectingOtherUser = Boolean(
+        isAdmin &&
+        simulateNormalUser &&
+        (
+            (inspectedAuthor?.uid && inspectedAuthor.uid !== user?.uid) ||
+            (currentUserTelemetry?.uid && currentUserTelemetry.uid !== user?.uid) ||
+            (inspectedAuthor?.email && user?.email && inspectedAuthor.email.toLowerCase() !== user.email.toLowerCase())
+        )
+    );
+
+    const displayedArchivedStack = useMemo(() => {
+        if (isInspectingOtherUser) {
+            return partitionStackItems(inspectedUserStack).archived;
+        }
+        return archivedStack;
+    }, [isInspectingOtherUser, inspectedUserStack, archivedStack]);
+
+    const filteredArchivedStack = useMemo(
+        () => filterAndSortArchivedStack(displayedArchivedStack, archiveSearchQuery),
+        [displayedArchivedStack, archiveSearchQuery]
+    );
+
+    const visibleArchivedStack = useMemo(
+        () => filteredArchivedStack.slice(0, archiveVisibleCount),
+        [filteredArchivedStack, archiveVisibleCount]
+    );
+
+    useEffect(() => {
+        setActivityVisibleCount(LEDGER_PAGE_SIZE);
+    }, [activityFilter, simulateNormalUser, inspectedAuthor?.uid]);
+
+    useEffect(() => {
+        setArchiveVisibleCount(LEDGER_PAGE_SIZE);
+    }, [archiveSearchQuery, isInspectingOtherUser, inspectedAuthor?.uid]);
+
+    const handleRestoreArchivedItem = useCallback(async (item: StackItem) => {
+        if (isInspectingOtherUser || !onRestoreStackItem) return;
+        const docKey = item.docId || item.id;
+        if (!docKey || busyStackDocIds[docKey]) return;
+        setBusyStackDocIds(prev => ({ ...prev, [docKey]: true }));
+        try {
+            await onRestoreStackItem(docKey);
+        } finally {
+            setBusyStackDocIds(prev => {
+                const next = { ...prev };
+                delete next[docKey];
+                return next;
+            });
+        }
+    }, [isInspectingOtherUser, onRestoreStackItem, busyStackDocIds]);
+
+    const handleConfirmPermanentDelete = useCallback(async () => {
+        if (isInspectingOtherUser || !stackItemToDelete || !onPermanentDeleteStackItem) return;
+        const target = stackItemToDelete;
+        const docKey = target.docId || target.id;
+        if (!docKey || busyStackDocIds[docKey]) return;
+        setBusyStackDocIds(prev => ({ ...prev, [docKey]: true }));
+        try {
+            await onPermanentDeleteStackItem(docKey);
+            setStackItemToDelete(null);
+        } finally {
+            setBusyStackDocIds(prev => {
+                const next = { ...prev };
+                delete next[docKey];
+                return next;
+            });
+        }
+    }, [isInspectingOtherUser, stackItemToDelete, onPermanentDeleteStackItem, busyStackDocIds]);
+
+    const toggleRow = useCallback((email: string) => {
+        setExpandedRow(prev => {
+            const next = prev === email ? null : email;
+            if (next) {
+                const author = ledgerData.find(u => u.email === email);
+                if (author?.uid && author.uid !== user?.uid) {
+                    void loadAuthorStack(author.uid);
+                }
+            }
+            return next;
+        });
+    }, [ledgerData, user?.uid, loadAuthorStack]);
+
+    const getAuthorStackCounts = useCallback((author: UserTelemetry): AuthorStackCounts | null => {
+        if (!author.uid) return null;
+        if (user?.uid && author.uid === user.uid) {
+            return {
+                activeCount: stackCount,
+                archivedCount: archivedStack.length,
+                isLoading: false,
+            };
+        }
+        const cached = authorStackCache[author.uid];
+        if (cached) {
+            return {
+                activeCount: cached.activeCount,
+                archivedCount: cached.archivedCount,
+                isLoading: false,
+            };
+        }
+        if (loadingStackUids[author.uid]) {
+            return { activeCount: 0, archivedCount: 0, isLoading: true };
+        }
+        return null;
+    }, [user?.uid, stackCount, archivedStack.length, authorStackCache, loadingStackUids]);
 
     return (
         <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative select-text">
@@ -2455,7 +2724,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                             <h2 className="text-3xl font-medium text-white mb-2">The Discovery Ledger</h2>
                             <p className="text-zinc-400 text-sm max-w-2xl leading-relaxed">
                                 {isNormalUserView 
-                                    ? "Your personal Token Wallet, curated Zcene history, and immutable token activity receipts."
+                                    ? "Your personal Token Wallet, curated Zcene history, token receipts, and archived Stack discoveries."
                                     : "Executive P&L ledger tracking earned token revenue, real Gemini API expenditure, gross margin, cache efficiency, and author activity."
                                 }
                             </p>
@@ -2476,6 +2745,9 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                             setInspectedAuthor(null);
                                         }
                                         setActivityFilter('all');
+                                        setActiveLedgerTab('activity');
+                                        setArchiveSearchQuery('');
+                                        setIsArchiveSearchOpen(false);
                                         setSimulateNormalUser(nextVal);
                                     }} 
                                 />
@@ -2497,6 +2769,9 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                     setSimulateNormalUser(false);
                                     setInspectedAuthor(null);
                                     setActivityFilter('all');
+                                    setActiveLedgerTab('activity');
+                                    setArchiveSearchQuery('');
+                                    setIsArchiveSearchOpen(false);
                                 }}
                                 className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition-colors cursor-pointer whitespace-nowrap self-start sm:self-auto"
                             >
@@ -2783,120 +3058,441 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     )}
 
                     {isNormalUserView ? (
-                        <div data-testid="token-transactions-ledger" className="space-y-4">
-                            <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
-                                <div className="min-w-0 max-w-xl">
-                                    <h3 className="text-xl font-medium text-white">Token Activity & Top-Up Receipts</h3>
-                                    <p className="text-xs text-zinc-400 mt-1">
-                                        Unified Zcene curations, workspace lifecycle status, artist lookups, Deep Connections unlocks, and wallet receipts. Shared Zcenes cost 0 Tokens.
-                                    </p>
-                                </div>
-
-                                {/* Filter Pills */}
-                                <div
-                                    role="tablist"
-                                    aria-label="Filter token activity"
-                                    className="flex flex-nowrap whitespace-nowrap overflow-x-auto hide-scrollbar scrollbar-hide shrink-0 items-center gap-1.5 max-w-full pb-1 md:pb-0"
+                        <div className="space-y-6">
+                            {/* Top-Level Ledger Tab Switcher */}
+                            <div
+                                role="tablist"
+                                aria-label="Discovery Ledger sections"
+                                data-testid="ledger-section-tabs"
+                                className={`w-full sm:w-auto grid grid-cols-2 sm:inline-grid items-center bg-zinc-950 border border-zinc-700/80 p-0.5 h-[38px] select-none ${RADIUS_TOKENS.toggle}`}
+                            >
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeLedgerTab === 'activity'}
+                                    data-testid="ledger-tab-activity"
+                                    onClick={() => setActiveLedgerTab('activity')}
+                                    className={`relative h-full px-3 sm:px-4 flex items-center justify-center gap-2 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap rounded-[10px] outline-none focus:outline-none ${
+                                        activeLedgerTab === 'activity' ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
+                                    }`}
                                 >
-                                    {ACTIVITY_FILTER_PILLS.map((pill) => {
-                                        const isSelected = activityFilter === pill.id;
-                                        return (
-                                            <button
-                                                key={pill.id}
-                                                type="button"
-                                                role="tab"
-                                                aria-selected={isSelected}
-                                                data-testid={`activity-filter-${pill.id}`}
-                                                onClick={() => setActivityFilter(pill.id)}
-                                                className={`px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer border shrink-0 whitespace-nowrap ${RADIUS_TOKENS.button} ${
-                                                    isSelected
-                                                        ? 'bg-primary text-black border-primary'
-                                                        : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-white'
-                                                }`}
-                                            >
-                                                {pill.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
+                                    {activeLedgerTab === 'activity' && (
+                                        <motion.span
+                                            layoutId="ledger-active-tab-pill"
+                                            transition={{ type: 'spring', stiffness: 480, damping: 38 }}
+                                            className="absolute inset-0 bg-zinc-800 rounded-[10px]"
+                                        />
+                                    )}
+                                    <span className="relative z-10">Token Activity</span>
+                                </button>
+                                <button
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={activeLedgerTab === 'stack_archive'}
+                                    data-testid="ledger-tab-stack-archive"
+                                    onClick={() => setActiveLedgerTab('stack_archive')}
+                                    className={`relative h-full px-3 sm:px-4 flex items-center justify-center gap-2 text-xs font-semibold transition-colors cursor-pointer whitespace-nowrap rounded-[10px] outline-none focus:outline-none ${
+                                        activeLedgerTab === 'stack_archive' ? 'text-white' : 'text-zinc-400 hover:text-zinc-200'
+                                    }`}
+                                >
+                                    {activeLedgerTab === 'stack_archive' && (
+                                        <motion.span
+                                            layoutId="ledger-active-tab-pill"
+                                            transition={{ type: 'spring', stiffness: 480, damping: 38 }}
+                                            className="absolute inset-0 bg-zinc-800 rounded-[10px]"
+                                        />
+                                    )}
+                                    <span className="relative z-10 flex items-center gap-1.5">
+                                        <span>Stack Archive</span>
+                                        <span
+                                            data-testid="stack-archive-tab-count"
+                                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md border leading-none ${
+                                                activeLedgerTab === 'stack_archive'
+                                                    ? 'bg-zinc-900/90 border-zinc-700 text-zinc-200'
+                                                    : 'bg-zinc-900 border-zinc-800 text-zinc-400'
+                                            }`}
+                                        >
+                                            {displayedArchivedStack.length}
+                                        </span>
+                                    </span>
+                                </button>
                             </div>
 
-                            <div className={`border border-zinc-800 bg-zinc-950/30 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
-                                <table className="w-full text-left border-collapse min-w-[640px]">
-                                    <thead>
-                                        <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                                            <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                                            <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity / Zcene</th>
-                                            <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 min-w-[140px] w-max whitespace-nowrap">Category & Scope</th>
-                                            <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Change</th>
-                                            <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance After</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {isLoading && unifiedUserRows.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={5} className="p-8 text-center text-zinc-500 text-xs italic">
-                                                    Loading token activity...
-                                                </td>
-                                            </tr>
-                                        ) : filteredUserRows.length === 0 ? (
-                                            <tr>
-                                                <td colSpan={5} className="p-8 text-center text-zinc-500 text-xs italic">
-                                                    {unifiedUserRows.length === 0
-                                                        ? 'No token activity recorded yet. Top up your wallet above to begin curating.'
-                                                        : 'No activity entries match the selected filter.'}
-                                                </td>
-                                            </tr>
-                                        ) : (
-                                            filteredUserRows.map((row) => {
-                                                const isPositive = row.delta > 0;
-                                                const changeLabel = row.delta === 0
-                                                    ? '0 T'
-                                                    : (isPositive ? `+${row.delta} T` : `${row.delta} T`);
+                            {activeLedgerTab === 'activity' ? (
+                                <div data-testid="token-transactions-ledger" className="space-y-4">
+                                    <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                                        <div className="min-w-0 max-w-xl">
+                                            <h3 className="text-xl font-medium text-white">Token Activity & Top-Up Receipts</h3>
+                                            <p className="text-xs text-zinc-400 mt-1">
+                                                Unified Zcene curations, workspace lifecycle status, artist lookups, Deep Connections unlocks, and wallet receipts. Shared Zcenes cost 0 Tokens.
+                                            </p>
+                                        </div>
 
+                                        {/* Filter Pills */}
+                                        <div
+                                            role="tablist"
+                                            aria-label="Filter token activity"
+                                            className="flex flex-nowrap whitespace-nowrap overflow-x-auto hide-scrollbar scrollbar-hide shrink-0 items-center gap-1.5 max-w-full pb-1 md:pb-0"
+                                        >
+                                            {ACTIVITY_FILTER_PILLS.map((pill) => {
+                                                const isSelected = activityFilter === pill.id;
                                                 return (
-                                                    <tr key={row.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
-                                                        <td className="p-4 text-xs font-mono text-zinc-400 whitespace-nowrap">
-                                                            {row.createdAt ? formatTxTimestamp(row.createdAt) : '—'}
-                                                        </td>
-                                                        <td className="p-4 text-sm text-zinc-200">
-                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                {row.isCurationRow && renderProjectStatusBadge(row.projectStatus, true)}
-                                                                <span className="font-medium text-white">{row.title}</span>
-                                                            </div>
-                                                            {row.subtitle && (
-                                                                <span className="block text-[11px] text-zinc-500 mt-0.5">
-                                                                    {row.subtitle}
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-4 text-xs min-w-[140px] w-max whitespace-nowrap">
-                                                            <div className="flex items-center gap-1.5 flex-wrap">
-                                                                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border whitespace-nowrap inline-flex items-center shrink-0 ${row.categoryBadge.style}`}>
-                                                                    {row.categoryBadge.label}
-                                                                </span>
-                                                                {row.isCurationRow && row.userFacingScope && (
-                                                                    <span className="px-2 py-0.5 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 text-[11px] font-medium whitespace-nowrap inline-flex items-center shrink-0">
-                                                                        {row.userFacingScope}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                        </td>
-                                                        <td className={`p-4 text-xs text-right font-mono font-bold whitespace-nowrap ${
-                                                            isPositive ? 'text-emerald-400' : row.delta === 0 ? 'text-emerald-300' : 'text-zinc-200'
-                                                        }`}>
-                                                            {changeLabel}
-                                                        </td>
-                                                        <td className="p-4 text-xs text-right font-mono text-zinc-400 whitespace-nowrap">
-                                                            {row.balanceAfter !== null ? `${row.balanceAfter} T` : '—'}
+                                                    <button
+                                                        key={pill.id}
+                                                        type="button"
+                                                        role="tab"
+                                                        aria-selected={isSelected}
+                                                        data-testid={`activity-filter-${pill.id}`}
+                                                        onClick={() => setActivityFilter(pill.id)}
+                                                        className={`px-3 py-1.5 text-xs font-semibold transition-colors cursor-pointer border shrink-0 whitespace-nowrap ${RADIUS_TOKENS.button} ${
+                                                            isSelected
+                                                                ? 'bg-primary text-black border-primary'
+                                                                : 'bg-zinc-900/60 text-zinc-400 border-zinc-800 hover:border-zinc-600 hover:text-white'
+                                                        }`}
+                                                    >
+                                                        {pill.label}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+
+                                    <div className={`border border-zinc-800 bg-zinc-950/30 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
+                                        <table className="w-full text-left border-collapse min-w-[640px]">
+                                            <thead>
+                                                <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity / Zcene</th>
+                                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 min-w-[140px] w-max whitespace-nowrap">Category & Scope</th>
+                                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Change</th>
+                                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance After</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {isLoading && unifiedUserRows.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={5} className="p-8 text-center text-zinc-500 text-xs italic">
+                                                            Loading token activity...
                                                         </td>
                                                     </tr>
+                                                ) : visibleActivityRows.length === 0 ? (
+                                                    <tr>
+                                                        <td colSpan={5} className="p-8 text-center text-zinc-500 text-xs italic">
+                                                            {unifiedUserRows.length === 0
+                                                                ? 'No token activity recorded yet. Top up your wallet above to begin curating.'
+                                                                : 'No activity entries match the selected filter.'}
+                                                        </td>
+                                                    </tr>
+                                                ) : (
+                                                    visibleActivityRows.map((row) => {
+                                                        const isPositive = row.delta > 0;
+                                                        const changeLabel = row.delta === 0
+                                                            ? '0 T'
+                                                            : (isPositive ? `+${row.delta} T` : `${row.delta} T`);
+
+                                                        return (
+                                                            <tr key={row.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
+                                                                <td className="p-4 text-xs font-mono text-zinc-400 whitespace-nowrap">
+                                                                    {row.createdAt ? formatTxTimestamp(row.createdAt) : '—'}
+                                                                </td>
+                                                                <td className="p-4 text-sm text-zinc-200">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        {row.isCurationRow && renderProjectStatusBadge(row.projectStatus, true)}
+                                                                        <span className="font-medium text-white">{row.title}</span>
+                                                                    </div>
+                                                                    {row.subtitle && (
+                                                                        <span className="block text-[11px] text-zinc-500 mt-0.5">
+                                                                            {row.subtitle}
+                                                                        </span>
+                                                                    )}
+                                                                </td>
+                                                                <td className="p-4 text-xs min-w-[140px] w-max whitespace-nowrap">
+                                                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border whitespace-nowrap inline-flex items-center shrink-0 ${row.categoryBadge.style}`}>
+                                                                            {row.categoryBadge.label}
+                                                                        </span>
+                                                                        {row.isCurationRow && row.userFacingScope && (
+                                                                            <span className="px-2 py-0.5 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 text-[11px] font-medium whitespace-nowrap inline-flex items-center shrink-0">
+                                                                                {row.userFacingScope}
+                                                                            </span>
+                                                                        )}
+                                                                    </div>
+                                                                </td>
+                                                                <td className={`p-4 text-xs text-right font-mono font-bold whitespace-nowrap ${
+                                                                    isPositive ? 'text-emerald-400' : row.delta === 0 ? 'text-emerald-300' : 'text-zinc-200'
+                                                                }`}>
+                                                                    {changeLabel}
+                                                                </td>
+                                                                <td className="p-4 text-xs text-right font-mono text-zinc-400 whitespace-nowrap">
+                                                                    {row.balanceAfter !== null ? `${row.balanceAfter} T` : '—'}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+
+                                    {filteredUserRows.length > activityVisibleCount && (
+                                        <div className="flex justify-center pt-1">
+                                            <button
+                                                type="button"
+                                                data-testid="activity-show-more-btn"
+                                                onClick={() => setActivityVisibleCount(prev => prev + LEDGER_PAGE_SIZE)}
+                                                className={`px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-zinc-900/70 hover:bg-zinc-800 border border-zinc-700/80 transition-colors cursor-pointer ${RADIUS_TOKENS.button}`}
+                                            >
+                                                Show more ({filteredUserRows.length - activityVisibleCount} remaining)
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            ) : (
+                                <div data-testid="stack-archive-ledger" className="space-y-4">
+                                    {/* Stack Archive Header & Standardized ToolbarSearch */}
+                                    <div className="relative flex items-center justify-between gap-4 min-h-[44px]">
+                                        <div
+                                            className={`min-w-0 flex-1 transition-opacity duration-150 ${isSmallScreen && isArchiveSearchOpen ? 'opacity-0 pointer-events-none' : ''}`}
+                                            aria-hidden={isSmallScreen && isArchiveSearchOpen ? true : undefined}
+                                            inert={isSmallScreen && isArchiveSearchOpen}
+                                        >
+                                            <div className="flex items-center gap-2.5 flex-wrap">
+                                                <h3 className="text-xl font-medium text-white">Stack Archive</h3>
+                                                {isInspectingOtherUser && (
+                                                    <span
+                                                        data-testid="stack-archive-readonly-badge"
+                                                        className="px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider rounded-md bg-amber-500/15 text-amber-300 border border-amber-500/30 whitespace-nowrap"
+                                                    >
+                                                        Read-Only Inspection
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <p className="text-xs text-zinc-400 mt-1">
+                                                Permanent discovery provenance for artists and labels archived from My Stack.
+                                            </p>
+                                        </div>
+
+                                        <ToolbarSearch
+                                            value={archiveSearchQuery}
+                                            onChange={setArchiveSearchQuery}
+                                            placeholder="Find in archive..."
+                                            isMobile={isSmallScreen}
+                                            isMobileOpen={isArchiveSearchOpen}
+                                            onMobileOpenChange={setIsArchiveSearchOpen}
+                                            size="control"
+                                            className="w-full md:w-72 shrink-0"
+                                            overlayClassName="z-20"
+                                            triggerTestId="archive-search-trigger"
+                                            inputTestId="archive-search-input"
+                                            overlayTestId="archive-search-overlay"
+                                        />
+                                    </div>
+
+                                    {isInspectingOtherUser && isLoadingInspectedStack && displayedArchivedStack.length === 0 ? (
+                                        <div className={`border border-zinc-800 bg-zinc-950/30 p-8 text-center text-zinc-500 text-xs italic ${RADIUS_TOKENS.frame}`}>
+                                            Loading Stack Archive...
+                                        </div>
+                                    ) : displayedArchivedStack.length === 0 ? (
+                                        <div
+                                            data-testid="stack-archive-empty"
+                                            className={`w-full flex flex-col items-center justify-center py-14 px-4 text-center bg-zinc-950/40 border border-dashed border-zinc-800/80 ${RADIUS_TOKENS.frame}`}
+                                        >
+                                            <div className="w-12 h-12 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
+                                                <StackIcon className="!text-2xl" />
+                                            </div>
+                                            <h4 className="text-base font-medium text-white mb-1">No archived discoveries yet</h4>
+                                            <p className="text-xs text-zinc-400 max-w-md leading-relaxed">
+                                                When you archive artists or labels from My Stack, their discovery date and source Zcene are preserved here so you can always trace where you found them.
+                                            </p>
+                                        </div>
+                                    ) : visibleArchivedStack.length === 0 ? (
+                                        <div
+                                            data-testid="stack-archive-no-matches"
+                                            className={`w-full flex flex-col items-center justify-center py-12 px-4 text-center bg-zinc-950/40 border border-dashed border-zinc-800/80 ${RADIUS_TOKENS.frame}`}
+                                        >
+                                            <div className="w-11 h-11 rounded-full bg-zinc-900 border border-zinc-800 flex items-center justify-center text-zinc-500 mb-3">
+                                                <span className="material-symbols-outlined !text-2xl">search_off</span>
+                                            </div>
+                                            <h4 className="text-sm font-semibold text-white mb-1">
+                                                No archived discoveries matching &ldquo;{archiveSearchQuery}&rdquo;
+                                            </h4>
+                                            <p className="text-xs text-zinc-400 max-w-md mb-5">
+                                                Try searching by artist name, record label, or the Zcene where you discovered them.
+                                            </p>
+                                            <button
+                                                type="button"
+                                                data-testid="archive-clear-search-btn"
+                                                onClick={() => {
+                                                    setArchiveSearchQuery('');
+                                                    setIsArchiveSearchOpen(false);
+                                                }}
+                                                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-xs font-medium text-white transition-colors flex items-center gap-1.5 cursor-pointer"
+                                            >
+                                                <span className="material-symbols-outlined !text-[16px]">close</span>
+                                                Clear Search
+                                            </button>
+                                        </div>
+                                    ) : isSmallScreen ? (
+                                        <div data-testid="stack-archive-mobile-list" className="space-y-3">
+                                            {visibleArchivedStack.map((item) => {
+                                                const docKey = item.docId || item.id;
+                                                const displayTitle = item.displayName || cleanArtistDisplayName(item.id);
+                                                const isBusy = Boolean(busyStackDocIds[docKey]);
+                                                return (
+                                                    <div
+                                                        key={docKey}
+                                                        data-testid={`archive-row-${docKey}`}
+                                                        className={`border border-zinc-800 bg-zinc-950/40 p-4 space-y-3 ${RADIUS_TOKENS.frame}`}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="min-w-0">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className="font-medium text-white text-sm">{displayTitle}</span>
+                                                                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/70 px-1.5 py-0.5 rounded-sm leading-none">
+                                                                        {item.type}
+                                                                    </span>
+                                                                </div>
+                                                                <p className="text-xs text-zinc-400 mt-1">
+                                                                    {item.discoveredVia ? `via ${item.discoveredVia}` : '—'}
+                                                                </p>
+                                                            </div>
+                                                        </div>
+
+                                                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                                            <div>
+                                                                <span className="block text-[9px] uppercase tracking-wider text-zinc-500">Saved</span>
+                                                                <span>{item.dateSaved ? formatTxTimestamp(item.dateSaved) : '—'}</span>
+                                                            </div>
+                                                            <div>
+                                                                <span className="block text-[9px] uppercase tracking-wider text-zinc-500">Archived</span>
+                                                                <span>{item.archivedAt ? formatTxTimestamp(item.archivedAt) : '—'}</span>
+                                                            </div>
+                                                        </div>
+
+                                                        {!isInspectingOtherUser && (
+                                                            <div className="flex items-center gap-2 pt-2 border-t border-zinc-800/60">
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isBusy}
+                                                                    data-testid={`archive-restore-${docKey}`}
+                                                                    onClick={() => handleRestoreArchivedItem(item)}
+                                                                    className={`flex-1 h-9 px-3 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-700/80 transition-colors flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50 ${RADIUS_TOKENS.button}`}
+                                                                >
+                                                                    <span className="material-symbols-outlined !text-[16px]">restore</span>
+                                                                    <span>Restore to Stack</span>
+                                                                </button>
+                                                                <button
+                                                                    type="button"
+                                                                    disabled={isBusy}
+                                                                    data-testid={`archive-delete-${docKey}`}
+                                                                    onClick={() => setStackItemToDelete(item)}
+                                                                    className={`h-9 w-9 flex-shrink-0 flex items-center justify-center text-red-400 hover:text-red-300 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 transition-colors cursor-pointer disabled:opacity-50 ${RADIUS_TOKENS.button}`}
+                                                                    title="Permanently delete"
+                                                                    aria-label={`Permanently delete ${displayTitle}`}
+                                                                >
+                                                                    <span className="material-symbols-outlined !text-[16px]">delete_forever</span>
+                                                                </button>
+                                                            </div>
+                                                        )}
+                                                    </div>
                                                 );
-                                            })
-                                        )}
-                                    </tbody>
-                                </table>
-                            </div>
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div
+                                            data-testid="stack-archive-desktop-table"
+                                            className={`border border-zinc-800 bg-zinc-950/30 overflow-x-auto ${RADIUS_TOKENS.frame}`}
+                                        >
+                                            <table className="w-full text-left border-collapse min-w-[640px]">
+                                                <thead>
+                                                    <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Artist / Label</th>
+                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Discovered Via</th>
+                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Saved</th>
+                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Archived</th>
+                                                        {!isInspectingOtherUser && (
+                                                            <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Actions</th>
+                                                        )}
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {visibleArchivedStack.map((item) => {
+                                                        const docKey = item.docId || item.id;
+                                                        const displayTitle = item.displayName || cleanArtistDisplayName(item.id);
+                                                        const isBusy = Boolean(busyStackDocIds[docKey]);
+                                                        return (
+                                                            <tr
+                                                                key={docKey}
+                                                                data-testid={`archive-row-${docKey}`}
+                                                                className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors"
+                                                            >
+                                                                <td className="p-4 text-sm text-zinc-200">
+                                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                                        <span className="font-medium text-white">{displayTitle}</span>
+                                                                        <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/70 px-1.5 py-0.5 rounded-sm leading-none">
+                                                                            {item.type}
+                                                                        </span>
+                                                                    </div>
+                                                                </td>
+                                                                <td className="p-4 text-xs text-zinc-300">
+                                                                    {item.discoveredVia || '—'}
+                                                                </td>
+                                                                <td className="p-4 text-xs font-mono text-zinc-400 whitespace-nowrap">
+                                                                    {item.dateSaved ? formatTxTimestamp(item.dateSaved) : '—'}
+                                                                </td>
+                                                                <td className="p-4 text-xs font-mono text-zinc-400 whitespace-nowrap">
+                                                                    {item.archivedAt ? formatTxTimestamp(item.archivedAt) : '—'}
+                                                                </td>
+                                                                {!isInspectingOtherUser && (
+                                                                    <td className="p-4 text-right whitespace-nowrap">
+                                                                        <div className="inline-flex items-center justify-end gap-2">
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={isBusy}
+                                                                                data-testid={`archive-restore-${docKey}`}
+                                                                                onClick={() => handleRestoreArchivedItem(item)}
+                                                                                className={`px-2.5 py-1.5 text-xs font-semibold bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white border border-zinc-700/80 transition-colors inline-flex items-center gap-1.5 cursor-pointer disabled:opacity-50 ${RADIUS_TOKENS.button}`}
+                                                                                title="Restore to My Stack"
+                                                                            >
+                                                                                <span className="material-symbols-outlined !text-[15px]">restore</span>
+                                                                                <span>Restore</span>
+                                                                            </button>
+                                                                            <button
+                                                                                type="button"
+                                                                                disabled={isBusy}
+                                                                                data-testid={`archive-delete-${docKey}`}
+                                                                                onClick={() => setStackItemToDelete(item)}
+                                                                                className={`w-8 h-8 inline-flex items-center justify-center text-red-400 hover:text-red-300 hover:bg-red-500/15 border border-transparent hover:border-red-500/30 transition-colors cursor-pointer disabled:opacity-50 ${RADIUS_TOKENS.button}`}
+                                                                                title="Permanently delete"
+                                                                                aria-label={`Permanently delete ${displayTitle}`}
+                                                                            >
+                                                                                <span className="material-symbols-outlined !text-[16px]">delete_forever</span>
+                                                                            </button>
+                                                                        </div>
+                                                                    </td>
+                                                                )}
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+
+                                    {filteredArchivedStack.length > archiveVisibleCount && (
+                                        <div className="flex justify-center pt-1">
+                                            <button
+                                                type="button"
+                                                data-testid="archive-show-more-btn"
+                                                onClick={() => setArchiveVisibleCount(prev => prev + LEDGER_PAGE_SIZE)}
+                                                className={`px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-zinc-900/70 hover:bg-zinc-800 border border-zinc-700/80 transition-colors cursor-pointer ${RADIUS_TOKENS.button}`}
+                                            >
+                                                Show more ({filteredArchivedStack.length - archiveVisibleCount} remaining)
+                                            </button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
                         </div>
                     ) : (
                         <>
@@ -2906,9 +3502,13 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                 filteredLedger={filteredLedger}
                                 expandedRow={expandedRow}
                                 toggleRow={toggleRow}
+                                getAuthorStackCounts={getAuthorStackCounts}
                                 onInspectUser={(inspected) => {
                                     setInspectedAuthor({ uid: inspected.uid || '', email: inspected.email });
                                     setActivityFilter('all');
+                                    setActiveLedgerTab('activity');
+                                    setArchiveSearchQuery('');
+                                    setIsArchiveSearchOpen(false);
                                     setSimulateNormalUser(true);
                                 }}
                             />
@@ -3193,6 +3793,64 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     </p>
                 </div>
             </footer>
+
+            {/* Permanent Delete Stack Archive Item Confirmation Modal */}
+            {stackItemToDelete && !isInspectingOtherUser && (() => {
+                const targetKey = stackItemToDelete.docId || stackItemToDelete.id;
+                const targetName = stackItemToDelete.displayName || cleanArtistDisplayName(stackItemToDelete.id);
+                const isDeleting = Boolean(busyStackDocIds[targetKey]);
+                return (
+                    <ModalBackdrop className="z-[110]" onClick={() => !isDeleting && setStackItemToDelete(null)}>
+                        <ModalContainer className="text-left" data-testid="stack-archive-delete-modal">
+                            <ModalHeader>
+                                <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-red-500 !text-[18px]">delete_forever</span>
+                                    <h3 className="text-base font-medium text-white">Permanently Delete Discovery?</h3>
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={isDeleting}
+                                    onClick={() => setStackItemToDelete(null)}
+                                    aria-label="Close delete confirmation"
+                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-xl text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors leading-none disabled:opacity-50"
+                                >
+                                    <span className="material-symbols-outlined !text-[18px]">close</span>
+                                </button>
+                            </ModalHeader>
+
+                            <ModalBody className="space-y-3">
+                                <p className="leading-relaxed text-zinc-300">
+                                    Are you sure you want to permanently remove <span className="font-semibold text-white">{targetName}</span>
+                                    {stackItemToDelete.discoveredVia ? (
+                                        <> (discovered via <span className="text-white">{stackItemToDelete.discoveredVia}</span>)</>
+                                    ) : null}
+                                    {' '}from your Stack Archive? This cannot be undone.
+                                </p>
+                            </ModalBody>
+
+                            <ModalFooter>
+                                <button
+                                    type="button"
+                                    disabled={isDeleting}
+                                    onClick={() => setStackItemToDelete(null)}
+                                    className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors disabled:opacity-50"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="button"
+                                    disabled={isDeleting}
+                                    data-testid="stack-archive-confirm-delete-btn"
+                                    onClick={handleConfirmPermanentDelete}
+                                    className="px-4 py-1.5 bg-red-600 hover:bg-red-700 text-white font-medium rounded-xl text-sm transition-opacity disabled:opacity-50 cursor-pointer"
+                                >
+                                    {isDeleting ? 'Deleting...' : 'Delete Forever'}
+                                </button>
+                            </ModalFooter>
+                        </ModalContainer>
+                    </ModalBackdrop>
+                );
+            })()}
         </div>
     );
 };

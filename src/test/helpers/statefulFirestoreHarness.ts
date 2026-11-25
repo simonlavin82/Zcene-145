@@ -40,6 +40,7 @@ export interface MockQueryRef {
 }
 
 const SERVER_TIMESTAMP_SENTINEL = { __sentinel: 'serverTimestamp' };
+const DELETE_FIELD_SENTINEL = { __sentinel: 'deleteField' };
 
 function makeIncrementSentinel(delta: number) {
   return { __sentinel: 'increment', delta };
@@ -375,6 +376,10 @@ export class StatefulFirestoreHarness {
     const next = existing ? deepCloneDoc(existing) : {};
     for (const [k, v] of Object.entries(patch)) {
       if (v === undefined) continue;
+      if (v && typeof v === 'object' && v.__sentinel === 'deleteField') {
+        delete next[k];
+        continue;
+      }
       const resolvedVal = cloneAndResolveSentinels(v, getFieldValue('', next, k), nowMs);
       setNestedField(next, k, resolvedVal);
     }
@@ -544,6 +549,7 @@ export function createFirestoreModuleMock(harness: StatefulFirestoreHarness) {
     onSnapshot,
     writeBatch,
     serverTimestamp: () => SERVER_TIMESTAMP_SENTINEL,
+    deleteField: () => DELETE_FIELD_SENTINEL,
     increment: (delta: number) => makeIncrementSentinel(delta),
     Timestamp: {
       now: () => makeTimestamp(Date.now()),

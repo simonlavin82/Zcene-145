@@ -114,10 +114,13 @@ export interface StackItem {
   id: string;
   type: string;
   dateSaved: number;
+  /** @deprecated Legacy external link field on older Firestore docs; no longer written. */
   link?: string;
   discoveredVia?: string;
   docId?: string;
   displayName?: string;
+  status?: 'active' | 'archived';
+  archivedAt?: number;
 }
 
 /** A lean position reference stored inside a user project's canvasLayout (artist/label nodes). */

@@ -181,7 +181,8 @@ describe("V47.4 Server-Side deleteUserAccount, GDPR Erasure & Anonymised P&L", (
         tokensSpent: 5,
         generationType: "Direct Hit",
       },
-      [`users/${uid}/stack/stack_1`]: { id: "fugazi", type: "artist" },
+      [`users/${uid}/stack/stack_1`]: { id: "fugazi", type: "artist", dateSaved: NOW_MS - 50_000, status: "active" },
+      [`users/${uid}/stack/stack_archived_1`]: { id: "buggin-us", type: "artist", dateSaved: NOW_MS - 100_000, status: "archived", archivedAt: NOW_MS - 20_000, discoveredVia: "Spaced" },
       [`users/${uid}/userSession/current`]: { activeProjectId: "proj_1" },
       [`users/${uid}/tokenTransactions/tx_1`]: { type: "top_up", tokens: 100 },
       [`users/${uid}/deepWebQueries/q_1`]: { query: "Private user question about Fugazi" },
@@ -231,6 +232,7 @@ describe("V47.4 Server-Side deleteUserAccount, GDPR Erasure & Anonymised P&L", (
     expect(store.has(`users/${uid}/projects/proj_1`)).toBe(false);
     expect(store.has(`users/${uid}/projects/proj_2`)).toBe(false);
     expect(store.has(`users/${uid}/stack/stack_1`)).toBe(false);
+    expect(store.has(`users/${uid}/stack/stack_archived_1`)).toBe(false);
     expect(store.has(`users/${uid}/userSession/current`)).toBe(false);
     expect(store.has(`users/${uid}/tokenTransactions/tx_1`)).toBe(false);
     expect(store.has(`users/${uid}/deepWebQueries/q_1`)).toBe(false);

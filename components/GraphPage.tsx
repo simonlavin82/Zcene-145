@@ -96,7 +96,7 @@ interface GraphPageProps {
   onUpdateChatHistories: (histories: Map<string, ChatMessage[]> | ((prev: Map<string, ChatMessage[]>) => Map<string, ChatMessage[]>)) => void;
   onShowToast: (message: string) => void;
   onRefreshUI: () => void;
-  onAddToStack: (node: Node, link?: string) => void;
+  onAddToStack: (node: Node) => void;
   stackCount: number;
   lastViewedStackCount: number;
   onUpdateLastViewedStackCount: (count: number) => void;

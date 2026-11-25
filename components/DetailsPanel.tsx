@@ -482,7 +482,7 @@ interface NodeDetailsCardProps {
     onClearChat?: () => void;
     isFullScreenMode?: boolean;
     isHero?: boolean;
-    onAddToStack: (node: Node, link?: string) => void;
+    onAddToStack: (node: Node) => void;
     onToggleMagazineView?: () => void;
     searchQuery?: string;
     isGuest?: boolean;
@@ -1413,7 +1413,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                         onAuthRequest?.();
                                         return;
                                     }
-                                    onAddToStack(node, links.purchase?.[0]?.url);
+                                    onAddToStack(node);
                                     onOpenStackDrawer?.();
                                 }}
                                 className="w-8 h-8 flex flex-shrink-0 items-center justify-center border border-zinc-800/80 rounded-xl transition-all duration-200 hover:border-zinc-700 active:scale-95 leading-none cursor-pointer text-zinc-400 hover:text-white hover:bg-zinc-800"
@@ -3633,7 +3633,7 @@ interface DetailsPanelProps {
     onMagazineViewToggle: (isOpen: boolean) => void;
     chatHistories: Map<string, ChatMessage[]>;
     onUpdateChatHistories: (histories: Map<string, ChatMessage[]> | ((prev: Map<string, ChatMessage[]>) => Map<string, ChatMessage[]>)) => void;
-    onAddToStack: (node: Node, link?: string) => void;
+    onAddToStack: (node: Node) => void;
     isGuest?: boolean;
     user?: any;
     onAuthRequest?: () => void;
