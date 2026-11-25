@@ -3495,6 +3495,149 @@ export const resolveVerifiedItunesArtistDisplayName = (
   return null;
 };
 
+/**
+ * V47.18 (Pillar A — Front-Door iTunes Naming Authority):
+ * Fast, $0.00, fail-open iTunes catalog artist-name check bounded by a strict wall-clock timeout (default 1500ms,
+ * zero 403/429 backoff sleep). Resolves Apple Music's canonical capitalization, internal hyphens ("At the Drive-In"),
+ * and official leading "The " ("The Murder City Devils") for unambiguous seeds at pre-flight.
+ *
+ * Guardrails:
+ * 1. Regional storefront priority (&country=ISO for non-US origins before US fallback).
+ * 2. Strict genre/taxonomy compatibility via evaluateGenreMatch.
+ * 3. Pass 1 (Exact normalized name match) takes absolute priority over Pass 2 (optional leading "The "),
+ *    guaranteeing non-"The " acts (e.g. "Supersuckers", "Deftones", "Pixies") never flip to a "The ..." variant.
+ * 4. Fails open (returns null) on timeout, HTTP error, or underground/DIY artists absent from iTunes.
+ */
+export const resolveItunesCanonicalArtistNameBackend = async (
+  artistName: string,
+  genre: string,
+  origin?: string,
+  disambiguationSnippet?: string,
+  timeoutMs: number = 1500
+): Promise<string | null> => {
+  const resolvedIso = origin ? normalizeIsoCode(extractCountrySlug(origin)) : null;
+  let cleanName = stripCountrySlug(String(artistName || ''), resolvedIso || origin).trim();
+  if (!cleanName) return null;
+  if (cleanName.includes('-') && !cleanName.includes(' ')) {
+    cleanName = titleCaseArtistId(cleanName);
+  }
+
+  const normName = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const targetNorm = normName(cleanName);
+  if (targetNorm.length < 2) return null;
+
+  const deadline = Date.now() + Math.max(250, timeoutMs);
+  const fetchFrontDoorJson = async (url: string): Promise<any | null> => {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs <= 100) return null;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), remainingMs);
+    try {
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res || !res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  const storefrontsToTry: Array<string | undefined> =
+    resolvedIso && resolvedIso !== 'us' ? [resolvedIso.toUpperCase(), undefined] : [undefined];
+
+  const hasLeadingThe = /^the\s+/i.test(cleanName);
+  const bareWithoutThe = cleanName.replace(/^the\s+/i, '').trim();
+  const articleVariantName = hasLeadingThe
+    ? (normName(bareWithoutThe).length >= 3 && normName(bareWithoutThe) !== 'the' ? bareWithoutThe : null)
+    : (targetNorm.length >= 3 ? `The ${cleanName}` : null);
+  const canTryOptionalThe =
+    Boolean(articleVariantName) &&
+    artistNamesMatchWithOptionalThe(articleVariantName, cleanName, {
+      requireMultiWordForOptionalThe: true,
+    });
+
+  for (const storefront of storefrontsToTry) {
+    if (deadline - Date.now() <= 100) break;
+    const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}` : '';
+    const primaryUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanName)}&entity=musicArtist&limit=15${countryParam}`;
+    const data = await fetchFrontDoorJson(primaryUrl);
+    const results: any[] = Array.isArray(data?.results) ? data.results : [];
+
+    const taxonomyValid = results.filter((r: any) => {
+      if (!r || typeof r.artistName !== 'string' || !r.artistName.trim()) return false;
+      if (r.artistName.trim().toLowerCase() === 'various artists') return false;
+      return evaluateGenreMatch(String(r.primaryGenreName || ''), genre || '', disambiguationSnippet || '');
+    });
+
+    // Pass 1: Exact normalized match priority (never flips "Supersuckers" -> "The Supersuckers")
+    const exactNormMatches = taxonomyValid.filter((r: any) => normName(r.artistName) === targetNorm);
+    if (exactNormMatches.length > 0) {
+      exactNormMatches.sort(
+        (a: any, b: any) =>
+          evaluateGenreDistanceScore(String(b.primaryGenreName || ''), genre || '', disambiguationSnippet || '') -
+          evaluateGenreDistanceScore(String(a.primaryGenreName || ''), genre || '', disambiguationSnippet || '')
+      );
+      const resolved = resolveVerifiedItunesArtistDisplayName(
+        exactNormMatches.map((r: any) => r.artistName),
+        cleanName
+      );
+      if (resolved) return resolved;
+    }
+
+    // Pass 2A: Optional-"The " match already present in primary search payload
+    if (canTryOptionalThe) {
+      const primaryOptionalTheMatches = taxonomyValid.filter(
+        (r: any) =>
+          normName(r.artistName) !== targetNorm &&
+          artistNamesMatchWithOptionalThe(r.artistName, cleanName, {
+            requireMultiWordForOptionalThe: true,
+          })
+      );
+      if (primaryOptionalTheMatches.length > 0) {
+        primaryOptionalTheMatches.sort(
+          (a: any, b: any) =>
+            evaluateGenreDistanceScore(String(b.primaryGenreName || ''), genre || '', disambiguationSnippet || '') -
+            evaluateGenreDistanceScore(String(a.primaryGenreName || ''), genre || '', disambiguationSnippet || '')
+        );
+        const resolved = resolveVerifiedItunesArtistDisplayName(
+          primaryOptionalTheMatches.map((r: any) => r.artistName),
+          cleanName
+        );
+        if (resolved) return resolved;
+      }
+
+      // Pass 2B: Dedicated leading-"The " fallback query only when Pass 1 & 2A yielded 0 matches
+      if (articleVariantName && deadline - Date.now() > 200) {
+        const variantNorm = normName(articleVariantName);
+        const variantUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(articleVariantName)}&entity=musicArtist&limit=15${countryParam}`;
+        const variantData = await fetchFrontDoorJson(variantUrl);
+        const variantResults: any[] = Array.isArray(variantData?.results) ? variantData.results : [];
+        const variantMatches = variantResults.filter((r: any) => {
+          if (!r || typeof r.artistName !== 'string' || !r.artistName.trim()) return false;
+          if (r.artistName.trim().toLowerCase() === 'various artists') return false;
+          if (normName(r.artistName) !== variantNorm) return false;
+          return evaluateGenreMatch(String(r.primaryGenreName || ''), genre || '', disambiguationSnippet || '');
+        });
+        if (variantMatches.length > 0) {
+          variantMatches.sort(
+            (a: any, b: any) =>
+              evaluateGenreDistanceScore(String(b.primaryGenreName || ''), genre || '', disambiguationSnippet || '') -
+              evaluateGenreDistanceScore(String(a.primaryGenreName || ''), genre || '', disambiguationSnippet || '')
+          );
+          const resolved = resolveVerifiedItunesArtistDisplayName(
+            variantMatches.map((r: any) => r.artistName),
+            cleanName
+          );
+          if (resolved) return resolved;
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
 const isSelfTitledAlbumMatch = (normTitle: string, cleanArtistName: string): boolean => {
   if (!normTitle || !cleanArtistName) return false;
   const norm = (s: string) => (s || '').toLowerCase().replace(/[^a-z0-9]/g, '');

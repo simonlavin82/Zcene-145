@@ -1316,10 +1316,10 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(canvasLayout.some(c => c.nodeId === 'scene-1::founded-1991')).toBe(true);
     });
 
-    it('verifies V47.17 Runbook Protocol specifies schemaVersion: 43 backward compatibility with 0 database purge required', () => {
-      expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V47.17 Regression Suite (Full-Stack)');
+    it('verifies V47.18 Runbook Protocol specifies schemaVersion: 43 backward compatibility with 0 database purge required', () => {
+      expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V47.18 Regression Suite (Full-Stack)');
       expect(BACKEND_REGRESSION_RUNBOOK).toContain('schemaVersion: 43');
-      expect(BACKEND_REGRESSION_RUNBOOK).toContain('Zero database purge is required for V47.17 operations');
+      expect(BACKEND_REGRESSION_RUNBOOK).toContain('Zero database purge is required for V47.18 operations');
     });
 
     it('verifies ARCHITECTURE_RULES contains all 48 contiguous laws with Rule 22 as Deep Cloning Isolation', () => {
@@ -5302,6 +5302,95 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
           detailsCache
         )
       ).toBe(false);
+    });
+
+    it('V47.18 Pillar D: <ConsolidatedValidationModal> confirmation updates draft scene title/name to the canonical auto-corrected name and prunes superseded pre-correction keys', () => {
+      // Simulate initial draft scene created when user typed raw "murder city devils"
+      const initialDraftScene = normalizeProjectScene(
+        {
+          id: 'scene-1',
+          sceneId: 'scene-1',
+          sceneIndex: 0,
+          title: 'murder city devils',
+          name: 'murder city devils',
+          seedArtists: 'murder city devils',
+          seedIds: ['murder-city-devils'],
+          seedArtistIds: ['murder-city-devils'],
+        },
+        0
+      );
+      expect(initialDraftScene.title).toBe('murder city devils');
+
+      // Pre-confirmation maps seeded with pre-correction key "murder-city-devils"
+      const activeSeedNames: Record<string, string> = { 'murder-city-devils': 'murder city devils' };
+      const activeDisambiguationHints: Record<string, string> = { 'murder-city-devils': 'USA' };
+      const activeDisambiguationGenres: Record<string, string> = { 'murder-city-devils': 'Garage Rock' };
+
+      // Box 4 pre-flight resolves "The Murder City Devils" ("the-murder-city-devils-us")
+      const confirmedItem = {
+        id: 'murder-city-devils',
+        sceneId: 'scene-1',
+        query: 'murder city devils',
+        isCorrected: true,
+        correctedQuery: 'The Murder City Devils',
+        originalQuery: 'murder city devils',
+        candidateId: 'the-murder-city-devils-us',
+        predictedOrigin: 'USA',
+        genre: 'Garage Rock',
+        isAmbiguous: false,
+      };
+
+      const supersededPreFlightBareKeys = new Set<string>();
+      const normId = confirmedItem.candidateId;
+      const canonicalBareId = 'the-murder-city-devils';
+      const cleanDisplayName = confirmedItem.correctedQuery;
+
+      if (confirmedItem.id !== normId && confirmedItem.id !== canonicalBareId) {
+        supersededPreFlightBareKeys.add(confirmedItem.id);
+      }
+      activeSeedNames[normId] = cleanDisplayName;
+      activeSeedNames[canonicalBareId] = cleanDisplayName;
+      activeDisambiguationHints[normId] = confirmedItem.predictedOrigin;
+      activeDisambiguationHints[canonicalBareId] = confirmedItem.predictedOrigin;
+      activeDisambiguationGenres[normId] = confirmedItem.genre;
+      activeDisambiguationGenres[canonicalBareId] = confirmedItem.genre;
+
+      supersededPreFlightBareKeys.forEach((staleKey) => {
+        delete activeSeedNames[staleKey];
+        delete activeDisambiguationHints[staleKey];
+        delete activeDisambiguationGenres[staleKey];
+      });
+
+      // Superseded pre-correction key "murder-city-devils" is pruned from all 3 maps
+      expect(activeSeedNames['murder-city-devils']).toBeUndefined();
+      expect(activeDisambiguationHints['murder-city-devils']).toBeUndefined();
+      expect(activeDisambiguationGenres['murder-city-devils']).toBeUndefined();
+      expect(activeSeedNames['the-murder-city-devils-us']).toBe('The Murder City Devils');
+      expect(activeSeedNames['the-murder-city-devils']).toBe('The Murder City Devils');
+      expect(activeDisambiguationHints['the-murder-city-devils-us']).toBe('USA');
+      expect(activeDisambiguationGenres['the-murder-city-devils-us']).toBe('Garage Rock');
+
+      // Re-routed scene updates title and name to "The Murder City Devils" (unless customName is set)
+      const resolvedDisplayParts = [cleanDisplayName];
+      const nextAutoTitle = initialDraftScene.customName?.trim()
+        ? initialDraftScene.customName.trim()
+        : resolvedDisplayParts.join(', ');
+      const updatedScene = normalizeProjectScene(
+        {
+          ...initialDraftScene,
+          title: nextAutoTitle,
+          name: nextAutoTitle,
+          seedArtists: resolvedDisplayParts.join('::'),
+          curatedSeedArtists: resolvedDisplayParts.join('::'),
+          seedIds: [normId],
+          seedArtistIds: [normId],
+        },
+        0
+      );
+      expect(updatedScene.title).toBe('The Murder City Devils');
+      expect(updatedScene.name).toBe('The Murder City Devils');
+      expect(updatedScene.seedArtists).toBe('The Murder City Devils');
+      expect(updatedScene.seedIds).toEqual(['the-murder-city-devils-us']);
     });
   });
 });

@@ -18,6 +18,7 @@ import {
   shouldRunRule38NotFoundUpgrade,
   shouldRunRule38ArtistNameUpgrade,
   resolveVerifiedItunesArtistDisplayName,
+  resolveItunesCanonicalArtistNameBackend,
   artistNamesMatchWithOptionalThe,
   sanitizeTextOnlyDiscography,
 } from '../src/services/curatorService';
@@ -3193,7 +3194,7 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
       expect(CANONICAL_STYLES_FLAT).toContain('Underground');
     });
 
-    it('6. V47.17 Canonical Verified iTunes artistName Adoption & v3 -> v4 Self-Heal: adopts "The Murder City Devils" (#3116895) and "At the Drive-In" (#159444), skips "Various Artists", rejects Tier 2 geo suffixes ("Klear TH") and multi-artist credits, and gates shouldRunRule38ArtistNameUpgrade strictly on itunesScrapeVersion === 3', async () => {
+    it('6. V47.17 Canonical Verified iTunes artistName Adoption & v3 -> v4 Self-Heal: adopts "The Murder City Devils" (#3269301) and "At the Drive-In" (#41990355), skips "Various Artists", rejects Tier 2 geo suffixes ("Klear TH") and multi-artist credits, and gates shouldRunRule38ArtistNameUpgrade strictly on itunesScrapeVersion === 3', async () => {
       // 1. resolveVerifiedItunesArtistDisplayName unit guards
       expect(
         resolveVerifiedItunesArtistDisplayName(
@@ -3250,7 +3251,7 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
         )
       ).toBe(false);
 
-      // 3. End-to-end scrapeImageUrlBackend returns verifiedArtistName: "The Murder City Devils" when queried with "Murder City Devils"
+      // 3. End-to-end scrapeImageUrlBackend returns verifiedArtistName: "The Murder City Devils" (#3269301) when queried with "Murder City Devils"
       const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
         const url = String(input);
         if (url.includes('term=Murder%20City%20Devils&entity=musicArtist')) {
@@ -3259,12 +3260,12 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
             status: 200,
             json: async () => ({
               results: [
-                { wrapperType: 'artist', artistId: 3116895, artistName: 'The Murder City Devils', primaryGenreName: 'Alternative' },
+                { wrapperType: 'artist', artistId: 3269301, artistName: 'The Murder City Devils', primaryGenreName: 'Alternative' },
               ],
             }),
           } as any;
         }
-        if (url.includes('lookup?id=3116895&entity=album')) {
+        if (url.includes('lookup?id=3269301&entity=album')) {
           return {
             ok: true,
             status: 200,
@@ -3272,7 +3273,7 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
               results: [
                 {
                   wrapperType: 'collection',
-                  artistId: 3116895,
+                  artistId: 3269301,
                   artistName: 'The Murder City Devils',
                   collectionId: 3116901,
                   collectionName: 'Empty Bottles, Broken Hearts',
@@ -3299,8 +3300,145 @@ describe('Rule 38: Offline Unit Tests — Scraper Waterfall, Artwork Priority & 
           'us',
           '1996'
         );
-        expect(res.itunesArtistId).toBe(3116895);
+        expect(res.itunesArtistId).toBe(3269301);
         expect(res.verifiedArtistName).toBe('The Murder City Devils');
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    it('7. V47.18 Pillar A (resolveItunesCanonicalArtistNameBackend): snaps "Murder City Devils" -> "The Murder City Devils" (#3269301) and "At The Drive In" -> "At the Drive-In" (#41990355), enforces Pass 1 exact-match priority ("Supersuckers" / "Deftones"), routes regional storefronts first, and fails open on DIY misses or timeouts', async () => {
+      const queriedUrls: string[] = [];
+      const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+        const url = String(input);
+        queriedUrls.push(url);
+
+        // 1. "Murder City Devils" -> returns "The Murder City Devils" (#3269301) in primary payload
+        if (url.includes('term=Murder%20City%20Devils&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 3269301, artistName: 'The Murder City Devils', primaryGenreName: 'Alternative' },
+              ],
+            }),
+          } as any;
+        }
+
+        // 2. "At The Drive In" -> Pass 1 exact norm match ("atthedrivein") returns "At the Drive-In" (#41990355)
+        if (url.includes('term=At%20The%20Drive%20In&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 41990355, artistName: 'At the Drive-In', primaryGenreName: 'Alternative' },
+              ],
+            }),
+          } as any;
+        }
+
+        // 3. "Supersuckers" -> Pass 1 exact norm match ("supersuckers") takes priority over a "The Supersuckers" row
+        if (url.includes('term=Supersuckers&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 999999, artistName: 'The Supersuckers', primaryGenreName: 'Rock' },
+                { wrapperType: 'artist', artistId: 158101, artistName: 'Supersuckers', primaryGenreName: 'Rock' },
+              ],
+            }),
+          } as any;
+        }
+
+        // 4. "Klear" (Bangkok, Thailand) -> Regional storefront &country=TH queried first
+        if (url.includes('term=Klear&entity=musicArtist&limit=15&country=TH')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 571882910, artistName: 'Klear', primaryGenreName: 'Alternative' },
+              ],
+            }),
+          } as any;
+        }
+
+        // 5. Hostile genre rejection (Hip-Hop artist returned for Hardcore Punk query)
+        if (url.includes('term=Hostile%20Homonym&entity=musicArtist')) {
+          return {
+            ok: true,
+            status: 200,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 777777, artistName: 'The Hostile Homonym', primaryGenreName: 'Hip-Hop/Rap' },
+              ],
+            }),
+          } as any;
+        }
+
+        return { ok: true, status: 200, json: async () => ({ results: [] }) } as any;
+      });
+
+      try {
+        // Case A: Snaps "Murder City Devils" -> "The Murder City Devils"
+        const mcd = await resolveItunesCanonicalArtistNameBackend(
+          'Murder City Devils',
+          'Garage Rock',
+          'USA',
+          'American garage punk band from Seattle.'
+        );
+        expect(mcd).toBe('The Murder City Devils');
+
+        // Case B: Snaps "At The Drive In" -> "At the Drive-In"
+        const atdi = await resolveItunesCanonicalArtistNameBackend(
+          'At The Drive In',
+          'Post-Hardcore',
+          'USA',
+          'El Paso post-hardcore band.'
+        );
+        expect(atdi).toBe('At the Drive-In');
+
+        // Case C: Pass 1 exact-match priority preserves "Supersuckers" (never flips to "The Supersuckers")
+        const supersuckers = await resolveItunesCanonicalArtistNameBackend(
+          'Supersuckers',
+          'Garage Punk',
+          'USA',
+          'Tucson/Seattle cowpunk and garage rock band.'
+        );
+        expect(supersuckers).toBe('Supersuckers');
+        expect(queriedUrls.some((u) => u.includes('term=The%20Supersuckers'))).toBe(false);
+
+        // Case D: Regional storefront priority (&country=TH)
+        queriedUrls.length = 0;
+        const klear = await resolveItunesCanonicalArtistNameBackend(
+          'Klear',
+          'Alternative Rock',
+          'Bangkok, Thailand',
+          'Thai alternative rock band.'
+        );
+        expect(klear).toBe('Klear');
+        expect(queriedUrls[0]).toContain('&country=TH');
+
+        // Case E: Hostile genre rejected -> returns null (fail-open to Flash)
+        const hostile = await resolveItunesCanonicalArtistNameBackend(
+          'Hostile Homonym',
+          'Hardcore Punk',
+          'USA',
+          'American hardcore punk band.'
+        );
+        expect(hostile).toBeNull();
+
+        // Case F: Underground DIY band absent from iTunes -> returns null cleanly
+        const diy = await resolveItunesCanonicalArtistNameBackend(
+          'Certain People I Know',
+          'Emo',
+          'USA',
+          '90s underground DIY emo band.'
+        );
+        expect(diy).toBeNull();
       } finally {
         fetchSpy.mockRestore();
       }

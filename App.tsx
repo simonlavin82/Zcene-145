@@ -5563,28 +5563,52 @@ const App: React.FC = () => {
           });
         }
 
-        // Map confirmed seeds across allTargetScenes and populate global metadata maps
+        // Map confirmed seeds across allTargetScenes and populate global metadata maps (V47.18 Pillar D: prune superseded pre-correction keys)
+        const supersededPreFlightBareKeys = new Set<string>();
         cacheCandidatesPerSeed.forEach(item => {
           const normId = normalizeArtistId(item.selectedCandidateId || item.candidateId || item.id);
-          const cleanDisplayName = item.correctedQuery?.trim() || item.query.trim();
+          const canonicalBareId = normalizeArtistId(
+            stripCountrySlug(normId, item.predictedOrigin)
+          ) || normId;
+          const cleanDisplayName = (
+            item.isAmbiguous && item.selectedCandidateId && Array.isArray(item.candidates)
+              ? (item.candidates.find(c => c.id === item.selectedCandidateId)?.name || item.correctedQuery || item.query)
+              : (item.correctedQuery || item.query)
+          )?.trim() || '';
+
+          if (item.id && item.id !== normId && item.id !== canonicalBareId) {
+            supersededPreFlightBareKeys.add(item.id);
+          }
+          if (item.originalQuery) {
+            const origNormKey = normalizeArtistId(item.originalQuery);
+            if (origNormKey && origNormKey !== normId && origNormKey !== canonicalBareId) {
+              supersededPreFlightBareKeys.add(origNormKey);
+            }
+          }
+
           if (cleanDisplayName) {
-            activeSeedNames[item.id] = cleanDisplayName;
             activeSeedNames[normId] = cleanDisplayName;
+            activeSeedNames[canonicalBareId] = cleanDisplayName;
             activeSeedNames[cleanDisplayName.toLowerCase()] = cleanDisplayName;
           }
           if (item.predictedOrigin) {
             activeDisambiguationHints[normId] = item.predictedOrigin;
-            activeDisambiguationHints[item.id] = item.predictedOrigin;
+            activeDisambiguationHints[canonicalBareId] = item.predictedOrigin;
           }
           if (item.genre) {
             activeDisambiguationGenres[normId] = item.genre;
-            activeDisambiguationGenres[item.id] = item.genre;
+            activeDisambiguationGenres[canonicalBareId] = item.genre;
           }
           if (item.originalQuery || (item.selectedCandidateId && item.selectedCandidateId !== item.id)) {
             activeOriginalQueries[normId] = item.isCorrected && item.correctedQuery
               ? item.correctedQuery
               : (item.originalQuery || item.id);
           }
+        });
+        supersededPreFlightBareKeys.forEach((staleKey) => {
+          delete activeSeedNames[staleKey];
+          delete activeDisambiguationHints[staleKey];
+          delete activeDisambiguationGenres[staleKey];
         });
 
         const updatedProjectScenes: ProjectScene[] = allTargetScenes.map((s, idx) => {
@@ -5594,16 +5618,23 @@ const App: React.FC = () => {
             const resolvedIds = matchingSeeds.map(m =>
               normalizeArtistId(m.selectedCandidateId || m.candidateId || (m.isCorrected && m.correctedQuery ? m.correctedQuery : m.id))
             );
-            const resolvedDisplay = matchingSeeds.map(m => {
+            const resolvedDisplayParts = matchingSeeds.map(m => {
               if (m.isAmbiguous && m.selectedCandidateId && Array.isArray(m.candidates)) {
                 const chosen = m.candidates.find(c => c.id === m.selectedCandidateId);
                 if (chosen?.name) return chosen.name;
               }
               return m.isCorrected && m.correctedQuery ? m.correctedQuery : m.query;
-            }).join('::');
+            }).map(part => (part || '').trim()).filter(Boolean);
+            const resolvedDisplay = resolvedDisplayParts.join('::');
+            const nextAutoTitle = s.customName && s.customName.trim()
+              ? s.customName.trim()
+              : (resolvedDisplayParts.join(', ') || s.title);
             return normalizeProjectScene({
               ...s,
+              title: nextAutoTitle,
+              name: nextAutoTitle,
               seedArtists: resolvedDisplay || s.seedArtists,
+              curatedSeedArtists: resolvedDisplay || s.curatedSeedArtists,
               seedIds: resolvedIds.length > 0 ? resolvedIds : s.seedIds,
               seedArtistIds: resolvedIds.length > 0 ? resolvedIds : s.seedArtistIds,
             }, idx);
@@ -5806,9 +5837,15 @@ const App: React.FC = () => {
         const stepZeroScenes: ProjectScene[] = scenesRef.current.length > 1
           ? scenesRef.current.map((s, idx) => {
               if ((s.sceneId || s.id) === lockedTargetSceneId) {
+                const nextStepZeroTitle = s.customName && s.customName.trim()
+                  ? s.customName.trim()
+                  : (displayArtists ? displayArtists.split('::').map(part => part.trim()).filter(Boolean).join(', ') : s.title);
                 return normalizeProjectScene({
                   ...s,
+                  title: nextStepZeroTitle,
+                  name: nextStepZeroTitle,
                   seedArtists: displayArtists || s.seedArtists,
+                  curatedSeedArtists: displayArtists || s.curatedSeedArtists,
                   seedIds: resolvedSeedIds.length > 0 ? resolvedSeedIds : s.seedIds,
                   seedArtistIds: resolvedSeedIds.length > 0 ? resolvedSeedIds : s.seedArtistIds,
                   discoveryFilters: activeDiscoveryFilters,
@@ -5823,6 +5860,7 @@ const App: React.FC = () => {
           : [normalizeProjectScene({
               ...createEmptyScene(0),
               seedArtists: displayArtists,
+              curatedSeedArtists: displayArtists,
               seedIds: resolvedSeedIds,
               seedArtistIds: resolvedSeedIds,
               discoveryFilters: activeDiscoveryFilters,
@@ -7086,21 +7124,28 @@ const App: React.FC = () => {
         const targetSceneIdxForJob = Math.max(0, scenesRef.current.findIndex(s => (s.sceneId || s.id) === targetSceneIdForJob));
         // V43.1: sanitizeScenesForTransport strips D3-mutated link object refs (source/target → string IDs)
         // and undefined fields so the HTTPS Callable payload always serializes cleanly.
-        const synchronizedScenesForJob = sanitizeScenesForTransport((scenesRef.current.length > 0 ? scenesRef.current : [createEmptyScene(0)]).map((s, idx) =>
-          (s.sceneId || s.id) === targetSceneIdForJob || idx === targetSceneIdxForJob
-            ? normalizeProjectScene({
-                ...s,
-                id: targetSceneIdForJob,
-                sceneId: targetSceneIdForJob,
-                sceneIndex: idx,
-                seedArtists: displayArtists,
-                seedIds: resolvedSeedIds,
-                seedArtistIds: resolvedSeedIds,
-                discoveryFilters: activeDiscoveryFilters,
-                status: 'curating'
-              }, idx)
-            : normalizeProjectScene(s, idx)
-        ));
+        const synchronizedScenesForJob = sanitizeScenesForTransport((scenesRef.current.length > 0 ? scenesRef.current : [createEmptyScene(0)]).map((s, idx) => {
+          if ((s.sceneId || s.id) === targetSceneIdForJob || idx === targetSceneIdxForJob) {
+            const nextJobSceneTitle = s.customName && s.customName.trim()
+              ? s.customName.trim()
+              : (displayArtists ? displayArtists.split('::').map(part => part.trim()).filter(Boolean).join(', ') : s.title);
+            return normalizeProjectScene({
+              ...s,
+              id: targetSceneIdForJob,
+              sceneId: targetSceneIdForJob,
+              sceneIndex: idx,
+              title: nextJobSceneTitle,
+              name: nextJobSceneTitle,
+              seedArtists: displayArtists,
+              curatedSeedArtists: displayArtists,
+              seedIds: resolvedSeedIds,
+              seedArtistIds: resolvedSeedIds,
+              discoveryFilters: activeDiscoveryFilters,
+              status: 'curating'
+            }, idx);
+          }
+          return normalizeProjectScene(s, idx);
+        }));
         scenesRef.current = synchronizedScenesForJob;
 
         graphPromise = generateGraphDataViaCloudJob(

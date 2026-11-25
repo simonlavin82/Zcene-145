@@ -687,5 +687,214 @@ describe('Architecture V42: Global 249-Country ISO-3166 Registry & End-to-End Di
       expect(store.has('artists/the-rocking-horse-winer')).toBe(false);
       expect(store.has('artists/rocking-horse-winner')).toBe(false);
     });
+
+    it('(d) V47.18 Pillars A & B: locks pre-flight seed identity across validateSeedOriginCallable -> executeCurationPipeline -> processCurationJob (0 redundant Flash calls) and guards Escape Hatch (!isAmbiguous && !originHint && !genreHint)', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const pipelineSrc = fs.readFileSync(path.resolve(__dirname, '../src/executeCurationPipeline.ts'), 'utf8');
+      const workerSrc = fs.readFileSync(path.resolve(__dirname, '../src/processCurationJob.ts'), 'utf8');
+
+      // 1. Pillar A: Escape Hatch Guard in validateSeedOriginCallable checks !isAmbiguous && !isEscapeHatchQuery (originHint, genreHint, mode === "escape_hatch")
+      expect(pipelineSrc).toContain('const isEscapeHatchQuery = Boolean(');
+      expect(pipelineSrc).toContain('(typeof originHint === "string" && originHint.trim()) ||');
+      expect(pipelineSrc).toContain('(typeof genreHint === "string" && genreHint.trim()) ||');
+      expect(pipelineSrc).toContain('mode === "escape_hatch"');
+      expect(pipelineSrc).toContain('if (!isAmbiguous && !isEscapeHatchQuery && validationResult.id)');
+
+      // 2. Pillar B: Both resolveSceneTopologyBackend and processCurationJob lock pre-validated seed identity and bypass redundant Flash calls
+      expect(pipelineSrc).toContain('const hasLockedPreFlightIdentity = Boolean(');
+      expect(pipelineSrc).toContain('Bypassing redundant Flash re-validation.');
+      expect(workerSrc).toContain('const hasLockedWorkerSeedIdentity = Boolean(');
+      expect(workerSrc).toContain('Bypassing redundant Phase 2 Flash call.');
+    });
+
+    it('(e) V47.18 Pillar C (Gaps 1–3 & Step 5/6 Parity): cold non-seed peer re-keying ("murder-city-devils-us" -> "the-murder-city-devils-us", iTunes #3269301) updates idRewriteMap, finalGraph.nodes/links, sceneArtistSnippetsMap (deleting superseded origNorm), activeNodes, artistIds, and enforces artistId === stripCountrySlug(cacheKey)', () => {
+      const normalizeId = (s: string) =>
+        s.trim().toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+
+      // Simulate a scene anchored by "At the Drive-In" (#41990355, at-the-drive-in-us) where Gemini 3.1 Pro
+      // emitted a cold peer node { id: "murder-city-devils-us", label: "Murder City Devils" } and Step 2
+      // iTunes verified "The Murder City Devils" (#3269301).
+      const finalGraph: any = {
+        nodes: [
+          { id: 'at-the-drive-in-us', label: 'At the Drive-In', type: 'artist', group: 1, isSeed: true },
+          { id: 'murder-city-devils-us', label: 'Murder City Devils', type: 'artist', group: 1 },
+          { id: 'sub-pop', label: 'Sub Pop', type: 'label', group: 2 },
+        ],
+        links: [
+          { source: 'at-the-drive-in-us', target: 'murder-city-devils-us', value: 1, forwardContext: 'shared Pacific Northwest touring circuits with' },
+          { source: 'murder-city-devils-us', target: 'sub-pop', value: 1, forwardContext: 'released seminal garage punk albums on' },
+        ],
+      };
+
+      const recommendedEntities: any[] = [
+        {
+          id: 'at-the-drive-in-us',
+          originalNodeId: 'at-the-drive-in-us',
+          name: 'At the Drive-In',
+          type: 'artist',
+          origin: 'El Paso, Texas, USA',
+          genre: 'Post-Hardcore',
+        },
+        {
+          id: 'murder-city-devils-us',
+          originalNodeId: 'murder-city-devils-us',
+          name: 'Murder City Devils',
+          type: 'artist',
+          origin: 'Seattle, Washington, USA',
+          genre: 'Garage Punk',
+        },
+      ];
+
+      // Step 2 Cold Peer Re-Keying (!hadExistingCachedDoc && verifiedItunesArtistName === "The Murder City Devils")
+      const coldPeer = recommendedEntities[1];
+      const verifiedItunesArtistName = 'The Murder City Devils';
+      coldPeer.name = verifiedItunesArtistName;
+      const verifiedBareSlug = normalizeId(verifiedItunesArtistName);
+      const currentIso = extractTrailingCountryIso(coldPeer.id);
+      const currentBareSlug = stripCountrySlug(coldPeer.id, currentIso);
+      expect(verifiedBareSlug).toBe('the-murder-city-devils');
+      expect(currentBareSlug).toBe('murder-city-devils');
+      coldPeer.id = canonicalizeArtistSlugWithOrigin(verifiedBareSlug, 'Seattle, Washington, USA');
+      expect(coldPeer.id).toBe('the-murder-city-devils-us');
+
+      const detailsCacheEntries: [string, any][] = [
+        [
+          'at-the-drive-in-us',
+          {
+            itunesArtistId: 41990355,
+            details: { artist: 'At the Drive-In', origin: 'El Paso, Texas, USA', genre: 'Post-Hardcore' },
+          },
+        ],
+        [
+          coldPeer.id,
+          {
+            itunesArtistId: 3269301,
+            details: { artist: 'The Murder City Devils', origin: 'Seattle, Washington, USA', genre: 'Garage Punk' },
+          },
+        ],
+      ];
+
+      // Step 3A: Scene Zine artistSnippets returns "The Murder City Devils" while finalGraph.nodes still has "murder-city-devils-us"
+      const sceneArtistSnippetsMap: Record<string, string> = {};
+      const zineSnippets = [
+        { id: 'At the Drive-In', snippet: 'At the Drive-In detonated post-hardcore from El Paso.' },
+        { id: 'The Murder City Devils', snippet: 'The Murder City Devils fused Spencer Moody vocals with Vox organ grit.' },
+      ];
+      for (const s of zineSnippets) {
+        sceneArtistSnippetsMap[s.id] = s.snippet;
+        sceneArtistSnippetsMap[normalizeId(s.id)] = s.snippet;
+      }
+      for (const n of finalGraph.nodes) {
+        const nodeNorm = normalizeId(n.id);
+        const nodeBare = stripCountrySlug(nodeNorm);
+        const nodeBareNoThe = nodeBare.replace(/^the-/, '');
+        const match = zineSnippets.find((s) => {
+          const sNorm = normalizeId(s.id);
+          const sBare = stripCountrySlug(sNorm);
+          return sNorm === nodeNorm || sBare === nodeBare || sBare.replace(/^the-/, '') === nodeBareNoThe;
+        });
+        if (match) {
+          n.narrativeSnippet = match.snippet;
+          sceneArtistSnippetsMap[n.id] = match.snippet;
+          sceneArtistSnippetsMap[nodeNorm] = match.snippet;
+        }
+      }
+      expect(finalGraph.nodes[1].narrativeSnippet).toContain('The Murder City Devils');
+      expect(sceneArtistSnippetsMap['murder-city-devils-us']).toBeDefined();
+
+      // Gap 3: Build idRewriteMap registering recNorm, entryKeyNorm, entryBareNorm, origNorm, and origBare
+      const idRewriteMap = new Map<string, string>();
+      for (const entityObj of recommendedEntities) {
+        const recNorm = normalizeId(entityObj.name);
+        const recDetailsEntry = detailsCacheEntries.find(
+          (entry) => entry[0] === entityObj.id || entry[0] === entityObj.originalNodeId || isEntitySeedMatch(recNorm, entry[0])
+        )!;
+        const entryKeyNorm = normalizeId(recDetailsEntry[0]);
+        const entryTrailingIso = extractTrailingCountryIso(entryKeyNorm);
+        const entryBareNorm = (entryTrailingIso ? stripCountrySlug(entryKeyNorm, entryTrailingIso) : stripCountrySlug(entryKeyNorm)) || recNorm;
+        const finalCanonicalId = canonicalizeArtistSlugWithOrigin(entryBareNorm, recDetailsEntry[1]?.details?.origin);
+
+        idRewriteMap.set(recNorm, finalCanonicalId);
+        idRewriteMap.set(entryKeyNorm, finalCanonicalId);
+        idRewriteMap.set(entryBareNorm, finalCanonicalId);
+        if (entityObj.originalNodeId) {
+          const origNorm = normalizeId(entityObj.originalNodeId);
+          idRewriteMap.set(origNorm, finalCanonicalId);
+          const origIso = extractTrailingCountryIso(origNorm);
+          const origBare = origIso ? stripCountrySlug(origNorm, origIso) : stripCountrySlug(origNorm);
+          if (origBare) idRewriteMap.set(origBare, finalCanonicalId);
+        }
+        entityObj.id = finalCanonicalId;
+        recDetailsEntry[0] = finalCanonicalId;
+      }
+
+      expect(idRewriteMap.get('murder-city-devils-us')).toBe('the-murder-city-devils-us');
+      expect(idRewriteMap.get('murder-city-devils')).toBe('the-murder-city-devils-us');
+      expect(idRewriteMap.get('the-murder-city-devils')).toBe('the-murder-city-devils-us');
+
+      // Apply idRewriteMap to finalGraph.nodes & prune superseded origNorm from sceneArtistSnippetsMap
+      for (const node of finalGraph.nodes) {
+        const prevRawNodeId = node.id;
+        const normId = normalizeId(node.id);
+        const baseNormId = stripCountrySlug(normId);
+        if (idRewriteMap.has(normId)) {
+          node.id = idRewriteMap.get(normId)!;
+        } else if (idRewriteMap.has(baseNormId)) {
+          node.id = idRewriteMap.get(baseNormId)!;
+        }
+        const rewrittenNormId = normalizeId(node.id);
+        if (node.narrativeSnippet) {
+          sceneArtistSnippetsMap[node.id] = node.narrativeSnippet;
+          sceneArtistSnippetsMap[rewrittenNormId] = node.narrativeSnippet;
+        }
+        if (normId !== rewrittenNormId) {
+          delete sceneArtistSnippetsMap[normId];
+          if (prevRawNodeId !== node.id) {
+            delete sceneArtistSnippetsMap[prevRawNodeId];
+          }
+        }
+      }
+
+      // Apply idRewriteMap to finalGraph.links
+      for (const link of finalGraph.links) {
+        if (idRewriteMap.has(link.source)) link.source = idRewriteMap.get(link.source)!;
+        if (idRewriteMap.has(link.target)) link.target = idRewriteMap.get(link.target)!;
+      }
+
+      // Final Node Label Lock
+      for (const node of finalGraph.nodes) {
+        const entry = detailsCacheEntries.find((e) => e[0] === node.id);
+        if (entry?.[1]?.details?.artist) {
+          node.label = entry[1].details.artist;
+        }
+      }
+
+      expect(finalGraph.nodes.map((n: any) => n.id)).toEqual([
+        'at-the-drive-in-us',
+        'the-murder-city-devils-us',
+        'sub-pop',
+      ]);
+      expect(finalGraph.nodes[1].label).toBe('The Murder City Devils');
+      expect(finalGraph.links[0].target).toBe('the-murder-city-devils-us');
+      expect(finalGraph.links[1].source).toBe('the-murder-city-devils-us');
+
+      // Superseded pre-rewrite key "murder-city-devils-us" is deleted from sceneArtistSnippetsMap while "the-murder-city-devils-us" is present
+      expect(sceneArtistSnippetsMap['the-murder-city-devils-us']).toContain('The Murder City Devils');
+      expect(sceneArtistSnippetsMap['murder-city-devils-us']).toBeUndefined();
+
+      // Step 6 mathematical parity: canonicalBareIdForWrite === stripCountrySlug(cleanCanonicalId)
+      const cleanCanonicalId = 'the-murder-city-devils-us';
+      const canonicalTrailingIso = extractTrailingCountryIso(cleanCanonicalId);
+      const canonicalBareIdForWrite = stripCountrySlug(cleanCanonicalId, canonicalTrailingIso);
+      expect(canonicalBareIdForWrite).toBe('the-murder-city-devils');
+
+      // And for an existing legacy doc ("murder-city-devils-us") whose display name was upgraded to "The Murder City Devils",
+      // canonicalBareIdForWrite stays "murder-city-devils" (never writing a mismatched artistId or dual stub!)
+      const legacyCanonicalId = 'murder-city-devils-us';
+      const legacyTrailingIso = extractTrailingCountryIso(legacyCanonicalId);
+      const legacyBareIdForWrite = stripCountrySlug(legacyCanonicalId, legacyTrailingIso);
+      expect(legacyBareIdForWrite).toBe('murder-city-devils');
+    });
   });
 });

@@ -814,29 +814,91 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         });
                     }
                     else {
-                        console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
-                        // Phase 2: Origin Validation (Flash-Lite) - Enforce lockedSeeds origin & genre hints
-                        const queryForValidation = cleanSeedDisplayName || (0, isoCountries_1.stripCountrySlug)(seed);
-                        const validationHints = (seedLock?.origin || seedLock?.genre)
-                            ? { originHint: seedLock.origin || undefined, genreHint: seedLock.genre || undefined }
-                            : undefined;
-                        const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(queryForValidation, validationHints);
-                        if (validationResult.apiUsage) {
-                            usageCollector.push(validationResult.apiUsage.model, validationResult.apiUsage);
-                        }
-                        if (validationResult.isValid) {
-                            const validatedCleanName = cleanSeedDisplayName || validationResult.id;
-                            const resolvedValidatedOrigin = validationResult.origin || seedLock?.origin || "";
+                        // V47.18 (Pillar B): Lock pre-validated seed identity in Worker Phase 1/2.
+                        // When a cold or degraded seed already arrives with lockedSeeds or complete Box 4 pre-flight metadata
+                        // (valid trailing ISO country code + origin + genre + display name), honor its locked identity
+                        // directly without invoking a redundant third Flash validation call.
+                        const strippedSeedForLock = (0, isoCountries_1.stripCountrySlug)(canonicalSeedId, expectedSeedIso || seedLock?.origin);
+                        const lockedSeedEntry = inputPayload.lockedSeeds?.[canonicalSeedId] ||
+                            inputPayload.lockedSeeds?.[seedNorm] ||
+                            inputPayload.lockedSeeds?.[seed] ||
+                            (strippedSeedForLock ? inputPayload.lockedSeeds?.[strippedSeedForLock] : undefined);
+                        const preValidatedOrigin = lockedSeedEntry?.origin ||
+                            seedLock?.origin ||
+                            (typeof cachedDetails?.details?.origin === 'string' ? cachedDetails.details.origin.trim() : '');
+                        const preValidatedGenre = lockedSeedEntry?.genre ||
+                            seedLock?.genre ||
+                            (typeof cachedDetails?.details?.genre === 'string' ? cachedDetails.details.genre.trim() : '');
+                        const preValidatedName = lockedSeedEntry?.name ||
+                            seedNamesMap[canonicalSeedId] ||
+                            seedNamesMap[seedNorm] ||
+                            seedNamesMap[seed] ||
+                            (strippedSeedForLock ? seedNamesMap[strippedSeedForLock] : undefined) ||
+                            (typeof cachedDetails?.details?.artist === 'string' ? cachedDetails.details.artist.trim() : '');
+                        const resolvedTrailingIso = (0, isoCountries_1.extractTrailingCountryIso)(canonicalSeedId);
+                        const hasLockedWorkerSeedIdentity = Boolean(resolvedTrailingIso &&
+                            !canonicalSeedId.endsWith('-uk') &&
+                            preValidatedOrigin &&
+                            String(preValidatedOrigin).trim() &&
+                            String(preValidatedOrigin).trim() !== 'Unknown' &&
+                            preValidatedGenre &&
+                            String(preValidatedGenre).trim() &&
+                            String(preValidatedGenre).trim() !== 'Unknown' &&
+                            preValidatedName &&
+                            String(preValidatedName).trim());
+                        if (hasLockedWorkerSeedIdentity) {
+                            const lockedCleanName = String(preValidatedName).trim();
+                            const lockedCleanOrigin = String(preValidatedOrigin).trim();
+                            const lockedCleanGenre = String(preValidatedGenre).trim();
+                            const lockedBareId = (0, isoCountries_1.stripCountrySlug)(canonicalSeedId, resolvedTrailingIso) || strippedSeedForLock;
+                            console.log(`[Phase 1] Pre-validated seed identity locked in worker for "${canonicalSeedId}" ("${lockedCleanName}", ${lockedCleanOrigin}, ${lockedCleanGenre}). Bypassing redundant Phase 2 Flash call.`);
+                            if (lockedBareId && lockedBareId !== canonicalSeedId) {
+                                try {
+                                    await (0, routerStubService_1.upsertBareRouterStub)(db, lockedBareId, canonicalSeedId, {
+                                        name: lockedCleanName,
+                                        origin: lockedCleanOrigin,
+                                        genre: lockedCleanGenre,
+                                    });
+                                }
+                                catch (stubErr) {
+                                    console.warn(`[Phase 1] Non-fatal router stub sync warning for locked seed "${lockedBareId}" -> "${canonicalSeedId}":`, stubErr);
+                                }
+                            }
+                            seedNamesMap[canonicalSeedId] = lockedCleanName;
+                            seedNamesMap[seedNorm] = lockedCleanName;
                             resolvedSeedArray.push({
-                                id: (0, executeCurationPipeline_1.canonicalizeArtistSlugWithOrigin)(validationResult.id, resolvedValidatedOrigin),
-                                name: validatedCleanName,
-                                origin: resolvedValidatedOrigin,
-                                genre: validationResult.genre || seedLock?.genre || "",
-                                isCacheHit: false
+                                id: canonicalSeedId,
+                                name: lockedCleanName,
+                                origin: lockedCleanOrigin,
+                                genre: lockedCleanGenre,
+                                isCacheHit: false,
                             });
                         }
                         else {
-                            throw new Error(`Validation failed for seed: ${seed}. It is not recognized as a valid musical entity.`);
+                            console.log(`[Phase 1] Cache Miss for seed: ${seed}. Routing to Phase 2 (Flash-Lite).`);
+                            // Phase 2: Origin Validation (Flash-Lite) - Fallback for unvalidated callers lacking pre-flight metadata
+                            const queryForValidation = cleanSeedDisplayName || (0, isoCountries_1.stripCountrySlug)(seed);
+                            const validationHints = (seedLock?.origin || seedLock?.genre)
+                                ? { originHint: seedLock.origin || undefined, genreHint: seedLock.genre || undefined }
+                                : undefined;
+                            const validationResult = await (0, curatorService_1.validateSeedOriginBackend)(queryForValidation, validationHints);
+                            if (validationResult.apiUsage) {
+                                usageCollector.push(validationResult.apiUsage.model, validationResult.apiUsage);
+                            }
+                            if (validationResult.isValid) {
+                                const validatedCleanName = cleanSeedDisplayName || validationResult.id;
+                                const resolvedValidatedOrigin = validationResult.origin || seedLock?.origin || "";
+                                resolvedSeedArray.push({
+                                    id: (0, executeCurationPipeline_1.canonicalizeArtistSlugWithOrigin)(validationResult.id, resolvedValidatedOrigin),
+                                    name: validatedCleanName,
+                                    origin: resolvedValidatedOrigin,
+                                    genre: validationResult.genre || seedLock?.genre || "",
+                                    isCacheHit: false
+                                });
+                            }
+                            else {
+                                throw new Error(`Validation failed for seed: ${seed}. It is not recognized as a valid musical entity.`);
+                            }
                         }
                     }
                 }
@@ -922,6 +984,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     const nodeSeedLock = isSeed ? (getSeedLock(n.id) || getSeedLock(canonical)) : null;
                     return {
                         id: n.id,
+                        originalNodeId: n.id,
                         name: cleanName,
                         type: n.type,
                         origin: nodeSeedLock?.origin || n.origin || null,
@@ -941,6 +1004,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     if (!exists) {
                         recommendedEntities.unshift({
                             id: canonicalSeedId,
+                            originalNodeId: canonicalSeedId,
                             name: cleanName,
                             type: 'artist',
                             origin: missingSeedLock?.origin || null,
@@ -983,27 +1047,48 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             ? (entitySeedLock?.origin || entityObj.origin || (expectedNodeIso ? isoCountries_1.ISO_TO_COUNTRY_NAME[expectedNodeIso] : null) || null)
                             : (entityObj.origin || null);
                         const resolvedGenreHint = entitySeedLock?.genre || entityObj.genre || null;
+                        let hadExistingCachedDoc = false;
                         if (!isLabel) {
                             try {
                                 const baseNormId = (0, curatorService_1.normalizeArtistId)((0, isoCountries_1.stripCountrySlug)(rawName, expectedNodeIso || resolvedOriginHint)); // without country suffix
-                                const existingQuery = await db.collection("artists")
+                                let effectiveBaseNormId = baseNormId;
+                                let existingQuery = await db.collection("artists")
                                     .where("artistId", ">=", baseNormId)
                                     .where("artistId", "<=", baseNormId + "\uf8ff")
                                     .limit(10)
                                     .get();
-                                if (!existingQuery.empty) {
-                                    const hasAmbiguousSibling = (0, isoCountries_1.inspectSlugDedupAmbiguity)(existingQuery.docs.map(d => ({ id: d.id, data: d.data() })), baseNormId);
+                                // V47.18 (Gap 1): Also check leading-"the-" counterpart (both stripping and adding "the-")
+                                // so a cached "the-murder-city-devils-us" doc is adopted at $0.00 when Gemini recommends peer "Murder City Devils".
+                                const strippedNoThe = (0, isoCountries_1.stripLeadingTheFromSlug)(baseNormId);
+                                const altBaseNormId = strippedNoThe && strippedNoThe !== baseNormId
+                                    ? strippedNoThe
+                                    : (baseNormId.length >= 3 ? `the-${baseNormId}` : null);
+                                let existingDocs = existingQuery.empty ? [] : existingQuery.docs;
+                                if (existingDocs.length === 0 && altBaseNormId && altBaseNormId !== baseNormId) {
+                                    const altQuery = await db.collection("artists")
+                                        .where("artistId", ">=", altBaseNormId)
+                                        .where("artistId", "<=", altBaseNormId + "\uf8ff")
+                                        .limit(10)
+                                        .get();
+                                    if (!altQuery.empty) {
+                                        effectiveBaseNormId = altBaseNormId;
+                                        existingDocs = altQuery.docs;
+                                    }
+                                }
+                                if (existingDocs.length > 0) {
+                                    const hasAmbiguousSibling = (0, isoCountries_1.inspectSlugDedupAmbiguity)(existingDocs.map(d => ({ id: d.id, data: d.data() })), effectiveBaseNormId);
                                     // Pick the most-complete compatible canonical doc (has graphData preferred)
                                     let bestDocId = artistNormId;
-                                    for (const snap of existingQuery.docs) {
+                                    for (const snap of existingDocs) {
                                         const snapData = snap.data();
-                                        if (!(0, executeCurationPipeline_1.shouldAdoptCanonicalSlugCandidate)(expectedNodeIso, snap.id, snapData, baseNormId, {
+                                        if (!(0, executeCurationPipeline_1.shouldAdoptCanonicalSlugCandidate)(expectedNodeIso, snap.id, snapData, effectiveBaseNormId, {
                                             sceneAnchorIsos,
                                             hasAmbiguousSibling,
                                             isSeed: isSeedEntity,
                                         })) {
                                             continue;
                                         }
+                                        hadExistingCachedDoc = true;
                                         if (snap.id !== artistNormId && snapData.artistId) {
                                             if (snapData.graphData || snap.id === artistNormId) {
                                                 bestDocId = snap.id;
@@ -1035,6 +1120,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             existingProjectDetailsMap.get((0, curatorService_1.normalizeArtistId)(artistNormId));
                         if (priorSceneCached && (0, cacheQualification_1.isFullyQualifiedEntityProfile)(priorSceneCached, isLabel, expectedNodeIso, { requireMembersAndPeers: true })) {
                             details = { ...priorSceneCached, _isReadOnly: true };
+                            hadExistingCachedDoc = true;
                             console.log(`[Curation Backend] [V43 Cross-Scene Cache Hit] Reusing project detailsCache for: ${artistNormId}`);
                         }
                         // 1. Check local Firestore Cache if not already resolved from prior scene
@@ -1044,6 +1130,9 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 const cacheDoc = await db.collection(collName).doc(artistNormId).get();
                                 if (cacheDoc.exists) {
                                     const cacheData = cacheDoc.data();
+                                    if (cacheData && !cacheData._isStub && !cacheData.redirectTo && !cacheData.isAmbiguous) {
+                                        hadExistingCachedDoc = true;
+                                    }
                                     if (cacheData && cacheData.detailsCache) {
                                         let cachedDetails = cacheData.detailsCache;
                                         if (typeof cachedDetails === 'string') {
@@ -1243,6 +1332,30 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 seedNamesMap[(0, curatorService_1.normalizeArtistId)(rawName)] ||
                                 searchArtistName;
                             details.details.artist = finalCleanArtistName;
+                            if (!isLabel && finalCleanArtistName) {
+                                entityObj.name = finalCleanArtistName;
+                            }
+                            // V47.18 (Pillar C.3): Re-key brand-new cold non-seed peer slug when iTunes verifies an official
+                            // leading-"The " display name (e.g. "murder-city-devils-us" -> "the-murder-city-devils-us")
+                            // before any Firestore document exists, while leaving existing cached docs untouched.
+                            if (!isLabel && !isSeedEntity && !hadExistingCachedDoc && verifiedItunesArtistName) {
+                                const verifiedBareSlug = (0, curatorService_1.normalizeArtistId)(verifiedItunesArtistName);
+                                const currentIso = (0, isoCountries_1.extractTrailingCountryIso)(artistNormId);
+                                const currentBareSlug = currentIso
+                                    ? (0, isoCountries_1.stripCountrySlug)(artistNormId, currentIso)
+                                    : (0, isoCountries_1.stripCountrySlug)(artistNormId);
+                                if (verifiedBareSlug &&
+                                    currentBareSlug &&
+                                    verifiedBareSlug !== currentBareSlug &&
+                                    (0, isoCountries_1.stripLeadingTheFromSlug)(verifiedBareSlug) === (0, isoCountries_1.stripLeadingTheFromSlug)(currentBareSlug)) {
+                                    const rekeyedPeerId = (0, executeCurationPipeline_1.canonicalizeArtistSlugWithOrigin)(verifiedBareSlug, expectedNodeIso || details.details.origin || resolvedOriginHint || currentIso || undefined);
+                                    if (rekeyedPeerId && rekeyedPeerId !== artistNormId) {
+                                        console.log(`[Curation Backend] [Pillar C.3 Cold Peer Re-Key] Re-keying new peer "${artistNormId}" → "${rekeyedPeerId}" ("${verifiedItunesArtistName}")`);
+                                        artistNormId = rekeyedPeerId;
+                                        entityObj.id = rekeyedPeerId;
+                                    }
+                                }
+                            }
                             if (isSeedEntity && finalCleanArtistName) {
                                 seedNamesMap[artistNormId] = finalCleanArtistName;
                                 seedNamesMap[(0, curatorService_1.normalizeArtistId)(rawName)] = finalCleanArtistName;
@@ -1453,13 +1566,17 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             finalGraph.nodes.forEach((n) => {
                                 const nodeNorm = (0, curatorService_1.normalizeArtistId)(n.id);
                                 const nodeBare = (0, isoCountries_1.stripCountrySlug)(nodeNorm);
+                                const nodeBareNoThe = (0, isoCountries_1.stripLeadingTheFromSlug)(nodeBare);
                                 const nodeLabelNorm = n.label ? (0, curatorService_1.normalizeArtistId)(n.label) : '';
+                                const nodeLabelNoThe = (0, isoCountries_1.stripLeadingTheFromSlug)(nodeLabelNorm);
                                 const snippetObj = rootBreakdownPayload.artistSnippets.find((s) => {
                                     const sNorm = (0, curatorService_1.normalizeArtistId)(s.id);
                                     const sBare = (0, isoCountries_1.stripCountrySlug)(sNorm);
+                                    const sBareNoThe = (0, isoCountries_1.stripLeadingTheFromSlug)(sBare);
                                     return (sNorm === nodeNorm ||
                                         (nodeBare && sBare === nodeBare) ||
-                                        (nodeLabelNorm && sNorm === nodeLabelNorm) ||
+                                        (nodeBareNoThe && sBareNoThe === nodeBareNoThe) ||
+                                        (nodeLabelNorm && (sNorm === nodeLabelNorm || (0, isoCountries_1.stripLeadingTheFromSlug)(sNorm) === nodeLabelNoThe)) ||
                                         s.id.toLowerCase() === n.id.toLowerCase());
                                 });
                                 if (snippetObj && snippetObj.snippet) {
@@ -1505,26 +1622,53 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     for (const entityObj of recommendedEntities) {
                         const isLabel = entityObj.type === 'label';
                         const recNorm = isLabel ? (0, curatorService_1.normalizeLabelId)(entityObj.name) : (0, curatorService_1.normalizeArtistId)(entityObj.name);
-                        const matchingSeedNorm = seedNorms.find((s) => (0, isoCountries_1.isEntitySeedMatch)(s, recNorm));
+                        const matchingSeedNorm = seedNorms.find((s) => (0, isoCountries_1.isEntitySeedMatch)(s, recNorm) || (entityObj.id && (0, isoCountries_1.isEntitySeedMatch)(s, entityObj.id)));
                         const recDetailsEntry = detailsCacheEntries.find((entry) => entry[0] === entityObj.id ||
+                            (entityObj.originalNodeId && entry[0] === entityObj.originalNodeId) ||
                             (0, isoCountries_1.isEntitySeedMatch)(recNorm, entry[0]) ||
                             (isLabel && (0, curatorService_1.normalizeLabelId)(entry[0]) === recNorm));
-                        let disambiguatedCanonicalId = recDetailsEntry ? recDetailsEntry[0] : recNorm;
+                        // V47.18 (Gap 3): Derive the base slug from the slugDedup-adopted or Step 2 iTunes-canonicalized
+                        // recDetailsEntry[0] (entityObj.id) so we never clobber an adopted/re-keyed canonical slug.
+                        const entryKeyNorm = recDetailsEntry
+                            ? (isLabel ? (0, curatorService_1.normalizeLabelId)(recDetailsEntry[0]) : (0, curatorService_1.normalizeArtistId)(recDetailsEntry[0]))
+                            : recNorm;
+                        const entryTrailingIso = !isLabel ? (0, isoCountries_1.extractTrailingCountryIso)(entryKeyNorm) : null;
+                        const entryBareNorm = !isLabel
+                            ? (entryTrailingIso ? (0, isoCountries_1.stripCountrySlug)(entryKeyNorm, entryTrailingIso) : (0, isoCountries_1.stripCountrySlug)(entryKeyNorm)) || recNorm
+                            : recNorm;
+                        let disambiguatedCanonicalId = entryKeyNorm;
                         if (isLabel) {
                             disambiguatedCanonicalId = (0, curatorService_1.normalizeLabelId)(disambiguatedCanonicalId);
                         }
                         else if (recDetailsEntry && !matchingSeedNorm) {
                             const originStr = recDetailsEntry[1]?.details?.origin;
-                            disambiguatedCanonicalId = (0, executeCurationPipeline_1.canonicalizeArtistSlugWithOrigin)(recNorm, originStr);
+                            disambiguatedCanonicalId = (0, executeCurationPipeline_1.canonicalizeArtistSlugWithOrigin)(entryBareNorm, originStr || entryTrailingIso || undefined);
                         }
                         const finalCanonicalId = disambiguatedCanonicalId;
                         idRewriteMap.set(recNorm, finalCanonicalId);
+                        idRewriteMap.set(entryKeyNorm, finalCanonicalId);
+                        idRewriteMap.set(entryBareNorm, finalCanonicalId);
+                        if (entityObj.originalNodeId) {
+                            const origNorm = isLabel
+                                ? (0, curatorService_1.normalizeLabelId)(entityObj.originalNodeId)
+                                : (0, curatorService_1.normalizeArtistId)(entityObj.originalNodeId);
+                            if (origNorm) {
+                                idRewriteMap.set(origNorm, finalCanonicalId);
+                                if (!isLabel) {
+                                    const origIso = (0, isoCountries_1.extractTrailingCountryIso)(origNorm);
+                                    const origBare = origIso ? (0, isoCountries_1.stripCountrySlug)(origNorm, origIso) : (0, isoCountries_1.stripCountrySlug)(origNorm);
+                                    if (origBare)
+                                        idRewriteMap.set(origBare, finalCanonicalId);
+                                }
+                            }
+                        }
                         if (isLabel) {
                             idRewriteMap.set((0, curatorService_1.normalizeArtistId)(entityObj.name), finalCanonicalId);
                         }
                         if (matchingSeedNorm) {
                             idRewriteMap.set(matchingSeedNorm, finalCanonicalId);
                         }
+                        entityObj.id = finalCanonicalId;
                         if (recDetailsEntry) {
                             recDetailsEntry[0] = finalCanonicalId; // update entry in-place for later logic
                         }
@@ -1545,6 +1689,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     if (finalGraph.nodes) {
                         const uniqueNodesMap = new Map();
                         finalGraph.nodes.forEach((node) => {
+                            const prevRawNodeId = node.id;
                             const normId = (0, curatorService_1.normalizeArtistId)(node.id);
                             const baseNormId = (0, isoCountries_1.stripCountrySlug)(normId);
                             const nodeIso = (0, isoCountries_1.extractTrailingCountryIso)(normId);
@@ -1555,6 +1700,19 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                                 const candidateRewrite = idRewriteMap.get(baseNormId);
                                 if (!nodeIso || (0, isoCountries_1.areCountryIsosCompatible)(nodeIso, (0, isoCountries_1.extractTrailingCountryIso)(candidateRewrite))) {
                                     node.id = candidateRewrite;
+                                }
+                            }
+                            // V47.18 (Gap 2 + Polish): Sync narrativeSnippet under the rewritten canonical node.id
+                            // and delete the superseded pre-rewrite key (origNorm / prevRawNodeId) so no orphaned snippet key persists.
+                            const rewrittenNormId = (0, curatorService_1.normalizeArtistId)(node.id);
+                            if (node.narrativeSnippet) {
+                                sceneArtistSnippetsMap[node.id] = node.narrativeSnippet;
+                                sceneArtistSnippetsMap[rewrittenNormId] = node.narrativeSnippet;
+                            }
+                            if (normId !== rewrittenNormId) {
+                                delete sceneArtistSnippetsMap[normId];
+                                if (prevRawNodeId !== node.id) {
+                                    delete sceneArtistSnippetsMap[prevRawNodeId];
                                 }
                             }
                             // Gate D: Overwrite node.origin ONLY when hydrated profile's origin satisfies Origin-Suffix Parity
@@ -2175,8 +2333,11 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     if (!isComplexGeneration) {
                         for (const seedName of artistList) {
                             const seedNorm = (0, curatorService_1.normalizeArtistId)(seedName);
-                            const bareSeedNorm = (0, isoCountries_1.stripCountrySlug)(seedNorm);
                             const canonicalSeedId = resolvedSeedNormMap.get(seedNorm) ?? seedNorm;
+                            const canonicalSeedIso = (0, isoCountries_1.extractTrailingCountryIso)(canonicalSeedId);
+                            const bareSeedNorm = (canonicalSeedIso
+                                ? (0, isoCountries_1.stripCountrySlug)(canonicalSeedId, canonicalSeedIso)
+                                : (0, isoCountries_1.stripCountrySlug)(canonicalSeedId)) || (0, isoCountries_1.stripCountrySlug)(seedNorm);
                             const canonicalDocRef = db.collection('artists').doc(canonicalSeedId);
                             const rawSeedDocRef = db.collection('artists').doc(bareSeedNorm);
                             try {
@@ -2359,6 +2520,15 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                     // Guardrail: Strip any surviving filter tags hallucinated by the AI
                     const strippedId = rawCanonicalId.replace(/-(after|before|genre|inc_genres|exc_origins|inc_origins|label|inc_labels|anchor_labels):[^\s]+/gi, '');
                     const cleanCanonicalId = isLabel ? (0, curatorService_1.normalizeLabelId)(strippedId) : strippedId;
+                    // V47.18 (Pillar C): Derive artistId and bare router stub key strictly from cleanCanonicalId
+                    // (stripping its trailing ISO suffix) so cacheKey, artistId, and the bare router stub
+                    // are mathematically guaranteed never to diverge.
+                    const canonicalTrailingIso = !isLabel ? (0, isoCountries_1.extractTrailingCountryIso)(cleanCanonicalId) : null;
+                    const canonicalBareIdForWrite = isLabel
+                        ? recNorm
+                        : (canonicalTrailingIso
+                            ? (0, isoCountries_1.stripCountrySlug)(cleanCanonicalId, canonicalTrailingIso)
+                            : (0, isoCountries_1.stripCountrySlug)(cleanCanonicalId)) || recNorm;
                     // Ensure the doc path ALWAYS writes strictly to the global, canonical ID
                     const recDocRef = db.collection(collName).doc(cleanCanonicalId);
                     const recSnap = await recDocRef.get();
@@ -2412,7 +2582,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         const shouldWriteGraphData = safeExtractedGraph && !isComplexGeneration && hasValidRationale;
                         await recDocRef.set({
                             cacheKey: cleanCanonicalId,
-                            [idFieldKey]: recNorm,
+                            [idFieldKey]: canonicalBareIdForWrite,
                             seedArtists: (recDetails?.details?.artist && !isLabel) ? recDetails.details.artist : recArtist,
                             graphData: shouldWriteGraphData ? JSON.stringify(safeExtractedGraph) : null,
                             detailsCache: finalRecDetails, // Save as structured object!
@@ -2438,7 +2608,7 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                             detailsCache: finalRecDetails,
                             updatedAt: firestore_2.FieldValue.serverTimestamp(),
                             cacheVersion: 4,
-                            [idFieldKey]: recNorm,
+                            [idFieldKey]: canonicalBareIdForWrite,
                             cacheKey: cleanCanonicalId,
                             isDeep: true,
                             ...(!isLabel && finalRecDetails?.details?.artist ? { seedArtists: finalRecDetails.details.artist } : {}),
@@ -2494,23 +2664,23 @@ exports.processCurationJob = (0, firestore_1.onDocumentCreated)({
                         await recDocRef.update(sanitizeUndefinedProperties(updatePayload));
                         console.log(`[Curation Backend] Proactively updated detailsCache for recommendation (${collName}): ${cleanCanonicalId}`);
                     }
-                    // Maintain Root-as-Router / Evolved Ambiguous Stub on `artists/{recNorm}` for all verified `-iso` artists
+                    // Maintain Root-as-Router / Evolved Ambiguous Stub on `artists/{canonicalBareIdForWrite}` for all verified `-iso` artists
                     if (!isLabel &&
                         !recDetails?._isStub &&
-                        cleanCanonicalId !== recNorm &&
+                        cleanCanonicalId !== canonicalBareIdForWrite &&
                         (0, isoCountries_1.extractTrailingCountryIso)(cleanCanonicalId) &&
                         /-[a-z]{2}$/i.test(cleanCanonicalId) &&
                         !cleanCanonicalId.endsWith("-uk")) {
                         try {
-                            await (0, routerStubService_1.upsertBareRouterStub)(db, recNorm, cleanCanonicalId, {
-                                name: recDetails?.details?.artist || recArtist || recNorm,
+                            await (0, routerStubService_1.upsertBareRouterStub)(db, canonicalBareIdForWrite, cleanCanonicalId, {
+                                name: recDetails?.details?.artist || recArtist || canonicalBareIdForWrite,
                                 origin: recDetails?.details?.origin,
                                 genre: recDetails?.details?.genre,
                                 summary: recDetails?.summary,
                             });
                         }
                         catch (stubSyncErr) {
-                            console.warn(`[Curation Backend] Non-fatal bare router stub sync warning for "${recNorm}" -> "${cleanCanonicalId}":`, stubSyncErr);
+                            console.warn(`[Curation Backend] Non-fatal bare router stub sync warning for "${canonicalBareIdForWrite}" -> "${cleanCanonicalId}":`, stubSyncErr);
                         }
                     }
                 }

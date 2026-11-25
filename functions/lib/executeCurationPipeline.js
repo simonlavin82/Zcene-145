@@ -200,53 +200,110 @@ async function resolveSceneTopologyBackend(params) {
         else {
             needsProGeneration = true;
             hasCacheMiss = true;
-            let validationResult = null;
-            const effectiveGenreHint = hintGenre || "Unknown";
-            const rawId = seedNamesMap[resolvedSeedNorm] ||
+            // V47.18 (Pillar B): Lock pre-validated seed identity in Column 2.
+            // When a cold or degraded seed already arrives from Box 4 (<ConsolidatedValidationModal>)
+            // with a valid trailing ISO country code, origin hint, genre hint, and display name,
+            // honor its locked identity directly without invoking a redundant second Flash call.
+            const resolvedTrailingIso = (0, isoCountries_1.extractTrailingCountryIso)(resolvedSeedNorm);
+            const lockedOriginHint = hintCountry ||
+                (typeof cachedDetails?.details?.origin === "string" ? cachedDetails.details.origin.trim() : "");
+            const lockedGenreHint = hintGenre ||
+                (disambiguationGenres && disambiguationGenres[resolvedSeedNorm]) ||
+                (typeof cachedDetails?.details?.genre === "string" ? cachedDetails.details.genre.trim() : "");
+            const lockedDisplayName = seedNamesMap[resolvedSeedNorm] ||
                 seedNamesMap[seedNorm] ||
-                (originalQueries && (originalQueries[seedNorm] || originalQueries[strippedSeed])) ||
-                strippedSeed;
-            const valResult = await (0, curatorService_1.validateSeedOriginBackend)(rawId || seed, hintCountry ? { originHint: hintCountry, genreHint: effectiveGenreHint } : undefined);
-            validationResult = valResult;
-            if (valResult.apiUsage) {
-                usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
-            }
-            if (validationResult.isValid) {
-                const bareNormId = (0, curatorService_1.normalizeArtistId)(validationResult.id);
-                const normId = (0, isoCountries_1.canonicalizeArtistSlugWithOrigin)(bareNormId, validationResult.origin);
-                if (normId !== bareNormId) {
-                    await (0, routerStubService_1.upsertBareRouterStub)(db, bareNormId, normId, {
-                        name: validationResult.id,
-                        origin: validationResult.origin || "Unknown",
-                        genre: validationResult.genre || "Unknown",
-                        disambiguationSnippet: validationResult.candidates?.[0]?.disambiguationSnippet,
-                        candidates: validationResult.candidates,
-                    });
-                }
-                const cleanMissName = seedNamesMap[normId] || seedNamesMap[bareNormId] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || validationResult.id;
+                seedNamesMap[strippedSeed] ||
+                seedNamesMap[preliminaryBare] ||
+                seedNamesMap[seed] ||
+                seedNamesMap[seed.toLowerCase()] ||
+                (typeof cachedDetails?.details?.artist === "string" ? cachedDetails.details.artist.trim() : "");
+            const hasLockedPreFlightIdentity = Boolean(resolvedTrailingIso &&
+                !resolvedSeedNorm.endsWith("-uk") &&
+                lockedOriginHint &&
+                lockedOriginHint.trim() &&
+                lockedOriginHint.trim() !== "Unknown" &&
+                lockedGenreHint &&
+                lockedGenreHint.trim() &&
+                lockedGenreHint.trim() !== "Unknown" &&
+                lockedDisplayName &&
+                lockedDisplayName.trim());
+            if (hasLockedPreFlightIdentity) {
+                const cleanLockedName = lockedDisplayName.trim();
+                const cleanLockedOrigin = lockedOriginHint.trim();
+                const cleanLockedGenre = lockedGenreHint.trim();
+                console.log(`[Phase 1] Pre-validated seed identity locked for "${resolvedSeedNorm}" ("${cleanLockedName}", ${cleanLockedOrigin}, ${cleanLockedGenre}). Bypassing redundant Flash re-validation.`);
+                seedNamesMap[resolvedSeedNorm] = cleanLockedName;
+                seedNamesMap[seedNorm] = cleanLockedName;
                 resolvedSeedArray.push({
-                    id: normId,
-                    name: cleanMissName,
-                    origin: validationResult.origin,
-                    genre: validationResult.genre,
-                    isCacheHit: false
+                    id: resolvedSeedNorm,
+                    name: cleanLockedName,
+                    origin: cleanLockedOrigin,
+                    genre: cleanLockedGenre,
+                    isCacheHit: false,
                 });
-                seedStubs[normId] = {
+                seedStubs[resolvedSeedNorm] = {
                     _isStub: true,
                     summary: "Awaiting Deep Cut analysis...",
                     imageUrl: null,
                     details: {
-                        genre: validationResult.genre || "Unknown",
-                        origin: validationResult.origin || "Unknown",
+                        genre: cleanLockedGenre,
+                        origin: cleanLockedOrigin,
                         founded: "Unknown",
-                        notableArtists: []
+                        notableArtists: [],
                     },
                     discography: [],
-                    links: []
+                    links: [],
                 };
             }
             else {
-                throw new https_1.HttpsError("failed-precondition", `Validation failed for seed: ${seed}.`);
+                let validationResult = null;
+                const effectiveGenreHint = hintGenre || "Unknown";
+                const rawId = seedNamesMap[resolvedSeedNorm] ||
+                    seedNamesMap[seedNorm] ||
+                    (originalQueries && (originalQueries[seedNorm] || originalQueries[strippedSeed])) ||
+                    strippedSeed;
+                const valResult = await (0, curatorService_1.validateSeedOriginBackend)(rawId || seed, hintCountry ? { originHint: hintCountry, genreHint: effectiveGenreHint } : undefined);
+                validationResult = valResult;
+                if (valResult.apiUsage) {
+                    usageCollector.push(valResult.apiUsage.model, valResult.apiUsage);
+                }
+                if (validationResult.isValid) {
+                    const bareNormId = (0, curatorService_1.normalizeArtistId)(validationResult.id);
+                    const normId = (0, isoCountries_1.canonicalizeArtistSlugWithOrigin)(bareNormId, validationResult.origin);
+                    if (normId !== bareNormId) {
+                        await (0, routerStubService_1.upsertBareRouterStub)(db, bareNormId, normId, {
+                            name: validationResult.id,
+                            origin: validationResult.origin || "Unknown",
+                            genre: validationResult.genre || "Unknown",
+                            disambiguationSnippet: validationResult.candidates?.[0]?.disambiguationSnippet,
+                            candidates: validationResult.candidates,
+                        });
+                    }
+                    const cleanMissName = seedNamesMap[normId] || seedNamesMap[bareNormId] || seedNamesMap[seedNorm] || seedNamesMap[seed.toLowerCase()] || validationResult.id;
+                    resolvedSeedArray.push({
+                        id: normId,
+                        name: cleanMissName,
+                        origin: validationResult.origin,
+                        genre: validationResult.genre,
+                        isCacheHit: false
+                    });
+                    seedStubs[normId] = {
+                        _isStub: true,
+                        summary: "Awaiting Deep Cut analysis...",
+                        imageUrl: null,
+                        details: {
+                            genre: validationResult.genre || "Unknown",
+                            origin: validationResult.origin || "Unknown",
+                            founded: "Unknown",
+                            notableArtists: []
+                        },
+                        discography: [],
+                        links: []
+                    };
+                }
+                else {
+                    throw new https_1.HttpsError("failed-precondition", `Validation failed for seed: ${seed}.`);
+                }
             }
         }
     }
@@ -417,13 +474,6 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
         isValid: Boolean(validationResult.isValid),
         apiUsage: validationResult.apiUsage,
     });
-    // V11.6 Fix 2 / V47.13: Programmatically enforce correctedInput for single-artist canonical name / typo / article normalization
-    if (validationResult.isValid &&
-        !validationResult.hasCollision &&
-        String(seed).trim().toLowerCase() !== String(validationResult.id || "").trim().toLowerCase()) {
-        validationResult.correctedInput = true;
-        console.log(`[validateSeedOriginCallable] Canonical normalization applied: "${seed}" → "${validationResult.id}"`);
-    }
     // V11.6 Fix 2B (Rule 11): Hard-block the pipeline for unrecognizable entities or failed bouncer re-queries.
     // isValid: false means the model could not confidently map the input to any known artist matching the parameters.
     // Throwing here prevents a broken stub from being minted and the pipeline from executing.
@@ -433,16 +483,82 @@ exports.validateSeedOriginCallable = (0, https_1.onCall)({
             ? `No culturally significant artist named "${seed}" found matching origin "${originHint}"${genreHint ? ` / genre "${genreHint}"` : ""}.`
             : `"${seed}" could not be identified as a real musical artist or label. Please check the spelling and try again.`);
     }
-    // Synchronously mint evolved stub in artists collection (Pre-Flight Gateway)
-    // Gated: If an originHint is provided (Escape Hatch Re-Query in Column 1), do NOT mint premature stubs before human confirms in Node 4.
-    if (!originHint) {
+    const isAmbiguous = !!(validationResult.hasCollision && validationResult.candidates && validationResult.candidates.length > 1);
+    const isEscapeHatchQuery = Boolean((typeof originHint === "string" && originHint.trim()) ||
+        (typeof genreHint === "string" && genreHint.trim()) ||
+        mode === "escape_hatch");
+    // V47.18 (Pillar A): Front-Door iTunes Naming Authority ($0.00, 1500ms fail-open timeout).
+    // Runs strictly on unambiguous initial pre-flight seeds (!isAmbiguous && !isEscapeHatchQuery)
+    // BEFORE correctedInput enforcement and router stub minting so Apple Music's official
+    // capitalization, internal hyphens ("At the Drive-In"), and leading "The " ("The Murder City Devils")
+    // become the single source of truth from the front door.
+    if (!isAmbiguous && !isEscapeHatchQuery && validationResult.id) {
         try {
-            const isAmbiguous = !!(validationResult.hasCollision && validationResult.candidates && validationResult.candidates.length > 1);
+            const itunesCanonicalName = await (0, curatorService_1.resolveItunesCanonicalArtistNameBackend)(validationResult.id, validationResult.genre, validationResult.origin, validationResult.candidates?.[0]?.disambiguationSnippet, 1500);
+            if (itunesCanonicalName) {
+                if (itunesCanonicalName !== validationResult.id) {
+                    console.log(`[validateSeedOriginCallable] [Pillar A iTunes Authority] Snapped "${validationResult.id}" → "${itunesCanonicalName}"`);
+                }
+                validationResult.id = itunesCanonicalName;
+                const snappedBareSlug = (0, curatorService_1.normalizeArtistId)(itunesCanonicalName);
+                let snappedTargetId = (0, isoCountries_1.canonicalizeArtistSlugWithOrigin)(snappedBareSlug, validationResult.origin);
+                // Check if an existing non-stub cached artist doc already lives at either snappedTargetId
+                // or its leading-"the-" counterpart so we never duplicate an already-cached Firestore doc.
+                try {
+                    const snappedIso = (0, isoCountries_1.extractTrailingCountryIso)(snappedTargetId);
+                    const strippedNoThe = (0, isoCountries_1.stripLeadingTheFromSlug)(snappedBareSlug);
+                    const altBareSlug = strippedNoThe !== snappedBareSlug ? strippedNoThe : `the-${snappedBareSlug}`;
+                    const altTargetId = snappedIso && altBareSlug !== snappedBareSlug
+                        ? `${altBareSlug}-${snappedIso}`
+                        : null;
+                    const primarySnap = await db.collection("artists").doc(snappedTargetId).get();
+                    const primaryData = primarySnap.exists ? primarySnap.data() : null;
+                    const isPrimaryNonStub = Boolean(primaryData && !primaryData._isStub && !primaryData.redirectTo && !primaryData.isAmbiguous);
+                    if (!isPrimaryNonStub && altTargetId && altTargetId !== snappedTargetId) {
+                        const altSnap = await db.collection("artists").doc(altTargetId).get();
+                        const altData = altSnap.exists ? altSnap.data() : null;
+                        const isAltNonStub = Boolean(altData && !altData._isStub && !altData.redirectTo && !altData.isAmbiguous);
+                        if (isAltNonStub) {
+                            console.log(`[validateSeedOriginCallable] [Pillar A Cache Reuse] Adopting existing cached doc "${altTargetId}" for "${itunesCanonicalName}"`);
+                            snappedTargetId = altTargetId;
+                        }
+                    }
+                }
+                catch (cacheCheckErr) {
+                    console.warn(`[validateSeedOriginCallable] Non-fatal existing cache doc check warning:`, cacheCheckErr);
+                }
+                if (Array.isArray(validationResult.candidates) && validationResult.candidates.length === 1) {
+                    validationResult.candidates[0] = {
+                        ...validationResult.candidates[0],
+                        id: snappedTargetId,
+                        name: itunesCanonicalName,
+                    };
+                }
+            }
+        }
+        catch (itunesErr) {
+            console.warn(`[validateSeedOriginCallable] Non-fatal iTunes front-door naming check failed open for "${validationResult.id}":`, itunesErr);
+        }
+    }
+    // V11.6 Fix 2 / V47.13 / V47.18: Programmatically enforce correctedInput for single-artist canonical name / typo / article normalization
+    if (validationResult.isValid &&
+        !validationResult.hasCollision &&
+        String(seed).trim().toLowerCase() !== String(validationResult.id || "").trim().toLowerCase()) {
+        validationResult.correctedInput = true;
+        console.log(`[validateSeedOriginCallable] Canonical normalization applied: "${seed}" → "${validationResult.id}"`);
+    }
+    // Synchronously mint evolved stub in artists collection (Pre-Flight Gateway)
+    // Gated: If an Escape Hatch hint is provided (originHint or genreHint), do NOT mint premature stubs before human confirms in Node 4.
+    if (!isEscapeHatchQuery) {
+        try {
             const candidates = validationResult.candidates || [];
-            // V47.13: Key single-artist bare router stubs strictly by the validated canonical name (validationResult.id)
-            // so typos ("the-rocking-horse-winer") and dropped articles ("rocking-horse-winner") never mint
-            // orphan/typo stub docs in /artists.
-            const bareNormId = (0, curatorService_1.normalizeArtistId)(!isAmbiguous && validationResult.id ? validationResult.id : seed);
+            // V47.13 / V47.18: Key single-artist bare router stubs strictly by the target doc's ISO-stripped bare slug
+            // (or validated canonical name) so typos and dropped articles never mint orphan stub docs in /artists.
+            const singleTargetId = !isAmbiguous && candidates.length === 1 ? candidates[0].id : null;
+            const singleTargetIso = singleTargetId ? (0, isoCountries_1.extractTrailingCountryIso)(singleTargetId) : null;
+            const bareNormId = singleTargetId && singleTargetIso
+                ? ((0, isoCountries_1.stripCountrySlug)(singleTargetId, singleTargetIso) || (0, curatorService_1.normalizeArtistId)(validationResult.id || seed))
+                : (0, curatorService_1.normalizeArtistId)(!isAmbiguous && validationResult.id ? validationResult.id : seed);
             const stubDocRef = db.collection("artists").doc(bareNormId);
             if (isAmbiguous) {
                 const existingSnap = await stubDocRef.get();
