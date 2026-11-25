@@ -75,8 +75,10 @@ describe('Architecture V42.1: Blank-Input Escape Hatch UX, Warm Ambiguous 3rd-Ho
 
       fireEvent.click(screen.getByText('Not this artist?'));
 
-      const originInput = screen.getByPlaceholderText('Country or region (required, e.g. Thailand)');
-      const genreInput = screen.getByPlaceholderText('Genre (optional)');
+      const originInput = screen.getByPlaceholderText('e.g. United Kingdom');
+      const genreInput = screen.getByPlaceholderText('e.g. Post-Punk');
+      expect(screen.getByLabelText('Origin / Country (required)')).toBe(originInput);
+      expect(screen.getByLabelText('Genre (optional)')).toBe(genreInput);
 
       // Both inputs MUST initialize blank ("") — never pre-populated with USA or Post-Grunge
       expect(originInput).toHaveValue('');
@@ -176,8 +178,10 @@ describe('Architecture V42.1: Blank-Input Escape Hatch UX, Warm Ambiguous 3rd-Ho
       const confirmBtn = screen.getByTestId('validation-confirm-button');
       expect(confirmBtn).toBeDisabled();
 
-      const originInput = screen.getByPlaceholderText('Country or region (required, e.g. Thailand)');
-      const genreInput = screen.getByPlaceholderText('Genre (optional)');
+      const originInput = screen.getByPlaceholderText('e.g. United Kingdom');
+      const genreInput = screen.getByPlaceholderText('e.g. Post-Punk');
+      expect(screen.getByLabelText('Origin / Country (required)')).toBe(originInput);
+      expect(screen.getByLabelText('Genre (optional)')).toBe(genreInput);
       expect(originInput).toHaveValue('');
       expect(genreInput).toHaveValue('');
 

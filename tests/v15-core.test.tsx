@@ -102,8 +102,8 @@ describe('V15 Core Regression Suite (Integration)', () => {
     expect(confirmBtn).toBeDisabled();
 
     // User enters fake hints: "Japan" and "Jazz" (inputs always initialize completely blank)
-    const originInput = screen.getByPlaceholderText(/Country or region/i);
-    const genreInput = screen.getByPlaceholderText(/Genre \(optional\)/i);
+    const originInput = screen.getByPlaceholderText(/e\.g\. United Kingdom/i);
+    const genreInput = screen.getByPlaceholderText(/e\.g\. Post-Punk/i);
     expect(originInput).toHaveValue('');
     expect(genreInput).toHaveValue('');
     fireEvent.change(originInput, { target: { value: 'Japan' } });
@@ -178,8 +178,8 @@ describe('V15 Core Regression Suite (Integration)', () => {
     fireEvent.click(notThisArtistBtn);
 
     // User enters valid hints: "USA" and "Punk Rock"
-    const originInput = screen.getByPlaceholderText(/Country or region/i);
-    const genreInput = screen.getByPlaceholderText(/Genre \(optional\)/i);
+    const originInput = screen.getByPlaceholderText(/e\.g\. United Kingdom/i);
+    const genreInput = screen.getByPlaceholderText(/e\.g\. Post-Punk/i);
     fireEvent.change(originInput, { target: { value: 'USA' } });
     fireEvent.change(genreInput, { target: { value: 'Punk Rock' } });
 

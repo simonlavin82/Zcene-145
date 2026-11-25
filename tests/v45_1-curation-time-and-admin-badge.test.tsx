@@ -424,7 +424,7 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       // Click "Not this artist?" escape hatch
       fireEvent.click(screen.getByText('Not this artist?'));
 
-      const originInput = screen.getByPlaceholderText('Country or region (required, e.g. Thailand)');
+      const originInput = screen.getByPlaceholderText('e.g. United Kingdom');
       fireEvent.change(originInput, { target: { value: 'Canada' } });
       fireEvent.click(screen.getByText('Apply'));
 
@@ -470,7 +470,7 @@ describe('Architecture V45.1: Curation Time Estimate, Admin CACHE HIT Guard, and
       // Click "Not this artist?" escape hatch
       fireEvent.click(screen.getByText('Not this artist?'));
 
-      const originInput = screen.getByPlaceholderText('Country or region (required, e.g. Thailand)');
+      const originInput = screen.getByPlaceholderText('e.g. United Kingdom');
       fireEvent.change(originInput, { target: { value: 'Germany' } });
       fireEvent.click(screen.getByText('Apply'));
 
