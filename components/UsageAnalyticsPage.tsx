@@ -2157,6 +2157,14 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [loadingStackUids, setLoadingStackUids] = useState<Record<string, boolean>>({});
     const authorStackCacheRef = useRef<Record<string, AuthorStackCacheEntry>>({});
     const loadingStackUidsRef = useRef<Record<string, boolean>>({});
+    const isMountedRef = useRef(true);
+    const authSessionEpochRef = useRef(0);
+    const stackRequestSeqRef = useRef<Record<string, number>>({});
+    const ledgerFetchSeqRef = useRef(0);
+    const lastAuthUidRef = useRef<string | undefined>(user?.uid);
+    const skipNextStalePreviewFetchRef = useRef(false);
+    const isActiveRef = useRef(isActive);
+    const previewStateRef = useRef({ simulateNormalUser, inspectedAuthor });
     const [inspectedUserStack, setInspectedUserStack] = useState<StackItem[]>([]);
     const [isLoadingInspectedStack, setIsLoadingInspectedStack] = useState<boolean>(false);
     const [ledgerData, setLedgerData] = useState<UserTelemetry[]>([]);
@@ -2176,17 +2184,74 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const containerRef = useRef<HTMLDivElement>(null);
 
     authorStackCacheRef.current = authorStackCache;
+    isActiveRef.current = isActive;
+    previewStateRef.current = { simulateNormalUser, inspectedAuthor };
 
-    const loadAuthorStack = useCallback(async (uid: string): Promise<AuthorStackCacheEntry | null> => {
+    useEffect(() => {
+        isMountedRef.current = true;
+        return () => {
+            isMountedRef.current = false;
+        };
+    }, []);
+
+    useEffect(() => {
+        if (!isActive) {
+            skipNextStalePreviewFetchRef.current = false;
+        }
+    }, [isActive]);
+
+    // Strictly above fetchLedger's useEffect so authSessionEpochRef increments before fresh fetches run on auth switch
+    useEffect(() => {
+        if (lastAuthUidRef.current === user?.uid) return;
+        lastAuthUidRef.current = user?.uid;
+        authSessionEpochRef.current += 1;
+        authorStackCacheRef.current = {};
+        loadingStackUidsRef.current = {};
+        stackRequestSeqRef.current = {};
+
+        const hadDirtyPreviewState =
+            previewStateRef.current.simulateNormalUser ||
+            previewStateRef.current.inspectedAuthor !== null;
+        skipNextStalePreviewFetchRef.current = Boolean(isActiveRef.current && hadDirtyPreviewState);
+
+        setAuthorStackCache({});
+        setLoadingStackUids({});
+        setInspectedUserStack([]);
+        setIsLoadingInspectedStack(false);
+        setExpandedRow(null);
+        setSimulateNormalUser(false);
+        setInspectedAuthor(null);
+        setActiveLedgerTab('activity');
+        setArchiveSearchQuery('');
+        setIsArchiveSearchOpen(false);
+    }, [user?.uid]);
+
+    const loadAuthorStack = useCallback(async (
+        uid: string,
+        options?: { forceRefresh?: boolean }
+    ): Promise<AuthorStackCacheEntry | null> => {
         if (!uid) return null;
-        const cached = authorStackCacheRef.current[uid];
-        if (cached) return cached;
-        if (loadingStackUidsRef.current[uid]) return null;
+        const forceRefresh = Boolean(options?.forceRefresh);
+        if (!forceRefresh) {
+            const cached = authorStackCacheRef.current[uid];
+            if (cached) return cached;
+            if (loadingStackUidsRef.current[uid]) return null;
+        }
+
+        const epoch = authSessionEpochRef.current;
+        const seq = (stackRequestSeqRef.current[uid] || 0) + 1;
+        stackRequestSeqRef.current[uid] = seq;
+        const isLatest = () =>
+            isMountedRef.current &&
+            epoch === authSessionEpochRef.current &&
+            seq === stackRequestSeqRef.current[uid];
 
         loadingStackUidsRef.current[uid] = true;
-        setLoadingStackUids(prev => ({ ...prev, [uid]: true }));
+        setLoadingStackUids(prev => (prev[uid] ? prev : { ...prev, [uid]: true }));
         try {
             const stackSnap = await getDocs(collection(db, 'users', uid, 'stack'));
+            if (!isLatest()) return null;
+
             const items: StackItem[] = (stackSnap?.docs || []).map((d) => ({
                 ...(d.data() as StackItem),
                 docId: d.id,
@@ -2204,13 +2269,15 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             console.warn('[UsageAnalyticsPage] Could not query author stack:', uid, err);
             return null;
         } finally {
-            delete loadingStackUidsRef.current[uid];
-            setLoadingStackUids(prev => {
-                if (!prev[uid]) return prev;
-                const next = { ...prev };
-                delete next[uid];
-                return next;
-            });
+            if (isLatest()) {
+                delete loadingStackUidsRef.current[uid];
+                setLoadingStackUids(prev => {
+                    if (!prev[uid]) return prev;
+                    const next = { ...prev };
+                    delete next[uid];
+                    return next;
+                });
+            }
         }
     }, []);
 
@@ -2225,11 +2292,19 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
 
     const fetchLedger = useCallback(async () => {
         if (!user) return;
+        const epoch = authSessionEpochRef.current;
+        const fetchSeq = ++ledgerFetchSeqRef.current;
+        const isLatestLedgerFetch = () =>
+            isMountedRef.current &&
+            epoch === authSessionEpochRef.current &&
+            fetchSeq === ledgerFetchSeqRef.current;
+
         setIsLoading(true);
         setError(null);
         try {
             let telemetryList: UserTelemetry[] = [];
             
+            if (!isLatestLedgerFetch()) return;
             if (isAdmin && !simulateNormalUser) {
                 const usersSnap = await getDocs(collection(db, 'users'));
                 const userPromises = usersSnap.docs.map(async (uDoc) => {
@@ -2302,8 +2377,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                 }
 
                 const shouldInspectOtherStack = Boolean(isAdmin && simulateNormalUser && targetUid && targetUid !== user.uid);
-                const cachedInspectedStack = shouldInspectOtherStack ? authorStackCacheRef.current[targetUid] : undefined;
-                if (shouldInspectOtherStack && !cachedInspectedStack) {
+                if (shouldInspectOtherStack) {
                     setIsLoadingInspectedStack(true);
                 }
 
@@ -2312,15 +2386,15 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     getDoc(userDocRef),
                     getDocs(collection(db, 'users', targetUid, 'projects')),
                     getDocs(query(collection(db, 'users', targetUid, 'tokenTransactions'), orderBy('createdAt', 'desc'), limit(500))).catch(() => null),
-                    shouldInspectOtherStack && !cachedInspectedStack
+                    shouldInspectOtherStack
                         ? getDocs(collection(db, 'users', targetUid, 'stack')).catch(() => null)
                         : Promise.resolve(null),
                 ]);
 
+                if (!isLatestLedgerFetch()) return;
+
                 if (shouldInspectOtherStack) {
-                    if (cachedInspectedStack) {
-                        setInspectedUserStack(cachedInspectedStack.items);
-                    } else if (inspectedStackSnap) {
+                    if (inspectedStackSnap) {
                         const parsedStack: StackItem[] = (inspectedStackSnap.docs || []).map((d) => ({
                             ...(d.data() as StackItem),
                             docId: d.id,
@@ -2389,9 +2463,11 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                 }
             }
             
+            if (!isLatestLedgerFetch()) return;
             setLedgerData(telemetryList);
 
             // Fetch JIT Auto-Healing Telemetry (Admin View Only)
+            if (!isLatestLedgerFetch()) return;
             if (isAdmin && !simulateNormalUser) {
                 try {
                     const systemSettingsRef = doc(db, 'adminLedger', 'system');
@@ -2502,10 +2578,13 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                 setDeletedAccountTelemetry([]);
             }
         } catch (err: any) {
+            if (!isLatestLedgerFetch()) return;
             console.error("Error fetching ledger data:", err);
             setError("Failed to query discovery archive: " + (err.message || String(err)));
         } finally {
-            setIsLoading(false);
+            if (isLatestLedgerFetch()) {
+                setIsLoading(false);
+            }
         }
     }, [user, isAdmin, simulateNormalUser, inspectedAuthor]);
 
@@ -2529,9 +2608,12 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     };
 
     useEffect(() => {
-        if (isActive) {
-            fetchLedger();
+        if (!isActive) return;
+        if (skipNextStalePreviewFetchRef.current) {
+            skipNextStalePreviewFetchRef.current = false;
+            return;
         }
+        fetchLedger();
     }, [isActive, fetchLedger, profile?.tokenBalance]);
 
     useEffect(() => {
@@ -2657,7 +2739,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
             if (next) {
                 const author = ledgerData.find(u => u.email === email);
                 if (author?.uid && author.uid !== user?.uid) {
-                    void loadAuthorStack(author.uid);
+                    void loadAuthorStack(author.uid, { forceRefresh: true });
                 }
             }
             return next;

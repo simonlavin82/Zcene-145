@@ -481,13 +481,15 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     });
     expect(customerStackReads).toBe(1);
 
-    // Click Inspect Wallet on customer: reuses cached stack (still 1 total read!)
+    // Click Inspect Wallet on customer: performs fresh stack read (total reads = 2; initial Admin load remained 0)
     const inspectButtons = screen.getAllByRole('button', { name: /Inspect Wallet/i });
     fireEvent.click(inspectButtons[1]);
 
     expect(await screen.findByTestId('ledger-tab-stack-archive')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(customerStackReads).toBe(2);
+    });
     expect(screen.getByTestId('stack-archive-tab-count')).toHaveTextContent('1');
-    expect(customerStackReads).toBe(1);
 
     // Switch to Stack Archive in Read-Only Admin Preview
     fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
@@ -567,5 +569,172 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     // Deep Cuts Bandcamp links remain completely intact
     expect(detailsSrc).toContain('https://bandcamp.com/search?q=');
     expect(detailsSrc).not.toContain('onAddToStack(node, links.purchase');
+  });
+
+  it('11. refreshes Stack counts on row re-expand & Inspect Wallet, clears authorStackCache on auth switch, and discards stale in-flight stack resolutions', async () => {
+    const customerUid = 'uid-simon-live';
+    const customerEmail = 'simon.lavin1@gmail.com';
+    let stackPhase: 'initial' | 'updated' = 'initial';
+    let holdFirstSlowResolve: ((val: any) => void) | null = null;
+    let shouldHoldNextStackFetch = false;
+
+    const initialStackDocs = Array.from({ length: 6 }, (_, idx) => ({
+      id: `active_${idx}`,
+      data: () => ({
+        id: `artist-${idx}`,
+        displayName: `Artist ${idx}`,
+        type: 'artist',
+        dateSaved: 1762000000000 + idx,
+        discoveredVia: 'Spaced',
+      }),
+    }));
+
+    const updatedStackDocs = [
+      ...Array.from({ length: 3 }, (_, idx) => ({
+        id: `active_${idx}`,
+        data: () => ({
+          id: `artist-${idx}`,
+          displayName: `Artist ${idx}`,
+          type: 'artist',
+          dateSaved: 1762000000000 + idx,
+          discoveredVia: 'Spaced',
+        }),
+      })),
+      {
+        id: 'arch_1',
+        data: () => ({
+          id: 'buggin-us',
+          displayName: 'Buggin',
+          type: 'artist',
+          dateSaved: 1762000000000,
+          archivedAt: 1762900000000,
+          status: 'archived',
+          discoveredVia: 'Spaced',
+        }),
+      },
+      {
+        id: 'arch_2',
+        data: () => ({
+          id: 'exhibition-us',
+          displayName: 'Exhibition',
+          type: 'artist',
+          dateSaved: 1762000000001,
+          archivedAt: 1762950000000,
+          status: 'archived',
+          discoveredVia: 'Spaced',
+        }),
+      },
+    ];
+
+    mockGetDoc.mockImplementation(async (ref: any) => {
+      if (ref?.path === 'adminLedger/system') {
+        return { exists: () => true, data: () => ({ jitEnabled: true }) };
+      }
+      if (ref?.path === `users/${customerUid}`) {
+        return {
+          exists: () => true,
+          data: () => ({
+            email: customerEmail,
+            tokenBalance: 69,
+            lifetimeTokensPurchased: 500,
+            lifetimeTokensSpent: 441,
+          }),
+        };
+      }
+      return { exists: () => false, data: () => ({}) };
+    });
+
+    mockGetDocs.mockImplementation(async (ref: any) => {
+      if (ref?.path === 'users') {
+        return {
+          docs: [
+            {
+              id: ADMIN_UID,
+              data: () => ({ email: ADMIN_EMAIL, tokenBalance: 0, lifetimeTokensPurchased: 0, lifetimeTokensSpent: 0 }),
+            },
+            {
+              id: customerUid,
+              data: () => ({ email: customerEmail, tokenBalance: 69, lifetimeTokensPurchased: 500, lifetimeTokensSpent: 441 }),
+            },
+          ],
+        };
+      }
+      if (ref?.path === `users/${customerUid}/stack`) {
+        if (shouldHoldNextStackFetch) {
+          shouldHoldNextStackFetch = false;
+          return new Promise((resolve) => {
+            holdFirstSlowResolve = resolve;
+          });
+        }
+        return { docs: stackPhase === 'initial' ? initialStackDocs : updatedStackDocs };
+      }
+      return { docs: [] };
+    });
+
+    const adminProps = makeBaseAnalyticsProps({
+      user: { uid: ADMIN_UID, email: ADMIN_EMAIL },
+      isAdmin: true,
+      stackCount: 0,
+      archivedStack: [],
+    });
+
+    const { rerender } = render(<UsageAnalyticsPage {...adminProps} />);
+
+    // 1. Expand customer row initially -> 6 active · 0 archived
+    expect(await screen.findByText(customerEmail)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(customerEmail));
+    await waitFor(() => {
+      expect(screen.getByTestId(`author-stack-counts-${customerUid}`)).toHaveTextContent('6 active · 0 archived');
+    });
+
+    // 2. Customer mutates stack out-of-band (3 active · 2 archived); collapse & re-expand fetches fresh counts
+    stackPhase = 'updated';
+    fireEvent.click(screen.getByText(customerEmail)); // collapse
+    fireEvent.click(screen.getByText(customerEmail)); // re-expand (forceRefresh)
+    await waitFor(() => {
+      expect(screen.getByTestId(`author-stack-counts-${customerUid}`)).toHaveTextContent('3 active · 2 archived');
+    });
+
+    // 3. Enter Inspect Wallet -> fresh Stack Archive (2)
+    const inspectButtons = screen.getAllByRole('button', { name: /Inspect Wallet/i });
+    fireEvent.click(inspectButtons[1]);
+    expect(await screen.findByTestId('ledger-tab-stack-archive')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByTestId('stack-archive-tab-count')).toHaveTextContent('2');
+    });
+
+    // Exit back to Admin and start a slow in-flight expand fetch that will resolve stale 6/0 AFTER an account switch
+    fireEvent.click(screen.getByRole('button', { name: /Exit Inspection/i }));
+    expect(await screen.findByText(customerEmail)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(customerEmail)); // collapse previously expanded row
+    shouldHoldNextStackFetch = true;
+    fireEvent.click(screen.getByText(customerEmail)); // re-expand triggers slow in-flight request
+    await waitFor(() => {
+      expect(holdFirstSlowResolve).not.toBeNull();
+    });
+
+    // 4. Switch auth account: Admin -> Customer -> back to Admin (clears cache & bumps authSessionEpochRef)
+    rerender(
+      <UsageAnalyticsPage
+        {...makeBaseAnalyticsProps({
+          user: { uid: customerUid, email: customerEmail },
+          isAdmin: false,
+          stackCount: 3,
+          archivedStack: updatedStackDocs.slice(3).map((d) => ({ ...(d.data() as StackItem), docId: d.id })),
+        })}
+      />
+    );
+    expect(await screen.findByTestId('stack-archive-tab-count')).toHaveTextContent('2');
+
+    // Resolve the stale in-flight request from the prior Admin session with old 6/0 data — must be discarded
+    holdFirstSlowResolve!({ docs: initialStackDocs });
+
+    // Switch back to Admin and expand customer row -> must fetch fresh 3 active · 2 archived (never stale 6/0)
+    rerender(<UsageAnalyticsPage {...adminProps} />);
+    expect(await screen.findByText(customerEmail)).toBeInTheDocument();
+    fireEvent.click(screen.getByText(customerEmail));
+    await waitFor(() => {
+      expect(screen.getByTestId(`author-stack-counts-${customerUid}`)).toHaveTextContent('3 active · 2 archived');
+    });
   });
 });
