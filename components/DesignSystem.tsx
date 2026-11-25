@@ -4002,16 +4002,21 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                     {/* 14. TOASTS */}
                     <section id="toasts">
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Toasts</h2>
-                        <div className="flex justify-center p-12 bg-zinc-950 rounded-xl border border-zinc-800">
-                             <div className="bg-brand-black text-primary px-4 py-3 rounded-xl shadow-2xl flex items-center justify-between gap-3 border border-primary/50 w-full max-w-sm">
-                                <div className="flex items-center gap-3">
-                                    <span className="material-symbols-outlined !text-[20px]">check_circle</span>
-                                    <span className="text-sm font-semibold tracking-tight pr-2">Artist seed registered in the curation queue</span>
-                                </div>
-                                <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center transition-opacity leading-none opacity-60 hover:opacity-100">
-                                    <span className="material-symbols-outlined !text-[16px]">close</span>
-                                </button>
-                             </div>
+                        <div className="space-y-4">
+                            <p className="text-sm text-zinc-400 leading-relaxed max-w-3xl">
+                                Transient feedback banners render at the global top-most overlay layer (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">z-[10000]</code> with <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">pointer-events-none</code> wrapper) so confirmations remain crisp and unobstructed above modals (<code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">z-[2000]</code>) and full-screen Zine views.
+                            </p>
+                            <div className="flex justify-center p-12 bg-zinc-950 rounded-xl border border-zinc-800">
+                                 <div className="bg-brand-black text-primary px-4 py-3 rounded-xl shadow-2xl flex items-center justify-between gap-3 border border-primary/50 w-full max-w-sm">
+                                    <div className="flex items-center gap-3">
+                                        <span className="material-symbols-outlined !text-[20px]">check_circle</span>
+                                        <span className="text-sm font-semibold tracking-tight pr-2">Artist seed registered in the curation queue</span>
+                                    </div>
+                                    <button className="w-8 h-8 flex flex-shrink-0 items-center justify-center transition-opacity leading-none opacity-60 hover:opacity-100">
+                                        <span className="material-symbols-outlined !text-[16px]">close</span>
+                                    </button>
+                                 </div>
+                            </div>
                         </div>
                     </section>
 
@@ -4020,7 +4025,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Contextual Indicators</h2>
                         <div className="space-y-12">
                             <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
-                                Standardized counters used in headers and utility bars to track unread content or list sizes. These follow an Action/Passive color logic and utilize a **rounded-lg (8px)** "slight" radius to distinguish them from primary interactive elements.
+                                Standardized counters used in headers and utility bars to track unread content or list sizes. These follow an Action/Passive color logic and utilize a <strong className="text-zinc-200 font-semibold">rounded-lg (8px)</strong> "slight" radius to distinguish them from primary interactive elements.
                             </p>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
                                  <div className="p-6 bg-zinc-900 border border-zinc-700/50 rounded-xl flex flex-col items-center gap-4">
@@ -4238,7 +4243,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Header/Footer</h4>
-                                            <p className="text-sm text-zinc-400">Uses <strong>bg-zinc-900</strong> to provide visual anchoring against the main body. Features consistent 1px borders for separation.</p>
+                                            <p className="text-sm text-zinc-400">Uses <strong>bg-zinc-900</strong> to provide visual anchoring against the main body. Features consistent 1px borders for separation. Split footers (e.g., <code className="text-xs text-zinc-300">MyStackDialog</code>) wrap a left-aligned Standard Text Link + passive Small Contextual Indicator opposite right-aligned <strong>Cancel</strong> + <strong>Done</strong> buttons via <code className="text-xs text-zinc-300">flex items-center justify-between w-full</code>.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Animation</h4>

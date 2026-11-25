@@ -1649,6 +1649,7 @@ interface UsageAnalyticsPageProps {
     archivedStack?: StackItem[];
     onRestoreStackItem?: (docId: string) => Promise<void> | void;
     onPermanentDeleteStackItem?: (docId: string) => Promise<void> | void;
+    requestedLedgerTab?: { tab: LedgerTabId; nonce: number } | null;
 }
 
 export const calculateTelemetryForUser = (
@@ -2140,6 +2141,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     archivedStack = [],
     onRestoreStackItem,
     onPermanentDeleteStackItem,
+    requestedLedgerTab = null,
 }) => {
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
@@ -2165,6 +2167,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const skipNextStalePreviewFetchRef = useRef(false);
     const isActiveRef = useRef(isActive);
     const previewStateRef = useRef({ simulateNormalUser, inspectedAuthor });
+    const lastHandledLedgerRequestNonceRef = useRef<number | null>(null);
     const [inspectedUserStack, setInspectedUserStack] = useState<StackItem[]>([]);
     const [isLoadingInspectedStack, setIsLoadingInspectedStack] = useState<boolean>(false);
     const [ledgerData, setLedgerData] = useState<UserTelemetry[]>([]);
@@ -2225,6 +2228,25 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         setArchiveSearchQuery('');
         setIsArchiveSearchOpen(false);
     }, [user?.uid]);
+
+    // One-shot deep-link handler (e.g., from MyStackDialog "Stack Archive" footer link)
+    useEffect(() => {
+        if (!requestedLedgerTab) return;
+        if (lastHandledLedgerRequestNonceRef.current === requestedLedgerTab.nonce) return;
+        lastHandledLedgerRequestNonceRef.current = requestedLedgerTab.nonce;
+
+        setActiveLedgerTab(requestedLedgerTab.tab);
+        setArchiveSearchQuery('');
+        setIsArchiveSearchOpen(false);
+
+        if (isAdmin && user?.uid) {
+            setInspectedAuthor({
+                uid: user.uid,
+                email: user.email || '',
+            });
+            setSimulateNormalUser(true);
+        }
+    }, [requestedLedgerTab, isAdmin, user?.uid, user?.email]);
 
     const loadAuthorStack = useCallback(async (
         uid: string,
@@ -2837,13 +2859,21 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         )}
                     </div>
 
-                    {/* Admin Inspection Exit Banner */}
+                    {/* Admin Inspection / Personal View Exit Banner */}
                     {isAdmin && simulateNormalUser && (
                         <div className="p-4 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 text-sm">
                             <div className="flex items-center gap-3 text-amber-200">
                                 <span className="material-symbols-outlined text-amber-400 !text-xl flex-shrink-0">visibility</span>
                                 <span>
-                                    Previewing wallet & curation history as <strong className="text-white">{inspectedAuthor?.email || currentUserTelemetry?.email || DEFAULT_CUSTOMER_EMAIL}</strong>. Real money API costs and cache statistics are masked according to Standard User permissions.
+                                    {isInspectingOtherUser ? (
+                                        <>
+                                            Previewing wallet &amp; curation history as <strong className="text-white">{inspectedAuthor?.email || currentUserTelemetry?.email || DEFAULT_CUSTOMER_EMAIL}</strong>. Real money API costs and cache statistics are masked according to Standard User permissions.
+                                        </>
+                                    ) : (
+                                        <>
+                                            Viewing your personal Discovery Ledger &amp; Stack Archive (<strong className="text-white">{user?.email || 'Admin'}</strong>).
+                                        </>
+                                    )}
                                 </span>
                             </div>
                             <button
@@ -2857,7 +2887,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                 }}
                                 className="px-3.5 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs transition-colors cursor-pointer whitespace-nowrap self-start sm:self-auto"
                             >
-                                Exit Inspection
+                                {isInspectingOtherUser ? 'Exit Inspection' : 'Return to Admin View'}
                             </button>
                         </div>
                     )}

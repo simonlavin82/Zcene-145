@@ -737,4 +737,179 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
       expect(screen.getByTestId(`author-stack-counts-${customerUid}`)).toHaveTextContent('3 active · 2 archived');
     });
   });
+
+  it('12. MyStackDialog renders left-aligned Stack Archive text link + passive contextual indicator alongside Cancel/Done, raises Toast to z-[10000], and fixes DesignSystem raw markdown', () => {
+    const onOpenStackArchive = vi.fn();
+    const { rerender } = render(
+      <MyStackDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stack={[]}
+        onRemove={vi.fn()}
+        onView={vi.fn()}
+        onAddArtist={vi.fn()}
+        seedArtists={[]}
+        archivedCount={0}
+        onOpenStackArchive={onOpenStackArchive}
+      />
+    );
+
+    const archiveLink = screen.getByTestId('my-stack-archive-link');
+    expect(archiveLink).toHaveTextContent('Stack Archive');
+    expect(screen.queryByTestId('my-stack-archive-count')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Done' })).toBeInTheDocument();
+
+    fireEvent.click(archiveLink);
+    expect(onOpenStackArchive).toHaveBeenCalledTimes(1);
+
+    // 3-digit count displays passive contextual indicator cleanly without clipping
+    rerender(
+      <MyStackDialog
+        isOpen={true}
+        onClose={vi.fn()}
+        stack={[]}
+        onRemove={vi.fn()}
+        onView={vi.fn()}
+        onAddArtist={vi.fn()}
+        seedArtists={[]}
+        archivedCount={124}
+        onOpenStackArchive={onOpenStackArchive}
+      />
+    );
+    const countBadge = screen.getByTestId('my-stack-archive-count');
+    expect(countBadge).toHaveTextContent('124');
+    expect(countBadge.className).toContain('rounded-lg');
+    expect(countBadge.className).toContain('min-w-[18px]');
+
+    // Toast z-index floats above MyStackDialog (z-[2000]) and mobile Zine (z-[9999])
+    const appSrc = fs.readFileSync(path.resolve(__dirname, '../App.tsx'), 'utf-8');
+    const toastBlock = appSrc.slice(appSrc.indexOf('const Toast:'), appSrc.indexOf('const Toast:') + 650);
+    expect(toastBlock).toContain('z-[10000]');
+    expect(appSrc).toContain('(prev?.nonce ?? 0) + 1');
+
+    // DesignSystem.tsx has no raw markdown **rounded-lg (8px)** string
+    const dsSrc = fs.readFileSync(path.resolve(__dirname, '../components/DesignSystem.tsx'), 'utf-8');
+    expect(dsSrc).not.toContain('**rounded-lg (8px)**');
+    expect(dsSrc).toContain('z-[10000]');
+  });
+
+  it('13. requestedLedgerTab deep-links straight to Stack Archive for Standard Users (even when already on /analytics) and lands Admins on their own interactive Stack Archive exiting any customer inspection', async () => {
+    const onRestoreStackItem = vi.fn().mockResolvedValue(undefined);
+    const onPermanentDeleteStackItem = vi.fn().mockResolvedValue(undefined);
+
+    // Part A: Standard User already on /analytics -> requestedLedgerTab activates Stack Archive
+    const standardProps = makeBaseAnalyticsProps({
+      archivedStack: sampleArchivedStack,
+      onRestoreStackItem,
+      onPermanentDeleteStackItem,
+      requestedLedgerTab: null,
+    });
+    const { rerender, unmount } = render(<UsageAnalyticsPage {...standardProps} />);
+
+    expect(await screen.findByTestId('token-transactions-ledger')).toBeInTheDocument();
+    expect(screen.getByTestId('ledger-tab-activity')).toHaveAttribute('aria-selected', 'true');
+
+    rerender(
+      <UsageAnalyticsPage
+        {...standardProps}
+        requestedLedgerTab={{ tab: 'stack_archive', nonce: 1 }}
+      />
+    );
+
+    expect(await screen.findByTestId('stack-archive-ledger')).toBeInTheDocument();
+    expect(screen.getByTestId('ledger-tab-stack-archive')).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByText('Buggin')).toBeInTheDocument();
+
+    // User clicks back to Token Activity, then triggers a new nonce deep-link -> switches back cleanly
+    fireEvent.click(screen.getByTestId('ledger-tab-activity'));
+    expect(screen.getByTestId('token-transactions-ledger')).toBeInTheDocument();
+
+    rerender(
+      <UsageAnalyticsPage
+        {...standardProps}
+        requestedLedgerTab={{ tab: 'stack_archive', nonce: 2 }}
+      />
+    );
+    expect(await screen.findByTestId('stack-archive-ledger')).toBeInTheDocument();
+    unmount();
+
+    // Part B: Admin inspecting a customer -> requestedLedgerTab exits customer inspection & opens Admin's own interactive Stack Archive
+    const customerUid = 'uid-cust-preview';
+    const customerEmail = 'simon.lavin1@gmail.com';
+    mockGetDoc.mockImplementation(async (ref: any) => {
+      if (ref?.path === 'adminLedger/system') return { exists: () => true, data: () => ({ jitEnabled: true }) };
+      return { exists: () => true, data: () => ({ email: ref?.path?.includes(ADMIN_UID) ? ADMIN_EMAIL : customerEmail, tokenBalance: 0 }) };
+    });
+    mockGetDocs.mockImplementation(async (ref: any) => {
+      if (ref?.path === 'users') {
+        return {
+          docs: [
+            { id: ADMIN_UID, data: () => ({ email: ADMIN_EMAIL, tokenBalance: 0 }) },
+            { id: customerUid, data: () => ({ email: customerEmail, tokenBalance: 69 }) },
+          ],
+        };
+      }
+      if (ref?.path === `users/${customerUid}/stack`) {
+        return {
+          docs: [
+            {
+              id: 'cust_arch_1',
+              data: () => ({ id: 'fiddlehead-us', displayName: 'Fiddlehead', type: 'artist', dateSaved: 1762000000000, archivedAt: 1762500000000, status: 'archived', discoveredVia: 'Have Heart' }),
+            },
+          ],
+        };
+      }
+      return { docs: [] };
+    });
+
+    const adminOwnArchived: StackItem[] = [
+      {
+        id: 'admin-archived-band',
+        docId: 'admin-archived-band_p1',
+        displayName: 'Admin Own Discovery',
+        type: 'artist',
+        dateSaved: 1762000000000,
+        archivedAt: 1762900000000,
+        status: 'archived',
+        discoveredVia: 'Spaced',
+      },
+    ];
+
+    const adminProps = makeBaseAnalyticsProps({
+      user: { uid: ADMIN_UID, email: ADMIN_EMAIL },
+      isAdmin: true,
+      stackCount: 2,
+      archivedStack: adminOwnArchived,
+      onRestoreStackItem,
+      onPermanentDeleteStackItem,
+      requestedLedgerTab: null,
+    });
+
+    const { rerender: rerenderAdmin } = render(<UsageAnalyticsPage {...adminProps} />);
+    expect(await screen.findByText(customerEmail)).toBeInTheDocument();
+
+    // First enter customer Inspect Wallet
+    const inspectBtns = screen.getAllByRole('button', { name: /Inspect Wallet/i });
+    fireEvent.click(inspectBtns[1]);
+    expect(await screen.findByTestId('ledger-tab-stack-archive')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
+    expect(await screen.findByTestId('stack-archive-readonly-badge')).toBeInTheDocument();
+    expect(screen.getByText('Fiddlehead')).toBeInTheDocument();
+
+    // Now deep-link from Admin's MyStackDialog -> exits customer inspection & opens Admin's own interactive Stack Archive
+    rerenderAdmin(
+      <UsageAnalyticsPage
+        {...adminProps}
+        requestedLedgerTab={{ tab: 'stack_archive', nonce: 1 }}
+      />
+    );
+
+    expect(await screen.findByText('Admin Own Discovery')).toBeInTheDocument();
+    expect(screen.queryByText('Fiddlehead')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('stack-archive-readonly-badge')).not.toBeInTheDocument();
+    expect(screen.getByTestId('archive-restore-admin-archived-band_p1')).toBeInTheDocument();
+    expect(screen.getByTestId('archive-delete-admin-archived-band_p1')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Return to Admin View/i })).toBeInTheDocument();
+  });
 });

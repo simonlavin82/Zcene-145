@@ -331,7 +331,7 @@ const Toast: React.FC<{ message: string; onClose: () => void }> = ({ message, on
   const cleanMessage = message.replace(/^[⚠️⚡✅]\s?/, '').trim();
 
   return (
-    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[1000] pointer-events-none px-4 w-full max-w-sm">
+    <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[10000] pointer-events-none px-4 w-full max-w-sm">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
@@ -1240,6 +1240,7 @@ const App: React.FC = () => {
   const [pinnedNodes, setPinnedNodes] = useState<Set<string>>(new Set());
   const [stack, setStack] = useState<StackItem[]>([]);
   const [lastViewedStackCount, setLastViewedStackCount] = useState<number>(0);
+  const [requestedLedgerTab, setRequestedLedgerTab] = useState<{ tab: 'activity' | 'stack_archive'; nonce: number } | null>(null);
   const activeStack = useMemo(() => stack.filter(item => item.status !== 'archived'), [stack]);
   const archivedStack = useMemo(() => stack.filter(item => item.status === 'archived'), [stack]);
   useEffect(() => {
@@ -3498,6 +3499,22 @@ const App: React.FC = () => {
     setIsStackDialogOpen(true);
     setLastViewedStackCount(activeStack.length);
   }, [activeStack.length]);
+
+  const handleOpenStackArchive = useCallback(() => {
+    setIsStackDialogOpen(false);
+    setIsMenuOpen(false);
+    if (activeStack.length !== lastViewedStackCount) {
+      setLastViewedStackCount(activeStack.length);
+      if (user && currentProjectId) {
+        setDoc(doc(db, 'users', user.uid, 'projects', currentProjectId), {
+          lastViewedStackCount: activeStack.length,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      }
+    }
+    setRequestedLedgerTab(prev => ({ tab: 'stack_archive', nonce: (prev?.nonce ?? 0) + 1 }));
+    navigate('/analytics');
+  }, [activeStack.length, lastViewedStackCount, user, currentProjectId, navigate]);
 
   const handleCloseModals = useCallback(() => {
     setIsStackDialogOpen(false);
@@ -11824,6 +11841,7 @@ const App: React.FC = () => {
             archivedStack={archivedStack}
             onRestoreStackItem={handleRestoreStackItem}
             onPermanentDeleteStackItem={handlePermanentDeleteStackItem}
+            requestedLedgerTab={requestedLedgerTab}
           />
         </div>
         <div className={`absolute inset-0 transition-opacity duration-300 ${currentView === View.Trash ? 'z-10' : 'z-0 opacity-0 pointer-events-none print:hidden'}`}>
@@ -12010,6 +12028,8 @@ const App: React.FC = () => {
           }
         }}
         stack={activeStack}
+        archivedCount={archivedStack.length}
+        onOpenStackArchive={handleOpenStackArchive}
         onRemove={(docId) => handleArchiveStackItem(docId as string)}
         onView={(id) => {
           if (id) {

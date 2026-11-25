@@ -39,7 +39,9 @@ export const MyStackDialog: React.FC<{
   onView: (id: string | null) => void;
   onAddArtist: (artistName: string) => void;
   seedArtists: string[];
-}> = ({ isOpen, onClose, stack, onRemove, onView, onAddArtist, seedArtists }) => {
+  archivedCount?: number;
+  onOpenStackArchive?: () => void;
+}> = ({ isOpen, onClose, stack, onRemove, onView, onAddArtist, seedArtists, archivedCount = 0, onOpenStackArchive }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const handleCopy = (id: string, name: string) => {
@@ -117,12 +119,36 @@ export const MyStackDialog: React.FC<{
                 )}
             </ModalBody>
             <ModalFooter>
-                <button onClick={onClose} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">
-                    Cancel
-                </button>
-                <button onClick={onClose} className="px-6 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90">
-                    Done
-                </button>
+                <div className={`flex items-center gap-2 w-full ${onOpenStackArchive ? 'justify-between' : 'justify-end'}`}>
+                    {onOpenStackArchive && (
+                        <button
+                            type="button"
+                            data-testid="my-stack-archive-link"
+                            onClick={onOpenStackArchive}
+                            className="inline-flex items-center gap-1.5 text-zinc-400 hover:text-primary transition-colors text-sm cursor-pointer whitespace-nowrap shrink-0 group"
+                        >
+                            <span className="underline underline-offset-4 decoration-zinc-700 group-hover:decoration-primary/60">
+                                Stack Archive
+                            </span>
+                            {archivedCount > 0 && (
+                                <span
+                                    data-testid="my-stack-archive-count"
+                                    className="h-4.5 min-w-[18px] px-1 rounded-lg inline-flex items-center justify-center text-[9px] font-semibold font-mono border bg-zinc-800 text-zinc-400 border-zinc-700 leading-none"
+                                >
+                                    {archivedCount}
+                                </span>
+                            )}
+                        </button>
+                    )}
+                    <div className="flex items-center gap-2 shrink-0">
+                        <button onClick={onClose} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors whitespace-nowrap">
+                            Cancel
+                        </button>
+                        <button onClick={onClose} className="px-6 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 whitespace-nowrap">
+                            Done
+                        </button>
+                    </div>
+                </div>
             </ModalFooter>
         </ModalContainer>
     </ModalBackdrop>
