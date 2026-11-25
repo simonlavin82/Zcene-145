@@ -3197,8 +3197,79 @@ const titlesMatchFuzzy = (
   return false;
 };
 
-const normalizeGenreText = (g: string): string =>
-  (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const NON_LATIN_APPLE_GENRE_REPLACEMENTS: Array<[RegExp, string]> = [
+  // Strictly preserve bare Electronic "Hardcore" (Apple Genre ID 1050) across CJK storefronts
+  [/ハードコア/g, ' hardcore '],
+  [/하드코어/g, ' hardcore '],
+  // Rock / Alternative / Punk / Metal / Indie / Pop
+  [/オルタナティブ|얼터너티브|另类音乐|另類音樂|อัลเทอร์เนทีฟ/g, ' alternative '],
+  [/パンク|펑크|朋克|พังก์/g, ' punk '],
+  [/ヘヴィメタル|メタル|메탈|헤비메탈|金属|金屬|เมทัล/g, ' metal '],
+  [/インディー|인디|独立音乐|獨立音樂|อินดี้/g, ' indie '],
+  [/ロック|록|摇滚|搖滾|ร็อก/g, ' rock '],
+  [/J-Pop|K-Pop|ポップ|팝|流行|ป๊อป/gi, ' pop '],
+  // Hostile & Non-Umbrella Families (Hip-Hop/Rap, Electronic/Dance, Classical, Jazz, Children, Comedy, Enka, Anime/Soundtrack)
+  [/ヒップホップ|ラップ|힙합|랩|嘻哈|说唱|說唱|ฮิปฮอป/g, ' hip hop rap '],
+  [/エレクトロニック|エレクトロニカ|ダンス|일렉트로닉|댄스|电子|電子|舞曲|อิเล็กทรอนิกส์/g, ' electronic dance '],
+  [/クラシック|클래식|古典|คลาสสิก/g, ' classical '],
+  [/ジャズ|재즈|爵士|แจ๊ส/g, ' jazz '],
+  [/カントリー|컨트리|乡村|鄉村/g, ' country '],
+  [/キッズ|ファミリー|어린이|儿童|兒童/g, ' children '],
+  [/コメディ|코미디|喜剧|喜劇/g, ' comedy '],
+  [/演歌/g, ' enka '],
+  [/サウンドトラック|アニメ|사운드트랙|原声|原聲/g, ' soundtrack '],
+];
+
+const LOCALIZED_LATIN_APPLE_GENRE_REPLACEMENTS: Array<[RegExp, string]> = [
+  // Nordic / German / Dutch compound rock, punk, indie & metal tokens (e.g. SE "Hårdrock" -> "hardrock" -> "hard rock")
+  [/\bhardrock\b/g, 'hard rock'],
+  [/\bpunkrock\b/g, 'punk rock'],
+  [/\bindierock\b/g, 'indie rock'],
+  [/\bpoprock\b/g, 'pop rock'],
+  [/\bfolkrock\b/g, 'folk rock'],
+  [/\bbluesrock\b/g, 'blues rock'],
+  [/\bkrautrock\b/g, 'krautrock'],
+  [/\bdeutschrock\b/g, 'rock'],
+  [/\bsvensk\s+rock\b/g, 'rock'],
+  // European localized "Alternative" (SE/NO/DK/DE "Alternativ", FR "Alternatif", ES/IT/PT "Alternativa" / "Alternativo" / "Musica alternativa")
+  [/\bmusica\s+alternativa\b/g, 'alternative'],
+  [/\brock\s+y\s+alternativo\b/g, 'rock alternative'],
+  [/\b(?:alternativ|alternatif|alternativa|alternativo)\b/g, 'alternative'],
+  // European localized "Electronic" (DE "Elektronisch", FR "Electronique", ES/IT "Electronica", PT/BR "Eletronica", SE "Elektronisk")
+  [/\bmusique\s+electronique\b/g, 'electronic'],
+  [/\b(?:elektronisch|elektronisk|electronique|eletronica)\b/g, 'electronic'],
+  // European localized Hostile Genres (Classical, Children, Comedy, Holiday, Christian, Soundtrack)
+  [/\b(?:klassisk|klassik|classique|clasica|classica)\b/g, 'classical'],
+  [/\b(?:barnmusik|barnemusikk|kindermusik|musique\s+pour\s+enfants|musica\s+infantil)\b/g, 'children'],
+  [/\b(?:komedi|komodie|humour|comedia)\b/g, 'comedy'],
+  [/\b(?:julmusik|weihnachtsmusik|noel|navidad)\b/g, 'holiday'],
+  [/\b(?:kristen|christlich|chretien|cristiana|religioso)\b/g, 'christian'],
+  [/\b(?:filmmusik|bande\s+originale|banda\s+sonora|colonna\s+sonora|trilha\s+sonora)\b/g, 'soundtrack'],
+];
+
+export const normalizeGenreText = (g: string): string => {
+  let text = String(g || '');
+  if (!text) return '';
+  for (const [pattern, replacement] of NON_LATIN_APPLE_GENRE_REPLACEMENTS) {
+    text = text.replace(pattern, replacement);
+  }
+  text = text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/ø/g, 'o')
+    .replace(/æ/g, 'ae')
+    .replace(/ß/g, 'ss')
+    .replace(/œ/g, 'oe')
+    .replace(/[^a-z0-9 ]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (!text) return '';
+  for (const [pattern, replacement] of LOCALIZED_LATIN_APPLE_GENRE_REPLACEMENTS) {
+    text = text.replace(pattern, replacement);
+  }
+  return text.replace(/\s+/g, ' ').trim();
+};
 
 const APPLE_ELECTRONIC_HARDCORE_ZCENE_TERMS = [
   'gabber', 'happy hardcore', 'hardcore techno', 'uk hardcore', 'hardstyle', 'rave',
@@ -3559,7 +3630,7 @@ export const resolveItunesCanonicalArtistNameBackend = async (
 
   for (const storefront of storefrontsToTry) {
     if (deadline - Date.now() <= 100) break;
-    const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}` : '';
+    const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}&lang=en_us` : '';
     const primaryUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanName)}&entity=musicArtist&limit=15${countryParam}`;
     const data = await fetchFrontDoorJson(primaryUrl);
     const results: any[] = Array.isArray(data?.results) ? data.results : [];
@@ -3905,7 +3976,7 @@ export const fetchArtistCollections = async (
 
   for (const storefront of storefrontsToTry) {
     try {
-      const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}` : '';
+      const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}&lang=en_us` : '';
       const lookupUrl = `https://itunes.apple.com/lookup?id=${artistId}&entity=album&limit=200${countryParam}`;
       const data = await fetchItunesJsonWithRetry(lookupUrl, 4000);
       if (data) {
@@ -4236,7 +4307,7 @@ const verifyCandidateDiscography = async (
   }
 
   try {
-    const countryParam = storefrontCountry ? `&country=${encodeURIComponent(storefrontCountry)}` : '';
+    const countryParam = storefrontCountry ? `&country=${encodeURIComponent(storefrontCountry)}&lang=en_us` : '';
     const lookupUrl = `https://itunes.apple.com/lookup?id=${candidate.artistId}&entity=album&limit=200${countryParam}`;
     const data = await fetchItunesJsonWithRetry(lookupUrl, 4000);
     if (data) {
@@ -4344,7 +4415,7 @@ export const scrapeImageUrlBackend = async (
     resolvedIso && resolvedIso !== 'us' ? [resolvedIso.toUpperCase(), undefined] : [undefined];
 
   for (const storefront of storefrontsToTry) {
-    const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}` : '';
+    const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}&lang=en_us` : '';
     const storefrontLabel = storefront || 'US(default)';
 
     // --- Tier 1: Base Query & Strict Taxonomy Match ---

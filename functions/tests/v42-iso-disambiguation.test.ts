@@ -28,6 +28,10 @@ import {
   resolveSceneContextNodes,
   buildHydrationIdentityLockBlock,
   scrapeImageUrlBackend,
+  normalizeGenreText,
+  evaluateGenreMatch,
+  isAppleElectronicHardcoreGenre,
+  isCatalogCorroboratedNonHostileGenre,
 } from '../src/services/curatorService';
 
 describe('Architecture V42: Global 249-Country ISO-3166 Registry & End-to-End Disambiguation Lock', () => {
@@ -584,23 +588,23 @@ describe('Architecture V42: Global 249-Country ISO-3166 Registry & End-to-End Di
       expect(curatorSrc).toContain('"The Deftones" -> "Deftones"');
     });
 
-    it('(b) multi-candidate "The X" vs. "X" or cross-country homonym collisions keep isAmbiguous: true without false programmatic correctedInput: true', () => {
-      const enforceSingleArtistCanonicalCorrection = (
+    it('(b) multi-candidate "The X" vs. "X" or cross-country homonym collisions and case-only inputs ("void" -> "Void") avoid false correctedInput: true while colliding typos ("nrvana" -> "Nirvana") preserve correctedInput: true', () => {
+      const enforcePreFlightCanonicalCorrection = (
         seed: string,
         validationResult: { isValid: boolean; hasCollision?: boolean; id: string; correctedInput: boolean }
       ) => {
-        if (
-          validationResult.isValid &&
-          !validationResult.hasCollision &&
-          String(seed).trim().toLowerCase() !== String(validationResult.id || '').trim().toLowerCase()
-        ) {
+        const isCaseInsensitiveMatch =
+          String(seed).trim().toLowerCase() === String(validationResult.id || '').trim().toLowerCase();
+        if (!validationResult.isValid || isCaseInsensitiveMatch) {
+          validationResult.correctedInput = false;
+        } else if (!validationResult.hasCollision && Boolean(String(validationResult.id || '').trim())) {
           validationResult.correctedInput = true;
         }
         return validationResult;
       };
 
       // 1. Single-artist dropped leading "The " -> sets correctedInput: true
-      const singleRestored = enforceSingleArtistCanonicalCorrection('Rocking Horse Winner', {
+      const singleRestored = enforcePreFlightCanonicalCorrection('Rocking Horse Winner', {
         isValid: true,
         hasCollision: false,
         id: 'The Rocking Horse Winner',
@@ -609,7 +613,7 @@ describe('Architecture V42: Global 249-Country ISO-3166 Registry & End-to-End Di
       expect(singleRestored.correctedInput).toBe(true);
 
       // 2. Single-artist stripped erroneous leading "The " -> sets correctedInput: true
-      const singleStripped = enforceSingleArtistCanonicalCorrection('The Deftones', {
+      const singleStripped = enforcePreFlightCanonicalCorrection('The Deftones', {
         isValid: true,
         hasCollision: false,
         id: 'Deftones',
@@ -618,16 +622,44 @@ describe('Architecture V42: Global 249-Country ISO-3166 Registry & End-to-End Di
       expect(singleStripped.correctedInput).toBe(true);
 
       // 3. Multi-candidate homonym collision (e.g. "Darko" -> primary "Darko US" + collision "Darko" [UK]) -> does NOT force correctedInput: true
-      const multiCollision = enforceSingleArtistCanonicalCorrection('Darko', {
+      const multiCollision = enforcePreFlightCanonicalCorrection('Darko', {
         isValid: true,
         hasCollision: true,
         id: 'Darko US',
         correctedInput: false,
       });
       expect(multiCollision.correctedInput).toBe(false);
+
+      // 4. Case-only match ("void" -> "Void", "The hives" -> "The Hives") -> forces correctedInput: false even if Flash returned true
+      const caseOnlyVoid = enforcePreFlightCanonicalCorrection('void', {
+        isValid: true,
+        hasCollision: false,
+        id: 'Void',
+        correctedInput: true,
+      });
+      expect(caseOnlyVoid.correctedInput).toBe(false);
+
+      // 5. Genuine typo on a colliding band name ("nrvana" -> "Nirvana", hasCollision: true, Flash correctedInput: true) -> preserves correctedInput: true
+      const collidingTypo = enforcePreFlightCanonicalCorrection('nrvana', {
+        isValid: true,
+        hasCollision: true,
+        id: 'Nirvana',
+        correctedInput: true,
+      });
+      expect(collidingTypo.correctedInput).toBe(true);
     });
 
-    it('(c) keys pre-flight single-artist Rule 17 bare router stubs strictly by canonicalBareNormId so typos and dropped articles never pollute /artists on cancel', async () => {
+    it('(c) V47.19 Read-Only Pre-Flight & Post-Confirmation Router-Stub Keying: validateSeedOriginCallable writes zero speculative stubs to /artists while post-confirmation upsertBareRouterStub keys strictly by canonicalBareNormId', async () => {
+      const fs = await import('fs');
+      const path = await import('path');
+      const pipelineSrc = fs.readFileSync(path.resolve(__dirname, '../src/executeCurationPipeline.ts'), 'utf8');
+      const preFlightCallableSlice = pipelineSrc.split('export const validateSeedOriginCallable')[1] || '';
+
+      // validateSeedOriginCallable MUST NOT write speculative stubs to /artists before user confirmation in Box 4
+      expect(preFlightCallableSlice).not.toContain('upsertBareRouterStub(');
+      expect(preFlightCallableSlice).not.toContain('stubDocRef.set(');
+      expect(preFlightCallableSlice).toContain('V47.19 Read-Only Pre-Flight Gateway');
+
       const store = new Map<string, any>();
       const fakeDb: any = {
         collection: (coll: string) => ({
@@ -648,7 +680,7 @@ describe('Architecture V42: Global 249-Country ISO-3166 Registry & End-to-End Di
       const normalizeId = (s: string) =>
         s.trim().toLowerCase().replace(/['’]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
 
-      // Simulate pre-flight stub minting for both typo ("the rocking horse winer") and dropped article ("Rocking Horse Winner")
+      // Simulate post-confirmation stub minting for both typo ("the rocking horse winer") and dropped article ("Rocking Horse Winner")
       for (const rawSeed of ['the rocking horse winer', 'Rocking Horse Winner']) {
         const validationResult = {
           isValid: true,
@@ -895,6 +927,94 @@ describe('Architecture V42: Global 249-Country ISO-3166 Registry & End-to-End Di
       const legacyTrailingIso = extractTrailingCountryIso(legacyCanonicalId);
       const legacyBareIdForWrite = stripCountrySlug(legacyCanonicalId, legacyTrailingIso);
       expect(legacyBareIdForWrite).toBe('murder-city-devils');
+    });
+
+    it('(f) V47.19 Localized Storefront Genre Normalization & &lang=en_us: resolves Swedish "Hårdrock" in Tier 1 on SE storefront for "The Hellacopters" (#8039597) while keeping EDM "ハードコア" blocked as bare "hardcore" (ID 1050)', async () => {
+      // 1. Diacritic folding & localized genre alias table
+      expect(normalizeGenreText('Hårdrock')).toBe('hard rock');
+      expect(normalizeGenreText('Hardrock')).toBe('hard rock');
+      expect(normalizeGenreText('Punkrock')).toBe('punk rock');
+      expect(normalizeGenreText('Indierock')).toBe('indie rock');
+      expect(normalizeGenreText('Alternativ')).toBe('alternative');
+      expect(normalizeGenreText('Alternatif')).toBe('alternative');
+      expect(normalizeGenreText('Música alternativa')).toBe('alternative');
+      expect(normalizeGenreText('ロック')).toBe('rock');
+      expect(normalizeGenreText('オルタナティブ')).toBe('alternative');
+
+      // 2. EDM "Hardcore" (Apple Genre ID 1050) guard strictly preserved across localized storefronts
+      expect(normalizeGenreText('ハードコア')).toBe('hardcore');
+      expect(normalizeGenreText('하드코어')).toBe('hardcore');
+      expect(isAppleElectronicHardcoreGenre('ハードコア')).toBe(true);
+      expect(evaluateGenreMatch('ハードコア', 'Hardcore Punk', 'Japanese hardcore punk band.')).toBe(false);
+      expect(isCatalogCorroboratedNonHostileGenre('ハードコア', 'Hardcore Punk')).toBe(false);
+
+      // 3. Localized hostile genres remain strictly blocked
+      expect(normalizeGenreText('Klassisk')).toBe('classical');
+      expect(normalizeGenreText('クラシック')).toBe('classical');
+      expect(isCatalogCorroboratedNonHostileGenre('Klassisk', 'Garage Rock')).toBe(false);
+      expect(isCatalogCorroboratedNonHostileGenre('Barnmusik', 'Indie Rock')).toBe(false);
+
+      // 4. End-to-end Tier 1 Hit on SE storefront for "The Hellacopters" (primaryGenreName: "Hårdrock", 0 Tier 2/3 escalations)
+      expect(evaluateGenreMatch('Hårdrock', 'Garage Rock / Hard Rock', 'Swedish garage hard rock band.')).toBe(true);
+
+      const fetchMock = vi.fn().mockImplementation(async (url: string) => {
+        if (url.includes('entity=musicArtist') && url.includes('country=SE')) {
+          return {
+            ok: true,
+            json: async () => ({
+              results: [
+                {
+                  artistId: 8039597,
+                  artistName: 'The Hellacopters',
+                  primaryGenreName: 'Hårdrock',
+                },
+              ],
+            }),
+          };
+        }
+        if (url.includes('lookup?id=8039597') && url.includes('country=SE')) {
+          return {
+            ok: true,
+            json: async () => ({
+              results: [
+                { wrapperType: 'artist', artistId: 8039597, artistName: 'The Hellacopters' },
+                {
+                  wrapperType: 'collection',
+                  collectionType: 'Album',
+                  artistId: 8039597,
+                  artistName: 'The Hellacopters',
+                  collectionName: 'By the Grace of God',
+                  primaryGenreName: 'Hårdrock',
+                  releaseDate: '2002-09-16T07:00:00Z',
+                  trackCount: 13,
+                  artworkUrl100: 'https://is1-ssl.mzstatic.com/image/thumb/Music124/hellacopters/100x100bb.jpg',
+                },
+              ],
+            }),
+          };
+        }
+        return { ok: true, json: async () => ({ results: [] }) };
+      });
+      global.fetch = fetchMock as any;
+
+      const res = await scrapeImageUrlBackend(
+        'The Hellacopters',
+        'artist',
+        'Garage Rock / Hard Rock',
+        'The Hellacopters are a Swedish garage rock and hard rock band formed in Stockholm in 1994.',
+        'Stockholm, Sweden',
+        [{ albumName: 'By the Grace of God', releaseYear: '2002' }],
+        'se',
+        '1994'
+      );
+
+      expect(res.itunesArtistId).toBe(8039597);
+      expect(res.verifiedArtistName).toBe('The Hellacopters');
+      expect(res.imageUrl).toContain('600x600bb.jpg');
+      // Only 2 network calls (1 artist search + 1 album lookup in Tier 1 on SE storefront, with &country=SE&lang=en_us)
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      expect(fetchMock.mock.calls[0][0]).toContain('&country=SE&lang=en_us');
+      expect(fetchMock.mock.calls[1][0]).toContain('&country=SE&lang=en_us');
     });
   });
 });

@@ -550,10 +550,30 @@ function normalizeProjectScene(raw, fallbackIndex = 0) {
         : Array.isArray(s.seedArtistIds) && s.seedArtistIds.length > 0
             ? s.seedArtistIds
             : [];
-    const seedIds = rawSeedIds.length > 0
+    let seedIds = rawSeedIds.length > 0
         ? rawSeedIds.map((id) => String(id).trim()).filter(Boolean)
         : seedsArray.map((seed) => normalizeCanonicalEntityId(seed)).filter(Boolean);
     const isCurated = Boolean(graphData.nodes && graphData.nodes.length > 0);
+    // V47.19: Self-heal bare seedIds / seedArtistIds on curated scenes back to their canonical -iso root node IDs
+    // (preferring isSeed || isSceneSeed || group === 0 root artist nodes first before falling back to general artist nodes).
+    if (isCurated && graphData.nodes.length > 0 && seedIds.length > 0) {
+        const artistNodes = graphData.nodes.filter((n) => n && n.type === 'artist');
+        const rootArtistNodes = artistNodes.filter((n) => Boolean(n.isSceneSeed || n.isSeed) || n.group === 0);
+        seedIds = seedIds.map((id) => {
+            if ((0, isoCountries_1.extractTrailingCountryIso)(id))
+                return id;
+            const matchesSlot = (n) => {
+                const nodeCleanId = stripSceneNamespace(String(n.canonicalId || n.id || '')).trim();
+                return (isCanonicalSeedMatch(nodeCleanId, [id]) ||
+                    (typeof n.label === 'string' && isCanonicalSeedMatch(n.label, [id])));
+            };
+            const matchedNode = rootArtistNodes.find(matchesSlot) || artistNodes.find(matchesSlot);
+            if (!matchedNode)
+                return id;
+            const candidateCanonicalId = normalizeCanonicalEntityId(stripSceneNamespace(String(matchedNode.canonicalId || matchedNode.id || '')));
+            return (0, isoCountries_1.extractTrailingCountryIso)(candidateCanonicalId) ? candidateCanonicalId : id;
+        });
+    }
     let curatedSeedArtists;
     if (typeof s.curatedSeedArtists === 'string' && s.curatedSeedArtists.trim().length > 0) {
         curatedSeedArtists = s.curatedSeedArtists.trim();
@@ -2103,7 +2123,10 @@ function getAllProjectSeedIds(scenes) {
         return [];
     const seen = new Set();
     const result = [];
-    for (const scene of scenes) {
+    for (const rawScene of scenes) {
+        if (!rawScene)
+            continue;
+        const scene = normalizeProjectScene(rawScene, rawScene.sceneIndex ?? 0);
         const list = scene?.seedIds?.length
             ? scene.seedIds
             : scene?.seedArtistIds?.length
@@ -2114,7 +2137,7 @@ function getAllProjectSeedIds(scenes) {
             const norm = normalizeCanonicalEntityId(clean);
             if (norm && !seen.has(norm)) {
                 seen.add(norm);
-                result.push(clean);
+                result.push(norm);
             }
         }
     }

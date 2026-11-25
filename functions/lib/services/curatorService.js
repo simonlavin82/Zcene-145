@@ -1,7 +1,7 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.shouldRunRule38ArtistNameUpgrade = exports.shouldRunRule38NotFoundUpgrade = exports.resolveItunesCanonicalArtistNameBackend = exports.resolveVerifiedItunesArtistDisplayName = exports.artistNamesMatchWithOptionalThe = exports.CURRENT_ITUNES_SCRAPE_VERSION = exports.COMPILATION_COLLECTION_RE = exports.evaluateGenreDistanceScore = exports.evaluateGenreMatch = exports.isAppleElectronicHardcoreGenre = exports.isCatalogCorroboratedNonHostileGenre = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.sanitizeBioText = exports.sanitizeAlbumName = exports.sanitizeNotableArtists = exports.buildHydrationIdentityLockBlock = exports.resolveSceneContextNodes = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.getNodeDetailsSchema = exports.LABEL_NODE_DETAILS_SCHEMA = exports.ARTIST_NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateOverarchingZineBackend = exports.OVERARCHING_ZINE_SCHEMA = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
-exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.reconcileDiscographyWithITunes = exports.sanitizeTextOnlyDiscography = exports.deduplicateDiscographyItems = exports.cleanSongQueryAlbumTitle = exports.cleanCollectionTitle = exports.fetchArtistArtwork = exports.fetchArtistCollections = exports.selectBestArtistArtwork = exports.getQualifyingDiscographyTitles = exports.filterConflatedArtistCollections = exports.passesUncorroboratedEraGate = void 0;
+exports.shouldRunRule38NotFoundUpgrade = exports.resolveItunesCanonicalArtistNameBackend = exports.resolveVerifiedItunesArtistDisplayName = exports.artistNamesMatchWithOptionalThe = exports.CURRENT_ITUNES_SCRAPE_VERSION = exports.COMPILATION_COLLECTION_RE = exports.evaluateGenreDistanceScore = exports.evaluateGenreMatch = exports.isAppleElectronicHardcoreGenre = exports.isCatalogCorroboratedNonHostileGenre = exports.normalizeGenreText = exports.checkVideoPlayability = exports.scrapeVideoIdBackend = exports.fetchNodeDetailsBackend = exports.sanitizeBioText = exports.sanitizeAlbumName = exports.sanitizeNotableArtists = exports.buildHydrationIdentityLockBlock = exports.resolveSceneContextNodes = exports.FETCH_NODE_DETAILS_PROMPT_TEMPLATE = exports.NODE_DETAILS_SCHEMA = exports.getNodeDetailsSchema = exports.LABEL_NODE_DETAILS_SCHEMA = exports.ARTIST_NODE_DETAILS_SCHEMA = exports.generateGraphDataBackend = exports.reconcileNarrativeEdges = exports.generateOverarchingZineBackend = exports.OVERARCHING_ZINE_SCHEMA = exports.generateRootsBreakdownBackend = exports.validateSeedOriginBackend = exports.SEED_VALIDATION_SCHEMA = exports.GENERATE_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_MULTI_SEED_GRAPH_PROMPT_TEMPLATE = exports.GENERATE_GRAPH_WITH_CONTEXT_PROMPT_TEMPLATE = exports.GRAPH_RESPONSE_SCHEMA = exports.extractCleanJsonString = exports.extractArtistSubGraph = exports.normalizeGraphData = exports.buildCompositeCacheKey = exports.extractCountrySlug = exports.sanitizeImageUrl = exports.extractValidYoutubeId = exports.cleanLabelDisplayName = exports.cleanArtistDisplayName = exports.titleCaseArtistId = exports.normalizeLabelId = exports.normalizeArtistId = exports.applyCanonicalAlias = exports.CANONICAL_ALIASES = exports.GEMINI_FLASH_MODEL = void 0;
+exports.generateSemanticLinkWeights = exports.scrapeImageUrlBackend = exports.reconcileDiscographyWithITunes = exports.sanitizeTextOnlyDiscography = exports.deduplicateDiscographyItems = exports.cleanSongQueryAlbumTitle = exports.cleanCollectionTitle = exports.fetchArtistArtwork = exports.fetchArtistCollections = exports.selectBestArtistArtwork = exports.getQualifyingDiscographyTitles = exports.filterConflatedArtistCollections = exports.passesUncorroboratedEraGate = exports.shouldRunRule38ArtistNameUpgrade = void 0;
 exports.sanitizeOverarchingRationale = sanitizeOverarchingRationale;
 exports.assessOverarchingZineQuality = assessOverarchingZineQuality;
 const genai_1 = require("@google/genai");
@@ -2846,7 +2846,80 @@ const titlesMatchFuzzy = (itunesTitle, zceneTitle, itunesYear, zceneYear) => {
     }
     return false;
 };
-const normalizeGenreText = (g) => (g || "").toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+const NON_LATIN_APPLE_GENRE_REPLACEMENTS = [
+    // Strictly preserve bare Electronic "Hardcore" (Apple Genre ID 1050) across CJK storefronts
+    [/ハードコア/g, ' hardcore '],
+    [/하드코어/g, ' hardcore '],
+    // Rock / Alternative / Punk / Metal / Indie / Pop
+    [/オルタナティブ|얼터너티브|另类音乐|另類音樂|อัลเทอร์เนทีฟ/g, ' alternative '],
+    [/パンク|펑크|朋克|พังก์/g, ' punk '],
+    [/ヘヴィメタル|メタル|메탈|헤비메탈|金属|金屬|เมทัล/g, ' metal '],
+    [/インディー|인디|独立音乐|獨立音樂|อินดี้/g, ' indie '],
+    [/ロック|록|摇滚|搖滾|ร็อก/g, ' rock '],
+    [/J-Pop|K-Pop|ポップ|팝|流行|ป๊อป/gi, ' pop '],
+    // Hostile & Non-Umbrella Families (Hip-Hop/Rap, Electronic/Dance, Classical, Jazz, Children, Comedy, Enka, Anime/Soundtrack)
+    [/ヒップホップ|ラップ|힙합|랩|嘻哈|说唱|說唱|ฮิปฮอป/g, ' hip hop rap '],
+    [/エレクトロニック|エレクトロニカ|ダンス|일렉트로닉|댄스|电子|電子|舞曲|อิเล็กทรอนิกส์/g, ' electronic dance '],
+    [/クラシック|클래식|古典|คลาสสิก/g, ' classical '],
+    [/ジャズ|재즈|爵士|แจ๊ส/g, ' jazz '],
+    [/カントリー|컨트리|乡村|鄉村/g, ' country '],
+    [/キッズ|ファミリー|어린이|儿童|兒童/g, ' children '],
+    [/コメディ|코미디|喜剧|喜劇/g, ' comedy '],
+    [/演歌/g, ' enka '],
+    [/サウンドトラック|アニメ|사운드트랙|原声|原聲/g, ' soundtrack '],
+];
+const LOCALIZED_LATIN_APPLE_GENRE_REPLACEMENTS = [
+    // Nordic / German / Dutch compound rock, punk, indie & metal tokens (e.g. SE "Hårdrock" -> "hardrock" -> "hard rock")
+    [/\bhardrock\b/g, 'hard rock'],
+    [/\bpunkrock\b/g, 'punk rock'],
+    [/\bindierock\b/g, 'indie rock'],
+    [/\bpoprock\b/g, 'pop rock'],
+    [/\bfolkrock\b/g, 'folk rock'],
+    [/\bbluesrock\b/g, 'blues rock'],
+    [/\bkrautrock\b/g, 'krautrock'],
+    [/\bdeutschrock\b/g, 'rock'],
+    [/\bsvensk\s+rock\b/g, 'rock'],
+    // European localized "Alternative" (SE/NO/DK/DE "Alternativ", FR "Alternatif", ES/IT/PT "Alternativa" / "Alternativo" / "Musica alternativa")
+    [/\bmusica\s+alternativa\b/g, 'alternative'],
+    [/\brock\s+y\s+alternativo\b/g, 'rock alternative'],
+    [/\b(?:alternativ|alternatif|alternativa|alternativo)\b/g, 'alternative'],
+    // European localized "Electronic" (DE "Elektronisch", FR "Electronique", ES/IT "Electronica", PT/BR "Eletronica", SE "Elektronisk")
+    [/\bmusique\s+electronique\b/g, 'electronic'],
+    [/\b(?:elektronisch|elektronisk|electronique|eletronica)\b/g, 'electronic'],
+    // European localized Hostile Genres (Classical, Children, Comedy, Holiday, Christian, Soundtrack)
+    [/\b(?:klassisk|klassik|classique|clasica|classica)\b/g, 'classical'],
+    [/\b(?:barnmusik|barnemusikk|kindermusik|musique\s+pour\s+enfants|musica\s+infantil)\b/g, 'children'],
+    [/\b(?:komedi|komodie|humour|comedia)\b/g, 'comedy'],
+    [/\b(?:julmusik|weihnachtsmusik|noel|navidad)\b/g, 'holiday'],
+    [/\b(?:kristen|christlich|chretien|cristiana|religioso)\b/g, 'christian'],
+    [/\b(?:filmmusik|bande\s+originale|banda\s+sonora|colonna\s+sonora|trilha\s+sonora)\b/g, 'soundtrack'],
+];
+const normalizeGenreText = (g) => {
+    let text = String(g || '');
+    if (!text)
+        return '';
+    for (const [pattern, replacement] of NON_LATIN_APPLE_GENRE_REPLACEMENTS) {
+        text = text.replace(pattern, replacement);
+    }
+    text = text
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .replace(/ø/g, 'o')
+        .replace(/æ/g, 'ae')
+        .replace(/ß/g, 'ss')
+        .replace(/œ/g, 'oe')
+        .replace(/[^a-z0-9 ]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+    if (!text)
+        return '';
+    for (const [pattern, replacement] of LOCALIZED_LATIN_APPLE_GENRE_REPLACEMENTS) {
+        text = text.replace(pattern, replacement);
+    }
+    return text.replace(/\s+/g, ' ').trim();
+};
+exports.normalizeGenreText = normalizeGenreText;
 const APPLE_ELECTRONIC_HARDCORE_ZCENE_TERMS = [
     'gabber', 'happy hardcore', 'hardcore techno', 'uk hardcore', 'hardstyle', 'rave',
     'electronic', 'dance', 'techno', 'edm', 'drum and bass', 'jungle', 'trance', 'house',
@@ -2898,7 +2971,7 @@ const ZCENE_UMBRELLA_CROSSOVER_TOKENS = [
  * crossover token is present). Strictly blocks bare Apple Electronic "Hardcore" (ID 1050).
  */
 const isCatalogCorroboratedNonHostileGenre = (itunesGenreRaw, zceneGenreRaw) => {
-    const itunesGenre = normalizeGenreText(itunesGenreRaw);
+    const itunesGenre = (0, exports.normalizeGenreText)(itunesGenreRaw);
     if (!itunesGenre || itunesGenre === 'undefined')
         return false;
     if ((0, exports.isAppleElectronicHardcoreGenre)(itunesGenre))
@@ -2910,7 +2983,7 @@ const isCatalogCorroboratedNonHostileGenre = (itunesGenreRaw, zceneGenreRaw) => 
     if (!isAppleUmbrella)
         return false;
     if (zceneGenreRaw !== undefined) {
-        const zceneGenre = normalizeGenreText(zceneGenreRaw);
+        const zceneGenre = (0, exports.normalizeGenreText)(zceneGenreRaw);
         if (!zceneGenre || zceneGenre === 'unknown')
             return false;
         const hasIncompatibleFamily = INCOMPATIBLE_NON_UMBRELLA_ZCENE_GENRE_TOKENS.some((token) => containsWord(zceneGenre, token));
@@ -2930,7 +3003,7 @@ exports.isCatalogCorroboratedNonHostileGenre = isCatalogCorroboratedNonHostileGe
  * as "Punk", "Rock", "Alternative", or "Metal" — never bare "Hardcore".
  */
 const isAppleElectronicHardcoreGenre = (itunesGenreRaw) => {
-    return normalizeGenreText(itunesGenreRaw) === 'hardcore';
+    return (0, exports.normalizeGenreText)(itunesGenreRaw) === 'hardcore';
 };
 exports.isAppleElectronicHardcoreGenre = isAppleElectronicHardcoreGenre;
 const matchesAppleElectronicHardcore = (zceneGenreNorm) => {
@@ -2942,8 +3015,8 @@ const matchesAppleElectronicHardcore = (zceneGenreNorm) => {
     return APPLE_ELECTRONIC_HARDCORE_ZCENE_TERMS.some(term => containsWord(zceneGenreNorm, term));
 };
 const evaluateGenreMatch = (itunesGenreRaw, zceneGenreRaw, summaryRaw) => {
-    const itunesGenre = normalizeGenreText(itunesGenreRaw);
-    const zceneGenre = normalizeGenreText(zceneGenreRaw);
+    const itunesGenre = (0, exports.normalizeGenreText)(itunesGenreRaw);
+    const zceneGenre = (0, exports.normalizeGenreText)(zceneGenreRaw);
     if (!itunesGenre)
         return false;
     // V47.9: Apple bare "Hardcore" is strictly Electronic/Dance/Gabber (never Punk/Metal/Rock/Rap)
@@ -2967,7 +3040,7 @@ const evaluateGenreMatch = (itunesGenreRaw, zceneGenreRaw, summaryRaw) => {
     }
     // 3. Summary fallback match using whole-word boundaries
     if (summaryRaw) {
-        const summaryNorm = normalizeGenreText(summaryRaw);
+        const summaryNorm = (0, exports.normalizeGenreText)(summaryRaw);
         const summaryMatch = itunesWords.some(w => containsWord(summaryNorm, w));
         if (summaryMatch)
             return true;
@@ -2976,8 +3049,8 @@ const evaluateGenreMatch = (itunesGenreRaw, zceneGenreRaw, summaryRaw) => {
 };
 exports.evaluateGenreMatch = evaluateGenreMatch;
 const evaluateGenreDistanceScore = (itunesGenreRaw, zceneGenreRaw, summaryRaw) => {
-    const itunesGenre = normalizeGenreText(itunesGenreRaw);
-    const zceneGenre = normalizeGenreText(zceneGenreRaw);
+    const itunesGenre = (0, exports.normalizeGenreText)(itunesGenreRaw);
+    const zceneGenre = (0, exports.normalizeGenreText)(zceneGenreRaw);
     if (!itunesGenre)
         return 0;
     // V47.9: Apple bare "Hardcore" is strictly Electronic/Dance/Gabber (never Punk/Metal/Rock/Rap)
@@ -3008,7 +3081,7 @@ const evaluateGenreDistanceScore = (itunesGenreRaw, zceneGenreRaw, summaryRaw) =
     }
     // 4. Summary fallback
     if (summaryRaw) {
-        const summaryNorm = normalizeGenreText(summaryRaw);
+        const summaryNorm = (0, exports.normalizeGenreText)(summaryRaw);
         const summaryMatch = itunesWords.some(w => containsWord(summaryNorm, w));
         if (summaryMatch)
             return 2;
@@ -3169,7 +3242,7 @@ const resolveItunesCanonicalArtistNameBackend = async (artistName, genre, origin
     for (const storefront of storefrontsToTry) {
         if (deadline - Date.now() <= 100)
             break;
-        const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}` : '';
+        const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}&lang=en_us` : '';
         const primaryUrl = `https://itunes.apple.com/search?term=${encodeURIComponent(cleanName)}&entity=musicArtist&limit=15${countryParam}`;
         const data = await fetchFrontDoorJson(primaryUrl);
         const results = Array.isArray(data?.results) ? data.results : [];
@@ -3456,7 +3529,7 @@ const fetchArtistCollections = async (artistId, countryIso, context) => {
     const storefrontsToTry = normIso && normIso !== 'us' ? [normIso.toUpperCase(), undefined] : [undefined];
     for (const storefront of storefrontsToTry) {
         try {
-            const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}` : '';
+            const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}&lang=en_us` : '';
             const lookupUrl = `https://itunes.apple.com/lookup?id=${artistId}&entity=album&limit=200${countryParam}`;
             const data = await fetchItunesJsonWithRetry(lookupUrl, 4000);
             if (data) {
@@ -3747,7 +3820,7 @@ const verifyCandidateDiscography = async (candidate, cleanArtistName, discograph
         return { candidate, matchCount: 0, matchedTitles: [], bestArtwork: null, albums: [] };
     }
     try {
-        const countryParam = storefrontCountry ? `&country=${encodeURIComponent(storefrontCountry)}` : '';
+        const countryParam = storefrontCountry ? `&country=${encodeURIComponent(storefrontCountry)}&lang=en_us` : '';
         const lookupUrl = `https://itunes.apple.com/lookup?id=${candidate.artistId}&entity=album&limit=200${countryParam}`;
         const data = await fetchItunesJsonWithRetry(lookupUrl, 4000);
         if (data) {
@@ -3832,7 +3905,7 @@ const scrapeImageUrlBackend = async (artistName, type, genre, summary, origin, d
     const requiresCatalogCorroboration = qualifyingDiscography.length > 0;
     const storefrontsToTry = resolvedIso && resolvedIso !== 'us' ? [resolvedIso.toUpperCase(), undefined] : [undefined];
     for (const storefront of storefrontsToTry) {
-        const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}` : '';
+        const countryParam = storefront ? `&country=${encodeURIComponent(storefront)}&lang=en_us` : '';
         const storefrontLabel = storefront || 'US(default)';
         // --- Tier 1: Base Query & Strict Taxonomy Match ---
         let baseExactMatches = [];

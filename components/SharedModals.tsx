@@ -2337,8 +2337,16 @@ export function ConsolidatedValidationModal({
         setLocalSeeds(prev => prev.map(s => {
           if (getSeedKey(s) === targetKey) {
             const hasCollision = !!(data.hasCollision && Array.isArray(data.candidates) && data.candidates.length > 1);
+            const hasNameChange = Boolean(
+              data.id && data.id.trim().toLowerCase() !== seedQuery.trim().toLowerCase()
+            );
+            const canonicalCaseName =
+              data.id && data.id.trim() && data.id.trim() !== seedQuery
+                ? data.id.trim()
+                : s.query;
             return {
               ...s,
+              query: !hasNameChange && canonicalCaseName ? canonicalCaseName : s.query,
               predictedOrigin: data.origin || customOrigin.trim(),
               genre: data.genre || customGenre.trim() || '',
               isKnownCacheHit: false, // force fresh pipeline routing
@@ -2348,8 +2356,8 @@ export function ConsolidatedValidationModal({
               selectedCandidateId: hasCollision ? data.candidates[0].id : undefined,
               candidateId: data.candidates && data.candidates.length === 1 ? data.candidates[0].id : undefined,
               isCorrected: true,
-              correctedQuery: (data.id && data.id !== seedQuery) ? data.id : s.correctedQuery,
-              originalQuery: (data.id && data.id !== seedQuery) ? (s.originalQuery || s.query) : s.originalQuery
+              correctedQuery: hasNameChange ? data.id.trim() : s.correctedQuery,
+              originalQuery: hasNameChange ? (s.originalQuery || s.query) : s.originalQuery
             };
           }
           return s;
@@ -2379,23 +2387,33 @@ export function ConsolidatedValidationModal({
         Specify the intended regional origin or country for <strong>{seed.query}</strong>:
       </p>
       <div className="flex gap-2">
-        <input
-          type="text"
-          autoFocus
-          disabled={isVerifying}
-          value={customOrigin}
-          onChange={e => setCustomOrigin(e.target.value)}
-          placeholder="Country or region (required, e.g. Thailand)"
-          className="flex-1 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
-        />
-        <input
-          type="text"
-          disabled={isVerifying}
-          value={customGenre}
-          onChange={e => setCustomGenre(e.target.value)}
-          placeholder="Genre (optional)"
-          className="w-36 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
-        />
+        <div className="flex-1 flex flex-col gap-1">
+          <label className="text-[10px] text-zinc-400 font-medium tracking-wide">
+            Origin / Country
+          </label>
+          <input
+            type="text"
+            autoFocus
+            disabled={isVerifying}
+            value={customOrigin}
+            onChange={e => setCustomOrigin(e.target.value)}
+            placeholder="Country or region (required, e.g. Thailand)"
+            className="w-full bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+          />
+        </div>
+        <div className="w-36 flex flex-col gap-1">
+          <label className="text-[10px] text-zinc-400 font-medium tracking-wide">
+            Genre (optional)
+          </label>
+          <input
+            type="text"
+            disabled={isVerifying}
+            value={customGenre}
+            onChange={e => setCustomGenre(e.target.value)}
+            placeholder="Genre (optional)"
+            className="w-36 bg-zinc-900 border border-zinc-700 rounded-lg px-2.5 py-1 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500 disabled:opacity-50"
+          />
+        </div>
       </div>
 
       {verificationError && (
@@ -2528,9 +2546,16 @@ export function ConsolidatedValidationModal({
                       )}
                       <div className="flex flex-col gap-3 p-3.5 bg-amber-950/20 border border-amber-500/40 rounded-xl">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="text-white font-medium text-base truncate">
-                            {seed.query}
-                          </span>
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-white font-medium text-base truncate">
+                              {seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
+                            </span>
+                            {seed.isCorrected && seed.originalQuery && (
+                              <span className="text-[10px] text-amber-500/80 font-medium truncate mt-0.5">
+                                Auto-corrected from "{seed.originalQuery}"
+                              </span>
+                            )}
+                          </div>
                           <span className="text-[10px] uppercase tracking-wider text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">
                             COLLISION DETECTED
                           </span>

@@ -118,8 +118,8 @@ export const ARCHITECTURE_RULES = [
     },
     { 
         id: 17, 
-        title: "Universal Pre-Flight Stub Minting & Single Source of Truth Seed-Identity Lock", 
-        desc: "Pre-flight alias resolution MUST synchronously mint evolved stubs (_isStub: true, isAmbiguous: boolean, candidates: []) to Firestore before background job creation. Single-artist bare router stubs are keyed strictly by the target doc's ISO-stripped bare slug (or validated canonical name) in validateSeedOriginCallable, resolveSceneTopologyBackend, and Step 6 so typos ('the-rocking-horse-winer') and dropped articles ('rocking-horse-winner', 'murder-city-devils') never mint orphan/typo stub docs in /artists or leak back into Column 2. Once Box 4 confirms a seed's locked { id-iso, bareId, name, origin, genre } (and prunes superseded pre-correction keys while syncing draft scene titles), Column 2 (hasLockedPreFlightIdentity) and Column 3 Phase 1/2 (hasLockedWorkerSeedIdentity) act strictly as consumers, bypassing redundant Flash re-validation calls (1 Flash validation call per cold seed instead of 3) and eliminating split-brain slug overwrites. Stubs MUST ONLY be minted from verified Flash/iTunes candidate payloads or verified cache hits; minting stubs directly from unverified raw user strings is strictly prohibited." 
+        title: "Read-Only Pre-Flight, Post-Confirmation Router-Stub Minting & Seed-Identity Lock", 
+        desc: "Pre-flight validation (validateSeedOriginCallable) is strictly read-only on /artists (merging any existing cached collision candidates in memory without writing speculative stubs prior to Box 4 confirmation), eliminating orphan stubs on Cancel or Escape Hatch and keeping post-canonicalization Direct Hit checks pure. Once Box 4 confirms a seed's locked { id-iso, bareId, name, origin, genre } (and prunes superseded pre-correction keys while syncing draft scene titles), bare router stubs (_isStub: true, isAmbiguous: boolean, candidates: []) are synchronously minted in Column 2 (resolveSceneTopologyBackend) and Column 3 (processCurationJob Phase 2 & Step 6) keyed strictly by the target doc's ISO-stripped bare slug (canonicalBareId) so typos ('the-rocking-horse-winer') and dropped articles ('rocking-horse-winner', 'murder-city-devils') never mint orphan/typo stub docs in /artists or leak back into Column 2. Column 2 (hasLockedPreFlightIdentity) and Column 3 Phase 1/2 (hasLockedWorkerSeedIdentity) act strictly as consumers, bypassing redundant Flash re-validation calls (1 Flash validation call per cold seed instead of 3), while normalizeProjectScene and getAllProjectSeedIds preserve canonical id-iso seedIds and seedArtistIds across + Add Scene and multi-scene forks. Stubs MUST ONLY be minted from verified Flash/iTunes candidate payloads or verified cache hits; minting stubs directly from unverified raw user strings is strictly prohibited." 
     },
     { 
         id: 18, 
@@ -297,7 +297,7 @@ const DiscoveryFlowDiagram: React.FC = () => (
                                 <span className="text-primary font-medium">3. Token Spend & Top-Up Gate ([Rules 18, 43, 45]):</span> <code>&lt;TokenConfirmationDialog&gt;</code> intercepts every curation (<code>5T–50T</code> dynamic batch sum + bundled <code>1T</code> pre-flight fee via <code>bundledSeedsLabel</code> across all uncached scenes; <code>3T</code> Deep Connections 3-message account pass; prompts <code>&lt;SimulatedStripeModal&gt;</code> <code>£5/£10/£15</code> if low balance). On "Confirm &amp; Spend", transitions immediately (0ms cross-fade, keeping mobile on ROOTS) into Box 4 <code>&lt;ConsolidatedValidationModal&gt;</code> with inline <code>isVerifyingOrigin</code> loading while Flash 3.6 runs in background.
                             </li>
                             <li>
-                                <span className="text-primary font-medium">Flash 3.6 Collision Detection &amp; $0.00 Front-Door iTunes Authority (-1T Pre-Flight):</span> Calls <code>validateSeedOriginCallable</code> (<code>thinking_level: minimal</code>, Zero Search Grounding) paired with <code>resolveItunesCanonicalArtistNameBackend</code> (<code>1500ms</code> fail-open timeout, gated on <code>!isAmbiguous &amp;&amp; !originHint &amp;&amp; !genreHint</code> with Pass 1 exact-match priority over Pass 2 optional leading <code>"The "</code>). Deducts non-refundable <code>1T</code> lookup fee once per uncached batch, snaps unambiguous artists to Apple Music's canonical billing (<code>"The Murder City Devils"</code>, <code>"At the Drive-In"</code>), and mints Evolved Stubs. Runs concurrently inside Box 4 with <code>validationRunIdRef</code> cancellation guard.
+                                <span className="text-primary font-medium">Flash 3.6 Collision Detection &amp; $0.00 Front-Door iTunes Authority (-1T Read-Only Pre-Flight):</span> Calls <code>validateSeedOriginCallable</code> (<code>thinking_level: minimal</code>, Zero Search Grounding, strictly read-only on <code>/artists</code>) paired with <code>resolveItunesCanonicalArtistNameBackend</code> (<code>1500ms</code> fail-open timeout, gated on <code>!isAmbiguous &amp;&amp; !originHint &amp;&amp; !genreHint</code> with Pass 1 exact-match priority over Pass 2 optional leading <code>"The "</code>). Deducts non-refundable <code>1T</code> lookup fee once per uncached batch, snaps unambiguous artists to Apple Music's canonical billing (<code>"The Murder City Devils"</code>, <code>"At the Drive-In"</code>), and forces <code>correctedInput = false</code> on case-only matches (<code>"void"</code> &rarr; <code>"Void"</code>). Runs concurrently inside Box 4 with <code>validationRunIdRef</code> cancellation guard.
                             </li>
                             <li>
                                 <span className="text-primary font-medium">4. Confirm Your Artists &amp; Inline Origin Verification ([Rules 11, 17, 20, 38, 45]):</span> <code>&lt;ConsolidatedValidationModal&gt;</code> presents inline micro-spinners for verifying roots, transitioning dynamically to verified cards, Pass 1 canonical band-name, typo &amp; official leading <code>"The "</code> auto-correction (<code>correctedInput: true</code> / <code>isCorrected: true</code>, restoring omitted official <code>"The "</code> while preserving non-<code>"The "</code> acts, keying single-artist router stubs strictly by canonical bare slug, pruning superseded pre-correction keys &amp; syncing draft scene titles upon confirmation, and promoting post-canonicalization cached Root hits to <code>isTopologyHit: true</code> for instant <code>-4T</code> remainder Direct Hit settlement), multi-scene duration estimate (<code>~3*K–5*K minutes (~3–5 mins per scene)</code>), disambiguation radio, or Escape Hatch (<code>-1T</code> per re-query). "Confirm &amp; Generate" button stays disabled until verification finishes.
@@ -809,7 +809,7 @@ const RunbookAccordion: React.FC = () => {
             >
                 <div className="flex items-center gap-3 text-zinc-200 font-medium text-sm uppercase tracking-wider">
                     <Terminal className="w-4 h-4 text-primary" />
-                    V47.18 Full-Stack Regression Runbook
+                    V47.19 Full-Stack Regression Runbook
                 </div>
                 {isOpen ? <ChevronDown className="w-4 h-4 text-zinc-400" /> : <ChevronRight className="w-4 h-4 text-zinc-400" />}
             </button>
@@ -965,7 +965,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                         ))}
                     </nav>
                     <div className="mt-8 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono pl-2">
-                        Zcene V47.18 Blueprint<br/>
+                        Zcene V47.19 Blueprint<br/>
                         100% Anti-Regression
                     </div>
                 </aside>
@@ -979,7 +979,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
                             <h1 className="text-2xl sm:text-3xl font-medium text-white">Engine</h1>
-                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.18 Locked</span>
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-primary/20 text-primary border border-primary/40">V47.19 Locked</span>
                         </div>
                         <p className="text-zinc-400 leading-relaxed text-xs sm:text-sm max-w-3xl">
                             Visual mirror and execution interface for the Zcene curation pipeline. Defines behavioral laws, state orchestration, anti-pollution boundaries, and regression-proof contracts.
@@ -1069,7 +1069,7 @@ LOCKED SEMANTIC TOPOLOGY & ZERO READ-ONLY WRITES (Rule 21):
             <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
                 <div className="container mx-auto text-center">
                     <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.18 Programmatic Architecture.</p>
+                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.19 Programmatic Architecture.</p>
                 </div>
             </footer>
         </div>

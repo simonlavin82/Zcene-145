@@ -677,62 +677,44 @@ export const validateSeedOriginCallable = onCall({
     }
   }
 
-  // V11.6 Fix 2 / V47.13 / V47.18: Programmatically enforce correctedInput for single-artist canonical name / typo / article normalization
-  if (
-    validationResult.isValid &&
-    !validationResult.hasCollision &&
-    String(seed).trim().toLowerCase() !== String(validationResult.id || "").trim().toLowerCase()
-  ) {
+  // V11.6 Fix 2 / V47.13 / V47.18 / V47.19: Programmatically enforce correctedInput:
+  // - Case-insensitive matches ("void" -> "Void", "The hives" -> "The Hives") or invalid results force correctedInput = false
+  // - Single-artist canonical name / typo / article normalizations force correctedInput = true
+  // - Colliding typos ("nrvana" -> "Nirvana", hasCollision: true) preserve Flash's correctedInput: true
+  const isCaseInsensitiveMatch =
+    String(seed).trim().toLowerCase() === String(validationResult.id || "").trim().toLowerCase();
+  if (!validationResult.isValid || isCaseInsensitiveMatch) {
+    validationResult.correctedInput = false;
+  } else if (!validationResult.hasCollision && Boolean(String(validationResult.id || "").trim())) {
     validationResult.correctedInput = true;
     console.log(`[validateSeedOriginCallable] Canonical normalization applied: "${seed}" → "${validationResult.id}"`);
   }
 
-  // Synchronously mint evolved stub in artists collection (Pre-Flight Gateway)
-  // Gated: If an Escape Hatch hint is provided (originHint or genreHint), do NOT mint premature stubs before human confirms in Node 4.
-  if (!isEscapeHatchQuery) {
+  // V47.19 Read-Only Pre-Flight Gateway:
+  // Never write speculative router stubs to /artists during pre-flight before the user confirms in Box 4
+  // (preventing orphan stubs on Cancel/Escape Hatch and keeping post-canonicalization Direct Hit checks pure).
+  // If an ambiguous router stub already exists in /artists from prior confirmed curations, merge its cached
+  // candidates in-memory so the radio disambiguation card surfaces all known homonyms.
+  if (!isEscapeHatchQuery && isAmbiguous) {
     try {
       const candidates = validationResult.candidates || [];
-      // V47.13 / V47.18: Key single-artist bare router stubs strictly by the target doc's ISO-stripped bare slug
-      // (or validated canonical name) so typos and dropped articles never mint orphan stub docs in /artists.
-      const singleTargetId = !isAmbiguous && candidates.length === 1 ? candidates[0].id : null;
-      const singleTargetIso = singleTargetId ? extractTrailingCountryIso(singleTargetId) : null;
-      const bareNormId = singleTargetId && singleTargetIso
-        ? (stripIsoCountrySlug(singleTargetId, singleTargetIso) || normalizeArtistId(validationResult.id || seed))
-        : normalizeArtistId(!isAmbiguous && validationResult.id ? validationResult.id : seed);
+      const bareNormId = normalizeArtistId(seed);
       const stubDocRef = db.collection("artists").doc(bareNormId);
-
-      if (isAmbiguous) {
-        const existingSnap = await stubDocRef.get();
-        const existingCandidates: any[] = existingSnap.exists && Array.isArray(existingSnap.data()?.candidates)
-          ? existingSnap.data()!.candidates
-          : [];
+      const existingSnap = await stubDocRef.get();
+      const existingCandidates: any[] = existingSnap.exists && Array.isArray(existingSnap.data()?.candidates)
+        ? existingSnap.data()!.candidates
+        : [];
+      if (existingCandidates.length > 0) {
         const mergedCandidates = [...candidates];
         for (const prev of existingCandidates) {
           if (prev?.id && !mergedCandidates.some((c: any) => c?.id === prev.id)) {
             mergedCandidates.push(prev);
           }
         }
-        await stubDocRef.set({
-          _isStub: true,
-          isAmbiguous: true,
-          redirectTo: null,
-          artistId: bareNormId,
-          cacheKey: bareNormId,
-          candidates: mergedCandidates,
-          cachedAt: FieldValue.serverTimestamp()
-        }, { merge: true });
-        console.log(`[validateSeedOriginCallable] Minted evolved ambiguous stub for "${bareNormId}" with ${mergedCandidates.length} candidates`);
-      } else if (candidates.length === 1 && candidates[0].id !== bareNormId) {
-        await upsertBareRouterStub(db, bareNormId, candidates[0].id, {
-          name: candidates[0].name || validationResult.id || seed,
-          origin: candidates[0].origin || validationResult.origin,
-          genre: candidates[0].genre || validationResult.genre,
-          disambiguationSnippet: candidates[0].disambiguationSnippet,
-          candidates,
-        });
+        validationResult.candidates = mergedCandidates;
       }
-    } catch (stubErr) {
-      console.warn(`[validateSeedOriginCallable] Failed to synchronously mint stub for "${seed}":`, stubErr);
+    } catch (stubReadErr) {
+      console.warn(`[validateSeedOriginCallable] Non-fatal cached candidate read warning for "${seed}":`, stubReadErr);
     }
   }
 

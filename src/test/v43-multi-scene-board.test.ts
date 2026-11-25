@@ -44,6 +44,8 @@ import {
   SCENE_MULTI_SEED_MAX_DX,
   SCENE_MULTI_SEED_CENTROID_MAX_D,
   isCanonicalSeedMatch,
+  getAllProjectSeedIds,
+  computeSceneSetSignature,
 } from '../../shared/multiSceneUtils';
 import { normalizeArtistId, normalizeLabelId, normalizeGraphData, stripCountrySlug, stripLeadingTheFromSlug, cleanArtistDisplayName, isNodeInSeedList, getProjectDisplayTitle, getEntityDocWithRedirect } from '../../services/artistCacheService';
 import { TOKEN_PRICING, computeBaseProjectTokenCost } from '../../shared/tokenEconomy';
@@ -1316,10 +1318,10 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(canvasLayout.some(c => c.nodeId === 'scene-1::founded-1991')).toBe(true);
     });
 
-    it('verifies V47.18 Runbook Protocol specifies schemaVersion: 43 backward compatibility with 0 database purge required', () => {
-      expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V47.18 Regression Suite (Full-Stack)');
+    it('verifies V47.19 Runbook Protocol specifies schemaVersion: 43 backward compatibility with 0 database purge required', () => {
+      expect(BACKEND_REGRESSION_RUNBOOK).toContain('# V47.19 Regression Suite (Full-Stack)');
       expect(BACKEND_REGRESSION_RUNBOOK).toContain('schemaVersion: 43');
-      expect(BACKEND_REGRESSION_RUNBOOK).toContain('Zero database purge is required for V47.18 operations');
+      expect(BACKEND_REGRESSION_RUNBOOK).toContain('Zero database purge is required for V47.19 operations');
     });
 
     it('verifies ARCHITECTURE_RULES contains all 48 contiguous laws with Rule 22 as Deep Cloning Isolation', () => {
@@ -5391,6 +5393,101 @@ describe('V43 Multi-Scene Infinite Board & Layered Zine Architecture ([Rule 44])
       expect(updatedScene.name).toBe('The Murder City Devils');
       expect(updatedScene.seedArtists).toBe('The Murder City Devils');
       expect(updatedScene.seedIds).toEqual(['the-murder-city-devils-us']);
+    });
+
+    it('V47.19 Canonical seedIds / seedArtistIds -iso Self-Heal & Multi-Scene Fork Preservation across single-root, multi-root, and uncurated scenes with computeSceneSetSignature invariance', () => {
+      // 1. Single-root curated scene with degraded bare seedIds ["the-murder-city-devils"] self-heals to ["the-murder-city-devils-us"]
+      const degradedScene1 = {
+        id: 'scene-1',
+        sceneId: 'scene-1',
+        sceneIndex: 0,
+        title: 'The Murder City Devils',
+        seedArtists: 'The Murder City Devils',
+        curatedSeedArtists: 'The Murder City Devils',
+        seedIds: ['the-murder-city-devils'],
+        seedArtistIds: ['the-murder-city-devils'],
+        graphData: {
+          nodes: [
+            { id: 'the-murder-city-devils-us', label: 'The Murder City Devils', type: 'artist', group: 1, isSeed: true },
+            { id: 'at-the-drive-in-us', label: 'At the Drive-In', type: 'artist', group: 2, isSeed: false },
+          ],
+          links: [],
+        },
+      };
+      const healedScene1 = normalizeProjectScene(degradedScene1, 0);
+      expect(healedScene1.seedIds).toEqual(['the-murder-city-devils-us']);
+      expect(healedScene1.seedArtistIds).toEqual(['the-murder-city-devils-us']);
+
+      // 2. Multi-root curated scene (2–5 seeds) prefers isSeed || isSceneSeed root nodes slot-by-slot
+      const multiRootScene = normalizeProjectScene(
+        {
+          id: 'scene-2',
+          sceneId: 'scene-2',
+          sceneIndex: 1,
+          title: 'The Hives, The Hellacopters',
+          seedArtists: 'The Hives::The Hellacopters',
+          curatedSeedArtists: 'The Hives::The Hellacopters',
+          seedIds: ['the-hives', 'the-hellacopters'],
+          seedArtistIds: ['the-hives', 'the-hellacopters'],
+          graphData: {
+            nodes: [
+              { id: 'the-hives-se', label: 'The Hives', type: 'artist', group: 1, isSeed: true },
+              { id: 'the-hellacopters-se', label: 'The Hellacopters', type: 'artist', group: 1, isSceneSeed: true },
+              { id: 'refused-se', label: 'Refused', type: 'artist', group: 2, isSeed: false },
+            ],
+            links: [],
+          },
+        },
+        1
+      );
+      expect(multiRootScene.seedIds).toEqual(['the-hives-se', 'the-hellacopters-se']);
+      expect(multiRootScene.seedArtistIds).toEqual(['the-hives-se', 'the-hellacopters-se']);
+
+      // 3. Uncurated draft scene (graphData.nodes empty) keeps its draft seedIds untouched
+      const uncuratedScene = normalizeProjectScene(
+        {
+          id: 'scene-3',
+          sceneId: 'scene-3',
+          sceneIndex: 2,
+          seedArtists: 'Void',
+          seedIds: ['void'],
+          graphData: { nodes: [], links: [] },
+        },
+        2
+      );
+      expect(uncuratedScene.seedIds).toEqual(['void']);
+
+      // 4. Forked 2-scene project top-level seedArtistIds retains canonical -iso slugs across all curated scenes
+      const scene2Single = normalizeProjectScene(
+        {
+          id: 'scene-2',
+          sceneId: 'scene-2',
+          sceneIndex: 1,
+          title: 'The Hives',
+          seedArtists: 'The Hives',
+          curatedSeedArtists: 'The Hives',
+          seedIds: ['the-hives-se'],
+          seedArtistIds: ['the-hives-se'],
+          graphData: {
+            nodes: [{ id: 'the-hives-se', label: 'The Hives', type: 'artist', group: 1, isSeed: true }],
+            links: [],
+          },
+        },
+        1
+      );
+      expect(getAllProjectSeedIds([degradedScene1 as any, scene2Single])).toEqual([
+        'the-murder-city-devils-us',
+        'the-hives-se',
+      ]);
+
+      // 5. computeSceneSetSignature is 100% invariant between bare and self-healed seedIds (protecting existing overarchingHistory archives)
+      const sigBeforeHeal = computeSceneSetSignature([
+        { ...degradedScene1, seedIds: ['the-murder-city-devils'] },
+        scene2Single,
+      ]);
+      const sigAfterHeal = computeSceneSetSignature([healedScene1, scene2Single]);
+      expect(sigAfterHeal).toBe(sigBeforeHeal);
+      expect(sigAfterHeal).toBe('the-hives+the-murder-city-devils');
     });
   });
 });
