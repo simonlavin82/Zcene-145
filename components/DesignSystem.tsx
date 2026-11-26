@@ -4485,6 +4485,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">edit</span>
                                                 Rename
                                             </div>
+                                            <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5 whitespace-nowrap">
+                                                <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">visibility_off</span>
+                                                Dim on Canvas
+                                            </div>
                                             <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-500 opacity-40 rounded-lg flex items-center gap-2.5 whitespace-nowrap">
                                                 <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">arrow_back</span>
                                                 Move Left

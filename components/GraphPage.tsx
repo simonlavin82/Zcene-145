@@ -1424,6 +1424,47 @@ const GraphPage: React.FC<GraphPageProps> = ({
       recommended: true,
   });
   const [searchQuery, setSearchQuery] = useState('');
+  const [dimmedSceneIds, setDimmedSceneIds] = useState<string[]>([]);
+  const dimmedSceneIdSet = useMemo(() => new Set(dimmedSceneIds), [dimmedSceneIds]);
+
+  const boardIdentityKey = useMemo(
+    () => projectId || `share::${projectName}::${scenes.map(s => s.seedArtists || '').join('|')}`,
+    [projectId, projectName, scenes]
+  );
+
+  useEffect(() => {
+    setDimmedSceneIds([]);
+  }, [boardIdentityKey]);
+
+  useEffect(() => {
+    const curatedIds = new Set(
+      scenes
+        .filter(s => (s.graphData?.nodes?.length ?? 0) > 0)
+        .map((s, i) => s.sceneId || s.id || `scene-${i + 1}`)
+    );
+    setDimmedSceneIds(prev => {
+      if (prev.length === 0) return prev;
+      if (curatedIds.size < 2) return [];
+      const filtered = prev.filter(id => curatedIds.has(id));
+      if (filtered.length >= curatedIds.size) return [];
+      return filtered.length === prev.length ? prev : filtered;
+    });
+  }, [scenes]);
+
+  const toggleDimScene = useCallback((targetSceneKey: string) => {
+    const curatedKeys = scenes
+      .filter(s => (s.graphData?.nodes?.length ?? 0) > 0)
+      .map((s, i) => s.sceneId || s.id || `scene-${i + 1}`);
+    if (curatedKeys.length < 2 || !curatedKeys.includes(targetSceneKey)) return;
+    setDimmedSceneIds(prev => {
+      if (prev.includes(targetSceneKey)) {
+        return prev.filter(id => id !== targetSceneKey);
+      }
+      const visibleCount = curatedKeys.filter(k => !prev.includes(k)).length;
+      if (visibleCount <= 1) return prev;
+      return [...prev, targetSceneKey];
+    });
+  }, [scenes]);
 
   const [readNodeIds, setReadNodeIds] = useState<Set<string>>(new Set());
 
@@ -2424,13 +2465,22 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 </div>
                 {scenes.length > 0 && (
                   <div className={`flex flex-wrap gap-1.5 relative ${activeSceneMenuId ? 'z-[70]' : ''}`} role="tablist" aria-label="Project Scenes">
-                    {scenes.map((scene, idx) => {
+                    {(() => {
+                      const curatedSceneKeys = scenes
+                        .filter(s => (s.graphData?.nodes?.length ?? 0) > 0)
+                        .map((s, i) => s.sceneId || s.id || `scene-${i + 1}`);
+                      const curatedScenesCount = curatedSceneKeys.length;
+                      const visibleCuratedCount = curatedSceneKeys.filter(k => !dimmedSceneIdSet.has(k)).length;
+
+                      return scenes.map((scene, idx) => {
                       const sceneKey = scene.sceneId || scene.id || `scene-${idx + 1}`;
                       const activeSceneKey = activeScene?.sceneId || activeScene?.id || activeSceneId;
                       const isCurrent = sceneKey === activeSceneKey;
                       const seedCount = toSeedArtistsArray(scene.seedArtists).length;
                       const isMenuOpen = activeSceneMenuId === sceneKey;
                       const displayName = scene.customName || `Scene ${idx + 1}`;
+                      const isCurrentMapped = (scene.graphData?.nodes?.length ?? 0) > 0;
+                      const isSceneDimmed = isCurrentMapped && dimmedSceneIdSet.has(sceneKey);
 
                       return (
                         <div
@@ -2438,26 +2488,47 @@ const GraphPage: React.FC<GraphPageProps> = ({
                           role="tab"
                           aria-selected={isCurrent}
                           data-testid={`scene-pill-${sceneKey}`}
+                          data-dimmed={isSceneDimmed ? 'true' : 'false'}
                           onClick={() => {
                             onSelectScene?.(sceneKey);
-                            const isMapped = (scene.graphData?.nodes?.length ?? 0) > 0;
-                            if (isMapped) {
+                            if (isCurrentMapped) {
                               setFocusedSceneCluster({ sceneId: sceneKey, timestamp: Date.now() });
                             }
                           }}
                           className={`relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium transition-all cursor-pointer select-none ${
                             isMenuOpen ? 'z-[70]' : ''
                           } ${
-                            isCurrent
-                              ? 'bg-zinc-800 text-primary border border-zinc-700 ring-1 ring-primary/30 shadow-sm'
-                              : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:border-zinc-700'
+                            isSceneDimmed
+                              ? isCurrent
+                                ? 'bg-zinc-800/70 text-primary/70 border border-dashed border-zinc-700/80 ring-1 ring-primary/20 shadow-sm'
+                                : 'bg-zinc-950/60 text-zinc-500 border border-dashed border-zinc-800 hover:text-zinc-300 hover:border-zinc-700'
+                              : isCurrent
+                                ? 'bg-zinc-800 text-primary border border-zinc-700 ring-1 ring-primary/30 shadow-sm'
+                                : 'bg-zinc-950 text-zinc-400 border border-zinc-800 hover:text-zinc-200 hover:border-zinc-700'
                           }`}
                         >
-                          <span>{displayName}</span>
+                          <span className={isSceneDimmed ? 'opacity-70' : ''}>{displayName}</span>
                           {seedCount > 0 && (
-                            <span className={`text-[10px] font-mono px-1 rounded ${isCurrent ? 'bg-primary/15 text-primary' : 'bg-zinc-900 text-zinc-500'}`}>
+                            <span className={`text-[10px] font-mono px-1 rounded ${isCurrent ? 'bg-primary/15 text-primary' : 'bg-zinc-900 text-zinc-500'} ${isSceneDimmed ? 'opacity-60' : ''}`}>
                               {seedCount}
                             </span>
+                          )}
+
+                          {/* Compact 1-click restore button when scene is dimmed on canvas */}
+                          {isSceneDimmed && (
+                            <button
+                              type="button"
+                              data-testid={`scene-undim-button-${sceneKey}`}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleDimScene(sceneKey);
+                              }}
+                              className="w-4 h-4 rounded flex items-center justify-center text-zinc-500 hover:text-zinc-200 transition-colors cursor-pointer shrink-0"
+                              title={`${displayName} is dimmed on canvas — click to show`}
+                              aria-label={`Show ${displayName} on Canvas`}
+                            >
+                              <span className="material-symbols-outlined !text-[13px]">visibility_off</span>
+                            </button>
                           )}
 
                           {/* more_vert trigger button */}
@@ -2515,10 +2586,36 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                   Rename
                                 </button>
 
+                                {/* V47.20: Ephemeral Scene Dimming on Canvas (curated scenes only, >= 2 curated scenes, owners & guests) */}
+                                {isCurrentMapped && curatedScenesCount >= 2 && (() => {
+                                  const isLastVisible = !isSceneDimmed && visibleCuratedCount <= 1;
+                                  return (
+                                    <button
+                                      type="button"
+                                      data-testid={`toggle-dim-scene-${sceneKey}`}
+                                      disabled={isLastVisible}
+                                      title={isLastVisible ? 'At least one scene must stay visible' : undefined}
+                                      onClick={() => {
+                                        if (isLastVisible) return;
+                                        setActiveSceneMenuId(null);
+                                        toggleDimScene(sceneKey);
+                                      }}
+                                      className={`w-full text-left px-3.5 py-2.5 text-sm font-medium rounded-lg flex items-center gap-2.5 whitespace-nowrap transition-all ${
+                                        isLastVisible
+                                          ? 'text-zinc-500 opacity-40 cursor-not-allowed'
+                                          : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer'
+                                      }`}
+                                    >
+                                      <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">
+                                        {isSceneDimmed ? 'visibility' : 'visibility_off'}
+                                      </span>
+                                      {isSceneDimmed ? 'Show on Canvas' : 'Dim on Canvas'}
+                                    </button>
+                                  );
+                                })()}
+
                                 {/* V47.20: 0-Token Scene Reordering (curated scenes only, >= 2 curated scenes, non-guest) */}
                                 {(() => {
-                                  const isCurrentMapped = (scene.graphData?.nodes?.length ?? 0) > 0;
-                                  const curatedScenesCount = scenes.filter(s => (s.graphData?.nodes?.length ?? 0) > 0).length;
                                   if (isGuest || !onReorderScene || !isCurrentMapped || curatedScenesCount < 2) {
                                     return null;
                                   }
@@ -2533,6 +2630,10 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     const didSwap = onReorderScene(sceneKey, direction);
                                     if (didSwap === true) {
                                       const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
+                                      const swappedKey = scenes[targetIdx]?.sceneId || scenes[targetIdx]?.id || `scene-${targetIdx + 1}`;
+                                      setDimmedSceneIds(prev =>
+                                        prev.map(id => (id === sceneKey ? swappedKey : id === swappedKey ? sceneKey : id))
+                                      );
                                       reorderCameraNonceRef.current += 1;
                                       setReorderCameraSignal({
                                         nonce: reorderCameraNonceRef.current,
@@ -2634,7 +2735,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
                           )}
                         </div>
                       );
-                    })}
+                    });
+                    })()}
                   </div>
                 )}
               </div>
@@ -3111,11 +3213,13 @@ const GraphPage: React.FC<GraphPageProps> = ({
             onOverwrite={() => {
               const sid = sceneRemovalIntercept?.sceneId;
               setSceneRemovalIntercept(null);
+              setDimmedSceneIds([]);
               if (sid) onRemoveScene?.(sid, 'overwrite');
             }}
             onSaveAsNew={() => {
               const sid = sceneRemovalIntercept?.sceneId;
               setSceneRemovalIntercept(null);
+              setDimmedSceneIds([]);
               if (sid) onRemoveScene?.(sid, 'fork');
             }}
         />
@@ -3221,7 +3325,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">
                                 <div className="h-full flex flex-col overflow-hidden">
 
-                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto px-6 sm:px-8"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} reorderCameraSignal={reorderCameraSignal} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
+                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto px-6 sm:px-8"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} reorderCameraSignal={reorderCameraSignal} dimmedSceneIds={dimmedSceneIds} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
                                 </div>
                             </div>
                             <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative`}>
@@ -3285,7 +3389,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 print:hidden ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden rounded-2xl">
                         <div className={`${LayoutSizes.headerBar} px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden`}><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Connections</h2></div>
-                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto px-6 sm:px-8"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} reorderCameraSignal={reorderCameraSignal} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
+                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto px-6 sm:px-8"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} reorderCameraSignal={reorderCameraSignal} dimmedSceneIds={dimmedSceneIds} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
                     </div>
                 </div>
                 

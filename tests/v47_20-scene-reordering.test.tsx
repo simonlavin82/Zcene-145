@@ -8,6 +8,7 @@ import { DetailsPanel } from '../components/DetailsPanel';
 import { applyShareBlacklistMutation, resolveMultiSceneSeedImageUrls } from '../App';
 import {
   reorderProjectScenes,
+  createEmptyProjectScene,
   buildCompositeCanvasGraph,
   resolveSceneNodeOverlaps,
   parseCrossSceneLinks,
@@ -956,5 +957,166 @@ describe('V47.20: 0-Token Curated Scene Reordering (Move Left / Move Right)', ()
     expect(onShowToast).toHaveBeenCalledWith('Moved "Mix" to Scene 2');
     // Scene pill strip remains mounted and visible on the ROOTS tab
     expect(screen.getByTestId('scene-pill-scene-1')).toBeInTheDocument();
+  });
+
+  it('19. GraphPage Dim on Canvas / Show on Canvas works for owners & guests, hides on drafts/single-scene, enforces Last-Visible-Scene guard, and supports 1-click pill restore', () => {
+    const fixture = buildThreeSceneFixture();
+    const draftScene = createEmptyProjectScene(3, 'Draft Band');
+
+    // (a) Single-scene board hides Dim on Canvas
+    const singleProps = buildGraphPageProps({ scenes: [fixture.scenes[0]] });
+    const { rerender } = render(<GraphPage {...singleProps} />);
+    fireEvent.click(screen.getByTestId('scene-menu-trigger-scene-1'));
+    expect(screen.queryByTestId('toggle-dim-scene-scene-1')).not.toBeInTheDocument();
+
+    // (b) 3 curated + 1 draft: draft pill hides Dim on Canvas
+    rerender(<GraphPage {...buildGraphPageProps({ scenes: [...fixture.scenes, draftScene] })} />);
+    fireEvent.click(screen.getByTestId('scene-menu-trigger-scene-4'));
+    expect(screen.queryByTestId('toggle-dim-scene-scene-4')).not.toBeInTheDocument();
+
+    // (c) Guest viewer on multi-scene shared board CAN toggle Dim on Canvas
+    rerender(<GraphPage {...buildGraphPageProps({ isGuest: true, scenes: fixture.scenes })} />);
+    fireEvent.click(screen.getByTestId('scene-menu-trigger-scene-1'));
+    const guestDimBtn = screen.getByTestId('toggle-dim-scene-scene-1');
+    expect(guestDimBtn).toHaveTextContent('Dim on Canvas');
+    expect(guestDimBtn).not.toBeDisabled();
+    fireEvent.click(guestDimBtn);
+
+    // Scene 1 pill marked dimmed, outer pill avoids opacity-* so child dropdown stays 100% opaque, and 1-click restore button renders
+    const pill1 = screen.getByTestId('scene-pill-scene-1');
+    expect(pill1.getAttribute('data-dimmed')).toBe('true');
+    expect(pill1.className).not.toMatch(/\bopacity-\d+/);
+    expect(screen.getByTestId('scene-undim-button-scene-1')).toBeInTheDocument();
+
+    // Re-opening Scene 1 menu flips label to Show on Canvas
+    fireEvent.click(screen.getByTestId('scene-menu-trigger-scene-1'));
+    expect(screen.getByTestId('toggle-dim-scene-scene-1')).toHaveTextContent('Show on Canvas');
+
+    // Dim Scene 2 as well -> Scene 3 is now the last visible scene and its Dim on Canvas is DISABLED
+    fireEvent.click(screen.getByTestId('scene-menu-trigger-scene-2'));
+    fireEvent.click(screen.getByTestId('toggle-dim-scene-scene-2'));
+    expect(screen.getByTestId('scene-pill-scene-2').getAttribute('data-dimmed')).toBe('true');
+
+    fireEvent.click(screen.getByTestId('scene-menu-trigger-scene-3'));
+    const lastVisibleBtn = screen.getByTestId('toggle-dim-scene-scene-3');
+    expect(lastVisibleBtn).toBeDisabled();
+    expect(lastVisibleBtn).toHaveAttribute('title', 'At least one scene must stay visible');
+
+    // Clicking 1-click restore button on Scene 1 immediately un-dims Scene 1 and re-enables Scene 3 dim button
+    fireEvent.click(screen.getByTestId('scene-undim-button-scene-1'));
+    expect(screen.getByTestId('scene-pill-scene-1').getAttribute('data-dimmed')).toBe('false');
+    expect(screen.queryByTestId('scene-undim-button-scene-1')).not.toBeInTheDocument();
+    expect(screen.getByTestId('toggle-dim-scene-scene-3')).not.toBeDisabled();
+  });
+
+  it('20. GraphPage remaps dimmedSceneIds across Move Left / Move Right reorder, clears on curated scene removal, and resets on project switch', () => {
+    const fixture = buildThreeSceneFixture();
+    const onRemoveScene = vi.fn();
+
+    const Harness: React.FC<{ projectId?: string }> = ({ projectId = 'proj-a' }) => {
+      const [scenes, setScenes] = useState(fixture.scenes);
+      const [layout, setLayout] = useState(fixture.canvasLayout);
+      const [bridges, setBridges] = useState(fixture.crossSceneLinks);
+      const [activeSceneId, setActiveSceneId] = useState('scene-3');
+
+      const handleReorder = (sceneId: string, dir: 'left' | 'right'): boolean => {
+        const fromIdx = scenes.findIndex(s => s.sceneId === sceneId);
+        const toIdx = dir === 'left' ? fromIdx - 1 : fromIdx + 1;
+        const res = reorderProjectScenes({
+          scenes,
+          fromIndex: fromIdx,
+          toIndex: toIdx,
+          canvasLayout: layout,
+          crossSceneLinks: bridges,
+        });
+        if (!res.didReorder) return false;
+        setScenes(res.reorderedScenes);
+        setLayout(res.reorderedCanvasLayout);
+        setBridges(res.reorderedCrossSceneLinks);
+        setActiveSceneId(res.sceneIdMap[activeSceneId] || activeSceneId);
+        return true;
+      };
+
+      const composite = buildCompositeCanvasGraph(scenes, bridges, layout);
+      return (
+        <GraphPage
+          {...buildGraphPageProps({
+            projectId,
+            data: composite,
+            scenes,
+            activeSceneId,
+            crossSceneLinks: bridges,
+            activeNodes: buildCanonicalDeduplicatedNodesFromScenes(scenes),
+            onReorderScene: handleReorder,
+            onRemoveScene,
+          })}
+        />
+      );
+    };
+
+    const { rerender } = render(<Harness projectId="proj-a" />);
+
+    // Dim Scene 3 ("Mix")
+    fireEvent.click(screen.getByTestId('scene-menu-trigger-scene-3'));
+    fireEvent.click(screen.getByTestId('toggle-dim-scene-scene-3'));
+    expect(screen.getByTestId('scene-pill-scene-3').getAttribute('data-dimmed')).toBe('true');
+
+    // Move Scene 3 ("Mix") left -> now Scene 2 ("Mix") MUST stay dimmed while Scene 3 ("Brit Indie") is visible!
+    fireEvent.click(screen.getByTestId('scene-menu-trigger-scene-3'));
+    fireEvent.click(screen.getByTestId('move-scene-left-scene-3'));
+    expect(screen.getByTestId('scene-pill-scene-2').getAttribute('data-dimmed')).toBe('true');
+    expect(screen.getByTestId('scene-pill-scene-2').textContent).toContain('Mix');
+    expect(screen.getByTestId('scene-pill-scene-3').getAttribute('data-dimmed')).toBe('false');
+    expect(screen.getByTestId('scene-pill-scene-3').textContent).toContain('Brit Indie');
+
+    // Switching projectId resets dimmedSceneIds cleanly
+    rerender(<Harness projectId="proj-b" />);
+    expect(screen.getByTestId('scene-pill-scene-2').getAttribute('data-dimmed')).toBe('false');
+
+    // Re-dim Scene 2, then confirm curated scene removal -> clears dimmedSceneIds
+    fireEvent.click(screen.getByTestId('scene-menu-trigger-scene-2'));
+    fireEvent.click(screen.getByTestId('toggle-dim-scene-scene-2'));
+    expect(screen.getByTestId('scene-pill-scene-2').getAttribute('data-dimmed')).toBe('true');
+
+    fireEvent.click(screen.getByTestId('scene-menu-trigger-scene-3'));
+    fireEvent.click(screen.getByTestId('remove-scene-scene-3'));
+    fireEvent.click(screen.getByRole('button', { name: /save as new zcene/i }));
+    expect(onRemoveScene).toHaveBeenCalledWith('scene-3', 'fork');
+    expect(screen.getByTestId('scene-pill-scene-2').getAttribute('data-dimmed')).toBe('false');
+  });
+
+  it('21. MusicGraph Scene Dimming mirrors 0.05 legend opacity, disables hit-box pointer-events, dims connected bridges, guards dimmed selectedNode, excludes search hits, and keeps layoutSignature physics-free', () => {
+    const mgSrc = fs.readFileSync(path.resolve(__dirname, '../components/MusicGraph.tsx'), 'utf-8');
+
+    // Pure helpers & prop wired
+    expect(mgSrc).toContain('dimmedSceneIds?: string[]');
+    expect(mgSrc).toContain('isNodeInDimmedScene');
+    expect(mgSrc).toContain('isLinkInDimmedScene');
+
+    // Hit-box pointer-events explicitly toggled on circle.hit-box (avoiding SVG child pointer-events: all override)
+    expect(mgSrc).toContain('select("circle.hit-box").style("pointer-events", d => isNodeInDimmedScene(d,');
+
+    // Search matcher skips dimmed scenes (Option A: 1:1 with Legend)
+    expect(mgSrc).toContain('if (isNodeInDimmedScene(node, dimmedSceneIdsSet)) return;');
+
+    // fitGraphToScreen frames non-dimmed scenes only (with fallback to visibleNodes)
+    expect(mgSrc).toContain('visibleNodesRef.current.filter(n => !isNodeInDimmedScene(n, dimmedSet))');
+
+    // Dimmed selectedNode does not dim visible scenes via selectionHighlightIds
+    expect(mgSrc).toContain('const isActiveSelectionDimmed = Boolean(');
+
+    // layoutSignature MUST NOT include dimmedSceneIds (guarantees zero D3 physics wake & zero Firestore writes)
+    const layoutSigLine = mgSrc.split('\n').find(l => l.includes('const layoutSignature =')) || '';
+    expect(layoutSigLine).toContain('activeFilters');
+    expect(layoutSigLine).not.toContain('dimmedSceneIds');
+  });
+
+  it('22. keeps DesignSystem.tsx Dim on Canvas preview in lockstep and keeps App.tsx 100% free of dimmedSceneIds persistence', () => {
+    const dsSrc = fs.readFileSync(path.resolve(__dirname, '../components/DesignSystem.tsx'), 'utf-8');
+    expect(dsSrc).toContain('Dim on Canvas');
+    expect(dsSrc).toContain('visibility_off');
+
+    const appSrc = fs.readFileSync(path.resolve(__dirname, '../App.tsx'), 'utf-8');
+    expect(appSrc).not.toContain('dimmedSceneIds');
   });
 });

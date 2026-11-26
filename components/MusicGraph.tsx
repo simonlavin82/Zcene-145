@@ -241,6 +241,7 @@ interface MusicGraphProps {
   activeSceneId?: string;
   focusedSceneCluster?: { sceneId: string; timestamp: number };
   reorderCameraSignal?: { nonce: number; fitAll: boolean };
+  dimmedSceneIds?: string[];
   onSimulationComplete?: () => void;
   /** Phase A — Coordinate Memory: fired once when simulation settles, with the
    * final fx/fy positions of all artist and label nodes. Only artist/label nodes
@@ -319,6 +320,42 @@ const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistsOrSet: Set<s
 };
 
 const EMPTY_SCENES: ProjectScene[] = [];
+const EMPTY_DIMMED_SCENE_IDS: string[] = [];
+
+const resolveNodeSceneId = (node?: { id?: string; sceneId?: string } | null): string | undefined => {
+  if (!node) return undefined;
+  if (node.sceneId) return node.sceneId;
+  const idStr = String(node.id || '');
+  if (idStr.includes('::')) return idStr.split('::')[0];
+  return undefined;
+};
+
+const isNodeInDimmedScene = (
+  node: { id?: string; sceneId?: string } | null | undefined,
+  dimmedSet: Set<string>
+): boolean => {
+  if (dimmedSet.size === 0 || !node) return false;
+  const sid = resolveNodeSceneId(node);
+  return Boolean(sid && dimmedSet.has(sid));
+};
+
+const isLinkInDimmedScene = (
+  link: any,
+  sNode: { id?: string; sceneId?: string } | undefined,
+  tNode: { id?: string; sceneId?: string } | undefined,
+  dimmedSet: Set<string>
+): boolean => {
+  if (dimmedSet.size === 0) return false;
+  const srcScene =
+    link?.sourceSceneId ||
+    resolveNodeSceneId(sNode) ||
+    resolveNodeSceneId(typeof link?.source === 'object' ? link.source : { id: link?.source });
+  const tgtScene =
+    link?.targetSceneId ||
+    resolveNodeSceneId(tNode) ||
+    resolveNodeSceneId(typeof link?.target === 'object' ? link.target : { id: link?.target });
+  return Boolean((srcScene && dimmedSet.has(srcScene)) || (tgtScene && dimmedSet.has(tgtScene)));
+};
 
 const MusicGraph: React.FC<MusicGraphProps> = ({
   data, libraryArtists, seedArtists, onNodeClick, selectedNode, peekedNode, isSmallScreen,
@@ -326,8 +363,11 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   activeFilters, searchQuery, setSearchQuery, toggleFilter,
   legendConfig, legendOrder,
   legendRef, onInteraction, onLegendInteraction, isGuest,
-  detailsCache, isActive = false, scenes = EMPTY_SCENES, activeSceneId, focusedSceneCluster, reorderCameraSignal, onSimulationComplete, onCoordinatesSettled
+  detailsCache, isActive = false, scenes = EMPTY_SCENES, activeSceneId, focusedSceneCluster, reorderCameraSignal, dimmedSceneIds = EMPTY_DIMMED_SCENE_IDS, onSimulationComplete, onCoordinatesSettled
 }) => {
+  const dimmedSceneIdsSet = useMemo(() => new Set(dimmedSceneIds), [dimmedSceneIds]);
+  const dimmedSceneIdsRef = useRef<Set<string>>(dimmedSceneIdsSet);
+  dimmedSceneIdsRef.current = dimmedSceneIdsSet;
   const isPassiveSelectionRef = useRef(isPassiveSelection);
   useEffect(() => {
     isPassiveSelectionRef.current = isPassiveSelection;
@@ -696,6 +736,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const query = trimmedQuery.toLowerCase();
     const newHighlighted = new Set<string>();
     visibleNodes.forEach(node => {
+        // Mirror Legend filter 1:1: skip nodes inside dimmed scenes so search never pans to ghost clusters
+        if (isNodeInDimmedScene(node, dimmedSceneIdsSet)) return;
         // Match against both the display label (title-cased) and the raw canonical id slug
         const canonId = stripSceneNamespace(String(node.canonicalId || node.id));
         const displayName = (node.label || canonId).replace(/-/g, ' ');
@@ -708,7 +750,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         }
     });
     setHighlightedNodes(newHighlighted);
-  }, [searchQuery, visibleNodes]);
+  }, [searchQuery, visibleNodes, dimmedSceneIdsSet]);
 
   // Set tracking target when search highlight changes
   useEffect(() => {
@@ -750,7 +792,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       
       let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
       let validNodesCount = 0;
-      visibleNodesRef.current.forEach(n => {
+      const dimmedSet = dimmedSceneIdsRef.current;
+      const nonDimmedNodes = dimmedSet.size > 0
+          ? visibleNodesRef.current.filter(n => !isNodeInDimmedScene(n, dimmedSet))
+          : visibleNodesRef.current;
+      const targetNodes = nonDimmedNodes.length > 0 ? nonDimmedNodes : visibleNodesRef.current;
+      targetNodes.forEach(n => {
           if (n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y)) {
               if (n.x < minX) minX = n.x;
               if (n.x > maxX) maxX = n.x;
@@ -1024,6 +1071,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
     const triggerNodeHover = (d: Node, isProgrammatic = false) => {
         if (isProgrammatic && isPassiveSelectionRef.current) return;
+        const dimmedSet = dimmedSceneIdsRef.current;
+        if (isNodeInDimmedScene(d, dimmedSet)) return;
         setHoveredNodeId(d.id);
         hoveredNodeIdRef.current = d.id;
         activeHoveredNodeRef.current = d;
@@ -1064,10 +1113,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             svg.selectAll<SVGLineElement, Link>("line.visual-line")
                 .transition().duration(200)
                 .attr("stroke", (l: any) => {
+                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return "#e4e4e7";
                     const isConnected = isFirstDegreeLink(l);
                     return isConnected ? "#F6E468" : "#e4e4e7";
                 })
                 .attr("stroke-opacity", (l: any) => {
+                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return 0.05;
                     const isConnected = isFirstDegreeLink(l);
                     return isConnected ? 0.9 : 0.05;
                 });
@@ -1076,14 +1127,17 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             svg.selectAll<SVGPathElement, Link>("path.bridge-visual-line")
                 .transition().duration(200)
                 .attr("stroke", (l: any) => {
+                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return "#e4e4e7";
                     const isConnected = isFirstDegreeLink(l);
                     return isConnected ? "#F6E468" : "#e4e4e7";
                 })
                 .attr("stroke-opacity", (l: any) => {
+                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return 0.05;
                     const isConnected = isFirstDegreeLink(l);
                     return isConnected ? 0.95 : 0.05;
                 })
                 .attr("stroke-width", (l: any) => {
+                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return 1.2;
                     const isConnected = isFirstDegreeLink(l);
                     return isConnected ? 2.0 : 1.2;
                 });
@@ -1100,6 +1154,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             allNodesSel
                 .transition().duration(200)
                 .style("opacity", (n: any) => {
+                    if (isNodeInDimmedScene(n, dimmedSet)) return 0.05;
                     const nodeType = n.type as FilterKeys;
                     const isFilteredOut = n.type !== 'artist' && 
                                           Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
@@ -1252,7 +1307,9 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     };
 
     const clearNodeHover = () => {
-        const activeNode = !isPassiveSelectionRef.current ? (selectedNodeRef.current || peekedNodeRef.current) : null;
+        const dimmedSet = dimmedSceneIdsRef.current;
+        const rawActiveNode = !isPassiveSelectionRef.current ? (selectedNodeRef.current || peekedNodeRef.current) : null;
+        const activeNode = rawActiveNode && !isNodeInDimmedScene(rawActiveNode, dimmedSet) ? rawActiveNode : null;
         if (activeNode) {
             triggerNodeHover(activeNode, true);
             setHoveredLink(null);
@@ -1269,12 +1326,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             // Restore node opacities
             const isSearchActive = searchQueryRef.current.trim().length > 0;
             const hlNodes = highlightedNodesRef.current;
-            const selHighlight = selectionHighlightIdsRef.current;
+            const selHighlight = rawActiveNode && isNodeInDimmedScene(rawActiveNode, dimmedSet) ? null : selectionHighlightIdsRef.current;
 
             const allNodesSel = svg.selectAll<SVGGElement, Node>("g.node-element");
             allNodesSel
                 .transition().duration(200)
                 .style("opacity", (n: any) => {
+                    if (isNodeInDimmedScene(n, dimmedSet)) return 0.05;
                     const nodeType = n.type as FilterKeys;
                     const isFilteredOut = n.type !== 'artist' && 
                                           Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
@@ -1313,6 +1371,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             svg.selectAll<SVGLineElement, Link>("line.visual-line")
                 .transition().duration(200)
                 .attr("stroke", (l: any) => {
+                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return "#e4e4e7";
                     if (isSearchActive) {
                         const s = typeof l.source === 'string' ? l.source : l.source.id;
                         const t = typeof l.target === 'string' ? l.target : l.target.id;
@@ -1328,6 +1387,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     
                     const sNode = visibleNodes.find(n => n.id === s);
                     const tNode = visibleNodes.find(n => n.id === t);
+                    if (isLinkInDimmedScene(l, sNode, tNode, dimmedSet)) return 0.05;
                     const isLinkFilteredOut = (node: Node | undefined) => {
                         if (!node || node.type === 'artist') return false;
                         const nodeType = node.type as FilterKeys;
@@ -1346,12 +1406,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                     return computeRestingLinkOpacity(l, sNode, tNode, nodeDegreesRef.current);
                 });
 
-            // Restore Cross-Scene Bridge Lines to neutral grey
+            // Restore Cross-Scene Bridge Lines to neutral grey (or 0.05 if either endpoint sits in a dimmed scene)
             svg.selectAll<SVGPathElement, Link>("path.bridge-visual-line")
                 .transition().duration(200)
                 .attr("stroke", "#e4e4e7")
                 .attr("stroke-width", 1.2)
-                .attr("stroke-opacity", 0.35);
+                .attr("stroke-opacity", (l: any) => isLinkInDimmedScene(l, undefined, undefined, dimmedSet) ? 0.05 : 0.35);
         }
     };
 
@@ -2163,8 +2223,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         })
         .text(d => toDisplayLabel(d));
 
+    const dimmedSet = dimmedSceneIdsRef.current;
+
     nodeElements
+        .attr("cursor", d => isNodeInDimmedScene(d, dimmedSet) ? "default" : "pointer")
         .style("opacity", d => {
+            if (isNodeInDimmedScene(d, dimmedSet)) return 0.05;
             const nodeType = d.type as FilterKeys;
             const isFilteredOut = d.type !== 'artist' && 
                                   Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
@@ -2183,6 +2247,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return 1;
         });
 
+    nodeElements.select("circle.hit-box").style("pointer-events", d => isNodeInDimmedScene(d, dimmedSet) ? "none" : "all");
+
     const nodeId = (n: any) => String(typeof n === 'string' ? n : n.id);
     const intraSceneLinks = visibleLinks.filter(l => !l.isCrossSceneBridge);
     const bridgeLinks = visibleLinks.filter(l => Boolean(l.isCrossSceneBridge));
@@ -2192,6 +2258,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .join("line")
         .attr("class", "visual-line")
         .attr("stroke", (d: any) => {
+            if (isLinkInDimmedScene(d, undefined, undefined, dimmedSet)) return "#e4e4e7";
             if (isSearchActive) {
                 const s = nodeId(d.source);
                 const t = nodeId(d.target);
@@ -2200,7 +2267,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
             }
             const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
-            if (activeNode) {
+            if (activeNode && !isNodeInDimmedScene(activeNode, dimmedSet)) {
                 const s = nodeId(d.source);
                 const t = nodeId(d.target);
                 if (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id)) {
@@ -2216,6 +2283,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
 
             const sNode = visibleNodes.find(n => n.id === s);
             const tNode = visibleNodes.find(n => n.id === t);
+            if (isLinkInDimmedScene(d, sNode, tNode, dimmedSet)) return 0.05;
             const isLinkFilteredOut = (node: Node | undefined) => {
                 if (!node || node.type === 'artist') return false;
                 const nodeType = node.type as FilterKeys;
@@ -2231,7 +2299,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             }
 
             const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
-            if (activeNode && (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id))) {
+            if (activeNode && !isNodeInDimmedScene(activeNode, dimmedSet) && (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id))) {
                 return 0.9;
             }
 
@@ -2258,7 +2326,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("stroke", "#e4e4e7")
         .attr("stroke-width", 1.2)
         .attr("stroke-dasharray", "6,4")
-        .attr("stroke-opacity", 0.4)
+        .attr("stroke-opacity", (d: any) => isLinkInDimmedScene(d, undefined, undefined, dimmedSet) ? 0.05 : 0.4)
         .attr("d", (d: any) => computeBridgePathD(d, visibleNodes))
         .style("pointer-events", "none");
 
@@ -2503,12 +2571,12 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
       return;
     }
     const activeNode = selectedNode || peekedNode;
-    if (activeNode && triggerNodeHoverRef.current) {
+    if (activeNode && !isNodeInDimmedScene(activeNode, dimmedSceneIdsSet) && triggerNodeHoverRef.current) {
         triggerNodeHoverRef.current(activeNode, true);
-    } else if (!activeNode && clearNodeHoverRef.current) {
+    } else if (clearNodeHoverRef.current) {
         clearNodeHoverRef.current();
     }
-  }, [selectedNode, peekedNode, isPassiveSelection]);
+  }, [selectedNode, peekedNode, isPassiveSelection, dimmedSceneIdsSet]);
 
   // Unified D3 Timer Lerp Camera
   // Fluidly interpolates the camera to track the active node (physics bouncing or CSS resizing)
@@ -2553,10 +2621,23 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     const nodeElements = container.select(".node-group").selectAll<SVGGElement, Node>("g.node-element");
     
     const isSearchActive = searchQuery.trim().length > 0;
+    const rawSelectionNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null));
+    const isActiveSelectionDimmed = Boolean(rawSelectionNode && isNodeInDimmedScene(rawSelectionNode, dimmedSceneIdsSet));
+    const effectiveSelHighlight = isActiveSelectionDimmed ? null : selectionHighlightIds;
+    if (activeHoveredNodeRef.current && isNodeInDimmedScene(activeHoveredNodeRef.current, dimmedSceneIdsSet)) {
+        activeHoveredNodeRef.current = null;
+        hoveredNodeIdRef.current = null;
+        setHoveredNodeId(null);
+        setHoveredLink(null);
+    }
+
+    nodeElements.attr("cursor", d => isNodeInDimmedScene(d, dimmedSceneIdsSet) ? "default" : "pointer");
+    nodeElements.select("circle.hit-box").style("pointer-events", d => isNodeInDimmedScene(d, dimmedSceneIdsSet) ? "none" : "all");
 
     nodeElements
         .transition().duration(300)
         .style("opacity", d => {
+            if (isNodeInDimmedScene(d, dimmedSceneIdsSet)) return 0.05;
             const nodeType = d.type as FilterKeys;
             const isFilteredOut = d.type !== 'artist' && 
                                   Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
@@ -2572,8 +2653,8 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 return isMatch ? 1 : 0.05;
             }
 
-            if (selectionHighlightIds) {
-                if (selectionHighlightIds.has(d.id)) return 1;
+            if (effectiveSelHighlight) {
+                if (effectiveSelHighlight.has(d.id)) return 1;
                 if (d.type === 'artist') return 0.4;
                 return 0.1;
             }
@@ -2584,7 +2665,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .transition().duration(300)
         .attr("r", d => isNodeSeedInOwnScene(d, seedArtists) ? 22 : 20)
         .attr("fill", d => {
-            const activeNode = (!isSearchActive && !isPassiveSelection) ? (selectedNode || peekedNode) : null;
+            const activeNode = (!isSearchActive && !isPassiveSelection && !isActiveSelectionDimmed) ? (selectedNode || peekedNode) : null;
             const hasActiveNs = activeNode && String(activeNode.id).includes('::');
             const isSelected = activeNode
                 ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
@@ -2594,7 +2675,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return isSeed ? "rgba(246, 228, 104, 0.08)" : "none";
         })
         .attr("stroke-width", d => {
-            const activeNode = (!isSearchActive && !isPassiveSelection) ? (selectedNode || peekedNode) : null;
+            const activeNode = (!isSearchActive && !isPassiveSelection && !isActiveSelectionDimmed) ? (selectedNode || peekedNode) : null;
             const hasActiveNs = activeNode && String(activeNode.id).includes('::');
             const isSelected = activeNode 
                 ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
@@ -2604,7 +2685,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return isSeed ? 1.5 : 0;
         })
         .attr("stroke", d => {
-            const activeNode = (!isSearchActive && !isPassiveSelection) ? (selectedNode || peekedNode) : null;
+            const activeNode = (!isSearchActive && !isPassiveSelection && !isActiveSelectionDimmed) ? (selectedNode || peekedNode) : null;
             const hasActiveNs = activeNode && String(activeNode.id).includes('::');
             const isSelected = activeNode 
                 ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
@@ -2619,20 +2700,23 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
         .attr("fill", d => {
             if (isNodeSeedInOwnScene(d, seedArtists)) return "#F6E468";
             const isSearchMatch = isSearchActive && (highlightedNodes.has(d.id) || highlightedNodes.has(String(d.id).toLowerCase()) || highlightedNodes.has(normalizeArtistId(String(d.id))));
-            const isSelMatch = Boolean(selectionHighlightIds && selectionHighlightIds.has(d.id));
+            const isSelMatch = Boolean(effectiveSelHighlight && effectiveSelHighlight.has(d.id));
             if (isSearchMatch || isSelMatch) return "#ffffff";
             return (d.type === 'artist' || d.type === 'label') ? "#e4e4e7" : "#a1a1aa";
         })
         .attr("opacity", d => {
             const isSearchMatch = isSearchActive && (highlightedNodes.has(d.id) || highlightedNodes.has(String(d.id).toLowerCase()) || highlightedNodes.has(normalizeArtistId(String(d.id))));
-            const isSelMatch = Boolean(selectionHighlightIds && selectionHighlightIds.has(d.id));
+            const isSelMatch = Boolean(effectiveSelHighlight && effectiveSelHighlight.has(d.id));
             if (isSearchMatch || isSelMatch) return 1;
             return (d.type === 'artist' || d.type === 'label') ? 1 : 0.8;
         });
 
+    const activeHoverNode = (!isActiveSelectionDimmed ? rawSelectionNode : null) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
+
     container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
         .transition().duration(300)
         .attr("stroke", (d: any) => {
+            if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return "#e4e4e7";
             if (isSearchActive) {
                 const s = typeof d.source === 'string' ? d.source : d.source.id;
                 const t = typeof d.target === 'string' ? d.target : d.target.id;
@@ -2640,14 +2724,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 const isMatchT = highlightedNodes.has(t) || highlightedNodes.has(String(t).toLowerCase());
                 return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
             }
-            const activeNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null)) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
-            if (!activeNode) return "#e4e4e7";
+            if (!activeHoverNode) return "#e4e4e7";
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
-            const hasActiveNs = String(activeNode.id).includes('::');
+            const hasActiveNs = String(activeHoverNode.id).includes('::');
             const isFirstDegree = hasActiveNs
-                ? (s.toLowerCase() === activeNode.id.toLowerCase() || t.toLowerCase() === activeNode.id.toLowerCase())
-                : (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id));
+                ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
+                : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
             return isFirstDegree ? "#F6E468" : "#e4e4e7";
         })
         .attr("stroke-opacity", (d: any) => {
@@ -2656,6 +2739,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             
             const sNode = visibleNodes.find(n => n.id === s);
             const tNode = visibleNodes.find(n => n.id === t);
+            if (isLinkInDimmedScene(d, sNode, tNode, dimmedSceneIdsSet)) return 0.05;
             const isLinkFilteredOut = (node: Node | undefined) => {
                 if (!node || node.type === 'artist') return false;
                 const nodeType = node.type as FilterKeys;
@@ -2670,25 +2754,24 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 return (isMatchS && isMatchT) ? 0.6 : 0.05;
             }
 
-            const activeNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null)) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
-            if (activeNode) {
-                const hasActiveNs = String(activeNode.id).includes('::');
+            if (activeHoverNode) {
+                const hasActiveNs = String(activeHoverNode.id).includes('::');
                 const isFirstDegree = hasActiveNs
-                    ? (s.toLowerCase() === activeNode.id.toLowerCase() || t.toLowerCase() === activeNode.id.toLowerCase())
-                    : (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id));
+                    ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
+                    : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
                 if (isFirstDegree) return 0.9;
             }
 
-            if (selectionHighlightIds) return (selectionHighlightIds.has(s) && selectionHighlightIds.has(t)) ? 0.3 : 0.05;
+            if (effectiveSelHighlight) return (effectiveSelHighlight.has(s) && effectiveSelHighlight.has(t)) ? 0.3 : 0.05;
             return computeRestingLinkOpacity(d, sNode, tNode, nodeDegreesRef.current);
         });
 
-    // Cross-Scene Bridge Lines: Default rest (neutral grey #e4e4e7, opacity 0.35, width 1.2)
-    // Active hover or selection (peekedNode, selectedNode, or activeHoveredNodeRef when !isPassiveSelection) illuminates connected bridges in yellow #F6E468
-    const activeHoverNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null)) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
+    // Cross-Scene Bridge Lines: Default rest (neutral grey #e4e4e7, opacity 0.35, width 1.2; 0.05 if either endpoint is in a dimmed scene)
+    // Active hover or selection (peekedNode, selectedNode, or activeHoveredNodeRef when !isPassiveSelection and non-dimmed) illuminates connected bridges in yellow #F6E468
     container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
         .transition().duration(300)
         .attr("stroke", (d: any) => {
+            if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return "#e4e4e7";
             if (!activeHoverNode) return "#e4e4e7";
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
@@ -2699,6 +2782,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
             return isConnected ? "#F6E468" : "#e4e4e7";
         })
         .attr("stroke-opacity", (d: any) => {
+            if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return 0.05;
             if (!activeHoverNode) return 0.35;
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
@@ -2707,12 +2791,13 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
                 : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
             if (isConnected) return 0.95;
-            if (selectionHighlightIds && (selectionHighlightIds.has(s) || selectionHighlightIds.has(t))) {
+            if (effectiveSelHighlight && (effectiveSelHighlight.has(s) || effectiveSelHighlight.has(t))) {
                 return 0.3;
             }
             return 0.1;
         })
         .attr("stroke-width", (d: any) => {
+            if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return 1.2;
             if (!activeHoverNode) return 1.2;
             const s = typeof d.source === 'string' ? d.source : d.source.id;
             const t = typeof d.target === 'string' ? d.target : d.target.id;
@@ -2722,7 +2807,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                 : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
             return isConnected ? 2.0 : 1.2;
         });
-  }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes, selectedNode, peekedNode, searchQuery, seedArtists, isPassiveSelection]);
+  }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes, selectedNode, peekedNode, searchQuery, seedArtists, isPassiveSelection, dimmedSceneIdsSet]);
 
   return (
     <div 
