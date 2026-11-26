@@ -3503,19 +3503,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                             className="absolute inset-0 bg-zinc-800 rounded-[10px]"
                                         />
                                     )}
-                                    <span className="relative z-10 flex items-center gap-1.5">
-                                        <span>Stack Archive</span>
-                                        <span
-                                            data-testid="stack-archive-tab-count"
-                                            className={`text-[10px] font-mono px-1.5 py-0.5 rounded-md border leading-none ${
-                                                activeLedgerTab === 'stack_archive'
-                                                    ? 'bg-zinc-900/90 border-zinc-700 text-zinc-200'
-                                                    : 'bg-zinc-900 border-zinc-800 text-zinc-400'
-                                            }`}
-                                        >
-                                            {displayedArchivedStack.length}
-                                        </span>
-                                    </span>
+                                    <span className="relative z-10">Stack Archive</span>
                                 </button>
                             </div>
 

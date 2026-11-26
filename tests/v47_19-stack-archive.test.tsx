@@ -179,7 +179,7 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(onRemove).toHaveBeenCalledWith('buggin-us_projA');
   });
 
-  it('3. switches between Token Activity (default) and Stack Archive tabs with archived count badge and preserves activity filter pills', async () => {
+  it('3. switches between Token Activity (default) and Stack Archive tabs with clean labels (no tab count badge) and preserves activity filter pills', async () => {
     render(
       <UsageAnalyticsPage
         {...makeBaseAnalyticsProps({
@@ -191,7 +191,8 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(await screen.findByTestId('token-transactions-ledger')).toBeInTheDocument();
     expect(screen.getByTestId('ledger-tab-activity')).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByTestId('ledger-tab-stack-archive')).toHaveAttribute('aria-selected', 'false');
-    expect(screen.getByTestId('stack-archive-tab-count')).toHaveTextContent('3');
+    expect(screen.getByTestId('ledger-tab-stack-archive')).toHaveTextContent('Stack Archive');
+    expect(screen.queryByTestId('stack-archive-tab-count')).not.toBeInTheDocument();
     expect(screen.getByTestId('activity-filter-all')).toBeInTheDocument();
     expect(screen.queryByTestId('stack-archive-ledger')).not.toBeInTheDocument();
 
@@ -506,7 +507,7 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     await waitFor(() => {
       expect(customerStackReads).toBe(2);
     });
-    expect(screen.getByTestId('stack-archive-tab-count')).toHaveTextContent('1');
+    expect(screen.queryByTestId('stack-archive-tab-count')).not.toBeInTheDocument();
 
     // Switch to Stack Archive in Read-Only Admin Preview
     fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
@@ -712,12 +713,14 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
       expect(screen.getByTestId(`author-stack-counts-${customerUid}`)).toHaveTextContent('3 active · 2 archived');
     });
 
-    // 3. Enter Inspect Wallet -> fresh Stack Archive (2)
+    // 3. Enter Inspect Wallet -> fresh Stack Archive (2 archived items: Buggin & Exhibition)
     const inspectButtons = screen.getAllByRole('button', { name: /Inspect Wallet/i });
     fireEvent.click(inspectButtons[1]);
     expect(await screen.findByTestId('ledger-tab-stack-archive')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
     await waitFor(() => {
-      expect(screen.getByTestId('stack-archive-tab-count')).toHaveTextContent('2');
+      expect(screen.getByText('Buggin')).toBeInTheDocument();
+      expect(screen.getByText('Exhibition')).toBeInTheDocument();
     });
 
     // Exit back to Admin and start a slow in-flight expand fetch that will resolve stale 6/0 AFTER an account switch
@@ -741,7 +744,10 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
         })}
       />
     );
-    expect(await screen.findByTestId('stack-archive-tab-count')).toHaveTextContent('2');
+    expect(await screen.findByTestId('ledger-tab-stack-archive')).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
+    expect(await screen.findByText('Buggin')).toBeInTheDocument();
+    expect(screen.getByText('Exhibition')).toBeInTheDocument();
 
     // Resolve the stale in-flight request from the prior Admin session with old 6/0 data — must be discarded
     holdFirstSlowResolve!({ docs: initialStackDocs });

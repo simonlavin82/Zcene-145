@@ -4069,7 +4069,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-2">
                                         <p className="text-sm text-zinc-500 font-semibold">Passive State</p>
-                                        <p className="text-xs text-zinc-400 leading-relaxed">Used for static counts or previously viewed items (e.g., Read Deep Cut cards, Viewed Stack items, Stack Archive tab count). Uses subdued zinc tones.</p>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">Used for static counts or previously viewed items (e.g., Read Deep Cut cards, Viewed Stack items). Uses subdued zinc tones.</p>
                                     </div>
                                 </div>
                                 <div className="mt-6 pt-5 border-t border-zinc-800/80 space-y-2">
