@@ -3939,14 +3939,17 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                             <div className="space-y-4 pt-6" data-testid="admin-jit-heals-section">
                                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-zinc-800 pb-4">
                                     <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2.5">
-                                            <h3 className="text-xl font-medium text-white inline-flex items-center">
-                                                JIT Auto-Healing Telemetry
+                                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
+                                            <div className="flex items-start sm:items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                                                <h3 className="text-lg sm:text-xl font-medium text-white leading-snug">
+                                                    JIT Auto-Healing Telemetry
+                                                </h3>
                                                 <InfoTooltip
                                                     align="right"
+                                                    className="mt-1 sm:mt-0 shrink-0"
                                                     content="Strictly capped at 100 automatic heals per 24 hours (~$0.04 max daily exposure). Auto-disables if breached; use the toggle to manually override anytime."
                                                 />
-                                            </h3>
+                                            </div>
                                             
                                             {/* 1. Static Status Badge (Design System: Badges & Tags) */}
                                             <span 
@@ -4141,19 +4144,19 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
 
                             {/* Failed & Auto-Refunded Curations (Sunk Cost Audit) Section */}
                             <div className="space-y-4 pt-6 border-t border-zinc-800/80" data-testid="admin-curation-failures-section">
-                                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-zinc-800 pb-4">
                                     <div className="min-w-0">
-                                        <div className="flex flex-wrap items-center gap-2.5">
-                                            <h2 className="text-xl font-medium text-white inline-flex items-start sm:items-center gap-2">
-                                                <span className="material-symbols-outlined text-rose-400 !text-[22px] shrink-0 mt-0.5 sm:mt-0">receipt_long</span>
-                                                <span>
+                                        <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
+                                            <div className="flex items-start sm:items-center justify-between sm:justify-start gap-2 w-full sm:w-auto">
+                                                <h3 className="text-lg sm:text-xl font-medium text-white leading-snug">
                                                     Failed &amp; Auto-Refunded Curations
-                                                    <InfoTooltip
-                                                        align="right"
-                                                        content="Permanent audit ledger of in-flight pipeline failures and 5-minute stale-lock reaper recoveries, capturing refunded tokens alongside partial Gemini API spend already incurred prior to abort."
-                                                    />
-                                                </span>
-                                            </h2>
+                                                </h3>
+                                                <InfoTooltip
+                                                    align="right"
+                                                    className="mt-1 sm:mt-0 shrink-0"
+                                                    content="Permanent audit ledger of in-flight pipeline failures and 5-minute stale-lock reaper recoveries, capturing refunded tokens alongside partial Gemini API spend already incurred prior to abort."
+                                                />
+                                            </div>
                                             <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 whitespace-nowrap">
                                                 Sunk Cost Audit
                                             </span>

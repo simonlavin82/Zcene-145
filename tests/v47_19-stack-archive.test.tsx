@@ -1461,10 +1461,54 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(screen.getByText(`Failed Zcene ${ADMIN_LOG_PAGE_SIZE + 3}`)).toBeInTheDocument();
     expect(screen.queryByTestId('curation-failures-show-more-btn')).not.toBeInTheDocument();
 
-    // Edge-safe InfoTooltip alignment: 4 KPI card tooltips + 2 wide Admin section header tooltips all right-aligned inward
-    const tooltips = Array.from(container.querySelectorAll('[role="tooltip"]'));
+    // Edge-safe InfoTooltip alignment: 4 KPI card tooltips + 2 Admin section header tooltips all right-aligned inward
+    const tooltips = Array.from(container.querySelectorAll('[role="tooltip"]')) as HTMLElement[];
     expect(tooltips.filter((el) => el.getAttribute('data-align') === 'right')).toHaveLength(6);
     expect(tooltips.filter((el) => el.getAttribute('data-align') === 'left')).toHaveLength(0);
+
+    // Runtime viewport clamping guard (375px screen, 16px edge gutter): clamps left & right overflows without double-shifting and resets to 0 when in-bounds
+    const origInnerWidth = window.innerWidth;
+    Object.defineProperty(window, 'innerWidth', { configurable: true, value: 375 });
+    try {
+      const failuresTooltip = tooltips[5];
+      const failuresWrapper = failuresTooltip.parentElement as HTMLElement;
+      const failuresBtn = failuresWrapper.querySelector('button') as HTMLButtonElement;
+      const makeRect = (left: number, right: number): DOMRect =>
+        ({ left, right, width: right - left, top: 100, bottom: 180, height: 80, x: left, y: 100, toJSON: () => ({}) } as DOMRect);
+
+      // Dynamic mock faithfully reflects real browser layout where getBoundingClientRect shifts by committed style.transform
+      let failuresNaturalLeft = -29;
+      vi.spyOn(failuresTooltip, 'getBoundingClientRect').mockImplementation(() => {
+        const applied = Number(failuresTooltip.dataset.appliedShift || 0);
+        return makeRect(failuresNaturalLeft + applied, failuresNaturalLeft + 192 + applied);
+      });
+      // Simulate back-to-back mobile tap events: must clamp once to +45px (never double-shift)
+      fireEvent.mouseEnter(failuresWrapper);
+      fireEvent.focus(failuresBtn);
+      fireEvent.click(failuresBtn);
+      expect(failuresTooltip.style.transform).toBe('translateX(45px)');
+      expect(failuresTooltip.getAttribute('data-applied-shift')).toBe('45');
+
+      const jitTooltip = tooltips[4];
+      const jitWrapper = jitTooltip.parentElement as HTMLElement;
+      const jitBtn = jitWrapper.querySelector('button') as HTMLButtonElement;
+      let jitNaturalLeft = 260;
+      vi.spyOn(jitTooltip, 'getBoundingClientRect').mockImplementation(() => {
+        const applied = Number(jitTooltip.dataset.appliedShift || 0);
+        return makeRect(jitNaturalLeft + applied, jitNaturalLeft + 192 + applied);
+      });
+      fireEvent.focus(jitBtn);
+      expect(jitTooltip.style.transform).toBe('translateX(-93px)');
+      expect(jitTooltip.getAttribute('data-applied-shift')).toBe('-93');
+
+      // When viewport/layout has room (naturalLeft=100, naturalRight=292 inside [16, 359]), shift resets cleanly to 0
+      jitNaturalLeft = 100;
+      fireEvent.mouseEnter(jitWrapper);
+      expect(jitTooltip.style.transform).toBe('');
+      expect(jitTooltip.getAttribute('data-applied-shift')).toBe('0');
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, value: origInnerWidth });
+    }
 
     // ToolbarSearch author filter filters mobile author cards and clears via built-in Clear button
     const authorSearch = screen.getByTestId('admin-author-search-input');
