@@ -240,6 +240,7 @@ interface MusicGraphProps {
   scenes?: ProjectScene[];
   activeSceneId?: string;
   focusedSceneCluster?: { sceneId: string; timestamp: number };
+  reorderCameraSignal?: { nonce: number; fitAll: boolean };
   onSimulationComplete?: () => void;
   /** Phase A — Coordinate Memory: fired once when simulation settles, with the
    * final fx/fy positions of all artist and label nodes. Only artist/label nodes
@@ -325,7 +326,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   activeFilters, searchQuery, setSearchQuery, toggleFilter,
   legendConfig, legendOrder,
   legendRef, onInteraction, onLegendInteraction, isGuest,
-  detailsCache, isActive = false, scenes = EMPTY_SCENES, activeSceneId, focusedSceneCluster, onSimulationComplete, onCoordinatesSettled
+  detailsCache, isActive = false, scenes = EMPTY_SCENES, activeSceneId, focusedSceneCluster, reorderCameraSignal, onSimulationComplete, onCoordinatesSettled
 }) => {
   const isPassiveSelectionRef = useRef(isPassiveSelection);
   useEffect(() => {
@@ -1705,7 +1706,15 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
     // Guard against scene re-indexing collisions (e.g., scene-5 being re-indexed to scene-3):
     // If the scene structure or order changed, discard live physics state so incoming composite
     // coordinates are honored instead of stale simulation coordinates from a previous scene.
-    const currentSceneFingerprint = scenes.map(s => `${s.sceneId || s.id}:${s.seedArtists || ''}`).join('|');
+    const currentSceneFingerprint = scenes.map(s => {
+      const sid = s.sceneId || s.id || '';
+      const seeds = s.curatedSeedArtists || s.seedArtists || '';
+      const custom = s.customName || '';
+      const filtersSig = s.discoveryFilters ? JSON.stringify(s.discoveryFilters) : '';
+      const firstNode = s.graphData?.nodes?.[0] ? stripSceneNamespace(s.graphData.nodes[0].canonicalId || s.graphData.nodes[0].id) : '';
+      const nodeCount = s.graphData?.nodes?.length ?? 0;
+      return `${sid}:${seeds}:${custom}:${filtersSig}:${nodeCount}:${firstNode}`;
+    }).join('|');
     const isSceneStructureChanged = lastSceneFingerprintRef.current !== currentSceneFingerprint;
     lastSceneFingerprintRef.current = currentSceneFingerprint;
 
@@ -2399,6 +2408,25 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
   }, [activeSceneId]);
 
   const lastCameraFollowedNodeIdRef = useRef<string | null>(null);
+  const lastReorderCameraNonceRef = useRef<number>(0);
+
+  // V47.20: Full-constellation camera fit after 0-Token Scene Reordering.
+  // Runs immediately BEFORE Smart Camera Follow so pre-seeding lastCameraFollowedNodeIdRef
+  // (when actively selected) prevents remapped selection from fighting or canceling fitGraphToScreen(750),
+  // while fitAll: false on mobile suppresses background camera jumps (Law 44).
+  useEffect(() => {
+    if (!reorderCameraSignal || reorderCameraSignal.nonce <= lastReorderCameraNonceRef.current) return;
+    lastReorderCameraNonceRef.current = reorderCameraSignal.nonce;
+    const activeNode = selectedNode || peekedNode;
+    if (!isPassiveSelection && activeNode) {
+      lastCameraFollowedNodeIdRef.current = String(activeNode.id || '');
+    }
+    isTrackingRef.current = false;
+    targetNodeIdRef.current = null;
+    if (reorderCameraSignal.fitAll && !isSmallScreenRef.current) {
+      fitGraphToScreen(750);
+    }
+  }, [reorderCameraSignal, selectedNode, peekedNode, isPassiveSelection, fitGraphToScreen]);
 
   // Smart Camera Follow: direct camera across Scenarios A, B, and C when navigating DEEP CUTS or selecting nodes
   useEffect(() => {

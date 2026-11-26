@@ -51,6 +51,7 @@ exports.pruneOverarchingHistory = pruneOverarchingHistory;
 exports.shiftSceneClusterCoordinates = shiftSceneClusterCoordinates;
 exports.canonicalizeProjectScenes = canonicalizeProjectScenes;
 exports.canonicalizeCrossSceneLinks = canonicalizeCrossSceneLinks;
+exports.reorderProjectScenes = reorderProjectScenes;
 const isoCountries_1 = require("./isoCountries");
 exports.SCENE_BASE_CENTER_X = 1000;
 exports.SCENE_BASE_CENTER_Y = 1000;
@@ -3097,5 +3098,236 @@ function canonicalizeCrossSceneLinks(crossSceneLinks, canonicalScenes) {
         });
     }
     return remappedBridges;
+}
+/**
+ * V47.20: 0-Token Curated Scene Reordering ([Rule 21], [Rule 29], [Rule 44]).
+ * Atomically moves a curated (mapped) scene from `fromIndex` to `toIndex`, canonically
+ * re-indexing all scenes (`scene-1..scene-k`), shifting cluster coordinates & `canvasLayout`
+ * by `(newIdx - oldIdx) * SCENE_HORIZONTAL_STRIDE` (`1050px`), and remapping `crossSceneLinks`
+ * via a collision-free single-pass bijection.
+ *
+ * Strictly rejects out-of-bounds indices, no-op moves, or any swap touching an uncurated draft
+ * scene (`graphData.nodes.length === 0`) so curated↔draft gaps can never corrupt Coordinate Memory.
+ */
+function reorderProjectScenes({ scenes, fromIndex, toIndex, canvasLayout, crossSceneLinks, }) {
+    const parseLayoutInput = (raw) => {
+        if (!raw)
+            return [];
+        if (typeof raw === 'string') {
+            try {
+                const parsed = JSON.parse(raw);
+                return Array.isArray(parsed) ? [...parsed] : [];
+            }
+            catch {
+                return [];
+            }
+        }
+        return Array.isArray(raw) ? [...raw] : [];
+    };
+    const parsedLayout = parseLayoutInput(canvasLayout);
+    const parsedBridges = parseCrossSceneLinks(crossSceneLinks);
+    const noopResult = () => ({
+        didReorder: false,
+        reorderedScenes: Array.isArray(scenes) ? [...scenes] : [],
+        reorderedCanvasLayout: parsedLayout,
+        reorderedCrossSceneLinks: parsedBridges,
+        sceneIdMap: {},
+    });
+    if (!Array.isArray(scenes) || scenes.length < 2) {
+        return noopResult();
+    }
+    if (!Number.isInteger(fromIndex) ||
+        !Number.isInteger(toIndex) ||
+        fromIndex === toIndex ||
+        fromIndex < 0 ||
+        toIndex < 0 ||
+        fromIndex >= scenes.length ||
+        toIndex >= scenes.length) {
+        return noopResult();
+    }
+    const isSceneMapped = (scene) => {
+        if (!scene?.graphData)
+            return false;
+        if (Array.isArray(scene.graphData.nodes)) {
+            return scene.graphData.nodes.length > 0;
+        }
+        if (typeof scene.graphData === 'string') {
+            try {
+                const parsed = JSON.parse(scene.graphData);
+                return Array.isArray(parsed?.nodes) && parsed.nodes.length > 0;
+            }
+            catch {
+                return false;
+            }
+        }
+        return false;
+    };
+    const rangeStart = Math.min(fromIndex, toIndex);
+    const rangeEnd = Math.max(fromIndex, toIndex);
+    for (let i = rangeStart; i <= rangeEnd; i++) {
+        if (!isSceneMapped(scenes[i])) {
+            return noopResult();
+        }
+    }
+    const indexed = scenes.map((scene, oldIdx) => ({ scene, oldIdx }));
+    const [movedEntry] = indexed.splice(fromIndex, 1);
+    indexed.splice(toIndex, 0, movedEntry);
+    const round2 = (v) => Math.round(v * 100) / 100;
+    const sceneShiftMap = new Map();
+    const sceneIdMap = {};
+    for (let newIdx = 0; newIdx < indexed.length; newIdx++) {
+        const { scene, oldIdx } = indexed[newIdx];
+        const oldSceneId = String(scene?.sceneId || scene?.id || `scene-${oldIdx + 1}`).trim();
+        const newSceneId = `scene-${newIdx + 1}`;
+        const dx = (newIdx - oldIdx) * exports.SCENE_HORIZONTAL_STRIDE;
+        sceneShiftMap.set(oldSceneId, { newSceneId, newIdx, dx });
+        sceneIdMap[oldSceneId] = newSceneId;
+    }
+    const reorderedScenes = indexed.map(({ scene, oldIdx }, newIdx) => {
+        const oldSceneId = String(scene?.sceneId || scene?.id || `scene-${oldIdx + 1}`).trim();
+        const { newSceneId, dx } = sceneShiftMap.get(oldSceneId);
+        let updatedGraphData = { nodes: [], links: [] };
+        if (scene?.graphData) {
+            const g = typeof scene.graphData === 'string'
+                ? (() => {
+                    try {
+                        return JSON.parse(scene.graphData);
+                    }
+                    catch {
+                        return { nodes: [], links: [] };
+                    }
+                })()
+                : scene.graphData;
+            const rawNodes = Array.isArray(g?.nodes) ? g.nodes : [];
+            const rawLinks = Array.isArray(g?.links) ? g.links : [];
+            const newNodes = rawNodes.map((node) => {
+                const canonical = stripSceneNamespace(node.canonicalId || node.id);
+                const reNamespacedId = namespaceSceneNodeId(newSceneId, canonical);
+                const newX = typeof node.x === 'number' && Number.isFinite(node.x) ? round2(node.x + dx) : node.x;
+                const newFx = typeof node.fx === 'number' && Number.isFinite(node.fx) ? round2(node.fx + dx) : node.fx;
+                return {
+                    ...node,
+                    id: reNamespacedId,
+                    canonicalId: canonical,
+                    sceneId: newSceneId,
+                    sceneIndex: newIdx,
+                    ...(typeof newX === 'number' ? { x: newX } : {}),
+                    ...(typeof newFx === 'number' ? { fx: newFx } : {}),
+                };
+            });
+            const newLinks = rawLinks.map((link) => {
+                const srcId = typeof link.source === 'object' && link.source !== null ? link.source.id : link.source;
+                const tgtId = typeof link.target === 'object' && link.target !== null ? link.target.id : link.target;
+                const newSrcId = namespaceSceneNodeId(newSceneId, stripSceneNamespace(srcId));
+                const newTgtId = namespaceSceneNodeId(newSceneId, stripSceneNamespace(tgtId));
+                return {
+                    ...link,
+                    source: newSrcId,
+                    target: newTgtId,
+                    sceneId: newSceneId,
+                };
+            });
+            updatedGraphData = {
+                nodes: newNodes,
+                links: newLinks,
+                ...(g?.synthesisRationale ? { synthesisRationale: g.synthesisRationale } : {}),
+            };
+        }
+        const seedsArray = toSeedArtistsArray(scene?.curatedSeedArtists || scene?.seedArtists);
+        const seedsJoined = seedsArray.join(', ');
+        const titleStr = typeof scene?.title === 'string' ? scene.title.trim() : '';
+        const isAutoSceneTitle = titleStr === seedsJoined || titleStr === seedsArray.join(' + ');
+        const hasExplicitCustomName = typeof scene?.customName === 'string' && scene.customName.trim().length > 0;
+        const hasCustomTitle = titleStr.length > 0 && !/^scene(?:\s+\d+)?$/i.test(titleStr) && !isAutoSceneTitle;
+        const preservedCustomName = hasExplicitCustomName
+            ? scene.customName.trim()
+            : hasCustomTitle
+                ? titleStr
+                : undefined;
+        const resolvedTitle = preservedCustomName || (seedsArray.length > 0 ? seedsJoined : `Scene ${newIdx + 1}`);
+        return normalizeProjectScene({
+            ...scene,
+            id: newSceneId,
+            sceneId: newSceneId,
+            sceneIndex: newIdx,
+            title: resolvedTitle,
+            name: resolvedTitle,
+            customName: preservedCustomName,
+            centerOffset: getSceneCenterOffset(newIdx),
+            graphData: updatedGraphData,
+        }, newIdx);
+    });
+    // Shift and re-namespace canvasLayout via the exact bijection, stripping any legacy `id` / `sceneId`
+    // fields so buildCompositeCanvasGraph (`ref?.id || ref?.nodeId`) always reads the updated `nodeId`.
+    const reorderedCanvasLayout = [];
+    const seenLayoutKeys = new Set();
+    for (const item of parsedLayout) {
+        if (!item || typeof item !== 'object')
+            continue;
+        const rawKey = String(item.id || item.nodeId || '').trim();
+        if (!rawKey)
+            continue;
+        const oldSid = extractSceneIdFromNodeId(rawKey) || (typeof item.sceneId === 'string' ? item.sceneId.trim() : null);
+        if (!oldSid || !sceneShiftMap.has(oldSid))
+            continue;
+        const { newSceneId, dx } = sceneShiftMap.get(oldSid);
+        const canonical = stripSceneNamespace(rawKey);
+        const newKey = namespaceSceneNodeId(newSceneId, canonical);
+        if (seenLayoutKeys.has(newKey.toLowerCase()))
+            continue;
+        seenLayoutKeys.add(newKey.toLowerCase());
+        const { id: _legacyId, sceneId: _legacySceneId, ...restItem } = item;
+        reorderedCanvasLayout.push({
+            ...restItem,
+            nodeId: newKey,
+            ...(typeof item.x === 'number' && Number.isFinite(item.x) ? { x: round2(item.x + dx) } : {}),
+            ...(typeof item.fx === 'number' && Number.isFinite(item.fx) ? { fx: round2(item.fx + dx) } : {}),
+        });
+    }
+    // Remap crossSceneLinks via exact bijection (preserves both identity & sonic_lineage bridges without ordinal drift)
+    const reorderedCrossSceneLinks = [];
+    const seenBridgeKeys = new Set();
+    for (const bridge of parsedBridges) {
+        const oldSrcSid = String(bridge.sourceSceneId || bridge.fromSceneId || extractSceneIdFromNodeId(bridge.sourceNodeId || '') || '').trim();
+        const oldTgtSid = String(bridge.targetSceneId || bridge.toSceneId || extractSceneIdFromNodeId(bridge.targetNodeId || '') || '').trim();
+        const newSrcSid = sceneShiftMap.get(oldSrcSid)?.newSceneId || oldSrcSid;
+        const newTgtSid = sceneShiftMap.get(oldTgtSid)?.newSceneId || oldTgtSid;
+        if (!newSrcSid || !newTgtSid || newSrcSid === newTgtSid)
+            continue;
+        const srcCanon = stripSceneNamespace(bridge.sourceCanonicalId || bridge.fromNodeId || bridge.sourceNodeId || '');
+        const tgtCanon = stripSceneNamespace(bridge.targetCanonicalId || bridge.toNodeId || bridge.targetNodeId || '');
+        if (!srcCanon || !tgtCanon)
+            continue;
+        const newSrcNodeId = namespaceSceneNodeId(newSrcSid, srcCanon);
+        const newTgtNodeId = namespaceSceneNodeId(newTgtSid, tgtCanon);
+        const pairKey = [newSrcNodeId.toLowerCase(), newTgtNodeId.toLowerCase()].sort().join('--');
+        if (seenBridgeKeys.has(pairKey))
+            continue;
+        seenBridgeKeys.add(pairKey);
+        const normalized = normalizeCrossSceneLink({
+            ...bridge,
+            id: `${newSrcNodeId}--${newTgtNodeId}`,
+            sourceSceneId: newSrcSid,
+            targetSceneId: newTgtSid,
+            fromSceneId: newSrcSid,
+            toSceneId: newTgtSid,
+            sourceNodeId: newSrcNodeId,
+            targetNodeId: newTgtNodeId,
+            sourceCanonicalId: srcCanon,
+            targetCanonicalId: tgtCanon,
+            fromNodeId: srcCanon,
+            toNodeId: tgtCanon,
+        });
+        if (normalized) {
+            reorderedCrossSceneLinks.push(normalized);
+        }
+    }
+    return {
+        didReorder: true,
+        reorderedScenes,
+        reorderedCanvasLayout,
+        reorderedCrossSceneLinks,
+        sceneIdMap,
+    };
 }
 //# sourceMappingURL=multiSceneUtils.js.map

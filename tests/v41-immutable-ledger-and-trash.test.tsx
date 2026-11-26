@@ -579,7 +579,7 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
   });
 
   describe('Part 5: Architecture & Master Blueprint Parity Gate', () => {
-    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V47.19', () => {
+    it('verifies architecture_truth.md and EnginePage.tsx are 100% in lockstep with V47.20', () => {
       const truthPath = path.resolve(__dirname, '../architecture_truth.md');
       const truthContent = fs.readFileSync(truthPath, 'utf8');
 
@@ -589,15 +589,17 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       const runbookPath = path.resolve(__dirname, '../docs/backend-regression-runbook.ts');
       const runbookContent = fs.readFileSync(runbookPath, 'utf8');
 
-      // Check V47.19 headers & badges (48 Laws)
-      expect(truthContent).toContain('V47.19 — 48 Laws');
-      expect(engineContent).toContain('Zcene V47.19 Blueprint');
-      expect(engineContent).toContain('V47.19 Locked');
+      // Check V47.20 headers & badges (48 Laws)
+      expect(truthContent).toContain('V47.20 — 48 Laws');
+      expect(engineContent).toContain('Zcene V47.20 Blueprint');
+      expect(engineContent).toContain('V47.20 Locked');
       expect(engineContent).toContain('48 Laws');
-      expect(engineContent).toContain('V47.19 Full-Stack Regression Runbook');
-      expect(runbookContent).toContain('# V47.19 Regression Suite (Full-Stack)');
-      expect(runbookContent).toContain('29 test suites (651 unit/integration tests)');
+      expect(engineContent).toContain('V47.20 Full-Stack Regression Runbook');
+      expect(runbookContent).toContain('# V47.20 Regression Suite (Full-Stack)');
+      expect(runbookContent).toContain('30 test suites (669 unit/integration tests)');
       expect(runbookContent).toContain('npx vitest run tests/v47_19-stack-archive.test.tsx');
+      expect(runbookContent).toContain('npx vitest run tests/v47_20-scene-reordering.test.tsx');
+      expect(runbookContent).not.toContain('651 unit/integration tests');
       expect(runbookContent).not.toContain('648 unit/integration tests');
       expect(runbookContent).not.toContain('644 unit/integration tests');
       expect(runbookContent).not.toContain('642 unit/integration tests');

@@ -142,6 +142,7 @@ interface GraphPageProps {
   onAddScene?: () => void;
   onRemoveScene?: (sceneId: string, action?: 'overwrite' | 'fork') => void;
   onRenameScene?: (sceneId: string, customName: string) => void;
+  onReorderScene?: (sceneId: string, direction: 'left' | 'right') => boolean | void;
   overarchingRationale?: string;
   overarchingZineTitle?: string;
   overarchingZineIntro?: string;
@@ -1211,6 +1212,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
   onAddScene,
   onRemoveScene,
   onRenameScene,
+  onReorderScene,
   overarchingRationale,
   overarchingZineTitle,
   overarchingZineIntro,
@@ -1233,6 +1235,8 @@ const GraphPage: React.FC<GraphPageProps> = ({
     return false;
   });
   const [focusedSceneCluster, setFocusedSceneCluster] = useState<{ sceneId: string; timestamp: number } | undefined>(undefined);
+  const [reorderCameraSignal, setReorderCameraSignal] = useState<{ nonce: number; fitAll: boolean } | undefined>(undefined);
+  const reorderCameraNonceRef = useRef<number>(0);
   const hasInitializedPanelRef = useRef(isLeftPanelCollapsed);
 
   useEffect(() => {
@@ -2505,11 +2509,76 @@ const GraphPage: React.FC<GraphPageProps> = ({
                                     setSceneRenameInput(scene.customName || '');
                                     setSceneToRename({ sceneId: sceneKey, currentName: displayName, index: idx + 1 });
                                   }}
-                                  className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
+                                  className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group cursor-pointer"
                                 >
-                                  <span className="material-symbols-outlined !text-[18px] text-zinc-500">edit</span>
+                                  <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">edit</span>
                                   Rename
                                 </button>
+
+                                {/* V47.20: 0-Token Scene Reordering (curated scenes only, >= 2 curated scenes, non-guest) */}
+                                {(() => {
+                                  const isCurrentMapped = (scene.graphData?.nodes?.length ?? 0) > 0;
+                                  const curatedScenesCount = scenes.filter(s => (s.graphData?.nodes?.length ?? 0) > 0).length;
+                                  if (isGuest || !onReorderScene || !isCurrentMapped || curatedScenesCount < 2) {
+                                    return null;
+                                  }
+                                  const isReorderLocked = Boolean(isLoading || isHydrating || isPreFlightChecking || projectStatus === 'curating');
+                                  const leftNeighborMapped = idx > 0 && (scenes[idx - 1]?.graphData?.nodes?.length ?? 0) > 0;
+                                  const rightNeighborMapped = idx < scenes.length - 1 && (scenes[idx + 1]?.graphData?.nodes?.length ?? 0) > 0;
+                                  const isMoveLeftDisabled = isReorderLocked || !leftNeighborMapped;
+                                  const isMoveRightDisabled = isReorderLocked || !rightNeighborMapped;
+
+                                  const triggerReorder = (direction: 'left' | 'right') => {
+                                    setActiveSceneMenuId(null);
+                                    const didSwap = onReorderScene(sceneKey, direction);
+                                    if (didSwap === true) {
+                                      const targetIdx = direction === 'left' ? idx - 1 : idx + 1;
+                                      reorderCameraNonceRef.current += 1;
+                                      setReorderCameraSignal({
+                                        nonce: reorderCameraNonceRef.current,
+                                        fitAll: !isSmallScreen,
+                                      });
+                                      const customLabel = scene.customName?.trim();
+                                      const toastMsg = customLabel
+                                        ? `Moved "${customLabel}" to Scene ${targetIdx + 1}`
+                                        : `Moved Scene ${idx + 1} to Scene ${targetIdx + 1}`;
+                                      onShowToast?.(toastMsg);
+                                    }
+                                  };
+
+                                  return (
+                                    <>
+                                      <button
+                                        type="button"
+                                        data-testid={`move-scene-left-${sceneKey}`}
+                                        disabled={isMoveLeftDisabled}
+                                        onClick={() => triggerReorder('left')}
+                                        className={`w-full text-left px-3.5 py-2.5 text-sm font-medium rounded-lg flex items-center gap-2.5 whitespace-nowrap transition-all ${
+                                          isMoveLeftDisabled
+                                            ? 'text-zinc-500 opacity-40 cursor-not-allowed'
+                                            : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer'
+                                        }`}
+                                      >
+                                        <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">arrow_back</span>
+                                        Move Left
+                                      </button>
+                                      <button
+                                        type="button"
+                                        data-testid={`move-scene-right-${sceneKey}`}
+                                        disabled={isMoveRightDisabled}
+                                        onClick={() => triggerReorder('right')}
+                                        className={`w-full text-left px-3.5 py-2.5 text-sm font-medium rounded-lg flex items-center gap-2.5 whitespace-nowrap transition-all ${
+                                          isMoveRightDisabled
+                                            ? 'text-zinc-500 opacity-40 cursor-not-allowed'
+                                            : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 cursor-pointer'
+                                        }`}
+                                      >
+                                        <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">arrow_forward</span>
+                                        Move Right
+                                      </button>
+                                    </>
+                                  );
+                                })()}
 
                                 {/* Remove Action (shown when scenes.length > 1 and not guest) */}
                                 {!isGuest && scenes.length > 1 && onRemoveScene && (
@@ -3152,7 +3221,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                             <div className="w-full flex-shrink-0 flex flex-col min-h-0 overflow-hidden relative">
                                 <div className="h-full flex flex-col overflow-hidden">
 
-                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto px-6 sm:px-8"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
+                                    <div className="flex-grow relative min-h-0 bg-zinc-900" ref={mobileGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto px-6 sm:px-8"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} reorderCameraSignal={reorderCameraSignal} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
                                 </div>
                             </div>
                             <div className={`w-full flex-shrink-0 h-full flex flex-col min-h-0 overflow-hidden relative`}>
@@ -3216,7 +3285,7 @@ const GraphPage: React.FC<GraphPageProps> = ({
                 <div ref={centerColumnRef} className={`flex-1 min-w-0 flex flex-col gap-4 relative z-10 transition-opacity duration-300 print:hidden ${isMagazineViewOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}>
                     <div className="flex-1 relative min-h-0 flex flex-col bg-zinc-900 border border-zinc-600/50 overflow-hidden rounded-2xl">
                         <div className={`${LayoutSizes.headerBar} px-4 flex-shrink-0 border-b border-zinc-600/50 flex items-center justify-between overflow-hidden`}><h2 className="text-base text-white font-medium uppercase tracking-widest whitespace-nowrap">Connections</h2></div>
-                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto px-6 sm:px-8"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
+                        <div className="flex-grow relative min-h-0" ref={desktopGraphAreaRef}>{(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 bg-zinc-900/60 backdrop-blur-md z-[90] flex flex-col items-center justify-center gap-4 pointer-events-auto px-6 sm:px-8"><LoadingSpinner subtext={loadingSubtext} /></div>)}{isFirstGeneration && !(isLoading || isHydrating || (data.nodes.length > 0 && isSimulationSettling)) && (<div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none"><ZceneEmptyState onNavigate={onNavigate} /></div>)}{data.nodes.length > 0 && (<MusicGraph data={data} libraryArtists={memoizedLibraryArtists} seedArtists={memoizedSeedArtists} onNodeClick={handleNodeClickInternal} selectedNode={selectedNode} peekedNode={peekedNode} isSmallScreen={isSmallScreen} isPassiveSelection={isPassiveSelection} activeFilters={activeFilters} searchQuery={searchQuery} setSearchQuery={setSearchQuery} toggleFilter={toggleFilterInternal} legendConfig={legendConfig} legendOrder={legendOrder} legendRef={desktopLegendAreaRef} onInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} onLegendInteraction={() => { if (!onboardingProgress.step3) updateOnboarding('step3'); }} isGuest={isGuest} detailsCache={detailsCache} isActive={isActive} scenes={scenes} activeSceneId={activeSceneId} focusedSceneCluster={focusedSceneCluster} reorderCameraSignal={reorderCameraSignal} onSimulationComplete={() => setIsSimulationSettling(false)} onCoordinatesSettled={onCoordinatesSettled} />)}</div>
                     </div>
                 </div>
                 

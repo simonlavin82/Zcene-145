@@ -4480,14 +4480,22 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                         </div>
 
-                                        <div className="w-48 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black text-left">
-                                            <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5">
-                                                <span className="material-symbols-outlined !text-[18px] text-zinc-500">edit</span>
+                                        <div className="w-48 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black text-left space-y-0.5">
+                                            <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5 whitespace-nowrap">
+                                                <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">edit</span>
                                                 Rename
                                             </div>
+                                            <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-500 opacity-40 rounded-lg flex items-center gap-2.5 whitespace-nowrap">
+                                                <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">arrow_back</span>
+                                                Move Left
+                                            </div>
+                                            <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5 whitespace-nowrap">
+                                                <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">arrow_forward</span>
+                                                Move Right
+                                            </div>
                                             <div className="my-2 border-t border-zinc-800/80" />
-                                            <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] rounded-lg flex items-center gap-2.5">
-                                                <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete</span>
+                                            <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] rounded-lg flex items-center gap-2.5 whitespace-nowrap">
+                                                <span className="material-symbols-outlined !text-[18px] text-[#ef4444] shrink-0">delete</span>
                                                 Remove
                                             </div>
                                         </div>
