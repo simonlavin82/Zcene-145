@@ -21,6 +21,29 @@ import { useContinuousDictation, combineDictationText } from '../hooks/useContin
 import { AudioPreviewPlayer, AlbumAudioPreviewButton, stopGlobalAudio, audioController } from './AudioPreviewPlayer';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
+export const isNodeInPopulatedScene = (node: Node, scene: ProjectScene): boolean => {
+    const sceneNodes = scene?.graphData?.nodes || [];
+    if (sceneNodes.length === 0) return false;
+
+    const targetCanon = stripSceneNamespace(node.canonicalId || node.id).toLowerCase();
+    const targetNorm = normalizeCanonicalEntityId(targetCanon);
+    const targetLabel = (node.label || '').toLowerCase().trim();
+    const isLabel = node.type === 'label';
+
+    return sceneNodes.some(sn => {
+        const snCanon = stripSceneNamespace(sn.canonicalId || sn.id).toLowerCase();
+        const snNorm = normalizeCanonicalEntityId(snCanon);
+        const snLabel = (sn.label || '').toLowerCase().trim();
+
+        if (snCanon === targetCanon || (targetNorm && snNorm === targetNorm)) return true;
+        if (targetLabel && snLabel && targetLabel === snLabel) return true;
+        if (isLabel && sn.type === 'label') {
+            return normalizeLabelId(sn.label || snCanon) === normalizeLabelId(node.label || targetCanon);
+        }
+        return false;
+    });
+};
+
 export const getArtistDisplayName = (details: any, node: any): string => {
     if (node?.type === 'label') {
         const raw = (node?.label && typeof node.label === 'string' && node.label.trim())
@@ -1076,29 +1099,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         const populatedScenes = scenes.filter(s => s.graphData && Array.isArray(s.graphData.nodes) && s.graphData.nodes.length > 0);
         if (populatedScenes.length < 2) return null;
 
-        const targetCanon = stripSceneNamespace(node.canonicalId || node.id).toLowerCase();
-        const targetNorm = normalizeCanonicalEntityId(targetCanon);
-        const targetLabel = (node.label || '').toLowerCase().trim();
-        const isLabel = node.type === 'label';
-
         const matchingScenes: { displayNum: number; customName?: string }[] = [];
 
         populatedScenes.forEach((scene, idx) => {
-            const sceneNodes = scene?.graphData?.nodes || [];
-            const isPresent = sceneNodes.some(sn => {
-                const snCanon = stripSceneNamespace(sn.canonicalId || sn.id).toLowerCase();
-                const snNorm = normalizeCanonicalEntityId(snCanon);
-                const snLabel = (sn.label || '').toLowerCase().trim();
-
-                if (snCanon === targetCanon || (targetNorm && snNorm === targetNorm)) return true;
-                if (targetLabel && snLabel && targetLabel === snLabel) return true;
-                if (isLabel && sn.type === 'label') {
-                    return normalizeLabelId(sn.label || snCanon) === normalizeLabelId(node.label || targetCanon);
-                }
-                return false;
-            });
-
-            if (isPresent) {
+            if (isNodeInPopulatedScene(node, scene)) {
                 const displayNum = typeof scene.sceneIndex === 'number' ? scene.sceneIndex + 1 : idx + 1;
                 if (!matchingScenes.some(m => m.displayNum === displayNum)) {
                     matchingScenes.push({
@@ -3712,6 +3716,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const [magazineSortBy, setMagazineSortBy] = useState<'none' | 'artist' | 'label'>('none');
     const [magazineSearchQuery, setMagazineSearchQuery] = useState('');
     const [isMagazineSearchOpen, setIsMagazineSearchOpen] = useState(false);
+    const [selectedZineSceneId, setSelectedZineSceneId] = useState<'all' | string>('all');
+    const [isSceneFilterMenuOpen, setIsSceneFilterMenuOpen] = useState(false);
     const [hasSeenMagazineView, setHasSeenMagazineView] = useState(false);
     const [jitLoadingIds, setJitLoadingIds] = useState<Set<string>>(new Set());
 
@@ -3724,11 +3730,75 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
     const canEditZine = Boolean(!isGuest && user && !isStaticMockup && !isGlobalLoading && onUpdateZineImages);
 
+    const populatedZineScenes = useMemo(() => {
+        return (scenes || [])
+            .map((scene, idx) => ({
+                scene,
+                idx,
+                sceneKey: scene.sceneId || scene.id || `scene-${idx + 1}`,
+                label: scene.customName?.trim() || `Scene ${idx + 1}`,
+            }))
+            .filter(({ scene }) => (scene.graphData?.nodes?.length ?? 0) > 0);
+    }, [scenes]);
+
+    const activeSceneFilterEntry = useMemo(() => {
+        if (selectedZineSceneId === 'all') return null;
+        return populatedZineScenes.find(s => s.sceneKey === selectedZineSceneId) || null;
+    }, [populatedZineScenes, selectedZineSceneId]);
+
+    const zineBoardResetKey = useMemo(
+        () => projectId || `share::${projectName || ''}::${(scenes || []).map(s => s.seedArtists || '').join('|')}`,
+        [projectId, projectName, scenes]
+    );
+
     useEffect(() => {
         if (!isMagazineViewOpen || !canEditZine) {
             setIsEditingZine(false);
         }
     }, [isMagazineViewOpen, canEditZine]);
+
+    useEffect(() => {
+        if (!isMagazineViewOpen) {
+            setSelectedZineSceneId('all');
+            setIsSceneFilterMenuOpen(false);
+        }
+    }, [isMagazineViewOpen]);
+
+    useEffect(() => {
+        setSelectedZineSceneId('all');
+        setIsSceneFilterMenuOpen(false);
+    }, [zineBoardResetKey]);
+
+    useEffect(() => {
+        if (populatedZineScenes.length < 2) {
+            setSelectedZineSceneId('all');
+            setIsSceneFilterMenuOpen(false);
+        } else if (
+            selectedZineSceneId !== 'all' &&
+            !populatedZineScenes.some(s => s.sceneKey === selectedZineSceneId)
+        ) {
+            setSelectedZineSceneId('all');
+            setIsSceneFilterMenuOpen(false);
+        }
+    }, [populatedZineScenes, selectedZineSceneId]);
+
+    useEffect(() => {
+        if (!isSceneFilterMenuOpen) return;
+        const handleEsc = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setIsSceneFilterMenuOpen(false);
+        };
+        window.addEventListener('keydown', handleEsc);
+        return () => window.removeEventListener('keydown', handleEsc);
+    }, [isSceneFilterMenuOpen]);
+
+    const handleSelectZineSceneFilter = useCallback((nextSceneId: 'all' | string) => {
+        setSelectedZineSceneId(nextSceneId);
+        setIsSceneFilterMenuOpen(false);
+        const container = magazineScrollContainerRef.current || (typeof document !== 'undefined' ? document.getElementById('magazine-scroll-container') : null);
+        if (container) {
+            container.scrollTop = 0;
+        }
+    }, []);
 
     const handleMarkZineImageFailed = useCallback((url: string) => {
         setFailedZineImageUrls((prev) => {
@@ -3968,15 +4038,21 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
 
         const selectedCanon = selectedNode ? stripSceneNamespace(selectedNode.canonicalId || selectedNode.id).toLowerCase() : null;
         if (selectedNode) {
-            // If the target artist is currently filtered out by a Zine search query, clear it so the card renders
-            if (magazineSearchQuery.trim()) {
+            // If the target artist is currently filtered out by a Zine search query or Scene Filter, clear the blocking filter so the card renders
+            if (magazineSearchQuery.trim() || selectedZineSceneId !== 'all') {
                 const isPresent = filteredAndSortedNodes.some(n => {
                     const nCanon = stripSceneNamespace(n.canonicalId || n.id).toLowerCase();
                     return nCanon === selectedCanon || normalizeArtistId(nCanon) === normalizeArtistId(selectedCanon || '');
                 });
                 if (!isPresent) {
-                    setMagazineSearchQuery('');
-                    setIsMagazineSearchOpen(false);
+                    if (magazineSearchQuery.trim()) {
+                        setMagazineSearchQuery('');
+                        setIsMagazineSearchOpen(false);
+                    }
+                    if (selectedZineSceneId !== 'all') {
+                        setSelectedZineSceneId('all');
+                        setIsSceneFilterMenuOpen(false);
+                    }
                 }
             }
 
@@ -4218,6 +4294,11 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             }
         }
 
+        // Filter by active Zine Scene Filter (shared multi-scene entities appear under every scene they belong to)
+        if (isMagazineViewOpen && activeSceneFilterEntry) {
+            result = result.filter(node => isNodeInPopulatedScene(node, activeSceneFilterEntry.scene));
+        }
+
         // Filter
         if (isMagazineViewOpen && magazineSearchQuery.trim()) {
             const query = magazineSearchQuery.toLowerCase().trim();
@@ -4282,7 +4363,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         });
 
         return result;
-    }, [activeNodes, isMagazineViewOpen, magazineSortBy, magazineSearchQuery, detailsCache, pinnedNodes]);
+    }, [activeNodes, isMagazineViewOpen, activeSceneFilterEntry, magazineSortBy, magazineSearchQuery, detailsCache, pinnedNodes]);
 
     useEffect(() => {
         if (!trackRef.current || !activeDotRef.current) return;
@@ -4505,12 +4586,23 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     );
 
     const resolvedZinePrintTitle = useMemo(() => {
+        if (activeSceneFilterEntry) {
+            const { scene, label } = activeSceneFilterEntry;
+            const sceneCustomTitle = normalizeZineTitle(scene.zineTitle);
+            const rawSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
+            const fallbackChapterTitle =
+                scene.customName?.trim() ||
+                (rawSeeds.length > 0 ? rawSeeds.join(', ') : '') ||
+                cleanArtistDisplayName(scene.title || scene.name, scene.graphData?.nodes) ||
+                label;
+            return formatZinePrintDocumentTitle(sceneCustomTitle || fallbackChapterTitle);
+        }
         const customEditorialTitle = scenes.length >= 2
             ? normalizeZineTitle(overarchingZineTitle)
             : normalizeZineTitle(scenes[0]?.zineTitle || overarchingZineTitle);
         const fallbackTitle = projectName || (allScenesSeedArtists.length > 0 ? allScenesSeedArtists.join(', ') : '');
         return formatZinePrintDocumentTitle(customEditorialTitle || fallbackTitle);
-    }, [scenes, overarchingZineTitle, projectName, allScenesSeedArtists]);
+    }, [activeSceneFilterEntry, scenes, overarchingZineTitle, projectName, allScenesSeedArtists]);
 
     const handleSaveAsPdf = useCallback(() => {
         if (typeof window === 'undefined' || typeof document === 'undefined') return;
@@ -4552,6 +4644,93 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
         }
     }, [isEditingZine, resolvedZinePrintTitle]);
 
+    const renderSceneFilterDropdown = (isMobileLayout: boolean) => {
+        if (populatedZineScenes.length < 2) return null;
+        const activeLabel = activeSceneFilterEntry ? activeSceneFilterEntry.label : 'All Scenes';
+        const isFiltered = Boolean(activeSceneFilterEntry);
+        return (
+            <div className={`relative ${isMobileLayout ? 'flex-1 min-w-[78px] max-w-[120px]' : 'shrink-0'} ${isSceneFilterMenuOpen ? 'z-[70]' : 'z-10'}`}>
+                <button
+                    type="button"
+                    data-testid={isMobileLayout ? 'zine-scene-filter-trigger-mobile' : 'zine-scene-filter-trigger'}
+                    onClick={() => setIsSceneFilterMenuOpen(prev => !prev)}
+                    aria-haspopup="listbox"
+                    aria-expanded={isSceneFilterMenuOpen}
+                    title={isFiltered ? `Filtered to ${activeLabel}` : 'Filter Zine by scene'}
+                    className={`h-10 rounded-xl border bg-zinc-950 text-sm pl-3 pr-2 inline-flex items-center justify-between gap-1.5 transition-colors cursor-pointer focus:ring-1 focus:ring-primary focus:outline-none ${
+                        isMobileLayout ? 'w-full' : 'max-w-[180px]'
+                    } ${
+                        isFiltered
+                            ? 'border-primary/60 text-primary'
+                            : 'border-zinc-700 text-zinc-300 hover:border-zinc-600'
+                    }`}
+                >
+                    <span className="truncate">{activeLabel}</span>
+                    <span className={`material-symbols-outlined !text-[18px] shrink-0 ${isFiltered ? 'text-primary' : 'text-zinc-400'}`}>
+                        arrow_drop_down
+                    </span>
+                </button>
+                {isSceneFilterMenuOpen && (
+                    <>
+                        <div
+                            className="fixed inset-0 z-10"
+                            onClick={() => setIsSceneFilterMenuOpen(false)}
+                        />
+                        <div
+                            role="listbox"
+                            aria-label="Filter Zine by scene"
+                            data-testid={isMobileLayout ? 'zine-scene-filter-menu-mobile' : 'zine-scene-filter-menu'}
+                            className="absolute left-0 top-full mt-1.5 w-48 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left antialiased space-y-0.5"
+                        >
+                            <button
+                                type="button"
+                                role="option"
+                                aria-selected={selectedZineSceneId === 'all'}
+                                data-testid="zine-scene-filter-option-all"
+                                onClick={() => handleSelectZineSceneFilter('all')}
+                                className={`w-full text-left px-3.5 py-2.5 text-sm font-medium rounded-lg flex items-center justify-between gap-2 whitespace-nowrap transition-all cursor-pointer ${
+                                    selectedZineSceneId === 'all'
+                                        ? 'bg-primary/10 text-primary'
+                                        : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                                }`}
+                            >
+                                <span className="truncate">All Scenes</span>
+                                {selectedZineSceneId === 'all' && (
+                                    <span className="material-symbols-outlined !text-[16px] text-primary shrink-0">check</span>
+                                )}
+                            </button>
+                            <div className="my-1.5 border-t border-zinc-800/80" />
+                            {populatedZineScenes.map((entry) => {
+                                const isSelected = selectedZineSceneId === entry.sceneKey;
+                                return (
+                                    <button
+                                        key={entry.sceneKey}
+                                        type="button"
+                                        role="option"
+                                        aria-selected={isSelected}
+                                        data-testid={`zine-scene-filter-option-${entry.sceneKey}`}
+                                        title={entry.label}
+                                        onClick={() => handleSelectZineSceneFilter(entry.sceneKey)}
+                                        className={`w-full text-left px-3.5 py-2.5 text-sm font-medium rounded-lg flex items-center justify-between gap-2 whitespace-nowrap transition-all cursor-pointer ${
+                                            isSelected
+                                                ? 'bg-primary/10 text-primary'
+                                                : 'text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200'
+                                        }`}
+                                    >
+                                        <span className="truncate">{entry.label}</span>
+                                        {isSelected && (
+                                            <span className="material-symbols-outlined !text-[16px] text-primary shrink-0">check</span>
+                                        )}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </>
+                )}
+            </div>
+        );
+    };
+
     return (
         <div
             className={`w-full ${isStaticMockup ? 'h-auto overflow-hidden' : 'h-full overflow-hidden'} flex flex-col bg-zinc-900 relative min-h-0 outline-none transition-colors duration-700 zine-print-unlock zine-print-root`}
@@ -4569,8 +4748,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                     data-testid="zine-toolbar-mobile"
                     className={`relative flex-shrink-0 z-[60] transition-all duration-300 print:hidden ${isMagazineViewOpen ? `bg-transparent ${LayoutSizes.topHeader} border-b border-zinc-700/50` : 'bg-zinc-900 h-0 overflow-hidden border-transparent'}`}
                 >
-                    <div className="px-4 flex items-center justify-between gap-2 h-full">
-                        <div className="flex items-center gap-2">
+                    <div className={`${populatedZineScenes.length >= 2 ? 'px-3 gap-1.5' : 'px-4 gap-2'} flex items-center justify-between h-full`}>
+                        <div className={`flex items-center ${populatedZineScenes.length >= 2 ? 'gap-1.5 flex-1 min-w-0' : 'gap-2'}`}>
                             <ToolbarSearch
                                 value={magazineSearchQuery}
                                 onChange={setMagazineSearchQuery}
@@ -4585,7 +4764,9 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 overlayTestId="zine-search-overlay-mobile"
                             />
 
-                            <div className="relative shrink-0 w-[90px]">
+                            {renderSceneFilterDropdown(true)}
+
+                            <div className={`relative shrink-0 ${populatedZineScenes.length >= 2 ? 'w-[74px]' : 'w-[90px]'}`}>
                                 <Select
                                     variant="md"
                                     value={magazineSortBy}
@@ -4598,7 +4779,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                         </div>
 
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className={`flex items-center ${populatedZineScenes.length >= 2 ? 'gap-1.5' : 'gap-2'} shrink-0`}>
                             <Button
                                 variant="secondary"
                                 size="toolbar"
@@ -4620,7 +4801,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     type="button"
                                     data-testid="zine-edit-toggle-btn-mobile"
                                     onClick={() => setIsEditingZine((prev) => !prev)}
-                                    className={`w-[88px] ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
+                                    className={`${populatedZineScenes.length >= 2 ? 'w-[76px] !px-2' : 'w-[88px]'} ${isEditingZine ? '!border-primary/70 !text-primary !bg-primary/10' : ''}`}
                                     title={isEditingZine ? 'Done Editing Zine' : 'Edit Zine Images'}
                                 >
                                     <span className="material-symbols-outlined !text-[18px] -ml-0.5">
@@ -4645,6 +4826,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     size="toolbar"
                                     inputTestId="zine-search-input"
                                 />
+                                {renderSceneFilterDropdown(false)}
                                 <div className="flex items-center gap-2 shrink-0">
                                     <Select
                                         variant="md"
@@ -4830,8 +5012,12 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                             </div>
                         )}
                         {isMagazineViewOpen && scenes.length >= 2 && (
-                            <div className="max-w-[1400px] mx-auto pt-12 md:pt-16 pb-8 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0" data-testid="zine-multi-scene-editorial">
-                                {/* 1) TOP LAYER: OVERARCHING ZINE H1 */}
+                            <div
+                                className={`max-w-[1400px] mx-auto ${activeSceneFilterEntry ? 'pt-8 md:pt-12' : 'pt-12 md:pt-16'} pb-8 mb-8 border-b border-zinc-800/50 transition-opacity duration-500 ease-in-out opacity-100 px-0`}
+                                data-testid="zine-multi-scene-editorial"
+                            >
+                                {/* 1) TOP LAYER: OVERARCHING ZINE H1 (hidden in single-scene Chapter View) */}
+                                {!activeSceneFilterEntry && (
                                 <div className="pb-12 mb-12 border-b border-zinc-800/60" data-testid="overarching-zine-section">
                                     <div className="flex items-center flex-wrap gap-2 gap-y-2 mb-6 animate-in fade-in slide-in-from-bottom-2 duration-700">
                                         <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
@@ -4888,11 +5074,15 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                         </p>
                                     )}
                                 </div>
+                                )}
 
-                                {/* 2) MIDDLE LAYER: INDIVIDUAL SCENE EDITORIALS (H2) */}
-                                <div className="space-y-12" data-testid="scene-editorials-stack">
+                                {/* 2) MIDDLE LAYER: INDIVIDUAL SCENE EDITORIALS (H2, or H1 when isolated in Chapter View) */}
+                                <div className={activeSceneFilterEntry ? '' : 'space-y-12'} data-testid="scene-editorials-stack">
                                     {scenes.map((scene, idx) => {
                                         const sceneKey = scene.sceneId || scene.id || `scene-${idx + 1}`;
+                                        if (activeSceneFilterEntry && activeSceneFilterEntry.sceneKey !== sceneKey) {
+                                            return null;
+                                        }
                                         const rawSeeds = toSeedArtistsArray(scene.curatedSeedArtists || scene.seedArtists);
                                         const sceneSeeds = rawSeeds.map(seed => {
                                             return cleanArtistDisplayName(seed, scene.graphData?.nodes) ||
@@ -4910,7 +5100,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                             <div
                                                 key={sceneKey}
                                                 data-testid={`zine-scene-section-${sceneKey}`}
-                                                className="pb-10 last:pb-2 border-b last:border-b-0 border-zinc-800/50"
+                                                className={activeSceneFilterEntry ? 'pb-2' : 'pb-10 last:pb-2 border-b last:border-b-0 border-zinc-800/50'}
                                             >
                                                 <div className="flex items-center flex-wrap gap-2 mb-4">
                                                     <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-zinc-800 font-mono whitespace-nowrap">
@@ -4923,7 +5113,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                                     )}
                                                 </div>
                                                 <ZineEditorialHeading
-                                                    level="h2"
+                                                    level={activeSceneFilterEntry ? 'h1' : 'h2'}
                                                     sectionKey={sceneKey}
                                                     customTitle={scene.zineTitle}
                                                     defaultTitle={sceneSeeds.length > 0 ? sceneSeeds.join(', ') : (cleanArtistDisplayName(scene.title || scene.name, scene.graphData?.nodes) || `Scene ${idx + 1}`)}
@@ -5039,7 +5229,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                 </div>
                             ) : filteredAndSortedNodes.length === 0 || systemError ? (
                                 <div className="absolute inset-0 z-10 flex items-center justify-center text-center p-8 pointer-events-none">
-                                    {!magazineSearchQuery.trim() && (isReconciliationPending || (Boolean(graphData?.nodes && graphData.nodes.length > 0) && seedArtists && seedArtists.length > 0)) && !systemError ? (
+                                    {!magazineSearchQuery.trim() && !activeSceneFilterEntry && (isReconciliationPending || (Boolean(graphData?.nodes && graphData.nodes.length > 0) && seedArtists && seedArtists.length > 0)) && !systemError ? (
                                         <div className="flex flex-col items-center justify-center gap-6">
                                             <LoadingSpinner
                                                 steps={DETAIL_THINKING_STEPS}
@@ -5049,21 +5239,42 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     ) : (
                                         <div className="flex flex-col items-center gap-4">
                                             <ZceneEmptyState onNavigate={onNavigate} />
-                                            {magazineSearchQuery && (
+                                            {(magazineSearchQuery || activeSceneFilterEntry) && (
                                                 <div className="flex flex-col items-center gap-3 pointer-events-auto">
-                                                    <p className="text-zinc-500 text-sm">No results matching "{magazineSearchQuery}"</p>
-                                                    <button
-                                                        type="button"
-                                                        data-testid="zine-empty-clear-search-btn"
-                                                        onClick={() => {
-                                                            setMagazineSearchQuery('');
-                                                            setIsMagazineSearchOpen(false);
-                                                        }}
-                                                        className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-sm font-medium text-white transition-colors flex items-center gap-2 cursor-pointer"
-                                                    >
-                                                        <span className="material-symbols-outlined !text-[16px]">close</span>
-                                                        Clear Search
-                                                    </button>
+                                                    <p className="text-zinc-500 text-sm">
+                                                        {magazineSearchQuery && activeSceneFilterEntry
+                                                            ? `No results matching "${magazineSearchQuery}" in ${activeSceneFilterEntry.label}`
+                                                            : magazineSearchQuery
+                                                                ? `No results matching "${magazineSearchQuery}"`
+                                                                : `No Deep Cuts found in ${activeSceneFilterEntry?.label}`}
+                                                    </p>
+                                                    <div className="flex items-center flex-wrap justify-center gap-2">
+                                                        {magazineSearchQuery && (
+                                                            <button
+                                                                type="button"
+                                                                data-testid="zine-empty-clear-search-btn"
+                                                                onClick={() => {
+                                                                    setMagazineSearchQuery('');
+                                                                    setIsMagazineSearchOpen(false);
+                                                                }}
+                                                                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-sm font-medium text-white transition-colors flex items-center gap-2 cursor-pointer"
+                                                            >
+                                                                <span className="material-symbols-outlined !text-[16px]">close</span>
+                                                                Clear Search
+                                                            </button>
+                                                        )}
+                                                        {activeSceneFilterEntry && (
+                                                            <button
+                                                                type="button"
+                                                                data-testid="zine-empty-show-all-scenes-btn"
+                                                                onClick={() => handleSelectZineSceneFilter('all')}
+                                                                className="px-4 py-2 rounded-xl bg-zinc-800 hover:bg-zinc-700 text-sm font-medium text-white transition-colors flex items-center gap-2 cursor-pointer"
+                                                            >
+                                                                <span className="material-symbols-outlined !text-[16px]">layers</span>
+                                                                Show All Scenes
+                                                            </button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             )}
                                         </div>

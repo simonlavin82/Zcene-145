@@ -4,6 +4,7 @@ import { NodeDetailsCard, DetailsPanel, extractSearchGenre, buildYoutubeSearchUr
 import { audioController, stopGlobalAudio } from './AudioPreviewPlayer';
 import { clearPreviewMemoryCacheForTests } from '../services/itunesPreviewService';
 import { streamNodeChat } from '../services/geminiService';
+import type { Node, NodeDetails, ProjectScene } from '../types';
 
 vi.mock('react-markdown', () => ({
   default: (props: any) => <div data-testid="markdown">{props.children}</div>
@@ -2011,6 +2012,266 @@ describe('DetailsPanel', () => {
             fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
             fireEvent.click(screen.getByTestId('zine-intro-remove-overarching'));
             expect(onUpdateZineIntro).toHaveBeenCalledWith('overarching', null);
+        });
+
+        describe('Zine Ephemeral Scene Filter (All Scenes / Chapter View — V47.20)', () => {
+            const madballNode: Node = { id: 'madball-us', canonicalId: 'madball-us', label: 'Madball', type: 'artist', group: 1 };
+            const agnosticFrontNode: Node = { id: 'agnostic-front-us', canonicalId: 'agnostic-front-us', label: 'Agnostic Front', type: 'artist', group: 2 };
+            const pulpNode: Node = { id: 'pulp-gb', canonicalId: 'pulp-gb', label: 'Pulp', type: 'artist', group: 1 };
+
+            const filterDetailsCache = new Map<string, NodeDetails>([
+                ['madball-us', { summary: 'NYHC torchbearers bridging both scenes.', details: { artist: 'Madball', genre: 'Hardcore', origin: 'New York, USA', founded: '1988' }, members: [], discography: [], links: [] } as any],
+                ['agnostic-front-us', { summary: 'Foundational Lower East Side hardcore.', details: { artist: 'Agnostic Front', genre: 'Hardcore', origin: 'New York, USA', founded: '1980' }, members: [], discography: [], links: [] } as any],
+                ['pulp-gb', { summary: 'Sheffield art-pop and Britpop icons.', details: { artist: 'Pulp', genre: 'Britpop', origin: 'Sheffield, UK', founded: '1978' }, members: [], discography: [], links: [] } as any],
+            ]);
+
+            const buildThreeSceneList = (includeTrailingDraft = false): ProjectScene[] => {
+                const list: ProjectScene[] = [
+                    {
+                        sceneId: 'scene-1',
+                        sceneIndex: 0,
+                        title: 'Madball',
+                        customName: 'NYCHC',
+                        seedArtists: 'Madball',
+                        seedIds: ['madball-us'],
+                        discoveryFilters: {},
+                        graphData: {
+                            nodes: [
+                                { id: 'scene-1::madball-us', canonicalId: 'madball-us', label: 'Madball', type: 'artist', group: 1, isSeed: true },
+                                { id: 'scene-1::agnostic-front-us', canonicalId: 'agnostic-front-us', label: 'Agnostic Front', type: 'artist', group: 2 },
+                            ],
+                            links: [],
+                        },
+                        synthesisRationale: 'New York hardcore street foundation.',
+                        centerOffset: { x: 1000, y: 1000 },
+                        status: 'ready',
+                        updatedAt: Date.now(),
+                    },
+                    {
+                        sceneId: 'scene-2',
+                        sceneIndex: 1,
+                        title: 'Madball + Radiohead',
+                        customName: 'Crossover',
+                        seedArtists: 'Madball::Radiohead',
+                        seedIds: ['madball-us', 'radiohead-gb'],
+                        discoveryFilters: {},
+                        graphData: {
+                            nodes: [
+                                { id: 'scene-2::madball-us', canonicalId: 'madball-us', label: 'Madball', type: 'artist', group: 1, isSeed: true },
+                            ],
+                            links: [],
+                        },
+                        synthesisRationale: 'Crossover bridge connecting hardcore and alternative.',
+                        centerOffset: { x: 2050, y: 1000 },
+                        status: 'ready',
+                        updatedAt: Date.now(),
+                    },
+                    {
+                        sceneId: 'scene-3',
+                        sceneIndex: 2,
+                        title: 'Pulp',
+                        customName: 'Brit Indie',
+                        zineTitle: '90s Britpop & Indie',
+                        seedArtists: 'Pulp',
+                        seedIds: ['pulp-gb'],
+                        discoveryFilters: {},
+                        graphData: {
+                            nodes: [
+                                { id: 'scene-3::pulp-gb', canonicalId: 'pulp-gb', label: 'Pulp', type: 'artist', group: 1, isSeed: true },
+                            ],
+                            links: [],
+                        },
+                        synthesisRationale: 'Sheffield and London 1990s indie pop canon.',
+                        centerOffset: { x: 3100, y: 1000 },
+                        status: 'ready',
+                        updatedAt: Date.now(),
+                    },
+                ];
+                if (includeTrailingDraft) {
+                    list.push({
+                        sceneId: 'scene-4',
+                        sceneIndex: 3,
+                        title: 'Draft Scene',
+                        customName: 'Uncurated Draft',
+                        seedArtists: 'Fugazi',
+                        seedIds: [],
+                        discoveryFilters: {},
+                        graphData: { nodes: [], links: [] },
+                        synthesisRationale: '',
+                        centerOffset: { x: 4150, y: 1000 },
+                        status: 'unmapped',
+                        updatedAt: Date.now(),
+                    });
+                }
+                return list;
+            };
+
+            const buildFilterProps = (overrides: Partial<React.ComponentProps<typeof DetailsPanel>> = {}) => ({
+                ...baseProps({
+                    projectId: 'proj-scene-filter',
+                    projectName: 'Madball + Radiohead (Mix 2)',
+                    selectedNode: madballNode,
+                    activeNodes: [madballNode, agnosticFrontNode, pulpNode],
+                    detailsCache: filterDetailsCache,
+                    graphData: { nodes: [madballNode, agnosticFrontNode, pulpNode], links: [] },
+                    seedArtists: ['Madball', 'Pulp'],
+                    scenes: buildThreeSceneList(),
+                    overarchingRationale: 'Overarching multi-scene editorial connecting NYCHC, Crossover, and Brit Indie.',
+                    overarchingZineTitle: 'Master Multi-Scene Zine',
+                    ...overrides,
+                }),
+            });
+
+            it('hides Scene Filter on single-scene or 1-curated+draft boards and renders custom All Scenes dropdown for both owners and /z/:id guests on desktop & 375px mobile (V47.20)', () => {
+                const threeScenes = buildThreeSceneList(true);
+
+                // (a) Single-scene board hides dropdown
+                const { rerender } = render(<DetailsPanel {...buildFilterProps({ scenes: [threeScenes[0]] })} />);
+                expect(screen.queryByTestId('zine-scene-filter-trigger')).not.toBeInTheDocument();
+
+                // (b) 1 curated + 1 uncurated draft hides dropdown
+                rerender(<DetailsPanel {...buildFilterProps({ scenes: [threeScenes[0], threeScenes[3]] })} />);
+                expect(screen.queryByTestId('zine-scene-filter-trigger')).not.toBeInTheDocument();
+
+                // (c) 3 curated + 1 draft on desktop owner: shows All Scenes + 3 curated scenes only (omits draft)
+                rerender(<DetailsPanel {...buildFilterProps({ scenes: threeScenes })} />);
+                const trigger = screen.getByTestId('zine-scene-filter-trigger');
+                expect(trigger).toHaveTextContent('All Scenes');
+                fireEvent.click(trigger);
+
+                const menu = screen.getByTestId('zine-scene-filter-menu');
+                expect(menu.className).toContain('w-48');
+                expect(screen.getByTestId('zine-scene-filter-option-all')).toHaveTextContent('All Scenes');
+                expect(screen.getByTestId('zine-scene-filter-option-scene-1')).toHaveTextContent('NYCHC');
+                expect(screen.getByTestId('zine-scene-filter-option-scene-2')).toHaveTextContent('Crossover');
+                expect(screen.getByTestId('zine-scene-filter-option-scene-3')).toHaveTextContent('Brit Indie');
+                expect(screen.queryByTestId('zine-scene-filter-option-scene-4')).not.toBeInTheDocument();
+
+                // (d) Shared /z/:id guest viewer ALSO gets interactive Scene Filter
+                rerender(<DetailsPanel {...buildFilterProps({ isGuest: true, user: null })} />);
+                expect(screen.getByTestId('zine-scene-filter-trigger')).toBeInTheDocument();
+
+                // (e) Mobile (375px) renders compact mobile trigger alongside search & Save as PDF
+                rerender(<DetailsPanel {...buildFilterProps({ isSmallScreen: true })} />);
+                expect(screen.getByTestId('zine-scene-filter-trigger-mobile')).toHaveTextContent('All Scenes');
+                expect(screen.getByTestId('zine-search-trigger-mobile')).toBeInTheDocument();
+                expect(screen.getByTestId('zine-save-pdf-btn-mobile')).toBeInTheDocument();
+            });
+
+            it('renders Chapter View (hides Overarching Zine, shows only selected scene editorial) and keeps shared multi-scene artist Madball visible under BOTH NYCHC and Crossover (V47.20)', () => {
+                render(<DetailsPanel {...buildFilterProps()} />);
+
+                // Default All Scenes renders Overarching + all 3 scenes + all 3 cards
+                expect(screen.getByTestId('overarching-zine-section')).toBeInTheDocument();
+                expect(screen.getByTestId('zine-scene-section-scene-1')).toBeInTheDocument();
+                expect(screen.getByTestId('zine-scene-section-scene-2')).toBeInTheDocument();
+                expect(screen.getByTestId('zine-scene-section-scene-3')).toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="madball-us"]')).toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="agnostic-front-us"]')).toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="pulp-gb"]')).toBeInTheDocument();
+
+                // Select NYCHC (scene-1) -> Chapter View + Madball & Agnostic Front only
+                fireEvent.click(screen.getByTestId('zine-scene-filter-trigger'));
+                fireEvent.click(screen.getByTestId('zine-scene-filter-option-scene-1'));
+
+                expect(screen.queryByTestId('overarching-zine-section')).not.toBeInTheDocument();
+                expect(screen.getByTestId('zine-scene-section-scene-1')).toBeInTheDocument();
+                expect(screen.queryByTestId('zine-scene-section-scene-2')).not.toBeInTheDocument();
+                expect(screen.queryByTestId('zine-scene-section-scene-3')).not.toBeInTheDocument();
+                expect(screen.getByTestId('zine-scene-filter-trigger').className).toContain('text-primary');
+                expect(document.querySelector('[data-node-id="madball-us"]')).toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="agnostic-front-us"]')).toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="pulp-gb"]')).not.toBeInTheDocument();
+
+                // Select Crossover (scene-2) -> shared artist Madball MUST still appear!
+                fireEvent.click(screen.getByTestId('zine-scene-filter-trigger'));
+                fireEvent.click(screen.getByTestId('zine-scene-filter-option-scene-2'));
+
+                expect(screen.queryByTestId('overarching-zine-section')).not.toBeInTheDocument();
+                expect(screen.getByTestId('zine-scene-section-scene-2')).toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="madball-us"]')).toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="agnostic-front-us"]')).not.toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="pulp-gb"]')).not.toBeInTheDocument();
+
+                // Select Brit Indie (scene-3) -> Pulp only
+                fireEvent.click(screen.getByTestId('zine-scene-filter-trigger'));
+                fireEvent.click(screen.getByTestId('zine-scene-filter-option-scene-3'));
+
+                expect(screen.getByTestId('zine-scene-section-scene-3')).toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="pulp-gb"]')).toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="madball-us"]')).not.toBeInTheDocument();
+            });
+
+            it('composes Scene Filter with Find in zine... cleanly, suppresses LoadingSpinner on zero matches, and offers Show All Scenes & Clear Search recovery (V47.20)', () => {
+                render(<DetailsPanel {...buildFilterProps()} />);
+
+                // Filter to Brit Indie, then search for Agnostic Front (belongs to NYCHC)
+                fireEvent.click(screen.getByTestId('zine-scene-filter-trigger'));
+                fireEvent.click(screen.getByTestId('zine-scene-filter-option-scene-3'));
+                fireEvent.change(screen.getByTestId('zine-search-input'), { target: { value: 'Agnostic Front' } });
+
+                // Zero matches -> must NOT show LoadingSpinner; shows contextual empty state + both recovery buttons
+                expect(screen.queryByText(/Typically takes 20–30 seconds/i)).not.toBeInTheDocument();
+                expect(screen.getByText('No results matching "Agnostic Front" in Brit Indie')).toBeInTheDocument();
+                expect(screen.getByTestId('zine-empty-clear-search-btn')).toBeInTheDocument();
+                const showAllBtn = screen.getByTestId('zine-empty-show-all-scenes-btn');
+                expect(showAllBtn).toBeInTheDocument();
+
+                // Clicking Show All Scenes restores Overarching Zine and surfaces the Agnostic Front match
+                fireEvent.click(showAllBtn);
+                expect(screen.getByTestId('overarching-zine-section')).toBeInTheDocument();
+                expect(document.querySelector('[data-node-id="agnostic-front-us"]')).toBeInTheDocument();
+            });
+
+            it('preserves active Scene Filter in Edit Mode, prints WYSIWYG Chapter PDF title, and resets cleanly to All Scenes on Zine close or scene removal (V47.20)', () => {
+                const origTitle = document.title;
+                let printedTitle = '';
+                const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {
+                    printedTitle = document.title;
+                });
+
+                try {
+                    const { rerender } = render(<DetailsPanel {...buildFilterProps()} />);
+
+                    // Filter to Brit Indie (custom zineTitle: "90s Britpop & Indie")
+                    fireEvent.click(screen.getByTestId('zine-scene-filter-trigger'));
+                    fireEvent.click(screen.getByTestId('zine-scene-filter-option-scene-3'));
+                    expect(screen.getByTestId('zine-scene-section-scene-3')).toBeInTheDocument();
+
+                    // Toggling Edit Mode keeps the active Brit Indie chapter filter intact
+                    fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+                    expect(screen.getByTestId('zine-scene-section-scene-3')).toBeInTheDocument();
+                    expect(screen.queryByTestId('overarching-zine-section')).not.toBeInTheDocument();
+                    expect(screen.getByTestId('zine-scene-filter-trigger')).toHaveTextContent('Brit Indie');
+
+                    // Exit edit mode and trigger WYSIWYG Chapter Save as PDF
+                    fireEvent.click(screen.getByTestId('zine-edit-toggle-btn'));
+                    fireEvent.click(screen.getByTestId('zine-save-pdf-btn'));
+                    expect(printSpy).toHaveBeenCalledTimes(1);
+                    expect(printedTitle).toBe('Zcene - 90s Britpop & Indie');
+                    window.dispatchEvent(new Event('afterprint'));
+
+                    // Closing & reopening Zine resets filter cleanly to All Scenes
+                    rerender(<DetailsPanel {...buildFilterProps({ isMagazineViewOpen: false })} />);
+                    rerender(<DetailsPanel {...buildFilterProps({ isMagazineViewOpen: true })} />);
+                    expect(screen.getByTestId('overarching-zine-section')).toBeInTheDocument();
+                    expect(screen.getByTestId('zine-scene-filter-trigger')).toHaveTextContent('All Scenes');
+
+                    // Removing the actively filtered scene automatically falls back to All Scenes
+                    fireEvent.click(screen.getByTestId('zine-scene-filter-trigger'));
+                    fireEvent.click(screen.getByTestId('zine-scene-filter-option-scene-3'));
+                    expect(screen.queryByTestId('overarching-zine-section')).not.toBeInTheDocument();
+
+                    const twoScenes = buildThreeSceneList().slice(0, 2);
+                    rerender(<DetailsPanel {...buildFilterProps({ scenes: twoScenes })} />);
+                    expect(screen.getByTestId('overarching-zine-section')).toBeInTheDocument();
+                    expect(screen.getByTestId('zine-scene-filter-trigger')).toHaveTextContent('All Scenes');
+                } finally {
+                    printSpy.mockRestore();
+                    document.title = origTitle;
+                    document.documentElement.classList.remove('zcene-printing-zine');
+                }
+            });
         });
 
         it('renders default headlines in Reading/Guest Mode and allows owners to edit and reset them via ZineEditorialHeading', () => {
