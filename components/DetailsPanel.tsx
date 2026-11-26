@@ -2229,7 +2229,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                                             }}
                                                                             onKeyDown={handleKeyDown}
                                                                             placeholder="Consult Zcene AI..."
-                                                                            className={`flex-1 w-full h-full bg-zinc-950 border ${chatDictation.isListening ? 'border-red-500/50' : 'border-zinc-700'} pt-2.5 pb-12 pl-4 pr-11 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none scrollbar-thin scrollbar-thumb-zinc-700`}
+                                                                            className="flex-1 w-full h-full bg-zinc-950 border border-zinc-700 pt-2.5 pb-12 pl-4 pr-11 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none scrollbar-thin scrollbar-thumb-zinc-700"
                                                                         />
                                                                         {displayedChatInput && (
                                                                             <button
@@ -2911,7 +2911,7 @@ export const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
                             }
                             setDraftIntro(e.target.value.slice(0, 600));
                         }}
-                        className={`w-full min-h-[112px] rounded-xl border ${noteDictation.isListening ? 'border-red-500/50' : 'border-zinc-700'} bg-zinc-950 text-white text-sm leading-relaxed pt-3 pb-11 pl-3.5 pr-11 placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none resize-y transition-colors`}
+                        className="w-full min-h-[112px] rounded-xl border border-zinc-700 bg-zinc-950 text-white text-sm leading-relaxed pt-3 pb-11 pl-3.5 pr-11 placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none resize-y transition-colors"
                     />
                     {displayedIntro && (
                         <button

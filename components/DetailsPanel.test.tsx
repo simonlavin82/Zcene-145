@@ -2982,15 +2982,16 @@ describe('DetailsPanel', () => {
                     expect(instances[0].interimResults).toBe(true);
                     expect(screen.getByLabelText('Stop dictation')).toBeInTheDocument();
 
-                    // Final segment 1
+                    // Lowercase start on empty input auto-capitalizes; textarea keeps neutral border (no red border)
+                    const textarea = screen.getByTestId('zine-intro-input-scene-1') as HTMLTextAreaElement;
+                    expect(textarea.className).not.toContain('border-red-500');
                     act(() => {
                         instances[0].onresult?.({
                             resultIndex: 0,
-                            results: [Object.assign([{ transcript: 'First thought.' }], { isFinal: true })],
+                            results: [Object.assign([{ transcript: 'when I was growing up' }], { isFinal: true })],
                         });
                     });
-                    const textarea = screen.getByTestId('zine-intro-input-scene-1') as HTMLTextAreaElement;
-                    expect(textarea.value).toBe('First thought.');
+                    expect(textarea.value).toBe('When I was growing up');
 
                     // Browser emits no-speech + onend during a thinking pause -> auto-restarts a fresh instance
                     act(() => {
@@ -3002,22 +3003,24 @@ describe('DetailsPanel', () => {
                     expect(instances[1].start).toHaveBeenCalledTimes(1);
                     expect(screen.getByLabelText('Stop dictation')).toBeInTheDocument();
 
-                    // Live interim preview appears inline AND reflects in N/600 counter
+                    // Mid-sentence continuation stays lowercase, normalizes "zcene" -> "Zcene" (leaves "scene" untouched),
+                    // renders inline, and reflects live length in N/600 counter
                     act(() => {
                         instances[1].onresult?.({
                             resultIndex: 0,
-                            results: [Object.assign([{ transcript: 'trailing words' }], { isFinal: false })],
+                            results: [Object.assign([{ transcript: 'my two favourite artists in this zcene and scene.' }], { isFinal: false })],
                         });
                     });
-                    expect(textarea.value).toBe('First thought. trailing words');
-                    expect(screen.getByText(`${'First thought. trailing words'.length}/600`)).toBeInTheDocument();
+                    const expectedCombined = 'When I was growing up my two favourite artists in this Zcene and scene.';
+                    expect(textarea.value).toBe(expectedCombined);
+                    expect(screen.getByText(`${expectedCombined.length}/600`)).toBeInTheDocument();
 
                     // Clicking Stop flushes trailing interim words into committed text without duplication
                     fireEvent.click(screen.getByLabelText('Stop dictation'));
                     expect(screen.getByLabelText('Start dictation')).toBeInTheDocument();
-                    expect(textarea.value).toBe('First thought. trailing words');
+                    expect(textarea.value).toBe(expectedCombined);
 
-                    // Restart & emit another live interim chunk, then click Save Note directly -> flushes before saving
+                    // Restart after terminal punctuation -> auto-capitalizes next sentence, and Save Note flushes live interim
                     fireEvent.click(screen.getByLabelText('Start dictation'));
                     expect(instances).toHaveLength(3);
                     act(() => {
@@ -3027,7 +3030,7 @@ describe('DetailsPanel', () => {
                         });
                     });
                     fireEvent.click(screen.getByTestId('zine-intro-save-scene-1'));
-                    expect(onSaveIntro).toHaveBeenCalledWith('First thought. trailing words saved live');
+                    expect(onSaveIntro).toHaveBeenCalledWith(`${expectedCombined} Saved live`);
                 } finally {
                     delete (window as any).SpeechRecognition;
                     vi.useRealTimers();
@@ -3139,12 +3142,13 @@ describe('DetailsPanel', () => {
                     fireEvent.click(screen.getByLabelText('Start dictation'));
                     expect(instances).toHaveLength(1);
                     expect(screen.getByLabelText('Stop dictation')).toBeInTheDocument();
+                    expect(chatBox.className).not.toContain('border-red-500');
 
                     // Finalized phrase 1 -> Stop dictation MUST stay visible alongside Clear (×) and Send (↑)
                     act(() => {
                         instances[0].onresult?.({
                             resultIndex: 0,
-                            results: [Object.assign([{ transcript: 'What is the name of' }], { isFinal: true })],
+                            results: [Object.assign([{ transcript: 'what is the name of' }], { isFinal: true })],
                         });
                     });
                     expect(chatBox.value).toBe('What is the name of');
@@ -3220,7 +3224,7 @@ describe('DetailsPanel', () => {
                             ],
                         });
                     });
-                    expect(textarea.value).toBe('Committed line. live interim');
+                    expect(textarea.value).toBe('Committed line. Live interim');
 
                     fireEvent.click(screen.getByLabelText('Clear note'));
                     expect(textarea.value).toBe('');

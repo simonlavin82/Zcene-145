@@ -32,9 +32,22 @@ export function combineDictationText(
   interim: string,
   maxLength?: number
 ): string {
-  const cleanInterim = (interim || '').trim();
+  let cleanInterim = (interim || '').trim();
   let combined = committed || '';
   if (cleanInterim) {
+    // Normalize exact brand word "zcene" -> "Zcene" without touching "scene"
+    cleanInterim = cleanInterim.replace(/\bzcene\b/gi, 'Zcene');
+
+    // Auto-capitalize first alphabetic char ONLY at start of empty input or after terminal punctuation/newline
+    const shouldCapitalizeStart =
+      !combined.trim() || /(?:[.!?]|\n)\s*$/.test(combined);
+    if (shouldCapitalizeStart) {
+      cleanInterim = cleanInterim.replace(
+        /^([^A-Za-z]*)([a-z])/,
+        (_, prefix: string, ch: string) => `${prefix}${ch.toUpperCase()}`
+      );
+    }
+
     if (!combined) {
       combined = cleanInterim;
     } else if (/\s$/.test(combined)) {
