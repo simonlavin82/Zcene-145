@@ -1030,14 +1030,14 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
         )}
 
         <ModalFooter className="shrink-0">
-          <div className={`flex w-full ${onOpenTokenActivity ? 'flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between' : 'items-center justify-end'}`}>
+          <div className={`flex items-center gap-2 w-full ${onOpenTokenActivity ? 'justify-between' : 'justify-end'}`}>
             {onOpenTokenActivity && (
               <button
                 type="button"
                 data-testid="stripe-token-activity-link"
                 disabled={isProcessing}
                 onClick={onOpenTokenActivity}
-                className="self-start sm:self-auto text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 hover:decoration-primary/60 cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+                className="text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 hover:decoration-primary/60 cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Token Activity
               </button>
@@ -1064,7 +1064,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
                     <span>Crediting...</span>
                   </>
                 ) : (
-                  <span>Confirm {isValidQuantity ? priceDisplay : ''} Top-Up</span>
+                  <span>Confirm</span>
                 )}
               </button>
             </div>

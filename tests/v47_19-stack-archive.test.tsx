@@ -10,6 +10,7 @@ import {
   filterAndSortArchivedStack,
   ACTIVITY_PAGE_SIZE,
   ARCHIVE_PAGE_SIZE,
+  ADMIN_LOG_PAGE_SIZE,
 } from '../components/UsageAnalyticsPage';
 import { MyStackDialog, SimulatedStripeModal } from '../components/SharedModals';
 import Header from '../components/Header';
@@ -1283,5 +1284,201 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(dsSrc).toContain('Compact Wallet Summary Strip');
     expect(dsSrc).toContain('Responsive Ledger Mobile Card Anatomy');
     expect(dsSrc).toContain('sm:max-w-[480px]');
+  });
+
+  it('18. SimulatedStripeModal uses concise Confirm CTA and single-row 375px split footer mirroring MyStackDialog', () => {
+    render(
+      <SimulatedStripeModal
+        isOpen={true}
+        currentBalance={49}
+        onClose={vi.fn()}
+        onOpenTokenActivity={vi.fn()}
+      />
+    );
+
+    const confirmBtn = screen.getByTestId('stripe-confirm-button');
+    expect(confirmBtn).toHaveTextContent('Confirm');
+    expect(confirmBtn.textContent?.trim()).toBe('Confirm');
+    expect(confirmBtn).toHaveClass('px-6', 'py-2', 'bg-white', 'text-brand-black', 'rounded-xl', 'font-medium', 'text-sm');
+
+    const activityLink = screen.getByTestId('stripe-token-activity-link');
+    const footerRow = activityLink.parentElement!;
+    expect(footerRow.className).toContain('flex');
+    expect(footerRow.className).toContain('items-center');
+    expect(footerRow.className).toContain('justify-between');
+    expect(footerRow.className).not.toContain('flex-col');
+  });
+
+  it('19. renders single-branch mobile DiscoveryLedgerTable cards at < 768px with expanded Curation Actions, Top Artist Discoveries, shared receipt cards, and 10-row nested activity pagination', () => {
+    expect(ADMIN_LOG_PAGE_SIZE).toBe(10);
+
+    const manyAuthorTxs = Array.from({ length: ADMIN_LOG_PAGE_SIZE + 5 }, (_, idx) => ({
+      id: `admin_tx_${idx}`,
+      type: 'spend_preflight',
+      delta: -1,
+      balanceAfter: 100 - idx,
+      description: `Admin Mobile Receipt ${idx + 1}`,
+      costUsd: 0.0015,
+      createdAt: { toMillis: () => 1763000000000 - idx * 1000 },
+    }));
+
+    const authorRow = {
+      uid: 'uid-cust-mobile',
+      email: 'simon.lavin1@gmail.com',
+      projectsCount: 63,
+      actionTriggers: { createCount: 63, updateCount: 120 },
+      artistSearches: {
+        globalCount: 30,
+        topSearches: [{ artistName: 'The Murder City Devils', count: 9 }],
+      },
+      cacheEfficiency: { liveQueries: 10, cacheHits: 20 },
+      deepCutsOpened: 42,
+      exactCost: 9.5937,
+      hasExactCost: true,
+      tokenBalance: 149,
+      lifetimeTokensPurchased: 600,
+      lifetimeTokensSpent: 461,
+      projects: [],
+      transactions: manyAuthorTxs,
+    };
+
+    const onInspectUser = vi.fn();
+    render(
+      <DiscoveryLedgerTable
+        isLoading={false}
+        filteredLedger={[authorRow]}
+        expandedRow="simon.lavin1@gmail.com"
+        toggleRow={vi.fn()}
+        onInspectUser={onInspectUser}
+        isSmallScreen={true}
+      />
+    );
+
+    // Single-branch render: mobile card list present, desktop table absent
+    expect(screen.getByTestId('admin-authors-mobile-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('admin-authors-desktop-table')).not.toBeInTheDocument();
+    expect(screen.getAllByText('simon.lavin1@gmail.com')).toHaveLength(1);
+
+    // Inspect Wallet button works cleanly on mobile card
+    fireEvent.click(screen.getByRole('button', { name: /Inspect Wallet/i }));
+    expect(onInspectUser).toHaveBeenCalledWith(authorRow);
+
+    // Expanded Curation Actions & Top Artist Discoveries visible inside mobile card
+    expect(screen.getByText('Curation Actions')).toBeInTheDocument();
+    expect(screen.getByText('The Murder City Devils')).toBeInTheDocument();
+
+    // Nested author activity uses shared mobile receipt cards & paginates at 10 rows
+    expect(screen.getByTestId('admin-author-activity-mobile-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('admin-author-activity-desktop-table')).not.toBeInTheDocument();
+    expect(screen.getByText('Admin Mobile Receipt 1')).toBeInTheDocument();
+    expect(screen.queryByText(`Admin Mobile Receipt ${ADMIN_LOG_PAGE_SIZE + 1}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId('admin-author-activity-show-more-btn')).toHaveTextContent('Show more (5 remaining)');
+
+    fireEvent.click(screen.getByTestId('admin-author-activity-show-more-btn'));
+    expect(screen.getByText(`Admin Mobile Receipt ${ADMIN_LOG_PAGE_SIZE + 5}`)).toBeInTheDocument();
+    expect(screen.queryByTestId('admin-author-activity-show-more-btn')).not.toBeInTheDocument();
+  });
+
+  it('20. renders 375px mobile JIT & Failed Curation cards with 10-row pagination, edge-safe InfoTooltips, ToolbarSearch author filter, and DesignSystem spec parity', async () => {
+    const manyHeals = Array.from({ length: ADMIN_LOG_PAGE_SIZE + 4 }, (_, idx) => ({
+      id: `heal_${idx}`,
+      data: () => ({
+        entityId: `band-${idx}-us`,
+        rawEntityId: `band-${idx}`,
+        entityType: 'artist',
+        displayName: `Healed Band ${idx + 1}`,
+        callerUid: 'u-1',
+        callerEmail: 'simon.lavin1@gmail.com',
+        projectName: 'Hardcore Mix',
+        totalTokens: 2500,
+        promptTokens: 2000,
+        candidatesTokens: 500,
+        costUsd: 0.00045,
+        timestamp: 1763000000000 - idx * 1000,
+      }),
+    }));
+
+    const manyFailures = Array.from({ length: ADMIN_LOG_PAGE_SIZE + 3 }, (_, idx) => ({
+      id: `fail_${idx}`,
+      data: () => ({
+        source: idx % 2 === 0 ? 'stale_reaper' : 'column2_error',
+        uid: 'u-1',
+        userEmail: 'simon.lavin1@gmail.com',
+        projectId: `p_${idx}`,
+        projectName: `Failed Zcene ${idx + 1}`,
+        tokensRefunded: 5,
+        isFullRefund: true,
+        reason: `Timeout ${idx + 1}`,
+        errorMessage: 'Upstream aborted',
+        sunkTotalTokens: 1200,
+        sunkCostUsd: 0.0123,
+        timestamp: 1763000000000 - idx * 1000,
+      }),
+    }));
+
+    mockGetDoc.mockResolvedValue({ exists: () => true, data: () => ({ jitEnabled: true }) });
+    mockGetDocs.mockImplementation(async (ref: any) => {
+      if (ref?.path === 'users') {
+        return {
+          docs: [
+            { id: ADMIN_UID, data: () => ({ email: ADMIN_EMAIL, tokenBalance: 0 }) },
+            { id: 'u-cust', data: () => ({ email: 'simon.lavin1@gmail.com', tokenBalance: 149, lifetimeTokensPurchased: 600, lifetimeTokensSpent: 461 }) },
+          ],
+        };
+      }
+      if (ref?.path === 'adminLedger/system/jitHeals') return { docs: manyHeals };
+      if (ref?.path === 'adminLedger/system/curationFailures') return { docs: manyFailures };
+      return { docs: [] };
+    });
+
+    const { container } = render(
+      <UsageAnalyticsPage
+        {...makeBaseAnalyticsProps({
+          user: { uid: ADMIN_UID, email: ADMIN_EMAIL },
+          isAdmin: true,
+          isSmallScreen: true,
+        })}
+      />
+    );
+
+    // JIT mobile single-branch cards + 10-row pagination
+    expect(await screen.findByTestId('jit-heals-mobile-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('jit-heals-desktop-table')).not.toBeInTheDocument();
+    expect(screen.getByText('Healed Band 1')).toBeInTheDocument();
+    expect(screen.queryByText(`Healed Band ${ADMIN_LOG_PAGE_SIZE + 1}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId('jit-show-more-btn')).toHaveTextContent('Show more (4 remaining)');
+    fireEvent.click(screen.getByTestId('jit-show-more-btn'));
+    expect(screen.getByText(`Healed Band ${ADMIN_LOG_PAGE_SIZE + 4}`)).toBeInTheDocument();
+    expect(screen.queryByTestId('jit-show-more-btn')).not.toBeInTheDocument();
+
+    // Failed & Auto-Refunded Curations mobile single-branch cards + 10-row pagination
+    expect(screen.getByTestId('curation-failures-mobile-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('curation-failures-desktop-table')).not.toBeInTheDocument();
+    expect(screen.getByText('Failed Zcene 1')).toBeInTheDocument();
+    expect(screen.queryByText(`Failed Zcene ${ADMIN_LOG_PAGE_SIZE + 1}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId('curation-failures-show-more-btn')).toHaveTextContent('Show more (3 remaining)');
+    fireEvent.click(screen.getByTestId('curation-failures-show-more-btn'));
+    expect(screen.getByText(`Failed Zcene ${ADMIN_LOG_PAGE_SIZE + 3}`)).toBeInTheDocument();
+    expect(screen.queryByTestId('curation-failures-show-more-btn')).not.toBeInTheDocument();
+
+    // Edge-safe InfoTooltip alignment: 4 right-aligned KPI tooltips + 2 left-aligned section header tooltips
+    const tooltips = Array.from(container.querySelectorAll('[role="tooltip"]'));
+    expect(tooltips.filter((el) => el.getAttribute('data-align') === 'right')).toHaveLength(4);
+    expect(tooltips.filter((el) => el.getAttribute('data-align') === 'left')).toHaveLength(2);
+
+    // ToolbarSearch author filter filters mobile author cards and clears via built-in Clear button
+    const authorSearch = screen.getByTestId('admin-author-search-input');
+    expect(authorSearch).toHaveAttribute('placeholder', 'Search by Author identity...');
+    fireEvent.change(authorSearch, { target: { value: 'simon.lavin1' } });
+    expect(screen.getByTestId('admin-author-card-u-cust')).toBeInTheDocument();
+    expect(screen.queryByTestId(`admin-author-card-${ADMIN_UID}`)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
+    expect(screen.getByTestId(`admin-author-card-${ADMIN_UID}`)).toBeInTheDocument();
+
+    // DesignSystem.tsx documents single-row Confirm split footer, InfoTooltip align="right"/"left", and Admin mobile cards
+    const dsSrc = fs.readFileSync(path.resolve(__dirname, '../components/DesignSystem.tsx'), 'utf-8');
+    expect(dsSrc).toContain('InfoTooltip align=&quot;right&quot;');
+    expect(dsSrc).toContain('Failed &amp; Auto-Refunded Curations');
+    expect(dsSrc).toContain('Progressive Pagination:');
   });
 });

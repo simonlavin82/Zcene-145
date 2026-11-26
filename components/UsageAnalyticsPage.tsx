@@ -207,6 +207,7 @@ export interface AuthorStackCacheEntry {
 
 export const ACTIVITY_PAGE_SIZE = 10;
 export const ARCHIVE_PAGE_SIZE = 20;
+export const ADMIN_LOG_PAGE_SIZE = 10;
 
 export const partitionStackItems = (items: StackItem[] = []): { active: StackItem[]; archived: StackItem[] } => {
     const active: StackItem[] = [];
@@ -894,6 +895,129 @@ export const buildUnifiedActivityRows = (
     return rows;
 };
 
+interface ActivityReceiptMobileCardProps {
+    row: UnifiedActivityRow;
+    showAdminMetrics?: boolean;
+    maskPurgedAsArchived?: boolean;
+}
+
+const ActivityReceiptMobileCard: React.FC<ActivityReceiptMobileCardProps> = ({
+    row,
+    showAdminMetrics = false,
+    maskPurgedAsArchived = true,
+}) => {
+    const isPositive = row.delta > 0;
+    const changeLabel = row.delta === 0
+        ? (showAdminMetrics ? '0T' : '0 T')
+        : (isPositive
+            ? (showAdminMetrics ? `+${row.delta}T` : `+${row.delta} T`)
+            : (showAdminMetrics ? `${row.delta}T` : `${row.delta} T`));
+    const isZeroCostDirectHit =
+        row.isCurationRow &&
+        (row.generationType === 'Direct Hit' || row.generationType === 'Clone') &&
+        (row.aiCostUsd ?? 0) === 0;
+    const costStr = row.aiCostUsd !== null
+        ? `${row.isCostEstimate ? '~' : ''}$${row.aiCostUsd.toFixed(4)}`
+        : '—';
+
+    return (
+        <div
+            data-testid={`activity-row-${row.id}`}
+            className={`border border-zinc-800 bg-zinc-950/40 p-4 space-y-2.5 ${RADIUS_TOKENS.frame}`}
+        >
+            <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                        {row.isCurationRow && renderProjectStatusBadge(row.projectStatus, maskPurgedAsArchived)}
+                        <span className="font-medium text-white text-sm leading-snug break-words">{row.title}</span>
+                    </div>
+                    {row.subtitle && (
+                        <span className="block text-[11px] text-zinc-500 mt-0.5">
+                            {row.subtitle}
+                        </span>
+                    )}
+                </div>
+                <span
+                    className={`text-sm font-mono font-bold whitespace-nowrap shrink-0 ${
+                        isPositive ? 'text-emerald-400' : row.delta === 0 ? (showAdminMetrics ? 'text-zinc-400' : 'text-emerald-300') : 'text-zinc-200'
+                    }`}
+                >
+                    {changeLabel}
+                </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 flex-wrap">
+                <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border whitespace-nowrap inline-flex items-center shrink-0 ${row.categoryBadge.style}`}>
+                    {row.categoryBadge.label}
+                </span>
+                {showAdminMetrics ? (
+                    row.isCurationRow && row.generationType && (
+                        <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded border whitespace-nowrap shrink-0 ${
+                            row.generationType === 'Direct Hit'
+                                ? 'border-primary/30 text-primary bg-primary/10'
+                                : 'border-zinc-700 text-zinc-300 bg-zinc-900'
+                        }`}>
+                            {row.generationType}
+                        </span>
+                    )
+                ) : (
+                    row.isCurationRow && row.userFacingScope && (
+                        <span className="px-2 py-0.5 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 text-[11px] font-medium whitespace-nowrap inline-flex items-center shrink-0">
+                            {row.userFacingScope}
+                        </span>
+                    )
+                )}
+            </div>
+
+            {showAdminMetrics && (
+                <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono">
+                    <div>
+                        <span className="block text-[9px] uppercase tracking-wider text-zinc-500">AI Cost</span>
+                        <span className={
+                            row.aiCostUsd === null
+                                ? 'text-zinc-600'
+                                : isZeroCostDirectHit
+                                    ? 'text-primary/90 font-semibold'
+                                    : 'text-red-400/80'
+                        }>
+                            {costStr}
+                        </span>
+                    </div>
+                    <div className="text-right">
+                        <span className="block text-[9px] uppercase tracking-wider text-zinc-500">Net Margin</span>
+                        {row.netMarginUsd === null ? (
+                            <span className="text-zinc-600">—</span>
+                        ) : row.isAdminBypass ? (
+                            <span className="text-zinc-400">
+                                {formatSignedUsd(row.netMarginUsd, 4)}{' '}
+                                <span className="text-[10px] text-zinc-500">(Sandbox)</span>
+                            </span>
+                        ) : (
+                            <span className={row.netMarginUsd >= 0 ? 'text-emerald-400 font-semibold' : 'text-red-400 font-semibold'}>
+                                {formatSignedUsd(row.netMarginUsd, 2)}
+                                {row.netMarginPct !== null ? (
+                                    <span className="text-[10px] text-zinc-400 font-normal ml-1">
+                                        ({row.netMarginPct.toFixed(0)}%)
+                                    </span>
+                                ) : null}
+                            </span>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                <span className="truncate">
+                    {row.createdAt ? formatTxTimestamp(row.createdAt) : '—'}
+                </span>
+                <span className="whitespace-nowrap shrink-0 text-zinc-400">
+                    {row.balanceAfter !== null ? `Bal: ${row.balanceAfter} T` : '—'}
+                </span>
+            </div>
+        </div>
+    );
+};
+
 export const TokenEconomicsKeyStrip: React.FC<{ isNormalUserView: boolean }> = ({ isNormalUserView }) => {
     if (isNormalUserView) return null;
 
@@ -909,27 +1033,29 @@ export const TokenEconomicsKeyStrip: React.FC<{ isNormalUserView: boolean }> = (
     return (
         <div
             data-testid="token-economics-key-strip"
-            className={`bg-zinc-900/35 border border-zinc-800/90 px-4 py-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-xs text-zinc-400 ${RADIUS_TOKENS.frame}`}
+            className={`bg-zinc-900/35 border border-zinc-800/90 px-4 py-3 flex flex-col items-start gap-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-3 sm:gap-y-1.5 text-xs text-zinc-400 ${RADIUS_TOKENS.frame}`}
         >
-            <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded-md whitespace-nowrap">
-                Token Economics Key
-            </span>
-            <span className="font-mono text-zinc-200 whitespace-nowrap">
-                <strong>1T</strong> = £{TOKEN_UNIT_GBP.toFixed(2)} / ~${TOKEN_UNIT_USD.toFixed(2)} USD
-            </span>
-            <span className="text-zinc-700 select-none">•</span>
+            <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary bg-primary/10 border border-primary/30 px-2 py-0.5 rounded-md whitespace-nowrap">
+                    Token Economics Key
+                </span>
+                <span className="font-mono text-zinc-200 whitespace-nowrap">
+                    <strong>1T</strong> = £{TOKEN_UNIT_GBP.toFixed(2)} / ~${TOKEN_UNIT_USD.toFixed(2)} USD
+                </span>
+            </div>
+            <span className="hidden sm:inline text-zinc-700 select-none">•</span>
             <span className="whitespace-nowrap">
                 Single-Root Zcene (<span className="font-mono text-white">5T</span>) = <span className="font-mono text-zinc-300">£{singleGbp} / ~${singleUsd}</span>
             </span>
-            <span className="text-zinc-700 select-none">•</span>
+            <span className="hidden sm:inline text-zinc-700 select-none">•</span>
             <span className="whitespace-nowrap">
                 Complex Zcene (<span className="font-mono text-white">10T</span>) = <span className="font-mono text-zinc-300">£{complexGbp} / ~${complexUsd}</span>
             </span>
-            <span className="text-zinc-700 select-none">•</span>
+            <span className="hidden sm:inline text-zinc-700 select-none">•</span>
             <span className="whitespace-nowrap">
                 Deep Connections (<span className="font-mono text-white">3T</span>) = <span className="font-mono text-zinc-300">£{deepGbp} / ~${deepUsd}</span>
             </span>
-            <span className="text-zinc-700 select-none">•</span>
+            <span className="hidden sm:inline text-zinc-700 select-none">•</span>
             <span className="whitespace-nowrap">
                 Pre-Flight Lookup (<span className="font-mono text-white">1T</span>) = <span className="font-mono text-zinc-300">£{preflightGbp} / ~${preflightUsd}</span>
             </span>
@@ -952,13 +1078,13 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
     const isPlatformProfitable = aggregateMetrics.platformNetProfitUsd >= 0;
 
     return (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
             {/* Card 1: Token Revenue (Earned) */}
-            <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
+            <div className={`bg-zinc-900/30 border border-zinc-800 p-4 sm:p-5 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Token Revenue (Earned)</span>
-                        <InfoTooltip content="Recognized revenue from tokens spent by non-admin customers (1T = £0.10 / ~$0.13 USD). Unspent wallet float remains deferred liability until consumed." />
+                        <InfoTooltip align="right" content="Recognized revenue from tokens spent by non-admin customers (1T = £0.10 / ~$0.13 USD). Unspent wallet float remains deferred liability until consumed." />
                     </div>
                     <div className="flex flex-wrap items-baseline gap-2 mt-2">
                         <span className="text-3xl font-bold font-mono text-emerald-400">
@@ -993,11 +1119,11 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
             </div>
 
             {/* Card 2: Actual AI API Cost */}
-            <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
+            <div className={`bg-zinc-900/30 border border-zinc-800 p-4 sm:p-5 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Actual AI API Cost</span>
-                        <InfoTooltip content="Total real Gemini 3.1 Pro + 3.6 Flash API expenditure across customer curations, Admin/Sandbox test runs, and background JIT Auto-Healing." />
+                        <InfoTooltip align="right" content="Total real Gemini 3.1 Pro + 3.6 Flash API expenditure across customer curations, Admin/Sandbox test runs, and background JIT Auto-Healing." />
                     </div>
                     <div className="flex flex-wrap items-baseline gap-2 mt-2">
                         <span className="text-3xl font-bold font-mono text-red-400">
@@ -1023,11 +1149,11 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
             </div>
 
             {/* Card 3: Net Gross Profit & Margin */}
-            <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between border-l-2 ${isProfitable ? 'border-l-primary' : 'border-l-red-400'} relative ${RADIUS_TOKENS.frame}`}>
+            <div className={`bg-zinc-900/30 border border-zinc-800 p-4 sm:p-5 flex flex-col justify-between border-l-2 ${isProfitable ? 'border-l-primary' : 'border-l-red-400'} relative ${RADIUS_TOKENS.frame}`}>
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">Net Gross Profit & Margin</span>
-                        <InfoTooltip content="Customer Earned Revenue minus Customer AI Cost. Subtitle reports platform-wide net profit after Admin R&D/Sandbox and JIT healing spend, alongside cold synthesis unit economics." />
+                        <InfoTooltip align="right" content="Customer Earned Revenue minus Customer AI Cost. Subtitle reports platform-wide net profit after Admin R&D/Sandbox and JIT healing spend, alongside cold synthesis unit economics." />
                     </div>
                     <div className="flex flex-wrap items-baseline gap-2 mt-2">
                         <span className={`text-3xl font-bold font-mono ${isProfitable ? 'text-primary' : 'text-red-400'}`}>
@@ -1065,11 +1191,11 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
             </div>
 
             {/* Card 4: Cache Hit Efficiency */}
-            <div className={`bg-zinc-900/30 border border-zinc-800 p-6 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
+            <div className={`bg-zinc-900/30 border border-zinc-800 p-4 sm:p-5 flex flex-col justify-between relative ${RADIUS_TOKENS.frame}`}>
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400">Cache Hit Efficiency</span>
-                        <InfoTooltip content="Share of Zcene curations resolved instantly from the verified global topology cache at $0.00 AI cost, valued at the real average cold curation Gemini cost." />
+                        <InfoTooltip align="right" content="Share of Zcene curations resolved instantly from the verified global topology cache at $0.00 AI cost, valued at the real average cold curation Gemini cost." />
                     </div>
                     <div className="flex flex-wrap items-baseline gap-2 mt-2">
                         <span className="text-3xl font-bold font-mono text-primary">
@@ -1100,6 +1226,7 @@ export const TelemetryOverviewCards: React.FC<TelemetryOverviewCardsProps> = ({
 interface DeepConnectionsQueryLogProps {
     uid?: string;
     email: string;
+    isSmallScreen?: boolean;
 }
 
 interface DeepWebQueryItem {
@@ -1115,7 +1242,7 @@ interface DeepWebQueryItem {
     timestamp: any;
 }
 
-const DeepConnectionsQueryLog: React.FC<DeepConnectionsQueryLogProps> = ({ uid }) => {
+const DeepConnectionsQueryLog: React.FC<DeepConnectionsQueryLogProps> = ({ uid, isSmallScreen = false }) => {
     const [queries, setQueries] = useState<DeepWebQueryItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -1176,41 +1303,63 @@ const DeepConnectionsQueryLog: React.FC<DeepConnectionsQueryLogProps> = ({ uid }
                 </span>
             </div>
 
-            <div className="bg-black/50 border border-zinc-800 rounded-md overflow-hidden">
-                <table className="w-full text-left border-collapse">
-                    <thead>
-                        <tr className="border-b border-zinc-800 bg-zinc-900/30">
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Artist / Node</th>
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Project</th>
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Question</th>
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {isLoading ? (
-                            <tr>
-                                <td colSpan={5} className="p-4 text-center text-xs text-zinc-500 italic">
-                                    <span className="inline-flex items-center gap-2">
-                                        <span className="material-symbols-outlined !text-[14px] animate-spin">progress_activity</span>
-                                        Loading Deep Connections queries...
+            {isLoading ? (
+                <div className="bg-black/50 border border-zinc-800 rounded-xl p-4 text-center text-xs text-zinc-500 italic">
+                    <span className="inline-flex items-center gap-2">
+                        <span className="material-symbols-outlined !text-[14px] animate-spin">progress_activity</span>
+                        Loading Deep Connections queries...
+                    </span>
+                </div>
+            ) : error ? (
+                <div className="bg-black/50 border border-zinc-800 rounded-xl p-4 text-center text-xs text-red-400 italic">
+                    {error}
+                </div>
+            ) : queries.length === 0 ? (
+                <div className="bg-black/50 border border-zinc-800 rounded-xl p-4 text-center text-xs text-zinc-500 italic">
+                    No Deep Connections consults recorded yet for this author.
+                </div>
+            ) : isSmallScreen ? (
+                <div data-testid="deep-connections-mobile-list" className="space-y-2.5">
+                    {queries.map((q) => {
+                        const dateMs = extractTimestampMs(q.timestamp);
+                        const dateStr = dateMs
+                            ? new Date(dateMs).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ',')
+                            : '—';
+                        return (
+                            <div key={q.id} className="bg-black/50 border border-zinc-800 rounded-xl p-3.5 space-y-2">
+                                <div className="flex items-start justify-between gap-2">
+                                    <span className="text-xs text-white font-medium break-words min-w-0">
+                                        {q.nodeName || q.nodeId || '—'}
                                     </span>
-                                </td>
+                                    <span className="text-xs font-mono text-red-400/80 whitespace-nowrap shrink-0">
+                                        ${q.costUsd.toFixed(4)}
+                                    </span>
+                                </div>
+                                <p className="text-xs text-zinc-300 leading-relaxed break-words">
+                                    &ldquo;{q.question}&rdquo;
+                                </p>
+                                <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                    <span className="truncate">{q.projectName || q.projectId || '—'}</span>
+                                    <span className="whitespace-nowrap shrink-0">{dateStr}</span>
+                                </div>
+                            </div>
+                        );
+                    })}
+                </div>
+            ) : (
+                <div data-testid="deep-connections-desktop-table" className="bg-black/50 border border-zinc-800 rounded-md overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[600px]">
+                        <thead>
+                            <tr className="border-b border-zinc-800 bg-zinc-900/30">
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Artist / Node</th>
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Project</th>
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Question</th>
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
                             </tr>
-                        ) : error ? (
-                            <tr>
-                                <td colSpan={5} className="p-4 text-center text-xs text-red-400 italic">
-                                    {error}
-                                </td>
-                            </tr>
-                        ) : queries.length === 0 ? (
-                            <tr>
-                                <td colSpan={5} className="p-4 text-center text-xs text-zinc-500 italic">
-                                    No Deep Connections consults recorded yet for this author.
-                                </td>
-                            </tr>
-                        ) : (
-                            queries.map((q) => {
+                        </thead>
+                        <tbody>
+                            {queries.map((q) => {
                                 const dateMs = extractTimestampMs(q.timestamp);
                                 const dateStr = dateMs
                                     ? new Date(dateMs).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ',')
@@ -1228,21 +1377,29 @@ const DeepConnectionsQueryLog: React.FC<DeepConnectionsQueryLogProps> = ({ uid }
                                         </td>
                                     </tr>
                                 );
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
         </div>
     );
 };
 
 interface AuthorUnifiedActivityTableProps {
     user: UserTelemetry;
+    isSmallScreen?: boolean;
 }
 
-const AuthorUnifiedActivityTable: React.FC<AuthorUnifiedActivityTableProps> = ({ user }) => {
+const AuthorUnifiedActivityTable: React.FC<AuthorUnifiedActivityTableProps> = ({ user, isSmallScreen = false }) => {
     const unifiedRows = useMemo(() => buildUnifiedActivityRows(user), [user]);
+    const [visibleCount, setVisibleCount] = useState<number>(ADMIN_LOG_PAGE_SIZE);
+
+    useEffect(() => {
+        setVisibleCount(ADMIN_LOG_PAGE_SIZE);
+    }, [user.email]);
+
+    const visibleRows = useMemo(() => unifiedRows.slice(0, visibleCount), [unifiedRows, visibleCount]);
 
     return (
         <div className="space-y-3">
@@ -1255,28 +1412,37 @@ const AuthorUnifiedActivityTable: React.FC<AuthorUnifiedActivityTableProps> = ({
                 </span>
             </div>
 
-            <div className="bg-black/50 border border-zinc-800 rounded-md overflow-x-auto">
-                <table className="w-full text-left border-collapse min-w-[680px]">
-                    <thead>
-                        <tr className="border-b border-zinc-800 bg-zinc-900/30">
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity / Zcene</th>
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Type / Generation</th>
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens</th>
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance</th>
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">AI Cost</th>
-                            <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Net Margin</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {unifiedRows.length === 0 ? (
-                            <tr>
-                                <td colSpan={7} className="p-4 text-center text-xs text-zinc-500 italic">
-                                    No curation or token activity recorded yet for this author.
-                                </td>
+            {unifiedRows.length === 0 ? (
+                <div className="bg-black/50 border border-zinc-800 rounded-xl p-4 text-center text-xs text-zinc-500 italic">
+                    No curation or token activity recorded yet for this author.
+                </div>
+            ) : isSmallScreen ? (
+                <div data-testid="admin-author-activity-mobile-list" className="space-y-2.5">
+                    {visibleRows.map((row) => (
+                        <ActivityReceiptMobileCard
+                            key={row.id}
+                            row={row}
+                            showAdminMetrics={true}
+                            maskPurgedAsArchived={false}
+                        />
+                    ))}
+                </div>
+            ) : (
+                <div data-testid="admin-author-activity-desktop-table" className="bg-black/50 border border-zinc-800 rounded-md overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[680px]">
+                        <thead>
+                            <tr className="border-b border-zinc-800 bg-zinc-900/30">
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity / Zcene</th>
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Type / Generation</th>
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens</th>
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance</th>
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">AI Cost</th>
+                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Net Margin</th>
                             </tr>
-                        ) : (
-                            unifiedRows.map((row) => {
+                        </thead>
+                        <tbody>
+                            {visibleRows.map((row) => {
                                 const isPositive = row.delta > 0;
                                 const isZeroCostDirectHit = row.isCurationRow && (row.generationType === 'Direct Hit' || row.generationType === 'Clone') && (row.aiCostUsd ?? 0) === 0;
                                 const dateStr = row.createdAt ? formatTxTimestamp(row.createdAt) : '—';
@@ -1357,11 +1523,24 @@ const AuthorUnifiedActivityTable: React.FC<AuthorUnifiedActivityTableProps> = ({
                                         </td>
                                     </tr>
                                 );
-                            })
-                        )}
-                    </tbody>
-                </table>
-            </div>
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+
+            {unifiedRows.length > visibleCount && (
+                <div className="flex justify-center pt-1">
+                    <button
+                        type="button"
+                        data-testid="admin-author-activity-show-more-btn"
+                        onClick={() => setVisibleCount(prev => prev + ADMIN_LOG_PAGE_SIZE)}
+                        className={`px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-zinc-900/70 hover:bg-zinc-800 border border-zinc-700/80 transition-colors cursor-pointer ${RADIUS_TOKENS.button}`}
+                    >
+                        Show more ({unifiedRows.length - visibleCount} remaining)
+                    </button>
+                </div>
+            )}
         </div>
     );
 };
@@ -1373,6 +1552,7 @@ export interface DiscoveryLedgerTableProps {
     toggleRow: (email: string) => void;
     onInspectUser?: (user: UserTelemetry) => void;
     getAuthorStackCounts?: (author: UserTelemetry) => AuthorStackCounts | null;
+    isSmallScreen?: boolean;
 }
 
 export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
@@ -1382,9 +1562,229 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
     toggleRow,
     onInspectUser,
     getAuthorStackCounts,
+    isSmallScreen = false,
 }) => {
+    const renderExpandedDetails = (user: UserTelemetry, totalActions: number) => (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 text-sm">
+            {/* Left Column: Curation Actions Summary */}
+            <div className="space-y-3 sm:space-y-4 min-w-0">
+                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Actions</h4>
+                <div className="space-y-2">
+                    <div className="flex justify-between gap-3 border-b border-zinc-800/50 pb-1">
+                        <span className="text-zinc-400">Zcenes Curated:</span>
+                        <span className="text-white font-mono shrink-0">{user.projectsCount}</span>
+                    </div>
+                    <div className="flex justify-between gap-3 border-b border-zinc-800/50 pb-1">
+                        <span className="text-zinc-400">Actions Executed:</span>
+                        <span className="text-white font-mono shrink-0">{user.actionTriggers.updateCount}</span>
+                    </div>
+                    <div className="flex justify-between gap-3 border-b border-zinc-800/50 pb-1">
+                        <span className="text-zinc-400">Deep Cuts Opened:</span>
+                        <span className="text-white font-mono shrink-0">{user.deepCutsOpened}</span>
+                    </div>
+                    {(user.preflightLookups?.calls ?? 0) > 0 && (
+                        <div className="flex justify-between gap-3 border-b border-zinc-800/50 pb-1">
+                            <span className="text-zinc-400">Pre-Flight Lookups:</span>
+                            <span className="text-white font-mono shrink-0">
+                                {user.preflightLookups!.calls}{' '}
+                                <span className="text-red-400/80 text-xs">
+                                    (${user.preflightLookups!.costUsd.toFixed(4)})
+                                </span>
+                            </span>
+                        </div>
+                    )}
+                    {(user.deepWebConsults?.calls ?? 0) > 0 && (
+                        <div className="flex justify-between gap-3 border-b border-zinc-800/50 pb-1">
+                            <span className="text-zinc-400">Deep Web Consults:</span>
+                            <span className="text-white font-mono shrink-0">
+                                {user.deepWebConsults!.calls}{' '}
+                                <span className="text-red-400/80 text-xs">
+                                    (${user.deepWebConsults!.costUsd.toFixed(4)})
+                                </span>
+                            </span>
+                        </div>
+                    )}
+                    {(() => {
+                        const stackCounts = getAuthorStackCounts?.(user);
+                        if (!stackCounts) return null;
+                        return (
+                            <div
+                                className="flex justify-between gap-3 border-b border-zinc-800/50 pb-1"
+                                data-testid={`author-stack-counts-${user.uid || user.email}`}
+                            >
+                                <span className="text-zinc-400">My Stack:</span>
+                                <span className="text-white font-mono shrink-0">
+                                    {stackCounts.isLoading ? (
+                                        <span className="text-zinc-500">Loading...</span>
+                                    ) : (
+                                        <>
+                                            {stackCounts.activeCount} active <span className="text-zinc-500">·</span> {stackCounts.archivedCount} archived
+                                        </>
+                                    )}
+                                </span>
+                            </div>
+                        );
+                    })()}
+                    <div className="flex justify-between gap-3">
+                        <span className="text-zinc-400">Total Actions:</span>
+                        <span className="text-white font-mono font-bold shrink-0">{totalActions}</span>
+                    </div>
+                </div>
+            </div>
+
+            {/* Right Column: Top Artist Discoveries */}
+            <div className="space-y-3 sm:space-y-4 min-w-0">
+                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Top Artist Discoveries (<span className="font-mono">{user.artistSearches.globalCount}</span> Total)</h4>
+                <div className="space-y-2">
+                    {user.artistSearches.topSearches.length === 0 ? (
+                        <div className="text-xs text-zinc-500 italic">No artist seeds recorded yet.</div>
+                    ) : (
+                        user.artistSearches.topSearches.map((search, i) => (
+                            <div key={i} className="flex justify-between gap-3 border-b border-zinc-800/50 pb-1">
+                                <span className="text-zinc-300 truncate">{search.artistName}</span>
+                                <span className="text-zinc-400 whitespace-nowrap shrink-0"><span className="font-mono">{search.count}</span> digs</span>
+                            </div>
+                        ))
+                    )}
+                </div>
+            </div>
+
+            {/* Full Width: Consolidated Unified Token Activity, Curations & Top-Up Receipts */}
+            <div className="col-span-1 md:col-span-2 pt-4 border-t border-zinc-800/80 mt-1 min-w-0">
+                <AuthorUnifiedActivityTable user={user} isSmallScreen={isSmallScreen} />
+            </div>
+
+            {/* Full Width: Deep Connections Query Log (Admin Exclusive) */}
+            <div className="col-span-1 md:col-span-2 pt-4 border-t border-zinc-800/80 mt-1 min-w-0">
+                <DeepConnectionsQueryLog uid={user.uid} email={user.email} isSmallScreen={isSmallScreen} />
+            </div>
+        </div>
+    );
+
+    if (isLoading && filteredLedger.length === 0) {
+        return (
+            <div className={`border border-zinc-800 bg-zinc-950/20 p-8 text-center text-zinc-500 text-sm italic ${RADIUS_TOKENS.frame}`}>
+                <div className="flex items-center justify-center gap-3">
+                    <span className="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span>
+                    Querying discovery archive...
+                </div>
+            </div>
+        );
+    }
+
+    if (filteredLedger.length === 0) {
+        return (
+            <div className={`border border-zinc-800 bg-zinc-950/20 p-8 text-center text-zinc-500 text-sm italic ${RADIUS_TOKENS.frame}`}>
+                No Author records found in the discovery archive.
+            </div>
+        );
+    }
+
+    if (isSmallScreen) {
+        return (
+            <div data-testid="admin-authors-mobile-list" className="space-y-3">
+                {filteredLedger.map((user) => {
+                    const totalActions = user.actionTriggers.createCount + user.actionTriggers.updateCount + (user.preflightLookups?.calls || 0) + (user.deepWebConsults?.calls || 0);
+                    const cost = user.hasExactCost ? user.exactCost : (user.cacheEfficiency.liveQueries * COST_PER_AI_CALL);
+                    const costPrefix = user.hasExactCost ? '' : '~';
+                    const authorIsAdmin = isAdminEmail(user.email);
+                    const spentTokens = Math.max(0, Number(user.lifetimeTokensSpent) || 0);
+                    const earnedGbp = authorIsAdmin ? 0 : tokensToGbp(spentTokens);
+                    const earnedUsd = authorIsAdmin ? 0 : tokensToUsd(spentTokens);
+                    const netMarginUsd = earnedUsd - cost;
+                    const netMarginPct = !authorIsAdmin && earnedUsd > 0 ? (netMarginUsd / earnedUsd) * 100 : null;
+                    const isExpanded = expandedRow === user.email;
+
+                    return (
+                        <div
+                            key={user.email}
+                            data-testid={`admin-author-card-${user.uid || user.email}`}
+                            className={`border border-zinc-800 bg-zinc-950/40 overflow-hidden ${RADIUS_TOKENS.frame}`}
+                        >
+                            <div
+                                onClick={() => toggleRow(user.email)}
+                                className="p-4 space-y-3 cursor-pointer hover:bg-zinc-900/20 transition-colors"
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <div className="flex items-center gap-2 min-w-0 flex-1">
+                                        <span className="font-medium text-white text-sm truncate">{user.email}</span>
+                                        {authorIsAdmin && (
+                                            <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-zinc-800 text-zinc-300 border border-zinc-700 shrink-0">
+                                                ADMIN
+                                            </span>
+                                        )}
+                                    </div>
+                                    <span className="material-symbols-outlined text-zinc-500 !text-[20px] shrink-0">
+                                        {isExpanded ? 'expand_less' : 'expand_more'}
+                                    </span>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-2.5 pt-2.5 border-t border-zinc-800/60 text-xs font-mono">
+                                    <div>
+                                        <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">Wallet</span>
+                                        <span className="text-primary font-semibold">{user.tokenBalance ?? 0}T</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">Zcenes</span>
+                                        <span className="text-white">{user.projectsCount}</span>
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">Revenue (Spent)</span>
+                                        {authorIsAdmin ? (
+                                            <span className="text-zinc-500">$0.00 <span className="text-[10px]">(0T Bypass)</span></span>
+                                        ) : (
+                                            <div>
+                                                <span className="text-emerald-400 font-semibold">£{earnedGbp.toFixed(2)}</span>
+                                                <span className="block text-[10px] text-zinc-500">{spentTokens}T spent</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">AI Cost / Margin</span>
+                                        <span className="text-red-400/80 block">{costPrefix}${cost.toFixed(4)}</span>
+                                        {authorIsAdmin ? (
+                                            <span className="text-[10px] text-zinc-500">Sandbox R&amp;D</span>
+                                        ) : spentTokens === 0 && cost === 0 ? (
+                                            <span className="text-[10px] text-zinc-600">—</span>
+                                        ) : (
+                                            <span className={`text-[10px] font-semibold ${netMarginUsd >= 0 ? 'text-primary' : 'text-red-400'}`}>
+                                                {formatSignedUsd(netMarginUsd, 2)}
+                                                {netMarginPct !== null ? ` (${formatSignedPct(netMarginPct, 1)})` : ''}
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+
+                                {onInspectUser && (
+                                    <button
+                                        type="button"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            onInspectUser(user);
+                                        }}
+                                        className={`w-full h-9 px-3 bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer select-none ${RADIUS_TOKENS.button}`}
+                                        title={`Inspect ${user.email}'s live wallet and curated zcenes`}
+                                    >
+                                        <span className="material-symbols-outlined !text-[15px]">visibility</span>
+                                        <span>Inspect Wallet</span>
+                                    </button>
+                                )}
+                            </div>
+
+                            {isExpanded && (
+                                <div className="border-t border-zinc-800 bg-zinc-900/20 p-4">
+                                    {renderExpandedDetails(user, totalActions)}
+                                </div>
+                            )}
+                        </div>
+                    );
+                })}
+            </div>
+        );
+    }
+
     return (
-        <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
+        <div data-testid="admin-authors-desktop-table" className={`border border-zinc-800 bg-zinc-950/20 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
             <table className="w-full text-left border-collapse min-w-[720px]">
                 <thead>
                     <tr className="border-b border-zinc-800 bg-zinc-900/50">
@@ -1398,225 +1798,113 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                     </tr>
                 </thead>
                 <tbody>
-                    {isLoading && filteredLedger.length === 0 ? (
-                        <tr>
-                            <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm italic">
-                                <div className="flex items-center justify-center gap-3">
-                                    <span className="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span>
-                                    Querying discovery archive...
-                                </div>
-                            </td>
-                        </tr>
-                    ) : filteredLedger.length === 0 ? (
-                        <tr>
-                            <td colSpan={7} className="p-8 text-center text-zinc-500 text-sm italic">
-                                No Author records found in the discovery archive.
-                            </td>
-                        </tr>
-                    ) : (
-                        filteredLedger.map((user) => {
-                            const totalActions = user.actionTriggers.createCount + user.actionTriggers.updateCount + (user.preflightLookups?.calls || 0) + (user.deepWebConsults?.calls || 0);
-                            const cost = user.hasExactCost ? user.exactCost : (user.cacheEfficiency.liveQueries * COST_PER_AI_CALL);
-                            const costPrefix = user.hasExactCost ? '' : '~';
-                            const authorIsAdmin = isAdminEmail(user.email);
-                            const spentTokens = Math.max(0, Number(user.lifetimeTokensSpent) || 0);
-                            const earnedGbp = authorIsAdmin ? 0 : tokensToGbp(spentTokens);
-                            const earnedUsd = authorIsAdmin ? 0 : tokensToUsd(spentTokens);
-                            const netMarginUsd = earnedUsd - cost;
-                            const netMarginPct = !authorIsAdmin && earnedUsd > 0 ? (netMarginUsd / earnedUsd) * 100 : null;
-                            const isExpanded = expandedRow === user.email;
+                    {filteredLedger.map((user) => {
+                        const totalActions = user.actionTriggers.createCount + user.actionTriggers.updateCount + (user.preflightLookups?.calls || 0) + (user.deepWebConsults?.calls || 0);
+                        const cost = user.hasExactCost ? user.exactCost : (user.cacheEfficiency.liveQueries * COST_PER_AI_CALL);
+                        const costPrefix = user.hasExactCost ? '' : '~';
+                        const authorIsAdmin = isAdminEmail(user.email);
+                        const spentTokens = Math.max(0, Number(user.lifetimeTokensSpent) || 0);
+                        const earnedGbp = authorIsAdmin ? 0 : tokensToGbp(spentTokens);
+                        const earnedUsd = authorIsAdmin ? 0 : tokensToUsd(spentTokens);
+                        const netMarginUsd = earnedUsd - cost;
+                        const netMarginPct = !authorIsAdmin && earnedUsd > 0 ? (netMarginUsd / earnedUsd) * 100 : null;
+                        const isExpanded = expandedRow === user.email;
 
-                            return (
-                                <React.Fragment key={user.email}>
-                                    <tr 
-                                        onClick={() => toggleRow(user.email)} 
-                                        className="border-b border-zinc-900 hover:bg-zinc-900/20 cursor-pointer transition-colors"
-                                    >
-                                        <td className="p-4">
-                                            <div className="flex items-center justify-between gap-3">
-                                                <div className="flex items-center gap-2 min-w-0">
-                                                    <span className="font-medium text-white truncate">{user.email}</span>
-                                                    {authorIsAdmin && (
-                                                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-zinc-800 text-zinc-300 border border-zinc-700 shrink-0">
-                                                            ADMIN
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {onInspectUser && (
-                                                    <button
-                                                        type="button"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            onInspectUser(user);
-                                                        }}
-                                                        className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer select-none shrink-0"
-                                                        title={`Inspect ${user.email}'s live wallet and curated zcenes`}
-                                                    >
-                                                        <span className="material-symbols-outlined !text-[13px]">visibility</span>
-                                                        Inspect Wallet
-                                                    </button>
+                        return (
+                            <React.Fragment key={user.email}>
+                                <tr 
+                                    onClick={() => toggleRow(user.email)} 
+                                    className="border-b border-zinc-900 hover:bg-zinc-900/20 cursor-pointer transition-colors"
+                                >
+                                    <td className="p-4">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2 min-w-0">
+                                                <span className="font-medium text-white truncate">{user.email}</span>
+                                                {authorIsAdmin && (
+                                                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-zinc-800 text-zinc-300 border border-zinc-700 shrink-0">
+                                                        ADMIN
+                                                    </span>
                                                 )}
                                             </div>
-                                        </td>
-                                        <td className="p-4 text-center font-mono text-primary font-semibold whitespace-nowrap">
-                                            {user.tokenBalance ?? 0}T
-                                        </td>
-                                        <td className="p-4 text-center font-mono text-white">
-                                            {user.projectsCount}
-                                        </td>
-                                        <td className="p-4 text-right font-mono whitespace-nowrap">
-                                            {authorIsAdmin ? (
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-zinc-500">$0.00</span>
-                                                    <span className="text-[10px] text-zinc-600">0T Bypass</span>
-                                                </div>
-                                            ) : (
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-emerald-400 font-semibold">
-                                                        £{earnedGbp.toFixed(2)} <span className="text-zinc-400 font-normal">/ ~${earnedUsd.toFixed(2)}</span>
-                                                    </span>
-                                                    <span className="text-[10px] text-zinc-500">
-                                                        {spentTokens}T spent ({user.lifetimeTokensPurchased ?? 0}T top-ups)
-                                                    </span>
-                                                </div>
+                                            {onInspectUser && (
+                                                <button
+                                                    type="button"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onInspectUser(user);
+                                                    }}
+                                                    className="px-2.5 py-1 rounded-lg bg-primary/10 hover:bg-primary/20 text-primary border border-primary/30 text-[11px] font-semibold flex items-center gap-1.5 transition-colors cursor-pointer select-none shrink-0"
+                                                    title={`Inspect ${user.email}'s live wallet and curated zcenes`}
+                                                >
+                                                    <span className="material-symbols-outlined !text-[13px]">visibility</span>
+                                                    Inspect Wallet
+                                                </button>
                                             )}
-                                        </td>
-                                        <td className="p-4 text-right font-mono text-red-400/80 whitespace-nowrap">
-                                            {costPrefix}${cost.toFixed(4)}
-                                        </td>
-                                        <td className="p-4 text-right font-mono whitespace-nowrap">
-                                            {authorIsAdmin ? (
-                                                <div className="flex flex-col items-end">
-                                                    <span className="text-zinc-400">{formatSignedUsd(-cost, 4)}</span>
-                                                    <span className="text-[10px] text-zinc-500">Sandbox R&amp;D</span>
-                                                </div>
-                                            ) : spentTokens === 0 && cost === 0 ? (
-                                                <span className="text-zinc-600">—</span>
-                                            ) : (
-                                                <div className="flex flex-col items-end">
-                                                    <span className={netMarginUsd >= 0 ? 'text-primary font-semibold' : 'text-red-400 font-semibold'}>
-                                                        {formatSignedUsd(netMarginUsd, 2)}
+                                        </div>
+                                    </td>
+                                    <td className="p-4 text-center font-mono text-primary font-semibold whitespace-nowrap">
+                                        {user.tokenBalance ?? 0}T
+                                    </td>
+                                    <td className="p-4 text-center font-mono text-white">
+                                        {user.projectsCount}
+                                    </td>
+                                    <td className="p-4 text-right font-mono whitespace-nowrap">
+                                        {authorIsAdmin ? (
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-zinc-500">$0.00</span>
+                                                <span className="text-[10px] text-zinc-600">0T Bypass</span>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-emerald-400 font-semibold">
+                                                    £{earnedGbp.toFixed(2)} <span className="text-zinc-400 font-normal">/ ~${earnedUsd.toFixed(2)}</span>
+                                                </span>
+                                                <span className="text-[10px] text-zinc-500">
+                                                    {spentTokens}T spent ({user.lifetimeTokensPurchased ?? 0}T top-ups)
+                                                </span>
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="p-4 text-right font-mono text-red-400/80 whitespace-nowrap">
+                                        {costPrefix}${cost.toFixed(4)}
+                                    </td>
+                                    <td className="p-4 text-right font-mono whitespace-nowrap">
+                                        {authorIsAdmin ? (
+                                            <div className="flex flex-col items-end">
+                                                <span className="text-zinc-400">{formatSignedUsd(-cost, 4)}</span>
+                                                <span className="text-[10px] text-zinc-500">Sandbox R&amp;D</span>
+                                            </div>
+                                        ) : spentTokens === 0 && cost === 0 ? (
+                                            <span className="text-zinc-600">—</span>
+                                        ) : (
+                                            <div className="flex flex-col items-end">
+                                                <span className={netMarginUsd >= 0 ? 'text-primary font-semibold' : 'text-red-400 font-semibold'}>
+                                                    {formatSignedUsd(netMarginUsd, 2)}
+                                                </span>
+                                                {netMarginPct !== null && (
+                                                    <span className={`text-[10px] font-bold ${netMarginUsd >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                                                        {formatSignedPct(netMarginPct, 1)} Margin
                                                     </span>
-                                                    {netMarginPct !== null && (
-                                                        <span className={`text-[10px] font-bold ${netMarginUsd >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
-                                                            {formatSignedPct(netMarginPct, 1)} Margin
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <span className="material-symbols-outlined text-zinc-500">
-                                                {isExpanded ? 'expand_less' : 'expand_more'}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                    {isExpanded && (
-                                         <tr className="bg-zinc-900/10 border-b border-zinc-900">
-                                             <td colSpan={7} className="p-6">
-                                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-sm">
-                                                     
-                                                     {/* Left Column: Curation Actions Summary */}
-                                                     <div className="space-y-4">
-                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Curation Actions</h4>
-                                                         <div className="space-y-2">
-                                                             <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                 <span className="text-zinc-400">Zcenes Curated:</span>
-                                                                 <span className="text-white font-mono">{user.projectsCount}</span>
-                                                             </div>
-                                                             <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                 <span className="text-zinc-400">Actions Executed:</span>
-                                                                 <span className="text-white font-mono">{user.actionTriggers.updateCount}</span>
-                                                             </div>
-                                                             <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                 <span className="text-zinc-400">Deep Cuts Opened:</span>
-                                                                 <span className="text-white font-mono">{user.deepCutsOpened}</span>
-                                                             </div>
-                                                             {(user.preflightLookups?.calls ?? 0) > 0 && (
-                                                                 <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                     <span className="text-zinc-400">Pre-Flight Lookups:</span>
-                                                                     <span className="text-white font-mono">
-                                                                         {user.preflightLookups!.calls}{' '}
-                                                                         <span className="text-red-400/80 text-xs">
-                                                                             (${user.preflightLookups!.costUsd.toFixed(4)})
-                                                                         </span>
-                                                                     </span>
-                                                                 </div>
-                                                             )}
-                                                             {(user.deepWebConsults?.calls ?? 0) > 0 && (
-                                                                 <div className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                     <span className="text-zinc-400">Deep Web Consults:</span>
-                                                                     <span className="text-white font-mono">
-                                                                         {user.deepWebConsults!.calls}{' '}
-                                                                         <span className="text-red-400/80 text-xs">
-                                                                             (${user.deepWebConsults!.costUsd.toFixed(4)})
-                                                                         </span>
-                                                                     </span>
-                                                                 </div>
-                                                             )}
-                                                             {(() => {
-                                                                 const stackCounts = getAuthorStackCounts?.(user);
-                                                                 if (!stackCounts) return null;
-                                                                 return (
-                                                                     <div
-                                                                         className="flex justify-between border-b border-zinc-800/50 pb-1"
-                                                                         data-testid={`author-stack-counts-${user.uid || user.email}`}
-                                                                     >
-                                                                         <span className="text-zinc-400">My Stack:</span>
-                                                                         <span className="text-white font-mono">
-                                                                             {stackCounts.isLoading ? (
-                                                                                 <span className="text-zinc-500">Loading...</span>
-                                                                             ) : (
-                                                                                 <>
-                                                                                     {stackCounts.activeCount} active <span className="text-zinc-500">·</span> {stackCounts.archivedCount} archived
-                                                                                 </>
-                                                                             )}
-                                                                         </span>
-                                                                     </div>
-                                                                 );
-                                                             })()}
-                                                             <div className="flex justify-between">
-                                                                 <span className="text-zinc-400">Total Actions:</span>
-                                                                 <span className="text-white font-mono font-bold">{totalActions}</span>
-                                                             </div>
-                                                         </div>
-                                                     </div>
-
-                                                     {/* Right Column: Top Artist Discoveries */}
-                                                     <div className="space-y-4">
-                                                         <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Top Artist Discoveries (<span className="font-mono">{user.artistSearches.globalCount}</span> Total)</h4>
-                                                         <div className="space-y-2">
-                                                             {user.artistSearches.topSearches.length === 0 ? (
-                                                                 <div className="text-xs text-zinc-500 italic">No artist seeds recorded yet.</div>
-                                                             ) : (
-                                                                 user.artistSearches.topSearches.map((search, i) => (
-                                                                     <div key={i} className="flex justify-between border-b border-zinc-800/50 pb-1">
-                                                                         <span className="text-zinc-300">{search.artistName}</span>
-                                                                         <span className="text-zinc-400"><span className="font-mono">{search.count}</span> digs</span>
-                                                                     </div>
-                                                                 ))
-                                                             )}
-                                                         </div>
-                                                     </div>
-
-                                                     {/* Full Width: Consolidated Unified Token Activity, Curations & Top-Up Receipts */}
-                                                     <div className="col-span-1 md:col-span-2 pt-4 border-t border-zinc-900 mt-2">
-                                                         <AuthorUnifiedActivityTable user={user} />
-                                                     </div>
-
-                                                     {/* Full Width: Deep Connections Query Log (Admin Exclusive) */}
-                                                     <div className="col-span-1 md:col-span-2 pt-4 border-t border-zinc-900 mt-2">
-                                                         <DeepConnectionsQueryLog uid={user.uid} email={user.email} />
-                                                     </div>
-
-                                                 </div>
-                                             </td>
-                                         </tr>
-                                    )}
-                                </React.Fragment>
-                            );
-                        })
-                    )}
+                                                )}
+                                            </div>
+                                        )}
+                                    </td>
+                                    <td className="p-4 text-center">
+                                        <span className="material-symbols-outlined text-zinc-500">
+                                            {isExpanded ? 'expand_less' : 'expand_more'}
+                                        </span>
+                                    </td>
+                                </tr>
+                                {isExpanded && (
+                                     <tr className="bg-zinc-900/10 border-b border-zinc-900">
+                                         <td colSpan={7} className="p-6">
+                                             {renderExpandedDetails(user, totalActions)}
+                                         </td>
+                                     </tr>
+                                )}
+                            </React.Fragment>
+                        );
+                    })}
                 </tbody>
             </table>
         </div>
@@ -2151,6 +2439,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [activityFilter, setActivityFilter] = useState<ActivityFilterCategory>('all');
     const [activityVisibleCount, setActivityVisibleCount] = useState<number>(ACTIVITY_PAGE_SIZE);
     const [archiveVisibleCount, setArchiveVisibleCount] = useState<number>(ARCHIVE_PAGE_SIZE);
+    const [jitVisibleCount, setJitVisibleCount] = useState<number>(ADMIN_LOG_PAGE_SIZE);
+    const [failuresVisibleCount, setFailuresVisibleCount] = useState<number>(ADMIN_LOG_PAGE_SIZE);
     const [archiveSearchQuery, setArchiveSearchQuery] = useState<string>('');
     const [isArchiveSearchOpen, setIsArchiveSearchOpen] = useState<boolean>(false);
     const [stackItemToDelete, setStackItemToDelete] = useState<StackItem | null>(null);
@@ -2230,6 +2520,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         setActiveLedgerTab('activity');
         setArchiveSearchQuery('');
         setIsArchiveSearchOpen(false);
+        setJitVisibleCount(ADMIN_LOG_PAGE_SIZE);
+        setFailuresVisibleCount(ADMIN_LOG_PAGE_SIZE);
     }, [user?.uid]);
 
     // One-shot deep-link handler (e.g., from MyStackDialog "Stack Archive" footer link)
@@ -3057,7 +3349,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                     setIsGrantingTokens(false);
                                 }
                             }}
-                            className={`bg-zinc-900/40 border border-zinc-800 p-5 space-y-3 ${RADIUS_TOKENS.frame}`}
+                            className={`bg-zinc-900/40 border border-zinc-800 p-4 sm:p-5 space-y-3 ${RADIUS_TOKENS.frame}`}
                         >
                             <div className="flex flex-wrap items-center justify-between gap-2">
                                 <div className="flex items-center gap-2">
@@ -3146,21 +3438,17 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         </form>
                     )}
 
-                    {/* Author Search Bar (Admin Exclusive — manual Sync Archives removed; reconciliation runs automatically on load) */}
+                    {/* Author Search Bar (Admin Exclusive — standardized ToolbarSearch) */}
                     {!isNormalUserView && (
-                        <div className={`w-full flex items-center gap-4 bg-zinc-950 px-4 py-2 border border-zinc-800 h-[38px] ${RADIUS_TOKENS.input}`}>
-                            <span className="material-symbols-outlined text-zinc-500 select-none">search</span>
-                            <input
-                                autoComplete="off"
-                                data-1p-ignore="true"
-                                data-lpignore="true"
-                                type="text"
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                placeholder="Search by Author identity..."
-                                className="bg-transparent text-white w-full border-none outline-none focus:ring-0 text-sm placeholder:text-zinc-600"
-                            />
-                        </div>
+                        <ToolbarSearch
+                            value={searchTerm}
+                            onChange={setSearchTerm}
+                            placeholder="Search by Author identity..."
+                            isMobile={false}
+                            size="control"
+                            width="full"
+                            inputTestId="admin-author-search-input"
+                        />
                     )}
 
                     {error && (
@@ -3283,61 +3571,9 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                         </div>
                                     ) : isSmallScreen ? (
                                         <div data-testid="token-activity-mobile-list" className="space-y-3">
-                                            {visibleActivityRows.map((row) => {
-                                                const isPositive = row.delta > 0;
-                                                const changeLabel = row.delta === 0
-                                                    ? '0 T'
-                                                    : (isPositive ? `+${row.delta} T` : `${row.delta} T`);
-
-                                                return (
-                                                    <div
-                                                        key={row.id}
-                                                        data-testid={`activity-row-${row.id}`}
-                                                        className={`border border-zinc-800 bg-zinc-950/40 p-4 space-y-2.5 ${RADIUS_TOKENS.frame}`}
-                                                    >
-                                                        <div className="flex items-start justify-between gap-3">
-                                                            <div className="min-w-0 flex-1">
-                                                                <div className="flex items-center gap-2 flex-wrap">
-                                                                    {row.isCurationRow && renderProjectStatusBadge(row.projectStatus, true)}
-                                                                    <span className="font-medium text-white text-sm leading-snug break-words">{row.title}</span>
-                                                                </div>
-                                                                {row.subtitle && (
-                                                                    <span className="block text-[11px] text-zinc-500 mt-0.5">
-                                                                        {row.subtitle}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            <span
-                                                                className={`text-sm font-mono font-bold whitespace-nowrap shrink-0 ${
-                                                                    isPositive ? 'text-emerald-400' : row.delta === 0 ? 'text-emerald-300' : 'text-zinc-200'
-                                                                }`}
-                                                            >
-                                                                {changeLabel}
-                                                            </span>
-                                                        </div>
-
-                                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border whitespace-nowrap inline-flex items-center shrink-0 ${row.categoryBadge.style}`}>
-                                                                {row.categoryBadge.label}
-                                                            </span>
-                                                            {row.isCurationRow && row.userFacingScope && (
-                                                                <span className="px-2 py-0.5 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 text-[11px] font-medium whitespace-nowrap inline-flex items-center shrink-0">
-                                                                    {row.userFacingScope}
-                                                                </span>
-                                                            )}
-                                                        </div>
-
-                                                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
-                                                            <span className="truncate">
-                                                                {row.createdAt ? formatTxTimestamp(row.createdAt) : '—'}
-                                                            </span>
-                                                            <span className="whitespace-nowrap shrink-0 text-zinc-400">
-                                                                {row.balanceAfter !== null ? `Bal: ${row.balanceAfter} T` : '—'}
-                                                            </span>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
+                                            {visibleActivityRows.map((row) => (
+                                                <ActivityReceiptMobileCard key={row.id} row={row} />
+                                            ))}
                                         </div>
                                     ) : (
                                         <div
@@ -3688,6 +3924,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                 expandedRow={expandedRow}
                                 toggleRow={toggleRow}
                                 getAuthorStackCounts={getAuthorStackCounts}
+                                isSmallScreen={isSmallScreen}
                                 onInspectUser={(inspected) => {
                                     setInspectedAuthor({ uid: inspected.uid || '', email: inspected.email });
                                     setActivityFilter('all');
@@ -3699,11 +3936,17 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                             />
 
                             {/* JIT Auto-Healing Telemetry (Phase 3 Admin Exclusive) */}
-                            <div className="space-y-4 pt-6">
+                            <div className="space-y-4 pt-6" data-testid="admin-jit-heals-section">
                                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 border-b border-zinc-800 pb-4">
-                                    <div>
-                                        <div className="flex items-center gap-3">
-                                            <h3 className="text-xl font-medium text-white">JIT Auto-Healing Telemetry</h3>
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2.5">
+                                            <h3 className="text-xl font-medium text-white inline-flex items-center">
+                                                JIT Auto-Healing Telemetry
+                                                <InfoTooltip
+                                                    align="left"
+                                                    content="Strictly capped at 100 automatic heals per 24 hours (~$0.04 max daily exposure). Auto-disables if breached; use the toggle to manually override anytime."
+                                                />
+                                            </h3>
                                             
                                             {/* 1. Static Status Badge (Design System: Badges & Tags) */}
                                             <span 
@@ -3723,7 +3966,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                 disabled={isTogglingJit}
                                                 aria-label="Toggle JIT Auto-Healing status"
                                                 title={isJitEnabled ? "Click to disable JIT Auto-Healing" : "Click to enable JIT Auto-Healing"}
-                                                className="w-10 h-5 rounded-full relative transition-colors bg-zinc-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                                                className="w-10 h-5 rounded-full relative transition-colors bg-zinc-800 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed shrink-0"
                                             >
                                                 <div 
                                                     className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full transition-transform duration-200 ${
@@ -3735,13 +3978,12 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                             </button>
                                         </div>
 
-                                        {/* 3. Descriptive Context Block */}
-                                        <p className="text-sm text-zinc-400 mt-2 max-w-3xl leading-relaxed">
-                                            The JIT Healer synthesizes missing database assets on-the-fly via Gemini Flash. To prevent runaway API costs, it is strictly capped at 100 automatic heals per 24 hours (a maximum daily exposure of ~$0.04). If this rolling threshold is breached, JIT Healing will automatically disable. You can use the toggle to manually override and lock the system at any time.
+                                        <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
+                                            On-the-fly Gemini Flash synthesis for missing database assets.
                                         </p>
                                     </div>
 
-                                    <div className="flex items-center gap-6 font-mono text-xs">
+                                    <div className="flex flex-wrap items-center gap-5 sm:gap-6 font-mono text-xs shrink-0">
                                         <div>
                                             <span className="text-zinc-500 block text-[10px] uppercase">Healed Assets</span>
                                             <span className="text-white font-bold">{jitHeals.length}</span>
@@ -3757,39 +3999,79 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
-                                    <table className="w-full text-left border-collapse min-w-[700px]">
-                                        <thead>
-                                            <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Entity</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Type</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Triggered By</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {isLoading && jitHeals.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={6} className="p-6 text-center text-zinc-500 text-xs italic">
-                                                        Loading healing receipts...
-                                                    </td>
+                                {isLoading && jitHeals.length === 0 ? (
+                                    <div className={`border border-zinc-800 bg-zinc-950/20 p-6 text-center text-zinc-500 text-xs italic ${RADIUS_TOKENS.frame}`}>
+                                        Loading healing receipts...
+                                    </div>
+                                ) : jitHeals.length === 0 ? (
+                                    <div className={`border border-zinc-800 bg-zinc-950/20 p-6 text-center text-zinc-500 text-xs italic ${RADIUS_TOKENS.frame}`}>
+                                        No JIT healing events recorded yet.
+                                    </div>
+                                ) : isSmallScreen ? (
+                                    <div data-testid="jit-heals-mobile-list" className="space-y-3">
+                                        {jitHeals.slice(0, jitVisibleCount).map((heal) => {
+                                            const d = new Date(heal.timestamp);
+                                            const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
+                                                d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                                            return (
+                                                <div
+                                                    key={heal.id}
+                                                    data-testid={`jit-heal-row-${heal.id}`}
+                                                    className={`border border-zinc-800 bg-zinc-950/40 p-4 space-y-2.5 ${RADIUS_TOKENS.frame}`}
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <span className="text-sm text-white font-medium block break-words">{heal.displayName}</span>
+                                                            <span className="block text-[11px] font-mono text-zinc-500 truncate">{heal.entityId}</span>
+                                                        </div>
+                                                        <span className="text-xs font-mono text-red-400 font-bold whitespace-nowrap shrink-0">
+                                                            ${heal.costUsd.toFixed(5)}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border whitespace-nowrap shrink-0 ${
+                                                            heal.entityType === 'label'
+                                                                ? 'border-teal-500/30 text-teal-400 bg-teal-950/20'
+                                                                : 'border-purple-500/30 text-purple-400 bg-purple-950/20'
+                                                        }`}>
+                                                            {heal.entityType}
+                                                        </span>
+                                                        <span className="text-xs text-zinc-300 truncate min-w-0">
+                                                            {heal.callerEmail || heal.callerUid}
+                                                            {heal.projectName ? ` · ${heal.projectName}` : heal.projectId ? ` · ${heal.projectId}` : ''}
+                                                        </span>
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                                        <span className="whitespace-nowrap">{dateStr}</span>
+                                                        <span className="whitespace-nowrap shrink-0">{heal.totalTokens.toLocaleString()} tok</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div data-testid="jit-heals-desktop-table" className={`border border-zinc-800 bg-zinc-950/20 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
+                                        <table className="w-full text-left border-collapse min-w-[700px]">
+                                            <thead>
+                                                <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Entity</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Type</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Triggered By</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
                                                 </tr>
-                                            ) : jitHeals.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={6} className="p-6 text-center text-zinc-500 text-xs italic">
-                                                        No JIT healing events recorded yet.
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                jitHeals.map((heal) => {
+                                            </thead>
+                                            <tbody>
+                                                {jitHeals.slice(0, jitVisibleCount).map((heal) => {
                                                     const d = new Date(heal.timestamp);
                                                     const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
                                                         d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                                                     return (
                                                         <tr key={heal.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
-                                                            <td className="p-3.5 text-xs text-zinc-400 font-mono">
+                                                            <td className="p-3.5 text-xs text-zinc-400 font-mono whitespace-nowrap">
                                                                 {dateStr}
                                                             </td>
                                                             <td className="p-3.5 text-sm text-white font-medium">
@@ -3837,30 +4119,49 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                             </td>
                                                         </tr>
                                                     );
-                                                })
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {jitHeals.length > jitVisibleCount && (
+                                    <div className="flex justify-center pt-1">
+                                        <button
+                                            type="button"
+                                            data-testid="jit-show-more-btn"
+                                            onClick={() => setJitVisibleCount(prev => prev + ADMIN_LOG_PAGE_SIZE)}
+                                            className={`px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-zinc-900/70 hover:bg-zinc-800 border border-zinc-700/80 transition-colors cursor-pointer ${RADIUS_TOKENS.button}`}
+                                        >
+                                            Show more ({jitHeals.length - jitVisibleCount} remaining)
+                                        </button>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Failed & Auto-Refunded Curations (Sunk Cost Audit) Section */}
                             <div className="space-y-4 pt-6 border-t border-zinc-800/80" data-testid="admin-curation-failures-section">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div>
-                                        <div className="flex items-center gap-3">
-                                            <span className="material-symbols-outlined text-rose-400 !text-[22px]">receipt_long</span>
-                                            <h2 className="text-xl font-medium text-white">Failed &amp; Auto-Refunded Curations</h2>
-                                            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30">
+                                <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2.5">
+                                            <span className="material-symbols-outlined text-rose-400 !text-[22px] shrink-0">receipt_long</span>
+                                            <h2 className="text-xl font-medium text-white inline-flex items-center">
+                                                Failed &amp; Auto-Refunded Curations
+                                                <InfoTooltip
+                                                    align="left"
+                                                    content="Permanent audit ledger of in-flight pipeline failures and 5-minute stale-lock reaper recoveries, capturing refunded tokens alongside partial Gemini API spend already incurred prior to abort."
+                                                />
+                                            </h2>
+                                            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-rose-500/15 text-rose-300 border border-rose-500/30 whitespace-nowrap">
                                                 Sunk Cost Audit
                                             </span>
                                         </div>
-                                        <p className="text-sm text-zinc-400 mt-1 max-w-3xl leading-relaxed">
-                                            Permanent audit ledger of in-flight pipeline failures and 5-minute stale-lock reaper recoveries, capturing refunded tokens alongside partial Gemini API spend already incurred prior to abort.
+                                        <p className="text-xs text-zinc-400 mt-1.5 leading-relaxed">
+                                            Audit log of failed or reaped curations, token refunds, and sunk Gemini API spend.
                                         </p>
                                     </div>
 
-                                    <div className="flex items-center gap-6 font-mono text-xs shrink-0">
+                                    <div className="flex flex-wrap items-center gap-5 sm:gap-6 font-mono text-xs shrink-0">
                                         <div>
                                             <span className="text-zinc-500 block text-[10px] uppercase">Failed Jobs</span>
                                             <span className="text-white font-bold">{curationFailures.length}</span>
@@ -3876,34 +4177,85 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                     </div>
                                 </div>
 
-                                <div className="border border-zinc-800 bg-zinc-950/20 overflow-x-auto">
-                                    <table className="w-full text-left border-collapse min-w-[780px]">
-                                        <thead>
-                                            <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">User / Project</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Source</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Reason</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Refunded</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Sunk Tokens</th>
-                                                <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Sunk Cost</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {isLoading && curationFailures.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={7} className="p-6 text-center text-zinc-500 text-xs italic">
-                                                        Loading failure &amp; refund receipts...
-                                                    </td>
+                                {isLoading && curationFailures.length === 0 ? (
+                                    <div className={`border border-zinc-800 bg-zinc-950/20 p-6 text-center text-zinc-500 text-xs italic ${RADIUS_TOKENS.frame}`}>
+                                        Loading failure &amp; refund receipts...
+                                    </div>
+                                ) : curationFailures.length === 0 ? (
+                                    <div className={`border border-zinc-800 bg-zinc-950/20 p-6 text-center text-zinc-500 text-xs italic ${RADIUS_TOKENS.frame}`}>
+                                        No failed or reaped curation events recorded.
+                                    </div>
+                                ) : isSmallScreen ? (
+                                    <div data-testid="curation-failures-mobile-list" className="space-y-3">
+                                        {curationFailures.slice(0, failuresVisibleCount).map((fail) => {
+                                            const d = new Date(fail.timestamp);
+                                            const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
+                                                d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+                                            const sourceLabel =
+                                                fail.source === 'stale_reaper'
+                                                    ? 'Stale Reaper'
+                                                    : fail.source === 'column2_error'
+                                                        ? 'Topology Error'
+                                                        : 'Worker Crash';
+                                            const sourceBadgeClass =
+                                                fail.source === 'stale_reaper'
+                                                    ? 'border-amber-500/30 text-amber-300 bg-amber-950/20'
+                                                    : 'border-rose-500/30 text-rose-300 bg-rose-950/20';
+                                            return (
+                                                <div
+                                                    key={fail.id}
+                                                    data-testid={`curation-failure-row-${fail.id}`}
+                                                    className={`border border-zinc-800 bg-zinc-950/40 p-4 space-y-2.5 ${RADIUS_TOKENS.frame}`}
+                                                >
+                                                    <div className="flex items-start justify-between gap-3">
+                                                        <div className="min-w-0 flex-1">
+                                                            <span className="text-sm font-medium text-white block truncate">{fail.userEmail || fail.uid}</span>
+                                                            <span className="block text-[11px] text-zinc-500 truncate">{fail.projectName || fail.projectId || '—'}</span>
+                                                        </div>
+                                                        <div className="text-right font-mono shrink-0">
+                                                            <span className="block text-xs text-emerald-300 font-semibold whitespace-nowrap">
+                                                                {fail.tokensRefunded > 0 ? `+${fail.tokensRefunded}T` : '0T'}
+                                                            </span>
+                                                            <span className="block text-[11px] text-rose-400 font-bold whitespace-nowrap">
+                                                                ${fail.sunkCostUsd.toFixed(4)}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+
+                                                    <div className="space-y-1">
+                                                        <span className={`inline-flex text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border whitespace-nowrap ${sourceBadgeClass}`}>
+                                                            {sourceLabel}
+                                                        </span>
+                                                        <p className="text-xs text-zinc-300 break-words">{fail.reason}</p>
+                                                        {fail.errorMessage && (
+                                                            <p className="text-[11px] text-zinc-500 break-words">{fail.errorMessage}</p>
+                                                        )}
+                                                    </div>
+
+                                                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                                        <span className="whitespace-nowrap">{dateStr}</span>
+                                                        <span className="whitespace-nowrap shrink-0">{fail.sunkTotalTokens.toLocaleString()} tok</span>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                ) : (
+                                    <div data-testid="curation-failures-desktop-table" className={`border border-zinc-800 bg-zinc-950/20 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
+                                        <table className="w-full text-left border-collapse min-w-[780px]">
+                                            <thead>
+                                                <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">User / Project</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Source</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Reason</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Refunded</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Sunk Tokens</th>
+                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Sunk Cost</th>
                                                 </tr>
-                                            ) : curationFailures.length === 0 ? (
-                                                <tr>
-                                                    <td colSpan={7} className="p-6 text-center text-zinc-500 text-xs italic">
-                                                        No failed or reaped curation events recorded.
-                                                    </td>
-                                                </tr>
-                                            ) : (
-                                                curationFailures.map((fail) => {
+                                            </thead>
+                                            <tbody>
+                                                {curationFailures.slice(0, failuresVisibleCount).map((fail) => {
                                                     const d = new Date(fail.timestamp);
                                                     const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
                                                         d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -3956,11 +4308,24 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                             </td>
                                                         </tr>
                                                     );
-                                                })
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                                })}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
+
+                                {curationFailures.length > failuresVisibleCount && (
+                                    <div className="flex justify-center pt-1">
+                                        <button
+                                            type="button"
+                                            data-testid="curation-failures-show-more-btn"
+                                            onClick={() => setFailuresVisibleCount(prev => prev + ADMIN_LOG_PAGE_SIZE)}
+                                            className={`px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-zinc-900/70 hover:bg-zinc-800 border border-zinc-700/80 transition-colors cursor-pointer ${RADIUS_TOKENS.button}`}
+                                        >
+                                            Show more ({curationFailures.length - failuresVisibleCount} remaining)
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                         </>
                     )}
