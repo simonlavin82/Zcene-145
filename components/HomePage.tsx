@@ -186,7 +186,8 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                       initial={{ opacity: 0, y: 10, scale: 0.95 }}
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                      className="absolute right-0 mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-black text-left font-display antialiased"
+                      data-testid="homepage-profile-dropdown"
+                      className="absolute right-0 mt-2 w-60 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-black text-left font-display antialiased"
                     >
                       {user ? (
                         <div className="px-3.5 py-2.5 border-b border-white/5">
@@ -209,9 +210,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                                 onNavigate(hasExistingGraph ? View.Dashboard : View.Graph);
                               });
                             }}
-                            className="w-full bg-white text-brand-black rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-sm font-semibold cursor-pointer"
+                            className="w-full bg-white text-brand-black rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-sm font-semibold cursor-pointer whitespace-nowrap"
                           >
-                            <span className="material-symbols-outlined !text-[16px] text-black font-bold">login</span>
+                            <span className="material-symbols-outlined !text-[16px] text-black font-bold shrink-0">login</span>
                             Sign In with Google
                           </button>
                         </div>
@@ -220,9 +221,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                       <div className="p-0.5 space-y-0.5">
                         <button
                           onClick={() => { setIsProfileOpen(false); onNavigate(View.Help); }}
-                          className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                          className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                         >
-                          <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary">help</span>
+                          <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary shrink-0">help</span>
                           Help
                         </button>
 
@@ -230,16 +231,16 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                           <>
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate(View.StyleGuide); }}
-                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                             >
-                              <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary">grid_view</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary shrink-0">grid_view</span>
                               Design System
                             </button>
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate(View.Engine); }}
-                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                             >
-                              <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary">settings_input_component</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary shrink-0">settings_input_component</span>
                               Engine
                             </button>
                           </>
@@ -248,9 +249,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                         {user && (
                           <button
                             onClick={() => { setIsProfileOpen(false); onNavigate(View.Analytics); }}
-                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                           >
-                            <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary">monitoring</span>
+                            <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary shrink-0">monitoring</span>
                             Discovery Ledger
                           </button>
                         )}
@@ -260,11 +261,11 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                             setIsProfileOpen(false);
                             window.open(ZCENE_INSTAGRAM_URL, '_blank');
                           }}
-                          className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                          className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                         >
-                          <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary">camera_alt</span>
+                          <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary shrink-0">camera_alt</span>
                           Instagram
-                          <span className="material-symbols-outlined !text-[12px] ml-auto opacity-40">open_in_new</span>
+                          <span className="material-symbols-outlined !text-[12px] ml-auto opacity-40 shrink-0">open_in_new</span>
                         </button>
 
                         <button
@@ -280,9 +281,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                               }
                             }
                           }}
-                          className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                          className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                         >
-                          <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary">restart_alt</span>
+                          <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary shrink-0">restart_alt</span>
                           Restart Walkthrough
                         </button>
                       </div>
@@ -293,9 +294,9 @@ const HomePage: React.FC<HomePageProps> = ({ onNavigate, hasExistingGraph = fals
                           <div className="p-0.5 space-y-0.5">
                             <button
                               onClick={() => { setIsProfileOpen(false); onLogout(); }}
-                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                             >
-                              <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary">logout</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500 group-hover:text-primary shrink-0">logout</span>
                               Sign Out
                             </button>
                           </div>

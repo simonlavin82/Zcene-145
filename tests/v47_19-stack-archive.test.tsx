@@ -8,9 +8,11 @@ import {
   DiscoveryLedgerTable,
   partitionStackItems,
   filterAndSortArchivedStack,
-  LEDGER_PAGE_SIZE,
+  ACTIVITY_PAGE_SIZE,
+  ARCHIVE_PAGE_SIZE,
 } from '../components/UsageAnalyticsPage';
-import { MyStackDialog } from '../components/SharedModals';
+import { MyStackDialog, SimulatedStripeModal } from '../components/SharedModals';
+import Header from '../components/Header';
 import { StackItem } from '../types';
 import { ADMIN_EMAIL, ADMIN_UID } from '../shared/tokenEconomy';
 
@@ -309,8 +311,11 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     });
   });
 
-  it('7. paginates both Token Activity and Stack Archive at 50 rows with incremental Show more expansion', async () => {
-    const manyTxs = Array.from({ length: LEDGER_PAGE_SIZE + 12 }, (_, idx) => ({
+  it('7. paginates Token Activity at 10 rows and Stack Archive at 20 rows with incremental Show more expansion', async () => {
+    expect(ACTIVITY_PAGE_SIZE).toBe(10);
+    expect(ARCHIVE_PAGE_SIZE).toBe(20);
+
+    const manyTxs = Array.from({ length: ACTIVITY_PAGE_SIZE + 14 }, (_, idx) => ({
       id: `tx_${idx}`,
       data: () => ({
         uid: 'u-member-1',
@@ -327,7 +332,7 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
       return { docs: [] };
     });
 
-    const manyArchived: StackItem[] = Array.from({ length: LEDGER_PAGE_SIZE + 8 }, (_, idx) => ({
+    const manyArchived: StackItem[] = Array.from({ length: ARCHIVE_PAGE_SIZE + 8 }, (_, idx) => ({
       id: `band-${idx}`,
       docId: `band-${idx}_proj`,
       displayName: `Archived Band ${idx + 1}`,
@@ -347,21 +352,28 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     );
 
     expect(await screen.findByText('Pre-Flight Artist Lookup: Band 1')).toBeInTheDocument();
-    expect(screen.queryByText(`Pre-Flight Artist Lookup: Band ${LEDGER_PAGE_SIZE + 1}`)).not.toBeInTheDocument();
-    expect(screen.getByTestId('activity-show-more-btn')).toHaveTextContent('Show more (12 remaining)');
+    expect(screen.queryByText(`Pre-Flight Artist Lookup: Band ${ACTIVITY_PAGE_SIZE + 1}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId('activity-show-more-btn')).toHaveTextContent('Show more (14 remaining)');
 
+    // First Show more expands 10 -> 20
     fireEvent.click(screen.getByTestId('activity-show-more-btn'));
-    expect(screen.getByText(`Pre-Flight Artist Lookup: Band ${LEDGER_PAGE_SIZE + 12}`)).toBeInTheDocument();
+    expect(screen.getByText(`Pre-Flight Artist Lookup: Band ${ACTIVITY_PAGE_SIZE * 2}`)).toBeInTheDocument();
+    expect(screen.queryByText(`Pre-Flight Artist Lookup: Band ${ACTIVITY_PAGE_SIZE * 2 + 1}`)).not.toBeInTheDocument();
+    expect(screen.getByTestId('activity-show-more-btn')).toHaveTextContent('Show more (4 remaining)');
+
+    // Second Show more expands 20 -> 24 and clears button
+    fireEvent.click(screen.getByTestId('activity-show-more-btn'));
+    expect(screen.getByText(`Pre-Flight Artist Lookup: Band ${ACTIVITY_PAGE_SIZE + 14}`)).toBeInTheDocument();
     expect(screen.queryByTestId('activity-show-more-btn')).not.toBeInTheDocument();
 
-    // Switch to Stack Archive
+    // Switch to Stack Archive (20 rows initial -> +8 remaining)
     fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
     expect(screen.getByText('Archived Band 1')).toBeInTheDocument();
-    expect(screen.queryByText(`Archived Band ${LEDGER_PAGE_SIZE + 1}`)).not.toBeInTheDocument();
+    expect(screen.queryByText(`Archived Band ${ARCHIVE_PAGE_SIZE + 1}`)).not.toBeInTheDocument();
     expect(screen.getByTestId('archive-show-more-btn')).toHaveTextContent('Show more (8 remaining)');
 
     fireEvent.click(screen.getByTestId('archive-show-more-btn'));
-    expect(screen.getByText(`Archived Band ${LEDGER_PAGE_SIZE + 8}`)).toBeInTheDocument();
+    expect(screen.getByText(`Archived Band ${ARCHIVE_PAGE_SIZE + 8}`)).toBeInTheDocument();
     expect(screen.queryByTestId('archive-show-more-btn')).not.toBeInTheDocument();
   });
 
@@ -941,5 +953,335 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
         value: originalScrollIntoView,
       });
     }
+  });
+
+  it('14. renders compact Wallet Hero with Option A runway (plural, low-balance amber nudges, Admin 0T bypass), single + Top Up CTA hidden in read-only inspection, and relocated support strip', async () => {
+    const dispatchSpy = vi.spyOn(window, 'dispatchEvent');
+    try {
+      // Standard User at 49T -> ~9 Single-Root Zcenes, + Top Up CTA visible, relocated support strip inside Token Activity
+      const { rerender, unmount } = render(
+        <UsageAnalyticsPage
+          {...makeBaseAnalyticsProps({
+            profile: { tokenBalance: 49, lifetimeTokensPurchased: 500, lifetimeTokensSpent: 461 },
+          })}
+        />
+      );
+
+      expect(await screen.findByTestId('wallet-hero-card')).toBeInTheDocument();
+      expect(screen.getByTestId('wallet-balance-value')).toHaveTextContent('49');
+      expect(screen.getByTestId('wallet-runway-line')).toHaveTextContent('~9 Single-Root Zcenes');
+      expect(screen.getByTestId('wallet-runway-line').className).toContain('text-zinc-400');
+
+      // Removed legacy hero clutter
+      expect(screen.queryByText('Available Discovery Balance')).not.toBeInTheDocument();
+      expect(screen.queryByText('Token Juice Reserve')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('analytics-topup-gbp_5')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('analytics-topup-gbp_10')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('analytics-topup-gbp_15')).not.toBeInTheDocument();
+
+      // Single Primary White + Top Up CTA dispatches open-topup-modal
+      const topUpBtn = screen.getByTestId('analytics-topup-btn');
+      expect(topUpBtn).toHaveTextContent('+ Top Up');
+      expect(topUpBtn.className).toContain('bg-white');
+      expect(topUpBtn.className).toContain('text-brand-black');
+      fireEvent.click(topUpBtn);
+      expect(dispatchSpy).toHaveBeenCalledWith(expect.objectContaining({ type: 'open-topup-modal' }));
+
+      // Support strip lives inside Token Activity, NOT inside wallet-hero-card
+      const supportStrip = screen.getByTestId('ledger-support-strip');
+      expect(screen.getByTestId('token-transactions-ledger').contains(supportStrip)).toBe(true);
+      expect(screen.getByTestId('wallet-hero-card').contains(supportStrip)).toBe(false);
+
+      // Low balance 5-9T -> singular amber nudge
+      rerender(
+        <UsageAnalyticsPage
+          {...makeBaseAnalyticsProps({
+            profile: { tokenBalance: 7, lifetimeTokensPurchased: 50, lifetimeTokensSpent: 43 },
+          })}
+        />
+      );
+      expect(screen.getByTestId('wallet-runway-line')).toHaveTextContent('Low balance · ~1 Single-Root Zcene left');
+      expect(screen.getByTestId('wallet-runway-line').className).toContain('text-amber-400');
+
+      // Low balance 0-4T -> amber top-up nudge
+      rerender(
+        <UsageAnalyticsPage
+          {...makeBaseAnalyticsProps({
+            profile: { tokenBalance: 4, lifetimeTokensPurchased: 50, lifetimeTokensSpent: 46 },
+          })}
+        />
+      );
+      expect(screen.getByTestId('wallet-runway-line')).toHaveTextContent('Low balance · Top up to curate new Zcenes');
+      expect(screen.getByTestId('wallet-runway-line').className).toContain('text-amber-400');
+      unmount();
+
+      // Admin personal ledger (0T) -> neutral bypass copy + NO + Top Up button
+      mockGetDoc.mockResolvedValue({
+        exists: () => true,
+        data: () => ({ email: ADMIN_EMAIL, tokenBalance: 0, lifetimeTokensPurchased: 0, lifetimeTokensSpent: 0 }),
+      });
+      const { unmount: unmountAdmin } = render(
+        <UsageAnalyticsPage
+          {...makeBaseAnalyticsProps({
+            user: { uid: ADMIN_UID, email: ADMIN_EMAIL },
+            isAdmin: true,
+            profile: { tokenBalance: 0, lifetimeTokensPurchased: 0, lifetimeTokensSpent: 0 },
+            requestedLedgerTab: { tab: 'activity', nonce: 1 },
+          })}
+        />
+      );
+      expect(await screen.findByTestId('wallet-hero-card')).toBeInTheDocument();
+      expect(screen.getByTestId('wallet-runway-line')).toHaveTextContent('Admin 0T Bypass · Unlimited curations');
+      expect(screen.getByTestId('wallet-runway-line').className).toContain('text-zinc-400');
+      expect(screen.queryByTestId('analytics-topup-btn')).not.toBeInTheDocument();
+      unmountAdmin();
+
+      // Admin inspecting a customer's wallet (isInspectingOtherUser=true) -> customer runway visible, + Top Up strictly hidden
+      const custUid = 'uid-cust-readonly';
+      const custEmail = 'simon.lavin1@gmail.com';
+      mockGetDoc.mockImplementation(async (ref: any) => {
+        if (ref?.path === 'adminLedger/system') return { exists: () => true, data: () => ({ jitEnabled: true }) };
+        return { exists: () => true, data: () => ({ email: custEmail, tokenBalance: 69, lifetimeTokensPurchased: 500, lifetimeTokensSpent: 431 }) };
+      });
+      mockGetDocs.mockImplementation(async (ref: any) => {
+        if (ref?.path === 'users') {
+          return {
+            docs: [
+              { id: ADMIN_UID, data: () => ({ email: ADMIN_EMAIL, tokenBalance: 0 }) },
+              { id: custUid, data: () => ({ email: custEmail, tokenBalance: 69, lifetimeTokensPurchased: 500, lifetimeTokensSpent: 431 }) },
+            ],
+          };
+        }
+        return { docs: [] };
+      });
+
+      render(
+        <UsageAnalyticsPage
+          {...makeBaseAnalyticsProps({
+            user: { uid: ADMIN_UID, email: ADMIN_EMAIL },
+            isAdmin: true,
+          })}
+        />
+      );
+      expect(await screen.findByText(custEmail)).toBeInTheDocument();
+      fireEvent.click(screen.getAllByRole('button', { name: /Inspect Wallet/i })[1]);
+      expect(await screen.findByTestId('wallet-hero-card')).toBeInTheDocument();
+      expect(screen.getByTestId('wallet-runway-line')).toHaveTextContent('~13 Single-Root Zcenes');
+      expect(screen.queryByTestId('analytics-topup-btn')).not.toBeInTheDocument();
+    } finally {
+      dispatchSpy.mockRestore();
+    }
+  });
+
+  it('15. renders single-branch mobile Token Activity cards at < 768px (isSmallScreen=true) with flex-wrap filter pills and zero duplicate desktop table nodes', async () => {
+    mockGetDocs.mockImplementation(async (ref: any) => {
+      if (ref?.path?.endsWith('projects')) {
+        return {
+          docs: [
+            {
+              id: 'proj-madball',
+              data: () => ({
+                name: 'Madball & Radiohead',
+                seedArtists: 'Madball::Radiohead',
+                status: 'completed',
+                tokensSpent: 10,
+                isComplexProject: true,
+                createdAt: { toMillis: () => 1763000000000 },
+              }),
+            },
+          ],
+        };
+      }
+      if (ref?.path?.endsWith('tokenTransactions')) {
+        return {
+          docs: [
+            {
+              id: 'tx-madball-settlement',
+              data: () => ({
+                uid: 'u-member-1',
+                type: 'spend_live_synthesis',
+                projectId: 'proj-madball',
+                delta: -9,
+                balanceAfter: 59,
+                description: 'Zcene Synthesis: Madball & Radiohead (9T balance after 1T pre-flight)',
+                createdAt: { toMillis: () => 1763000001000 },
+              }),
+            },
+          ],
+        };
+      }
+      return { docs: [] };
+    });
+
+    render(
+      <UsageAnalyticsPage
+        {...makeBaseAnalyticsProps({
+          isSmallScreen: true,
+        })}
+      />
+    );
+
+    expect(await screen.findByTestId('token-activity-mobile-list')).toBeInTheDocument();
+    expect(screen.queryByTestId('token-activity-desktop-table')).not.toBeInTheDocument();
+    expect(screen.getAllByText('Madball & Radiohead')).toHaveLength(1);
+    expect(screen.getByText('-9 T')).toBeInTheDocument();
+    expect(screen.getByText('Bal: 59 T')).toBeInTheDocument();
+    expect(screen.getByText('9T settlement after 1T pre-flight')).toBeInTheDocument();
+
+    // Filter pills wrap cleanly instead of clipping horizontally off-screen
+    const filterPillBar = screen.getByTestId('activity-filter-pills');
+    expect(filterPillBar.className).toContain('flex-wrap');
+    expect(filterPillBar.className).not.toContain('flex-nowrap');
+    expect(filterPillBar.className).not.toContain('overflow-x-auto');
+  });
+
+  it('16. SimulatedStripeModal renders responsive split footer with Token Activity link (disabled while processing) and requestedLedgerTab deep-links to Token Activity with smooth scroll', async () => {
+    let resolveTopUp: ((val: any) => void) | null = null;
+    mockHttpsCallable.mockReturnValue(
+      vi.fn().mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveTopUp = resolve;
+          })
+      )
+    );
+    const onOpenTokenActivity = vi.fn();
+
+    const { unmount } = render(
+      <SimulatedStripeModal
+        isOpen={true}
+        currentBalance={49}
+        onClose={vi.fn()}
+        onOpenTokenActivity={onOpenTokenActivity}
+      />
+    );
+
+    const modalContainer = screen.getByTestId('simulated-stripe-modal');
+    expect(modalContainer.className).toContain('sm:max-w-[480px]');
+
+    const activityLink = screen.getByTestId('stripe-token-activity-link');
+    expect(activityLink).toHaveTextContent('Token Activity');
+    expect(activityLink).not.toBeDisabled();
+    fireEvent.click(activityLink);
+    expect(onOpenTokenActivity).toHaveBeenCalledTimes(1);
+
+    // Trigger in-flight top-up -> Token Activity link becomes disabled
+    fireEvent.click(screen.getByTestId('stripe-waiver-checkbox'));
+    fireEvent.click(screen.getByTestId('stripe-confirm-button'));
+    expect(activityLink).toBeDisabled();
+    resolveTopUp!({ data: { tokenBalance: 149, addedTokens: 100 } });
+    await waitFor(() => {
+      expect(activityLink).not.toBeDisabled();
+    });
+    unmount();
+
+    // Verify requestedLedgerTab={{ tab: 'activity', nonce }} switches from Stack Archive back to Token Activity & smooth scrolls
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    const scrollIntoViewMock = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      writable: true,
+      value: scrollIntoViewMock,
+    });
+    try {
+      const baseProps = makeBaseAnalyticsProps({
+        isActive: true,
+        archivedStack: sampleArchivedStack,
+        requestedLedgerTab: null,
+      });
+      const { rerender } = render(<UsageAnalyticsPage {...baseProps} />);
+      expect(await screen.findByTestId('token-transactions-ledger')).toBeInTheDocument();
+
+      fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
+      expect(screen.getByTestId('stack-archive-ledger')).toBeInTheDocument();
+
+      rerender(<UsageAnalyticsPage {...baseProps} requestedLedgerTab={{ tab: 'activity', nonce: 1 }} />);
+      expect(await screen.findByTestId('token-transactions-ledger')).toBeInTheDocument();
+      expect(screen.getByTestId('ledger-tab-activity')).toHaveAttribute('aria-selected', 'true');
+      await waitFor(() => {
+        expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+        expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      });
+    } finally {
+      Object.defineProperty(Element.prototype, 'scrollIntoView', {
+        configurable: true,
+        writable: true,
+        value: originalScrollIntoView,
+      });
+    }
+  });
+
+  it('17. locks w-60 non-wrapping profile dropdown across Header & HomePage (149T/9999T) and aligns DesignSystem.tsx living specs', () => {
+    const { rerender } = render(
+      <Header
+        user={{ uid: 'u-1', email: 'simon.lavin1@gmail.com' } as any}
+        onLogoClick={vi.fn()}
+        view="dashboard"
+        isSmallScreen={true}
+        isMagazineViewOpen={false}
+        stackCount={0}
+        isStackNew={false}
+        onOpenStack={vi.fn()}
+        onNavigate={vi.fn()}
+        onLogout={vi.fn()}
+        onDeleteAccount={vi.fn()}
+        isAdmin={false}
+        isProfileOpen={true}
+        setIsProfileOpen={vi.fn()}
+        isDeleteAccountModalOpen={false}
+        setIsDeleteAccountModalOpen={vi.fn()}
+        isMenuOpen={false}
+        setIsMenuOpen={vi.fn()}
+        tokenBalance={149}
+      />
+    );
+
+    const dropdown = screen.getByTestId('header-profile-dropdown');
+    expect(dropdown.className).toContain('w-60');
+    expect(dropdown.className).not.toContain('w-56');
+
+    const topUpBtn = screen.getByTestId('profile-topup-btn');
+    const topUpBadge = screen.getByTestId('profile-topup-badge');
+    expect(topUpBtn.className).toContain('whitespace-nowrap');
+    expect(topUpBadge).toHaveTextContent('149T');
+    expect(topUpBadge.className).toContain('whitespace-nowrap');
+    expect(topUpBadge.className).toContain('shrink-0');
+
+    rerender(
+      <Header
+        user={{ uid: 'u-1', email: 'simon.lavin1@gmail.com' } as any}
+        onLogoClick={vi.fn()}
+        view="dashboard"
+        isSmallScreen={false}
+        isMagazineViewOpen={false}
+        stackCount={0}
+        isStackNew={false}
+        onOpenStack={vi.fn()}
+        onNavigate={vi.fn()}
+        onLogout={vi.fn()}
+        onDeleteAccount={vi.fn()}
+        isAdmin={false}
+        isProfileOpen={true}
+        setIsProfileOpen={vi.fn()}
+        isDeleteAccountModalOpen={false}
+        setIsDeleteAccountModalOpen={vi.fn()}
+        isMenuOpen={false}
+        setIsMenuOpen={vi.fn()}
+        tokenBalance={9999}
+      />
+    );
+    expect(screen.getByTestId('profile-topup-badge')).toHaveTextContent('9999T');
+
+    // HomePage profile dropdown parity & DesignSystem living spec parity
+    const homeSrc = fs.readFileSync(path.resolve(__dirname, '../components/HomePage.tsx'), 'utf-8');
+    expect(homeSrc).toContain('data-testid="homepage-profile-dropdown"');
+    expect(homeSrc).toContain('w-60 z-20');
+
+    const dsSrc = fs.readFileSync(path.resolve(__dirname, '../components/DesignSystem.tsx'), 'utf-8');
+    expect(dsSrc).toContain('w-60 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5');
+    expect(dsSrc).toContain('Single-Line + Right-Badge Guardrail');
+    expect(dsSrc).toContain('Compact Wallet Summary Strip');
+    expect(dsSrc).toContain('Responsive Ledger Mobile Card Anatomy');
+    expect(dsSrc).toContain('sm:max-w-[480px]');
   });
 });

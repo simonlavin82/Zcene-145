@@ -3516,6 +3516,13 @@ const App: React.FC = () => {
     navigate('/analytics');
   }, [activeStack.length, lastViewedStackCount, user, currentProjectId, navigate]);
 
+  const handleOpenTokenActivity = useCallback(() => {
+    setSimulatedStripeModal({ isOpen: false });
+    setIsMenuOpen(false);
+    setRequestedLedgerTab(prev => ({ tab: 'activity', nonce: (prev?.nonce ?? 0) + 1 }));
+    navigate('/analytics');
+  }, [navigate]);
+
   const handleCloseModals = useCallback(() => {
     setIsStackDialogOpen(false);
     setIsMenuOpen(false);
@@ -10799,12 +10806,6 @@ const App: React.FC = () => {
             healedNodeIdsRef.current.add(node.id);
           }
 
-          // Silent background self-healing: DO NOT show a spinner if the user already has cached data or it was displayable
-          if (!isCached && !wasDisplayable) {
-            setLoadingNodeIds(prev => new Set(prev).add(node.id));
-          }
-          lastProgressTimestampRef.current = Date.now();
-
           // Fix 2: Per-node try/finally guarantees loadingNodeIds cleanup even if an
           // unexpected exception escapes the inner while-loop try/catch. Previously only
           // isFetchingDetailsRef was reset (in the outer finally), leaving the spinner
@@ -12113,6 +12114,7 @@ const App: React.FC = () => {
         initialTierId={simulatedStripeModal.initialTierId}
         currentBalance={profile?.tokenBalance ?? 0}
         onClose={() => setSimulatedStripeModal({ isOpen: false })}
+        onOpenTokenActivity={handleOpenTokenActivity}
         onSuccess={(_, credited) => showToast(`Added ${credited} Tokens to your Zcene wallet.`)}
       />
 

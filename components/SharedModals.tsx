@@ -782,6 +782,7 @@ export interface SimulatedStripeModalProps {
   currentBalance?: number;
   onClose: () => void;
   onSuccess?: (newBalance: number, tokensCredited: number) => void;
+  onOpenTokenActivity?: () => void;
 }
 
 export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
@@ -791,6 +792,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
   currentBalance = 0,
   onClose,
   onSuccess,
+  onOpenTokenActivity,
 }) => {
   const resolveDefaultQuantity = () => {
     if (
@@ -873,7 +875,7 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
 
   return (
     <ModalBackdrop className="z-[2200]" onClick={isProcessing ? undefined : onClose}>
-      <ModalContainer data-testid="simulated-stripe-modal" className="max-w-md w-full">
+      <ModalContainer data-testid="simulated-stripe-modal" className="sm:max-w-[480px]">
         <ModalHeader className="shrink-0">
           <div className="flex items-center gap-2">
             <span className="material-symbols-outlined text-primary !text-[18px]">bolt</span>
@@ -1028,30 +1030,45 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
         )}
 
         <ModalFooter className="shrink-0">
-          <button
-            type="button"
-            disabled={isProcessing}
-            onClick={onClose}
-            className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            data-testid="stripe-confirm-button"
-            disabled={isProcessing || !isValidQuantity || !waiverAccepted}
-            onClick={handleConfirmPurchase}
-            className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
-          >
-            {isProcessing ? (
-              <>
-                <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
-                <span>Crediting...</span>
-              </>
-            ) : (
-              <span>Confirm {isValidQuantity ? priceDisplay : ''} Top-Up</span>
+          <div className={`flex w-full ${onOpenTokenActivity ? 'flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between' : 'items-center justify-end'}`}>
+            {onOpenTokenActivity && (
+              <button
+                type="button"
+                data-testid="stripe-token-activity-link"
+                disabled={isProcessing}
+                onClick={onOpenTokenActivity}
+                className="self-start sm:self-auto text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 hover:decoration-primary/60 cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                Token Activity
+              </button>
             )}
-          </button>
+            <div className="flex items-center justify-end gap-2 shrink-0">
+              <button
+                type="button"
+                disabled={isProcessing}
+                onClick={onClose}
+                className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors whitespace-nowrap"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                data-testid="stripe-confirm-button"
+                disabled={isProcessing || !isValidQuantity || !waiverAccepted}
+                onClick={handleConfirmPurchase}
+                className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+              >
+                {isProcessing ? (
+                  <>
+                    <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
+                    <span>Crediting...</span>
+                  </>
+                ) : (
+                  <span>Confirm {isValidQuantity ? priceDisplay : ''} Top-Up</span>
+                )}
+              </button>
+            </div>
+          </div>
         </ModalFooter>
       </ModalContainer>
     </ModalBackdrop>

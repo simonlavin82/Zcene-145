@@ -3162,6 +3162,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                     </div>
                                 </div>
+                                <p className="text-xs text-zinc-400 leading-relaxed pt-2 border-t border-zinc-800/80">
+                                    <strong className="text-zinc-200">Ledger Filter Pill Bars &amp; Activity Badges:</strong> Filter pill bars (e.g., Discovery Ledger&apos;s <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">All</code> / <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Curations</code> / <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Deep Connections</code> / <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Top-Ups &amp; Refunds</code>) and ledger category/scope/status pills MUST use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">flex flex-wrap items-center gap-1.5</code> with <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">whitespace-nowrap shrink-0</code> on each pill — never <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">flex-nowrap overflow-x-auto hide-scrollbar</code>, which clips trailing pills off-screen at 375px.
+                                </p>
                             </div>
                         </div>
 
@@ -4066,8 +4069,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-2">
                                         <p className="text-sm text-zinc-500 font-semibold">Passive State</p>
-                                        <p className="text-xs text-zinc-400 leading-relaxed">Used for static counts or previously viewed items (e.g., Read Deep Cut cards, Viewed Stack items). Uses subdued zinc tones.</p>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">Used for static counts or previously viewed items (e.g., Read Deep Cut cards, Viewed Stack items, Stack Archive tab count). Uses subdued zinc tones.</p>
                                     </div>
+                                </div>
+                                <div className="mt-6 pt-5 border-t border-zinc-800/80 space-y-2">
+                                    <p className="text-sm text-primary font-semibold">Brand-Accent Token Value Pills</p>
+                                    <p className="text-xs text-zinc-400 leading-relaxed">
+                                        Distinct from monochrome count indicators, wallet balance pills inside navigation headers and profile dropdowns (<code className="text-xs bg-zinc-900 text-primary px-1.5 py-0.5 font-mono">font-mono text-[10px] bg-primary/15 border border-primary/30 text-primary px-1.5 py-0.5 rounded whitespace-nowrap shrink-0</code>) always lock to a single line so 3–4 digit balances (<code className="text-xs text-zinc-300 font-mono">149T</code>–<code className="text-xs text-zinc-300 font-mono">9,999T</code>) never compress or wrap sibling menu labels.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -4249,7 +4258,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Header/Footer</h4>
-                                            <p className="text-sm text-zinc-400">Uses <strong>bg-zinc-900</strong> to provide visual anchoring against the main body. Features consistent 1px borders for separation. Split footers (e.g., <code className="text-xs text-zinc-300">MyStackDialog</code>) wrap a left-aligned Standard Text Link opposite right-aligned <strong>Cancel</strong> + <strong>Done</strong> buttons via <code className="text-xs text-zinc-300">flex items-center justify-between w-full</code>.</p>
+                                            <p className="text-sm text-zinc-400">Uses <strong>bg-zinc-900</strong> to provide visual anchoring against the main body. Features consistent 1px borders for separation. Split footers with compact right actions (e.g., <code className="text-xs text-zinc-300">MyStackDialog</code> <strong>Cancel</strong> + <strong>Done</strong>) keep a single row via <code className="text-xs text-zinc-300">flex items-center justify-between w-full</code> down to 375px. Split footers with wide dynamic CTAs (e.g., <code className="text-xs text-zinc-300">SimulatedStripeModal</code> <strong>Confirm £10.00 Top-Up</strong>) MUST use a responsive stack (<code className="text-xs text-zinc-300">flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between</code>) paired with a concise left Standard Text Link (<code className="text-xs text-zinc-300">Token Activity</code>), <code className="text-xs text-zinc-300">px-3</code> Cancel, and <code className="text-xs text-zinc-300">sm:max-w-[480px]</code> desktop width so 375px viewports never cramp or overflow.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Animation</h4>
@@ -4342,38 +4351,47 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Unified Dropdown Anatomy</h3>
                                     <div className="bg-zinc-950 p-8 rounded-xl border border-zinc-800 flex justify-center">
-                                        <div className="w-56 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5">
+                                        <div className="w-60 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5">
                                             <div className="px-3.5 py-2.5 border-b border-white/5">
                                                 <p className="text-[9px] uppercase tracking-[0.2em] text-zinc-500 font-bold mb-1">Authenticated Account</p>
                                                 <p className="text-sm font-medium text-zinc-200 truncate">user@example.com</p>
                                             </div>
                                             
                                             <div className="p-0.5 space-y-0.5">
-                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5">
-                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500">help</span>
-                                                    Help
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-primary rounded-lg flex items-center justify-between gap-2 whitespace-nowrap">
+                                                    <span className="flex items-center gap-2.5 min-w-0 whitespace-nowrap">
+                                                        <span className="material-symbols-outlined !text-[18px] text-primary shrink-0">bolt</span>
+                                                        Top Up Tokens
+                                                    </span>
+                                                    <span className="font-mono text-[10px] bg-primary/15 border border-primary/30 px-1.5 py-0.5 rounded text-primary whitespace-nowrap shrink-0">
+                                                        149T
+                                                    </span>
                                                 </div>
-                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5">
-                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500">monitoring</span>
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5 whitespace-nowrap">
+                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">monitoring</span>
                                                     Discovery Ledger
                                                 </div>
-                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5">
-                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500">camera_alt</span>
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5 whitespace-nowrap">
+                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">help</span>
+                                                    Help
+                                                </div>
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5 whitespace-nowrap">
+                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">camera_alt</span>
                                                     Instagram
-                                                    <span className="material-symbols-outlined !text-[12px] ml-auto opacity-40">open_in_new</span>
+                                                    <span className="material-symbols-outlined !text-[12px] ml-auto opacity-40 shrink-0">open_in_new</span>
                                                 </div>
                                             </div>
 
                                             <div className="border-t border-zinc-800/80 my-2" />
                                             
                                             <div className="p-0.5 space-y-0.5">
-                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5">
-                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500">logout</span>
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 rounded-lg flex items-center gap-2.5 whitespace-nowrap">
+                                                    <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">logout</span>
                                                     Sign Out
                                                 </div>
                                                 <div className="border-t border-zinc-800/80 my-2" />
-                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] rounded-lg flex items-center gap-2.5">
-                                                    <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete_forever</span>
+                                                <div className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] rounded-lg flex items-center gap-2.5 whitespace-nowrap">
+                                                    <span className="material-symbols-outlined !text-[18px] text-[#ef4444] shrink-0">delete_forever</span>
                                                     Delete Account
                                                 </div>
                                             </div>
@@ -4484,11 +4502,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Border Radius & Dimensions</h4>
-                                            <p className="text-sm text-zinc-400">Dropdown containers use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl</code> (12px) with universal <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">w-56</code> (224px) width and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">p-1.5</code> inner padding, pairing with <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">w-9 h-9</code> (44px touch target) triggers.</p>
+                                            <p className="text-sm text-zinc-400">Account and profile dropdown containers use <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">rounded-xl</code> (12px) with a minimum <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">w-60</code> (240px) width and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">p-1.5</code> inner padding, pairing with <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">w-9 h-9</code> (44px touch target) triggers. Compact context menus without trailing value badges (e.g., card actions <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">w-56</code>, Scene Switcher <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">w-48</code>) may remain narrower.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Typography & Sizing</h4>
-                                            <p className="text-sm text-zinc-400">Labels use comfortable <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-sm font-medium</code> (14px) styling with 18px icons and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">px-3.5 py-2.5</code> (40px–42px row height) to ensure universal accessibility across both desktop and mobile viewports, with metadata labels in tiny caps (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-[9px] font-bold uppercase</code>) like GUEST ACCOUNT. The container uses <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">antialiased</code> font smoothing.</p>
+                                            <p className="text-sm text-zinc-400">Labels use comfortable <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-sm font-medium</code> (14px) styling with 18px icons and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">px-3.5 py-2.5</code> (40px–42px row height) to ensure universal accessibility across both desktop and mobile viewports, with metadata labels in tiny caps (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">text-[9px] font-bold uppercase</code>) like GUEST ACCOUNT. <strong>Single-Line + Right-Badge Guardrail:</strong> Every menu button carrying a label and trailing badge (e.g., <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">Top Up Tokens</code> + <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">9999T</code>) MUST apply <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">whitespace-nowrap</code> on the row/label wrapper and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">whitespace-nowrap shrink-0</code> on leading icons and trailing pills. The container uses <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">antialiased</code> font smoothing.</p>
                                         </div>
                                         <div className="space-y-1">
                                             <h4 className="text-sm font-semibold text-zinc-500 uppercase tracking-widest">Icon Hover States</h4>
@@ -5440,6 +5458,104 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             toggleRow={(email) => setDemoExpandedRow(prev => prev === email ? null : email)}
                                         />
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Compact Wallet Summary Strip */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-medium text-zinc-200">Compact Wallet Summary Strip</h3>
+                                <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
+                                    Standard User Discovery Ledger wallet summary designed to keep tabs and receipts above the fold. Replaces lifetime-ratio progress bars and duplicate tier buttons with one balance readout, a single runway line (shifting to amber below 10T; neutral bypass copy for Admin personal view), one Primary White <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">+ Top Up</code> CTA (hidden in read-only Admin inspection), and a flat 3-stat inline footer row.
+                                </p>
+                                <div className="space-y-4">
+                                    <div className="bg-zinc-900/40 border border-zinc-800 p-4 sm:p-5 space-y-3.5 rounded-2xl max-w-3xl">
+                                        <div className="flex items-center justify-between gap-4">
+                                            <div className="min-w-0 space-y-1">
+                                                <div className="flex items-baseline gap-2.5">
+                                                    <span className="text-3xl sm:text-4xl font-bold font-mono text-primary leading-none">49</span>
+                                                    <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400">Tokens</span>
+                                                </div>
+                                                <p className="text-xs text-zinc-400">~9 Single-Root Zcenes</p>
+                                            </div>
+                                            <span className="h-[38px] px-4 sm:px-5 bg-white text-brand-black rounded-xl font-medium text-sm inline-flex items-center justify-center whitespace-nowrap shrink-0">
+                                                + Top Up
+                                            </span>
+                                        </div>
+                                        <div className="grid grid-cols-3 gap-3 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-8 sm:gap-y-2 pt-3 border-t border-zinc-800/80">
+                                            <div className="min-w-0 sm:flex sm:items-baseline sm:gap-2">
+                                                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 block sm:inline">Zcenes Curated</span>
+                                                <span className="text-sm font-bold font-mono text-white block sm:inline mt-0.5 sm:mt-0">63</span>
+                                            </div>
+                                            <div className="min-w-0 sm:flex sm:items-baseline sm:gap-2">
+                                                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 block sm:inline">Lifetime Purchased</span>
+                                                <span className="text-sm font-bold font-mono text-emerald-300 block sm:inline mt-0.5 sm:mt-0">500 T</span>
+                                            </div>
+                                            <div className="min-w-0 sm:flex sm:items-baseline sm:gap-2">
+                                                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 block sm:inline">Lifetime Spent</span>
+                                                <span className="text-sm font-bold font-mono text-zinc-200 block sm:inline mt-0.5 sm:mt-0">461 T</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Responsive Ledger Mobile Card Anatomy */}
+                            <div className="space-y-6">
+                                <h3 className="text-xl font-medium text-zinc-200">Responsive Ledger Mobile Card Anatomy</h3>
+                                <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
+                                    Both <strong>Token Activity</strong> (paginated at 10 rows) and <strong>Stack Archive</strong> (paginated at 20 rows) use a single-branch <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">isSmallScreen</code> (&lt; 768px) switch so mobile viewports render zero-overflow cards with zero duplicate desktop table DOM nodes.
+                                </p>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
+                                    {/* Token Activity Mobile Card Specimen */}
+                                    <div className="border border-zinc-800 bg-zinc-950/40 p-4 space-y-2.5 rounded-2xl">
+                                        <div className="flex items-start justify-between gap-3">
+                                            <div className="min-w-0 flex-1">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0">ACTIVE</span>
+                                                    <span className="font-medium text-white text-sm leading-snug">Madball &amp; Radiohead</span>
+                                                </div>
+                                                <span className="block text-[11px] text-zinc-500 mt-0.5">9T settlement after 1T pre-flight</span>
+                                            </div>
+                                            <span className="text-sm font-mono font-bold text-zinc-200 whitespace-nowrap shrink-0">-9 T</span>
+                                        </div>
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border bg-primary/15 text-primary border-primary/30 whitespace-nowrap shrink-0">Zcene Curation</span>
+                                            <span className="px-2 py-0.5 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 text-[11px] font-medium whitespace-nowrap shrink-0">Multi-Root Zcene</span>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                            <span>25 Nov 2026, 22:21</span>
+                                            <span className="whitespace-nowrap shrink-0">Bal: 59 T</span>
+                                        </div>
+                                    </div>
+
+                                    {/* Stack Archive Mobile Card Specimen */}
+                                    <div className="border border-zinc-800 bg-zinc-950/40 p-4 space-y-3 rounded-2xl">
+                                        <div className="min-w-0">
+                                            <div className="flex items-center gap-2 flex-wrap">
+                                                <span className="font-medium text-white text-sm">Restraining Order</span>
+                                                <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/70 px-1.5 py-0.5 rounded-sm leading-none">ARTIST</span>
+                                            </div>
+                                            <p className="text-xs text-zinc-400 mt-1">via Spaced</p>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                            <div>
+                                                <span className="block text-[9px] uppercase tracking-wider text-zinc-500">Saved</span>
+                                                <span>29 Oct 2026, 10:43</span>
+                                            </div>
+                                            <div>
+                                                <span className="block text-[9px] uppercase tracking-wider text-zinc-500">Archived</span>
+                                                <span>25 Nov 2026, 22:15</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-500 leading-relaxed max-w-3xl">
+                                    <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
+                                    <ul className="list-disc list-outside pl-4 space-y-1.5 mt-2">
+                                        <li><strong>Shared Card Shell:</strong> <code className="text-zinc-300">border border-zinc-800 bg-zinc-950/40 p-4 rounded-2xl</code> stacked with <code className="text-zinc-300">space-y-3</code> and subtle <code className="text-zinc-300">border-t border-zinc-800/60</code> monospace metadata footers.</li>
+                                        <li><strong>Zero Duplicate Nodes:</strong> Conditional rendering via <code className="text-zinc-300">isSmallScreen ? &lt;MobileCards /&gt; : &lt;DesktopTable /&gt;</code> guarantees only one branch mounts per viewport.</li>
+                                        <li><strong>Support Strip Placement:</strong> Billing dispute support (<code className="text-zinc-300">support@zcene.online</code>) sits quietly below the Token Activity list and Show More control rather than inside the top Wallet Hero.</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>

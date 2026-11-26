@@ -391,7 +391,8 @@ const Header: React.FC<HeaderProps> = ({
                         initial={{ opacity: 0, y: 10, scale: 0.95 }}
                         animate={{ opacity: 1, y: 0, scale: 1 }}
                         exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        className="absolute right-0 top-full mt-2 w-56 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left antialiased"
+                        data-testid="header-profile-dropdown"
+                        className="absolute right-0 top-full mt-2 w-60 z-20 overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left antialiased"
                       >
                         {user ? (
                           <div className="px-3.5 py-2.5 border-b border-white/5">
@@ -409,9 +410,9 @@ const Header: React.FC<HeaderProps> = ({
                           <div className="p-1 border-b border-white/5">
                             <button
                               onClick={() => { setIsProfileOpen(false); onLogin(); }}
-                              className="w-full bg-white text-brand-black rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-sm font-semibold cursor-pointer"
+                              className="w-full bg-white text-brand-black rounded-xl px-4 py-2.5 flex items-center justify-center gap-2 transition-all hover:opacity-90 active:scale-95 text-sm font-semibold cursor-pointer whitespace-nowrap"
                             >
-                              <span className="material-symbols-outlined !text-[16px] text-black font-bold">login</span>
+                              <span className="material-symbols-outlined !text-[16px] text-black font-bold shrink-0">login</span>
                               Sign In with Google
                             </button>
                           </div>
@@ -420,14 +421,18 @@ const Header: React.FC<HeaderProps> = ({
                           {/* 1. Top Up Tokens */}
                           {user && !isGuest && !isAdmin && (
                             <button
+                              data-testid="profile-topup-btn"
                               onClick={() => { setIsProfileOpen(false); triggerTopUpModal(); }}
-                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-primary hover:bg-zinc-800 transition-all rounded-lg flex items-center justify-between gap-2.5 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-primary hover:bg-zinc-800 transition-all rounded-lg flex items-center justify-between gap-2 whitespace-nowrap group"
                             >
-                              <span className="flex items-center gap-2.5">
-                                <span className="material-symbols-outlined !text-[18px] text-primary">bolt</span>
+                              <span className="flex items-center gap-2.5 min-w-0 whitespace-nowrap">
+                                <span className="material-symbols-outlined !text-[18px] text-primary shrink-0">bolt</span>
                                 Top Up Tokens
                               </span>
-                              <span className="font-mono text-[10px] bg-primary/15 border border-primary/30 px-1.5 py-0.5 rounded text-primary">
+                              <span
+                                data-testid="profile-topup-badge"
+                                className="font-mono text-[10px] bg-primary/15 border border-primary/30 px-1.5 py-0.5 rounded text-primary whitespace-nowrap shrink-0"
+                              >
                                 {tokenBalance}T
                               </span>
                             </button>
@@ -437,9 +442,9 @@ const Header: React.FC<HeaderProps> = ({
                           {!isGuest && (
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate('analytics'); }}
-                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                             >
-                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">monitoring</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">monitoring</span>
                               Discovery Ledger
                             </button>
                           )}
@@ -448,9 +453,9 @@ const Header: React.FC<HeaderProps> = ({
                           {user && !isGuest && (
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate('trash'); }}
-                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                             >
-                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">delete</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">delete</span>
                               Trash
                             </button>
                           )}
@@ -458,9 +463,9 @@ const Header: React.FC<HeaderProps> = ({
                           {/* 4. Help */}
                           <button
                             onClick={() => { setIsProfileOpen(false); onNavigate('help'); }}
-                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                           >
-                            <span className="material-symbols-outlined !text-[18px] text-zinc-500">help</span>
+                            <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">help</span>
                             Help
                           </button>
 
@@ -468,9 +473,9 @@ const Header: React.FC<HeaderProps> = ({
                           {isAdmin && (
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate('engine'); }}
-                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                             >
-                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">settings_input_component</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">settings_input_component</span>
                               Engine
                             </button>
                           )}
@@ -479,9 +484,9 @@ const Header: React.FC<HeaderProps> = ({
                           {isAdmin && (
                             <button
                               onClick={() => { setIsProfileOpen(false); onNavigate('design'); }}
-                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                             >
-                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">grid_view</span>
+                              <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">grid_view</span>
                               Design System
                             </button>
                           )}
@@ -500,9 +505,9 @@ const Header: React.FC<HeaderProps> = ({
                                 }
                               }
                             }}
-                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                           >
-                            <span className="material-symbols-outlined !text-[18px] text-zinc-500">restart_alt</span>
+                            <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">restart_alt</span>
                             Restart Walkthrough
                           </button>
 
@@ -512,11 +517,11 @@ const Header: React.FC<HeaderProps> = ({
                               setIsProfileOpen(false);
                               window.open(ZCENE_INSTAGRAM_URL, '_blank');
                             }}
-                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                           >
-                            <span className="material-symbols-outlined !text-[18px] text-zinc-500">camera_alt</span>
+                            <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">camera_alt</span>
                             Instagram
-                            <span className="material-symbols-outlined !text-[12px] ml-auto opacity-40">open_in_new</span>
+                            <span className="material-symbols-outlined !text-[12px] ml-auto opacity-40 shrink-0">open_in_new</span>
                           </button>
                         </div>
 
@@ -526,9 +531,9 @@ const Header: React.FC<HeaderProps> = ({
                             <div className="p-0.5 space-y-0.5">
                               <button
                                 onClick={() => { setIsProfileOpen(false); onLogout(); }}
-                                className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+                                className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                               >
-                                <span className="material-symbols-outlined !text-[18px] text-zinc-500">logout</span>
+                                <span className="material-symbols-outlined !text-[18px] text-zinc-500 shrink-0">logout</span>
                                 Sign Out
                               </button>
                               {!(isAdmin || isProtectedAdminIdentity(user?.uid, user?.email)) && (
@@ -536,9 +541,9 @@ const Header: React.FC<HeaderProps> = ({
                                   <div className="border-t border-zinc-800/80 my-2" />
                                   <button
                                     onClick={() => { setIsProfileOpen(false); setIsDeleteAccountModalOpen(true); }}
-                                    className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group"
+                                    className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 whitespace-nowrap group"
                                   >
-                                    <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete_forever</span>
+                                    <span className="material-symbols-outlined !text-[18px] text-[#ef4444] shrink-0">delete_forever</span>
                                     Delete Account
                                   </button>
                                 </>

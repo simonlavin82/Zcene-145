@@ -11,7 +11,6 @@ import { AdminViewToggle } from './ui/AdminViewToggle';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 import { cleanArtistDisplayName } from '../services/artistCacheService';
 import {
-    TOP_UP_TIER_LIST,
     TokenTopUpTierId,
     TOKEN_PRICING,
     TOKEN_UNIT_GBP,
@@ -206,7 +205,8 @@ export interface AuthorStackCacheEntry {
     archivedCount: number;
 }
 
-export const LEDGER_PAGE_SIZE = 50;
+export const ACTIVITY_PAGE_SIZE = 10;
+export const ARCHIVE_PAGE_SIZE = 20;
 
 export const partitionStackItems = (items: StackItem[] = []): { active: StackItem[]; archived: StackItem[] } => {
     const active: StackItem[] = [];
@@ -2149,8 +2149,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const [inspectedAuthor, setInspectedAuthor] = useState<{ uid: string; email: string } | null>(null);
     const [activeLedgerTab, setActiveLedgerTab] = useState<LedgerTabId>('activity');
     const [activityFilter, setActivityFilter] = useState<ActivityFilterCategory>('all');
-    const [activityVisibleCount, setActivityVisibleCount] = useState<number>(LEDGER_PAGE_SIZE);
-    const [archiveVisibleCount, setArchiveVisibleCount] = useState<number>(LEDGER_PAGE_SIZE);
+    const [activityVisibleCount, setActivityVisibleCount] = useState<number>(ACTIVITY_PAGE_SIZE);
+    const [archiveVisibleCount, setArchiveVisibleCount] = useState<number>(ARCHIVE_PAGE_SIZE);
     const [archiveSearchQuery, setArchiveSearchQuery] = useState<string>('');
     const [isArchiveSearchOpen, setIsArchiveSearchOpen] = useState<boolean>(false);
     const [stackItemToDelete, setStackItemToDelete] = useState<StackItem | null>(null);
@@ -2695,8 +2695,6 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const liveLifetimeSpent = (isAdmin && simulateNormalUser)
         ? Math.max(0, Math.floor(Number(currentUserTelemetry?.lifetimeTokensSpent ?? 0)))
         : Math.max(0, Math.floor(Number(profile?.lifetimeTokensSpent ?? currentUserTelemetry?.lifetimeTokensSpent ?? 0)));
-    const juiceMax = Math.max(liveLifetimePurchased, liveTokenBalance, 100);
-    const juicePct = Math.min(100, Math.round((liveTokenBalance / juiceMax) * 100));
 
     const aggregateMetrics = useMemo(
         () => computeAggregateMetrics(ledgerData, jitHeals, curationFailures, deletedAccountTelemetry),
@@ -2746,11 +2744,11 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     );
 
     useEffect(() => {
-        setActivityVisibleCount(LEDGER_PAGE_SIZE);
+        setActivityVisibleCount(ACTIVITY_PAGE_SIZE);
     }, [activityFilter, simulateNormalUser, inspectedAuthor?.uid]);
 
     useEffect(() => {
-        setArchiveVisibleCount(LEDGER_PAGE_SIZE);
+        setArchiveVisibleCount(ARCHIVE_PAGE_SIZE);
     }, [archiveSearchQuery, isInspectingOtherUser, inspectedAuthor?.uid]);
 
     const handleRestoreArchivedItem = useCallback(async (item: StackItem) => {
@@ -2848,14 +2846,14 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                 onRestartWalkthrough={onRestartWalkthrough}
             />
 
-            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow">
-                <div className="max-w-6xl mx-auto space-y-10">
-                    <div className="pt-6 pb-2">
+            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-grow">
+                <div className="max-w-6xl mx-auto space-y-6">
+                    <div className="pt-1">
                         <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
                     </div>
                     
                     {/* Header Info */}
-                    <div className="border-b border-zinc-800 pb-6 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
+                    <div className="border-b border-zinc-800 pb-4 flex flex-col md:flex-row md:items-end md:justify-between gap-4">
                         <div>
                             <h2 className="text-3xl font-medium text-white mb-2">The Discovery Ledger</h2>
                             <p className="text-zinc-400 text-sm max-w-2xl leading-relaxed">
@@ -2935,110 +2933,81 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         </div>
                     )}
 
-                    {/* Standard User & Admin Preview Mode: Token Wallet Juice Bar */}
-                    {isNormalUserView && (
-                        <div data-testid="wallet-hero-card" className={`bg-zinc-900/40 border border-zinc-800 p-6 sm:p-8 space-y-6 ${RADIUS_TOKENS.frame}`}>
-                            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-                                <div className="space-y-2">
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-400 block">
-                                        Available Discovery Balance
-                                    </span>
-                                    <div className="flex items-baseline gap-3">
-                                        <span data-testid="wallet-balance-value" className="text-4xl sm:text-5xl font-bold font-mono text-primary">
-                                            {liveTokenBalance}
-                                        </span>
-                                        <span className="text-sm font-semibold uppercase tracking-widest text-zinc-400">
-                                            Tokens
+                    {/* Standard User & Admin Preview Mode: Compact Wallet Summary Strip */}
+                    {isNormalUserView && (() => {
+                        const isOwnAdminPersonalView = Boolean(isAdmin && !isInspectingOtherUser);
+                        const singleRootRunway = Math.floor(liveTokenBalance / TOKEN_PRICING.SINGLE_SEED);
+                        const isLowBalance = !isOwnAdminPersonalView && liveTokenBalance < TOKEN_PRICING.COMPLEX_QUERY;
+                        const runwayText = isOwnAdminPersonalView
+                            ? 'Admin 0T Bypass · Unlimited curations'
+                            : liveTokenBalance >= TOKEN_PRICING.COMPLEX_QUERY
+                                ? `~${singleRootRunway} Single-Root ${singleRootRunway === 1 ? 'Zcene' : 'Zcenes'}`
+                                : liveTokenBalance >= TOKEN_PRICING.SINGLE_SEED
+                                    ? 'Low balance · ~1 Single-Root Zcene left'
+                                    : 'Low balance · Top up to curate new Zcenes';
+
+                        return (
+                            <div data-testid="wallet-hero-card" className={`bg-zinc-900/40 border border-zinc-800 p-4 sm:p-5 space-y-3.5 ${RADIUS_TOKENS.frame}`}>
+                                <div className="flex items-center justify-between gap-4">
+                                    <div className="min-w-0 space-y-1">
+                                        <div className="flex items-baseline gap-2.5">
+                                            <span data-testid="wallet-balance-value" className="text-3xl sm:text-4xl font-bold font-mono text-primary leading-none">
+                                                {liveTokenBalance}
+                                            </span>
+                                            <span className="text-xs font-semibold uppercase tracking-widest text-zinc-400">
+                                                Tokens
+                                            </span>
+                                        </div>
+                                        <p
+                                            data-testid="wallet-runway-line"
+                                            className={`text-xs ${isLowBalance ? 'text-amber-400' : 'text-zinc-400'}`}
+                                        >
+                                            {runwayText}
+                                        </p>
+                                    </div>
+
+                                    {!isInspectingOtherUser && !isAdmin && (
+                                        <button
+                                            type="button"
+                                            data-testid="analytics-topup-btn"
+                                            onClick={() => triggerTopUp()}
+                                            className="h-[38px] px-4 sm:px-5 bg-white text-brand-black rounded-xl font-medium text-sm inline-flex items-center justify-center gap-1.5 hover:opacity-90 active:scale-95 transition-all cursor-pointer whitespace-nowrap shrink-0"
+                                        >
+                                            + Top Up
+                                        </button>
+                                    )}
+                                </div>
+
+                                {/* Compact Inline Metrics Row */}
+                                <div className="grid grid-cols-3 gap-3 sm:flex sm:flex-wrap sm:items-baseline sm:gap-x-8 sm:gap-y-2 pt-3 border-t border-zinc-800/80">
+                                    <div className="min-w-0 sm:flex sm:items-baseline sm:gap-2">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 block sm:inline">Zcenes Curated</span>
+                                        <span className="text-sm font-bold font-mono text-white block sm:inline mt-0.5 sm:mt-0">
+                                            {currentUserTelemetry?.projectsCount ?? 0}
                                         </span>
                                     </div>
-                                    <p className="text-xs text-zinc-400 max-w-xl">
-                                        Tokens unlock new Single-Root Zcenes, Multi-Root / Anchored Zcenes, and Deep Connections grounded artist consults.
-                                    </p>
-                                </div>
-
-                                <div className="flex flex-wrap items-center gap-2.5">
-                                    {TOP_UP_TIER_LIST.map((tier) => (
-                                        <button
-                                            key={tier.id}
-                                            type="button"
-                                            data-testid={`analytics-topup-${tier.id}`}
-                                            onClick={() => triggerTopUp(tier.id)}
-                                            className={`px-4 py-2.5 text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border ${RADIUS_TOKENS.button} ${
-                                                tier.featured
-                                                    ? 'bg-primary text-black border-primary hover:bg-primary-hover shadow-[0_0_20px_rgba(204,255,0,0.18)]'
-                                                    : 'bg-zinc-950 text-white border-zinc-700 hover:border-primary/60'
-                                            }`}
-                                        >
-                                            <span className="font-mono">+{tier.tokens}T</span>
-                                            <span className={tier.featured ? 'text-black/80 font-mono' : 'text-zinc-400 font-mono'}>
-                                                ({tier.priceDisplay})
-                                            </span>
-                                        </button>
-                                    ))}
+                                    <div className="min-w-0 sm:flex sm:items-baseline sm:gap-2">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 block sm:inline">
+                                            <span className="sm:hidden">Purchased</span>
+                                            <span className="hidden sm:inline">Lifetime Purchased</span>
+                                        </span>
+                                        <span className="text-sm font-bold font-mono text-emerald-300 block sm:inline mt-0.5 sm:mt-0">
+                                            {liveLifetimePurchased} T
+                                        </span>
+                                    </div>
+                                    <div className="min-w-0 sm:flex sm:items-baseline sm:gap-2">
+                                        <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 block sm:inline">
+                                            <span className="sm:hidden">Spent</span>
+                                            <span className="hidden sm:inline">Lifetime Spent</span>
+                                        </span>
+                                        <span className="text-sm font-bold font-mono text-zinc-200 block sm:inline mt-0.5 sm:mt-0">
+                                            {liveLifetimeSpent} T
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
-
-                            {/* Token Juice Bar */}
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between text-[11px] font-mono text-zinc-400">
-                                    <span>Token Juice Reserve</span>
-                                    <span>{liveTokenBalance} / {juiceMax} T ({juicePct}%)</span>
-                                </div>
-                                <div className="h-3 w-full bg-zinc-950 border border-zinc-800 rounded-full overflow-hidden">
-                                    <motion.div
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${juicePct}%` }}
-                                        transition={{ duration: 0.45, ease: 'easeOut' }}
-                                        className={`h-full rounded-full ${
-                                            liveTokenBalance < 5 ? 'bg-amber-400' : 'bg-primary'
-                                        }`}
-                                    />
-                                </div>
-                            </div>
-
-                            {/* Personal Metrics Strip */}
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2 border-t border-zinc-800/80">
-                                <div className="bg-zinc-950/60 border border-zinc-800/80 p-4 rounded-xl">
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500 block">Zcenes Curated</span>
-                                    <span className="text-2xl font-bold font-mono text-white mt-1 block">
-                                        {currentUserTelemetry?.projectsCount ?? 0}
-                                    </span>
-                                </div>
-                                <div className="bg-zinc-950/60 border border-zinc-800/80 p-4 rounded-xl">
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500 block">Lifetime Purchased</span>
-                                    <span className="text-2xl font-bold font-mono text-emerald-300 mt-1 block">
-                                        {liveLifetimePurchased} T
-                                    </span>
-                                </div>
-                                <div className="bg-zinc-950/60 border border-zinc-800/80 p-4 rounded-xl">
-                                    <span className="text-[10px] font-bold uppercase tracking-[0.18em] text-zinc-500 block">Lifetime Spent</span>
-                                    <span className="text-2xl font-bold font-mono text-zinc-200 mt-1 block">
-                                        {liveLifetimeSpent} T
-                                    </span>
-                                </div>
-                            </div>
-
-                            {/* Transparent Pricing Reference */}
-                            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs text-zinc-400 pt-1">
-                                <span><strong className="text-white font-mono">5T</strong> Single-Root Zcene</span>
-                                <span><strong className="text-white font-mono">10T</strong> Multi-Root / Anchored Zcene</span>
-                                <span><strong className="text-white font-mono">3T</strong> Deep Connections (3 Messages)</span>
-                                <span><strong className="text-emerald-300 font-mono">0T</strong> Shared Zcenes & Clones</span>
-                            </div>
-
-                            {/* Billing & Refund Support Help Link */}
-                            <div className="text-[11px] text-zinc-400 border-t border-zinc-800/80 pt-3 flex flex-wrap items-center justify-between gap-2">
-                                <span>Need assistance with a token top-up, transaction dispute, or refund?</span>
-                                <a
-                                    href={ZCENE_SUPPORT_MAILTO}
-                                    className="text-primary hover:underline font-medium inline-flex items-center gap-1.5"
-                                >
-                                    <span className="material-symbols-outlined !text-[14px]">mail</span>
-                                    <span>Contact {ZCENE_SUPPORT_EMAIL}</span>
-                                </a>
-                            </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
                     {/* Admin Token Grant Tool (Phase 2 Admin Exclusive) */}
                     {!isNormalUserView && (
@@ -3276,7 +3245,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                         <div
                                             role="tablist"
                                             aria-label="Filter token activity"
-                                            className="flex flex-nowrap whitespace-nowrap overflow-x-auto hide-scrollbar scrollbar-hide shrink-0 items-center gap-1.5 max-w-full pb-1 md:pb-0"
+                                            data-testid="activity-filter-pills"
+                                            className="flex flex-wrap items-center gap-1.5"
                                         >
                                             {ACTIVITY_FILTER_PILLS.map((pill) => {
                                                 const isSelected = activityFilter === pill.id;
@@ -3301,34 +3271,91 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                         </div>
                                     </div>
 
-                                    <div className={`border border-zinc-800 bg-zinc-950/30 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
-                                        <table className="w-full text-left border-collapse min-w-[640px]">
-                                            <thead>
-                                                <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity / Zcene</th>
-                                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 min-w-[140px] w-max whitespace-nowrap">Category & Scope</th>
-                                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Change</th>
-                                                    <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance After</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {isLoading && unifiedUserRows.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={5} className="p-8 text-center text-zinc-500 text-xs italic">
-                                                            Loading token activity...
-                                                        </td>
+                                    {isLoading && unifiedUserRows.length === 0 ? (
+                                        <div className={`border border-zinc-800 bg-zinc-950/30 p-8 text-center text-zinc-500 text-xs italic ${RADIUS_TOKENS.frame}`}>
+                                            Loading token activity...
+                                        </div>
+                                    ) : visibleActivityRows.length === 0 ? (
+                                        <div className={`border border-zinc-800 bg-zinc-950/30 p-8 text-center text-zinc-500 text-xs italic ${RADIUS_TOKENS.frame}`}>
+                                            {unifiedUserRows.length === 0
+                                                ? 'No token activity recorded yet. Top up your wallet above to begin curating.'
+                                                : 'No activity entries match the selected filter.'}
+                                        </div>
+                                    ) : isSmallScreen ? (
+                                        <div data-testid="token-activity-mobile-list" className="space-y-3">
+                                            {visibleActivityRows.map((row) => {
+                                                const isPositive = row.delta > 0;
+                                                const changeLabel = row.delta === 0
+                                                    ? '0 T'
+                                                    : (isPositive ? `+${row.delta} T` : `${row.delta} T`);
+
+                                                return (
+                                                    <div
+                                                        key={row.id}
+                                                        data-testid={`activity-row-${row.id}`}
+                                                        className={`border border-zinc-800 bg-zinc-950/40 p-4 space-y-2.5 ${RADIUS_TOKENS.frame}`}
+                                                    >
+                                                        <div className="flex items-start justify-between gap-3">
+                                                            <div className="min-w-0 flex-1">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    {row.isCurationRow && renderProjectStatusBadge(row.projectStatus, true)}
+                                                                    <span className="font-medium text-white text-sm leading-snug break-words">{row.title}</span>
+                                                                </div>
+                                                                {row.subtitle && (
+                                                                    <span className="block text-[11px] text-zinc-500 mt-0.5">
+                                                                        {row.subtitle}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <span
+                                                                className={`text-sm font-mono font-bold whitespace-nowrap shrink-0 ${
+                                                                    isPositive ? 'text-emerald-400' : row.delta === 0 ? 'text-emerald-300' : 'text-zinc-200'
+                                                                }`}
+                                                            >
+                                                                {changeLabel}
+                                                            </span>
+                                                        </div>
+
+                                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                                            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border whitespace-nowrap inline-flex items-center shrink-0 ${row.categoryBadge.style}`}>
+                                                                {row.categoryBadge.label}
+                                                            </span>
+                                                            {row.isCurationRow && row.userFacingScope && (
+                                                                <span className="px-2 py-0.5 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 text-[11px] font-medium whitespace-nowrap inline-flex items-center shrink-0">
+                                                                    {row.userFacingScope}
+                                                                </span>
+                                                            )}
+                                                        </div>
+
+                                                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                                            <span className="truncate">
+                                                                {row.createdAt ? formatTxTimestamp(row.createdAt) : '—'}
+                                                            </span>
+                                                            <span className="whitespace-nowrap shrink-0 text-zinc-400">
+                                                                {row.balanceAfter !== null ? `Bal: ${row.balanceAfter} T` : '—'}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    ) : (
+                                        <div
+                                            data-testid="token-activity-desktop-table"
+                                            className={`border border-zinc-800 bg-zinc-950/30 overflow-x-auto ${RADIUS_TOKENS.frame}`}
+                                        >
+                                            <table className="w-full text-left border-collapse min-w-[640px]">
+                                                <thead>
+                                                    <tr className="border-b border-zinc-800 bg-zinc-900/50">
+                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
+                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity / Zcene</th>
+                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 min-w-[140px] w-max whitespace-nowrap">Category & Scope</th>
+                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Change</th>
+                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance After</th>
                                                     </tr>
-                                                ) : visibleActivityRows.length === 0 ? (
-                                                    <tr>
-                                                        <td colSpan={5} className="p-8 text-center text-zinc-500 text-xs italic">
-                                                            {unifiedUserRows.length === 0
-                                                                ? 'No token activity recorded yet. Top up your wallet above to begin curating.'
-                                                                : 'No activity entries match the selected filter.'}
-                                                        </td>
-                                                    </tr>
-                                                ) : (
-                                                    visibleActivityRows.map((row) => {
+                                                </thead>
+                                                <tbody>
+                                                    {visibleActivityRows.map((row) => {
                                                         const isPositive = row.delta > 0;
                                                         const changeLabel = row.delta === 0
                                                             ? '0 T'
@@ -3372,24 +3399,39 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                                 </td>
                                                             </tr>
                                                         );
-                                                    })
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                    })}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
 
                                     {filteredUserRows.length > activityVisibleCount && (
                                         <div className="flex justify-center pt-1">
                                             <button
                                                 type="button"
                                                 data-testid="activity-show-more-btn"
-                                                onClick={() => setActivityVisibleCount(prev => prev + LEDGER_PAGE_SIZE)}
+                                                onClick={() => setActivityVisibleCount(prev => prev + ACTIVITY_PAGE_SIZE)}
                                                 className={`px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-zinc-900/70 hover:bg-zinc-800 border border-zinc-700/80 transition-colors cursor-pointer ${RADIUS_TOKENS.button}`}
                                             >
                                                 Show more ({filteredUserRows.length - activityVisibleCount} remaining)
                                             </button>
                                         </div>
                                     )}
+
+                                    {/* Billing & Refund Support Help Link */}
+                                    <div
+                                        data-testid="ledger-support-strip"
+                                        className="text-[11px] text-zinc-400 border-t border-zinc-800/80 pt-4 flex flex-wrap items-center justify-between gap-2"
+                                    >
+                                        <span>Need assistance with a token top-up, transaction dispute, or refund?</span>
+                                        <a
+                                            href={ZCENE_SUPPORT_MAILTO}
+                                            className="text-primary hover:underline font-medium inline-flex items-center gap-1.5 whitespace-nowrap"
+                                        >
+                                            <span className="material-symbols-outlined !text-[14px]">mail</span>
+                                            <span>Contact {ZCENE_SUPPORT_EMAIL}</span>
+                                        </a>
+                                    </div>
                                 </div>
                             ) : (
                                 <div data-testid="stack-archive-ledger" className="space-y-4">
@@ -3627,7 +3669,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                             <button
                                                 type="button"
                                                 data-testid="archive-show-more-btn"
-                                                onClick={() => setArchiveVisibleCount(prev => prev + LEDGER_PAGE_SIZE)}
+                                                onClick={() => setArchiveVisibleCount(prev => prev + ARCHIVE_PAGE_SIZE)}
                                                 className={`px-4 py-2 text-xs font-semibold text-zinc-300 hover:text-white bg-zinc-900/70 hover:bg-zinc-800 border border-zinc-700/80 transition-colors cursor-pointer ${RADIUS_TOKENS.button}`}
                                             >
                                                 Show more ({filteredArchivedStack.length - archiveVisibleCount} remaining)
