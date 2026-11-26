@@ -1461,10 +1461,10 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(screen.getByText(`Failed Zcene ${ADMIN_LOG_PAGE_SIZE + 3}`)).toBeInTheDocument();
     expect(screen.queryByTestId('curation-failures-show-more-btn')).not.toBeInTheDocument();
 
-    // Edge-safe InfoTooltip alignment: 4 right-aligned KPI tooltips + 2 left-aligned section header tooltips
+    // Edge-safe InfoTooltip alignment: 4 KPI card tooltips + 2 wide Admin section header tooltips all right-aligned inward
     const tooltips = Array.from(container.querySelectorAll('[role="tooltip"]'));
-    expect(tooltips.filter((el) => el.getAttribute('data-align') === 'right')).toHaveLength(4);
-    expect(tooltips.filter((el) => el.getAttribute('data-align') === 'left')).toHaveLength(2);
+    expect(tooltips.filter((el) => el.getAttribute('data-align') === 'right')).toHaveLength(6);
+    expect(tooltips.filter((el) => el.getAttribute('data-align') === 'left')).toHaveLength(0);
 
     // ToolbarSearch author filter filters mobile author cards and clears via built-in Clear button
     const authorSearch = screen.getByTestId('admin-author-search-input');

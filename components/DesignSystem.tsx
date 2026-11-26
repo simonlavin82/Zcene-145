@@ -5390,7 +5390,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-500 leading-relaxed">
                                         <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
                                         <p className="mt-2">
-                                            Cards render softened structural frames (rounded-2xl via <code>RADIUS_TOKENS.frame</code>) and utilize edge-safe <code>&lt;InfoTooltip align=&quot;right&quot; /&gt;</code> triggers on right-aligned KPI headers (and <code>align=&quot;left&quot;</code> on left-aligned section titles) with <code>group-focus-within</code> tap support so 192px tooltips expand inward without clipping off 375px viewport edges.
+                                            Cards render softened structural frames (rounded-2xl via <code>RADIUS_TOKENS.frame</code>) and utilize edge-safe <code>&lt;InfoTooltip align=&quot;right&quot; /&gt;</code> triggers on right-positioned KPI headers and wide Admin section titles (reserving <code>align=&quot;left&quot;</code> for genuinely left-edge triggers) with <code>group-focus-within</code> tap support so 192px tooltips expand inward without clipping off 375px viewport edges.
                                         </p>
                                     </div>
                                 </div>
