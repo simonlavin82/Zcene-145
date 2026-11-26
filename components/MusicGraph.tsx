@@ -14,41 +14,41 @@ import { getSceneCenterOffset, stripSceneNamespace, resolveSceneNodeOverlaps, re
 type FilterKeys = 'genre' | 'label' | 'country' | 'founded' | 'seed' | 'recommended';
 
 export interface DesktopTooltipPositionParams {
-  nodeScreenX: number;
-  nodeScreenY: number;
-  tooltipHeight?: number;
-  tooltipWidth?: number;
-  nodeRadius?: number;
-  margin?: number;
-  viewportWidth?: number;
-  viewportHeight?: number;
-  minTop?: number;
+    nodeScreenX: number;
+    nodeScreenY: number;
+    tooltipHeight?: number;
+    tooltipWidth?: number;
+    nodeRadius?: number;
+    margin?: number;
+    viewportWidth?: number;
+    viewportHeight?: number;
+    minTop?: number;
 }
 
 export function computeDesktopTooltipPosition({
-  nodeScreenX,
-  nodeScreenY,
-  tooltipHeight = 380,
-  tooltipWidth = 320,
-  nodeRadius = 35,
-  margin = 16,
-  viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200,
-  viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800,
-  minTop = 72,
+    nodeScreenX,
+    nodeScreenY,
+    tooltipHeight = 380,
+    tooltipWidth = 320,
+    nodeRadius = 35,
+    margin = 16,
+    viewportWidth = typeof window !== 'undefined' ? window.innerWidth : 1200,
+    viewportHeight = typeof window !== 'undefined' ? window.innerHeight : 800,
+    minTop = 72,
 }: DesktopTooltipPositionParams): { left: number; top: number; isFlipped: boolean } {
-  // Default: anchor +16px to right of node circle hit radius (nodeScreenX + 35 + 16)
-  const defaultLeft = nodeScreenX + nodeRadius + margin;
-  const isFlipped = defaultLeft + tooltipWidth > viewportWidth - margin;
-  const left = isFlipped
-    ? Math.max(margin, nodeScreenX - nodeRadius - margin - tooltipWidth)
-    : defaultLeft;
+    // Default: anchor +16px to right of node circle hit radius (nodeScreenX + 35 + 16)
+    const defaultLeft = nodeScreenX + nodeRadius + margin;
+    const isFlipped = defaultLeft + tooltipWidth > viewportWidth - margin;
+    const left = isFlipped
+        ? Math.max(margin, nodeScreenX - nodeRadius - margin - tooltipWidth)
+        : defaultLeft;
 
-  // Vertically center relative to nodeScreenY, clamped between minTop (72px) and viewport bottom
-  const targetTop = nodeScreenY - tooltipHeight / 2;
-  const maxTop = Math.max(minTop, viewportHeight - tooltipHeight - margin);
-  const top = Math.max(minTop, Math.min(targetTop, maxTop));
+    // Vertically center relative to nodeScreenY, clamped between minTop (72px) and viewport bottom
+    const targetTop = nodeScreenY - tooltipHeight / 2;
+    const maxTop = Math.max(minTop, viewportHeight - tooltipHeight - margin);
+    const top = Math.max(minTop, Math.min(targetTop, maxTop));
 
-  return { left, top, isFlipped };
+    return { left, top, isFlipped };
 }
 
 // Define static virtual space to isolate physics from container resizes
@@ -60,13 +60,13 @@ const VIRTUAL_CENTER_Y = VIRTUAL_HEIGHT / 2;
 const roundCoord2 = (val: number): number => Math.round(val * 100) / 100;
 
 interface ScenePhysicsProfile {
-  numNodes: number;
-  numSeeds: number;
-  isExpandedLayout: boolean;
-  spacingMultiplier: number;
-  globalGravityStrength: number;
-  seedStrength: number;
-  isFullyPinned: boolean;
+    numNodes: number;
+    numSeeds: number;
+    isExpandedLayout: boolean;
+    spacingMultiplier: number;
+    globalGravityStrength: number;
+    seedStrength: number;
+    isFullyPinned: boolean;
 }
 
 /**
@@ -76,31 +76,31 @@ interface ScenePhysicsProfile {
  * the 1050px territory stride while preserving exact intra-scene repulsion.
  */
 const createSceneIsolatedChargeForce = (chargeStrengthFn: (d: Node) => number): d3.Force<Node, Link> => {
-  let sceneForces: d3.ForceManyBody<Node>[] = [];
+    let sceneForces: d3.ForceManyBody<Node>[] = [];
 
-  const force = ((alpha: number) => {
-    for (let i = 0; i < sceneForces.length; i++) {
-      sceneForces[i](alpha);
-    }
-  }) as d3.Force<Node, Link>;
+    const force = ((alpha: number) => {
+        for (let i = 0; i < sceneForces.length; i++) {
+            sceneForces[i](alpha);
+        }
+    }) as d3.Force<Node, Link>;
 
-  force.initialize = (nodes: Node[], random: () => number) => {
-    const groups = new Map<number, Node[]>();
-    for (const n of nodes) {
-      const idx = typeof n.sceneIndex === 'number' ? n.sceneIndex : 0;
-      const list = groups.get(idx);
-      if (list) list.push(n);
-      else groups.set(idx, [n]);
-    }
-    sceneForces = [];
-    groups.forEach((sceneNodes) => {
-      const mb = d3.forceManyBody<Node>().strength(chargeStrengthFn);
-      mb.initialize(sceneNodes, random);
-      sceneForces.push(mb);
-    });
-  };
+    force.initialize = (nodes: Node[], random: () => number) => {
+        const groups = new Map<number, Node[]>();
+        for (const n of nodes) {
+            const idx = typeof n.sceneIndex === 'number' ? n.sceneIndex : 0;
+            const list = groups.get(idx);
+            if (list) list.push(n);
+            else groups.set(idx, [n]);
+        }
+        sceneForces = [];
+        groups.forEach((sceneNodes) => {
+            const mb = d3.forceManyBody<Node>().strength(chargeStrengthFn);
+            mb.initialize(sceneNodes, random);
+            sceneForces.push(mb);
+        });
+    };
 
-  return force;
+    return force;
 };
 
 /**
@@ -111,38 +111,38 @@ const createSceneIsolatedChargeForce = (chargeStrengthFn: (d: Node) => number): 
  * Also skips individual nodes whose `fx != null` or `fy != null`.
  */
 const createSceneIsolatedCenterForce = (strength: number): d3.Force<Node, Link> => {
-  let sceneCenters: d3.ForceCenter<Node>[] = [];
+    let sceneCenters: d3.ForceCenter<Node>[] = [];
 
-  const force = ((alpha: number) => {
-    for (let i = 0; i < sceneCenters.length; i++) {
-      sceneCenters[i](alpha);
-    }
-  }) as d3.Force<Node, Link>;
+    const force = ((alpha: number) => {
+        for (let i = 0; i < sceneCenters.length; i++) {
+            sceneCenters[i](alpha);
+        }
+    }) as d3.Force<Node, Link>;
 
-  force.initialize = (nodes: Node[], random: () => number) => {
-    const groups = new Map<number, Node[]>();
-    for (const n of nodes) {
-      const idx = typeof n.sceneIndex === 'number' ? n.sceneIndex : 0;
-      const list = groups.get(idx);
-      if (list) list.push(n);
-      else groups.set(idx, [n]);
-    }
-    sceneCenters = [];
-    groups.forEach((sceneNodes, sceneIdx) => {
-      const isFullyPinned =
-        sceneNodes.length > 0 &&
-        sceneNodes.every((n) => n.fx !== null && n.fx !== undefined && n.fy !== null && n.fy !== undefined);
-      if (isFullyPinned) return;
-      const unpinnedNodes = sceneNodes.filter((n) => n.fx == null && n.fy == null);
-      if (unpinnedNodes.length === 0) return;
-      const center = getSceneCenterOffset(sceneIdx);
-      const fc = d3.forceCenter<Node>(center.x, center.y).strength(strength);
-      fc.initialize(unpinnedNodes, random);
-      sceneCenters.push(fc);
-    });
-  };
+    force.initialize = (nodes: Node[], random: () => number) => {
+        const groups = new Map<number, Node[]>();
+        for (const n of nodes) {
+            const idx = typeof n.sceneIndex === 'number' ? n.sceneIndex : 0;
+            const list = groups.get(idx);
+            if (list) list.push(n);
+            else groups.set(idx, [n]);
+        }
+        sceneCenters = [];
+        groups.forEach((sceneNodes, sceneIdx) => {
+            const isFullyPinned =
+                sceneNodes.length > 0 &&
+                sceneNodes.every((n) => n.fx !== null && n.fx !== undefined && n.fy !== null && n.fy !== undefined);
+            if (isFullyPinned) return;
+            const unpinnedNodes = sceneNodes.filter((n) => n.fx == null && n.fy == null);
+            if (unpinnedNodes.length === 0) return;
+            const center = getSceneCenterOffset(sceneIdx);
+            const fc = d3.forceCenter<Node>(center.x, center.y).strength(strength);
+            fc.initialize(unpinnedNodes, random);
+            sceneCenters.push(fc);
+        });
+    };
 
-  return force;
+    return force;
 };
 
 /**
@@ -152,2708 +152,2776 @@ const createSceneIsolatedCenterForce = (strength: number): d3.Force<Node, Link> 
  *   • artist <-> genre / country / founded: 0.18 at rest
  */
 export const computeRestingLinkOpacity = (
-  l: any,
-  sNode: Node | undefined,
-  tNode: Node | undefined,
-  nodeDegreesMap: Map<string, number>
+    l: any,
+    sNode: Node | undefined,
+    tNode: Node | undefined,
+    nodeDegreesMap: Map<string, number>
 ): number => {
-  const sType = sNode?.type || 'artist';
-  const tType = tNode?.type || 'artist';
-  if (sType === 'artist' && tType === 'artist') {
-    const w = typeof l?.weight === 'number' ? Math.max(0.1, Math.min(1.0, l.weight)) : 0.5;
-    return Math.round((0.26 + w * 0.24) * 100) / 100;
-  }
-  if (sType === 'label' || tType === 'label') {
-    const labelNode = sType === 'label' ? sNode : tNode;
-    const deg = labelNode ? (nodeDegreesMap.get(labelNode.id) ?? 1) : 1;
-    return deg > 1 ? 0.30 : 0.22;
-  }
-  return 0.18;
+    const sType = sNode?.type || 'artist';
+    const tType = tNode?.type || 'artist';
+    if (sType === 'artist' && tType === 'artist') {
+        const w = typeof l?.weight === 'number' ? Math.max(0.1, Math.min(1.0, l.weight)) : 0.5;
+        return Math.round((0.26 + w * 0.24) * 100) / 100;
+    }
+    if (sType === 'label' || tType === 'label') {
+        const labelNode = sType === 'label' ? sNode : tNode;
+        const deg = labelNode ? (nodeDegreesMap.get(labelNode.id) ?? 1) : 1;
+        return deg > 1 ? 0.30 : 0.22;
+    }
+    return 0.18;
 };
 
 const isNodeSeedInOwnScene = (node: Node, seedArtists: string[]): boolean => {
-  if (node.type !== 'artist') return false;
-  if (typeof node.isSceneSeed === 'boolean') return node.isSceneSeed;
-  const canonicalId = stripSceneNamespace(node.canonicalId || node.id);
-  return isNodeInSeedList(canonicalId || node.label || '', seedArtists);
+    if (node.type !== 'artist') return false;
+    if (typeof node.isSceneSeed === 'boolean') return node.isSceneSeed;
+    const canonicalId = stripSceneNamespace(node.canonicalId || node.id);
+    return isNodeInSeedList(canonicalId || node.label || '', seedArtists);
 };
 
 const computeBridgePathD = (d: any, fallbackNodes?: Node[]): string => {
-  let sNode = d?.source;
-  let tNode = d?.target;
+    let sNode = d?.source;
+    let tNode = d?.target;
 
-  if ((!sNode || typeof sNode === 'string' || sNode?.x === undefined) && fallbackNodes) {
-    const sId = d?.sourceNodeId || (typeof sNode === 'string' ? sNode : sNode?.id);
-    if (sId) {
-      sNode = fallbackNodes.find(n => n.id === sId || n.id.toLowerCase() === String(sId).toLowerCase()) || sNode;
+    if ((!sNode || typeof sNode === 'string' || sNode?.x === undefined) && fallbackNodes) {
+        const sId = d?.sourceNodeId || (typeof sNode === 'string' ? sNode : sNode?.id);
+        if (sId) {
+            sNode = fallbackNodes.find(n => n.id === sId || n.id.toLowerCase() === String(sId).toLowerCase()) || sNode;
+        }
     }
-  }
 
-  if ((!tNode || typeof tNode === 'string' || tNode?.x === undefined) && fallbackNodes) {
-    const tId = d?.targetNodeId || (typeof tNode === 'string' ? tNode : tNode?.id);
-    if (tId) {
-      tNode = fallbackNodes.find(n => n.id === tId || n.id.toLowerCase() === String(tId).toLowerCase()) || tNode;
+    if ((!tNode || typeof tNode === 'string' || tNode?.x === undefined) && fallbackNodes) {
+        const tId = d?.targetNodeId || (typeof tNode === 'string' ? tNode : tNode?.id);
+        if (tId) {
+            tNode = fallbackNodes.find(n => n.id === tId || n.id.toLowerCase() === String(tId).toLowerCase()) || tNode;
+        }
     }
-  }
 
-  const x1 = sNode?.x;
-  const y1 = sNode?.y;
-  const x2 = tNode?.x;
-  const y2 = tNode?.y;
-  if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined || isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) {
-    return '';
-  }
-  const dx = x2 - x1;
-  const dy = y2 - y1;
-  const dist = Math.hypot(dx, dy);
-  if (dist < 12) return '';
+    const x1 = sNode?.x;
+    const y1 = sNode?.y;
+    const x2 = tNode?.x;
+    const y2 = tNode?.y;
+    if (x1 === undefined || y1 === undefined || x2 === undefined || y2 === undefined || isNaN(x1) || isNaN(y1) || isNaN(x2) || isNaN(y2)) {
+        return '';
+    }
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const dist = Math.hypot(dx, dy);
+    if (dist < 12) return '';
 
-  const mx = (x1 + x2) / 2;
-  const my = (y1 + y2) / 2;
-  const absDx = Math.abs(dx);
-  const arcLift = Math.min(200, Math.max(70, absDx * 0.15));
-  const cy = my - arcLift;
-  return `M ${x1},${y1} Q ${mx},${cy} ${x2},${y2}`;
+    const mx = (x1 + x2) / 2;
+    const my = (y1 + y2) / 2;
+    const absDx = Math.abs(dx);
+    const arcLift = Math.min(200, Math.max(70, absDx * 0.15));
+    const cy = my - arcLift;
+    return `M ${x1},${y1} Q ${mx},${cy} ${x2},${y2}`;
 };
 
 interface MusicGraphProps {
-  data: GraphData;
-  libraryArtists: string[];
-  seedArtists: string[];
-  onNodeClick: (node: Node | null) => void;
-  selectedNode: Node | null;
-  peekedNode?: Node | null;
-  isSmallScreen: boolean;
-  isPassiveSelection?: boolean;
-  activeFilters: Record<FilterKeys, boolean>;
-  searchQuery: string;
-  setSearchQuery: (query: string) => void;
-  toggleFilter: (filter: FilterKeys) => void;
-  legendConfig: Record<string, { label: string; shape: React.ReactNode }>;
-  legendOrder: FilterKeys[];
-  legendRef?: React.RefObject<HTMLDivElement | null>;
-  onInteraction?: () => void;
-  onLegendInteraction?: () => void;
-  isGuest?: boolean;
-  detailsCache?: Map<string, NodeDetails>;
-  isActive?: boolean;
-  scenes?: ProjectScene[];
-  activeSceneId?: string;
-  focusedSceneCluster?: { sceneId: string; timestamp: number };
-  reorderCameraSignal?: { nonce: number; fitAll: boolean };
-  dimmedSceneIds?: string[];
-  onSimulationComplete?: () => void;
-  /** Phase A — Coordinate Memory: fired once when simulation settles, with the
-   * final fx/fy positions of all artist and label nodes. Only artist/label nodes
-   * are included (metadata petals are excluded — they are positioned relative to
-   * their parent artists and do not need independent persistence). */
-  onCoordinatesSettled?: (layout: CanvasNodeRef[]) => void;
+    data: GraphData;
+    libraryArtists: string[];
+    seedArtists: string[];
+    onNodeClick: (node: Node | null) => void;
+    selectedNode: Node | null;
+    peekedNode?: Node | null;
+    isSmallScreen: boolean;
+    isPassiveSelection?: boolean;
+    activeFilters: Record<FilterKeys, boolean>;
+    searchQuery: string;
+    setSearchQuery: (query: string) => void;
+    toggleFilter: (filter: FilterKeys) => void;
+    legendConfig: Record<string, { label: string; shape: React.ReactNode }>;
+    legendOrder: FilterKeys[];
+    legendRef?: React.RefObject<HTMLDivElement | null>;
+    onInteraction?: () => void;
+    onLegendInteraction?: () => void;
+    isGuest?: boolean;
+    detailsCache?: Map<string, NodeDetails>;
+    isActive?: boolean;
+    scenes?: ProjectScene[];
+    activeSceneId?: string;
+    focusedSceneCluster?: { sceneId: string; timestamp: number };
+    reorderCameraSignal?: { nonce: number; fitAll: boolean };
+    dimmedSceneIds?: string[];
+    onSimulationComplete?: () => void;
+    /** Phase A — Coordinate Memory: fired once when simulation settles, with the
+     * final fx/fy positions of all artist and label nodes. Only artist/label nodes
+     * are included (metadata petals are excluded — they are positioned relative to
+     * their parent artists and do not need independent persistence). */
+    onCoordinatesSettled?: (layout: CanvasNodeRef[]) => void;
 }
 
 const isSameNodeId = (id1: any, id2: any): boolean => {
-  if (!id1 || !id2) return false;
-  const s1 = String(id1).toLowerCase();
-  const s2 = String(id2).toLowerCase();
-  if (s1 === s2 || normalizeArtistId(s1) === normalizeArtistId(s2)) return true;
-  const c1 = stripSceneNamespace(s1);
-  const c2 = stripSceneNamespace(s2);
-  return Boolean(c1 && c2 && (c1 === c2 || normalizeArtistId(c1) === normalizeArtistId(c2)));
+    if (!id1 || !id2) return false;
+    const s1 = String(id1).toLowerCase();
+    const s2 = String(id2).toLowerCase();
+    if (s1 === s2 || normalizeArtistId(s1) === normalizeArtistId(s2)) return true;
+    const c1 = stripSceneNamespace(s1);
+    const c2 = stripSceneNamespace(s2);
+    return Boolean(c1 && c2 && (c1 === c2 || normalizeArtistId(c1) === normalizeArtistId(c2)));
 };
 
 const escapeRegExp = (string: string) => {
-  return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 };
 
 const computeNodeDepths = (nodes: Node[], links: Link[], seedArtistsOrSet: Set<string> | string[]): Map<string, number> => {
-  const seedList = Array.isArray(seedArtistsOrSet) ? seedArtistsOrSet : Array.from(seedArtistsOrSet);
-  const depths = new Map<string, number>();
-  const adj = new Map<string, string[]>();
-  
-  // Initialize adjacency list
-  nodes.forEach(n => {
-    adj.set(n.id, []);
-  });
-  
-  links.forEach(l => {
-    if (l.isCrossSceneBridge) return;
-    const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
-    const targetId = typeof l.target === 'object' ? l.target.id : l.target;
-    if (adj.has(sourceId) && adj.has(targetId)) {
-      adj.get(sourceId)!.push(targetId);
-      adj.get(targetId)!.push(sourceId);
+    const seedList = Array.isArray(seedArtistsOrSet) ? seedArtistsOrSet : Array.from(seedArtistsOrSet);
+    const depths = new Map<string, number>();
+    const adj = new Map<string, string[]>();
+
+    // Initialize adjacency list
+    nodes.forEach(n => {
+        adj.set(n.id, []);
+    });
+
+    links.forEach(l => {
+        if (l.isCrossSceneBridge) return;
+        const sourceId = typeof l.source === 'object' ? l.source.id : l.source;
+        const targetId = typeof l.target === 'object' ? l.target.id : l.target;
+        if (adj.has(sourceId) && adj.has(targetId)) {
+            adj.get(sourceId)!.push(targetId);
+            adj.get(targetId)!.push(sourceId);
+        }
+    });
+
+    const queue: string[] = [];
+
+    // Seed nodes get depth 0
+    nodes.forEach(n => {
+        const isSeed = isNodeSeedInOwnScene(n, seedList);
+        if (isSeed) {
+            depths.set(n.id, 0);
+            queue.push(n.id);
+        }
+    });
+
+    let head = 0;
+    while (head < queue.length) {
+        const currentId = queue[head++];
+        const currentDepth = depths.get(currentId)!;
+
+        const neighbors = adj.get(currentId) || [];
+        for (const neighborId of neighbors) {
+            if (!depths.has(neighborId)) {
+                depths.set(neighborId, currentDepth + 1);
+                queue.push(neighborId);
+            }
+        }
     }
-  });
-  
-  const queue: string[] = [];
-  
-  // Seed nodes get depth 0
-  nodes.forEach(n => {
-    const isSeed = isNodeSeedInOwnScene(n, seedList);
-    if (isSeed) {
-      depths.set(n.id, 0);
-      queue.push(n.id);
-    }
-  });
-  
-  let head = 0;
-  while (head < queue.length) {
-    const currentId = queue[head++];
-    const currentDepth = depths.get(currentId)!;
-    
-    const neighbors = adj.get(currentId) || [];
-    for (const neighborId of neighbors) {
-      if (!depths.has(neighborId)) {
-        depths.set(neighborId, currentDepth + 1);
-        queue.push(neighborId);
-      }
-    }
-  }
-  
-  // Default depth for any disconnected nodes
-  nodes.forEach(n => {
-    if (!depths.has(n.id)) {
-      depths.set(n.id, 2);
-    }
-  });
-  
-  return depths;
+
+    // Default depth for any disconnected nodes
+    nodes.forEach(n => {
+        if (!depths.has(n.id)) {
+            depths.set(n.id, 2);
+        }
+    });
+
+    return depths;
 };
 
 const EMPTY_SCENES: ProjectScene[] = [];
 const EMPTY_DIMMED_SCENE_IDS: string[] = [];
 
 const resolveNodeSceneId = (node?: { id?: string; sceneId?: string } | null): string | undefined => {
-  if (!node) return undefined;
-  if (node.sceneId) return node.sceneId;
-  const idStr = String(node.id || '');
-  if (idStr.includes('::')) return idStr.split('::')[0];
-  return undefined;
+    if (!node) return undefined;
+    if (node.sceneId) return node.sceneId;
+    const idStr = String(node.id || '');
+    if (idStr.includes('::')) return idStr.split('::')[0];
+    return undefined;
 };
 
 const isNodeInDimmedScene = (
-  node: { id?: string; sceneId?: string } | null | undefined,
-  dimmedSet: Set<string>
+    node: { id?: string; sceneId?: string } | null | undefined,
+    dimmedSet: Set<string>
 ): boolean => {
-  if (dimmedSet.size === 0 || !node) return false;
-  const sid = resolveNodeSceneId(node);
-  return Boolean(sid && dimmedSet.has(sid));
+    if (dimmedSet.size === 0 || !node) return false;
+    const sid = resolveNodeSceneId(node);
+    return Boolean(sid && dimmedSet.has(sid));
 };
 
 const isLinkInDimmedScene = (
-  link: any,
-  sNode: { id?: string; sceneId?: string } | undefined,
-  tNode: { id?: string; sceneId?: string } | undefined,
-  dimmedSet: Set<string>
+    link: any,
+    sNode: { id?: string; sceneId?: string } | undefined,
+    tNode: { id?: string; sceneId?: string } | undefined,
+    dimmedSet: Set<string>
 ): boolean => {
-  if (dimmedSet.size === 0) return false;
-  const srcScene =
-    link?.sourceSceneId ||
-    resolveNodeSceneId(sNode) ||
-    resolveNodeSceneId(typeof link?.source === 'object' ? link.source : { id: link?.source });
-  const tgtScene =
-    link?.targetSceneId ||
-    resolveNodeSceneId(tNode) ||
-    resolveNodeSceneId(typeof link?.target === 'object' ? link.target : { id: link?.target });
-  return Boolean((srcScene && dimmedSet.has(srcScene)) || (tgtScene && dimmedSet.has(tgtScene)));
+    if (dimmedSet.size === 0) return false;
+    const srcScene =
+        link?.sourceSceneId ||
+        resolveNodeSceneId(sNode) ||
+        resolveNodeSceneId(typeof link?.source === 'object' ? link.source : { id: link?.source });
+    const tgtScene =
+        link?.targetSceneId ||
+        resolveNodeSceneId(tNode) ||
+        resolveNodeSceneId(typeof link?.target === 'object' ? link.target : { id: link?.target });
+    return Boolean((srcScene && dimmedSet.has(srcScene)) || (tgtScene && dimmedSet.has(tgtScene)));
 };
 
 const MusicGraph: React.FC<MusicGraphProps> = ({
-  data, libraryArtists, seedArtists, onNodeClick, selectedNode, peekedNode, isSmallScreen,
-  isPassiveSelection = false,
-  activeFilters, searchQuery, setSearchQuery, toggleFilter,
-  legendConfig, legendOrder,
-  legendRef, onInteraction, onLegendInteraction, isGuest,
-  detailsCache, isActive = false, scenes = EMPTY_SCENES, activeSceneId, focusedSceneCluster, reorderCameraSignal, dimmedSceneIds = EMPTY_DIMMED_SCENE_IDS, onSimulationComplete, onCoordinatesSettled
+    data, libraryArtists, seedArtists, onNodeClick, selectedNode, peekedNode, isSmallScreen,
+    isPassiveSelection = false,
+    activeFilters, searchQuery, setSearchQuery, toggleFilter,
+    legendConfig, legendOrder,
+    legendRef, onInteraction, onLegendInteraction, isGuest,
+    detailsCache, isActive = false, scenes = EMPTY_SCENES, activeSceneId, focusedSceneCluster, reorderCameraSignal, dimmedSceneIds = EMPTY_DIMMED_SCENE_IDS, onSimulationComplete, onCoordinatesSettled
 }) => {
-  const dimmedSceneIdsSet = useMemo(() => new Set(dimmedSceneIds), [dimmedSceneIds]);
-  const dimmedSceneIdsRef = useRef<Set<string>>(dimmedSceneIdsSet);
-  dimmedSceneIdsRef.current = dimmedSceneIdsSet;
-  const isPassiveSelectionRef = useRef(isPassiveSelection);
-  useEffect(() => {
-    isPassiveSelectionRef.current = isPassiveSelection;
-  }, [isPassiveSelection]);
-  const svgRef = useRef<SVGSVGElement | null>(null);
-  const onSimulationCompleteRef = useRef(onSimulationComplete);
-  useEffect(() => {
-    onSimulationCompleteRef.current = onSimulationComplete;
-  }, [onSimulationComplete]);
-  // Phase A — Coordinate Memory: stable ref so the simulation.on("end") closure
-  // always calls the latest version of the callback without re-creating the sim.
-  const onCoordinatesSettledRef = useRef(onCoordinatesSettled);
-  useEffect(() => {
-    onCoordinatesSettledRef.current = onCoordinatesSettled;
-  }, [onCoordinatesSettled]);
-  const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
-  const wasAllPinnedAtStartRef = useRef<boolean>(false);
-  const lastSceneFingerprintRef = useRef<string>('');
-  const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
-  const [isLegendExpanded, setIsLegendExpanded] = useState(false);
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-  const graphSearchInputRef = useRef<HTMLInputElement>(null);
-  const [isCompactMode, setIsCompactMode] = useState(false);
-  const [hoveredLink, setHoveredLink] = useState<{
-    sourceId: string;
-    targetId?: string;
-    context?: string;
-    connections?: { context: string; targetName: string }[];
-    fallbackMessage?: string;
-    dna?: string;
-    x: number;
-    y: number;
-    screenX?: number;
-    screenY?: number;
-  } | null>(null);
-  const [hoverQuadrant, setHoverQuadrant] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('top-right');
-  const activeHoveredLinkRef = useRef<{ link: Link } | null>(null);
-  const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
-  const [isCardExpanded, setIsCardExpanded] = useState(false);
-  const desktopTooltipRef = useRef<HTMLDivElement>(null);
-  const [measuredTooltipHeight, setMeasuredTooltipHeight] = useState<number>(380);
+    const dimmedSceneIdsSet = useMemo(() => new Set(dimmedSceneIds), [dimmedSceneIds]);
+    const dimmedSceneIdsRef = useRef<Set<string>>(dimmedSceneIdsSet);
+    dimmedSceneIdsRef.current = dimmedSceneIdsSet;
+    const isPassiveSelectionRef = useRef(isPassiveSelection);
+    useEffect(() => {
+        isPassiveSelectionRef.current = isPassiveSelection;
+    }, [isPassiveSelection]);
+    const svgRef = useRef<SVGSVGElement | null>(null);
+    const onSimulationCompleteRef = useRef(onSimulationComplete);
+    useEffect(() => {
+        onSimulationCompleteRef.current = onSimulationComplete;
+    }, [onSimulationComplete]);
+    // Phase A — Coordinate Memory: stable ref so the simulation.on("end") closure
+    // always calls the latest version of the callback without re-creating the sim.
+    const onCoordinatesSettledRef = useRef(onCoordinatesSettled);
+    useEffect(() => {
+        onCoordinatesSettledRef.current = onCoordinatesSettled;
+    }, [onCoordinatesSettled]);
+    const simulationRef = useRef<d3.Simulation<Node, Link> | null>(null);
+    const wasAllPinnedAtStartRef = useRef<boolean>(false);
+    const lastSceneFingerprintRef = useRef<string>('');
+    const zoomRef = useRef<d3.ZoomBehavior<SVGSVGElement, unknown> | null>(null);
+    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+    const [highlightedNodes, setHighlightedNodes] = useState<Set<string>>(new Set());
+    const [isLegendExpanded, setIsLegendExpanded] = useState(false);
+    const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+    const graphSearchInputRef = useRef<HTMLInputElement>(null);
+    const [isCompactMode, setIsCompactMode] = useState(false);
+    const [hoveredLink, setHoveredLink] = useState<{
+        sourceId: string;
+        targetId?: string;
+        context?: string;
+        connections?: { context: string; targetName: string }[];
+        fallbackMessage?: string;
+        dna?: string;
+        x: number;
+        y: number;
+        screenX?: number;
+        screenY?: number;
+    } | null>(null);
+    const [hoverQuadrant, setHoverQuadrant] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('top-right');
+    const activeHoveredLinkRef = useRef<{ link: Link } | null>(null);
+    const [hoveredNodeId, setHoveredNodeId] = useState<string | null>(null);
+    const [isCardExpanded, setIsCardExpanded] = useState(false);
+    const desktopTooltipRef = useRef<HTMLDivElement>(null);
+    const [measuredTooltipHeight, setMeasuredTooltipHeight] = useState<number>(380);
 
-  useEffect(() => {
-    if (desktopTooltipRef.current) {
-      const h = desktopTooltipRef.current.offsetHeight;
-      if (h && Math.abs(h - measuredTooltipHeight) > 4) {
-        setMeasuredTooltipHeight(h);
-      }
-    }
-  }, [hoveredLink, measuredTooltipHeight]);
+    useEffect(() => {
+        if (desktopTooltipRef.current) {
+            const h = desktopTooltipRef.current.offsetHeight;
+            if (h && Math.abs(h - measuredTooltipHeight) > 4) {
+                setMeasuredTooltipHeight(h);
+            }
+        }
+    }, [hoveredLink, measuredTooltipHeight]);
 
-  useEffect(() => {
-    setIsCardExpanded(false);
-  }, [hoveredLink?.sourceId]);
-  const hoveredNodeIdRef = useRef<string | null>(null);
-  const activeHoveredNodeRef = useRef<Node | null>(null);
-  const scenesRef = useRef<ProjectScene[]>(scenes || []);
-  scenesRef.current = scenes || [];
-
-  const triggerNodeHoverRef = useRef<(d: Node, isProgrammatic?: boolean) => void>(() => {});
-  const clearNodeHoverRef = useRef<() => void>(() => {});
-
-  useEffect(() => {
+    useEffect(() => {
+        setIsCardExpanded(false);
+    }, [hoveredLink?.sourceId]);
+    const hoveredNodeIdRef = useRef<string | null>(null);
+    const activeHoveredNodeRef = useRef<Node | null>(null);
+    const scenesRef = useRef<ProjectScene[]>(scenes || []);
     scenesRef.current = scenes || [];
-    const activeNode = activeHoveredNodeRef.current || selectedNode || peekedNode;
-    if (hoveredLink && activeNode && triggerNodeHoverRef.current) {
-      triggerNodeHoverRef.current(activeNode, false);
-    }
-  }, [scenes]);
 
-  useEffect(() => {
-    hoveredNodeIdRef.current = hoveredNodeId;
-  }, [hoveredNodeId]);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const localLegendRef = useRef<HTMLDivElement | null>(null);
-  const isTrackingRef = useRef(false);
-  const targetNodeIdRef = useRef<string | null>(null);
-  const prevVisibleNodesLengthRef = useRef<number>(0);
+    const triggerNodeHoverRef = useRef<(d: Node, isProgrammatic?: boolean) => void>(() => { });
+    const clearNodeHoverRef = useRef<() => void>(() => { });
 
-  const setLegendRef = useCallback((node: HTMLDivElement | null) => {
-    localLegendRef.current = node;
-    if (legendRef) {
-      if (typeof legendRef === 'function') {
-        (legendRef as any)(node);
-      } else {
-        (legendRef as any).current = node;
-      }
-    }
-  }, [legendRef]);
+    useEffect(() => {
+        scenesRef.current = scenes || [];
+        const activeNode = activeHoveredNodeRef.current || selectedNode || peekedNode;
+        if (hoveredLink && activeNode && triggerNodeHoverRef.current) {
+            triggerNodeHoverRef.current(activeNode, false);
+        }
+    }, [scenes]);
 
-  // Detect if legend needs to be in compact mode based on container width.
-  // 730px = minimum canvas width for all 6 filter pills to fit on a single row.
-  // Below this the ribbon would wrap, so we fall back to the drawer on all screen
-  // types — including compressed desktop panel configurations.
-  useEffect(() => {
-    const observer = new ResizeObserver(entries => {
-      if (entries[0]) {
-        const width = entries[0].contentRect.width;
-        setIsCompactMode(width < 730);
-      }
-    });
+    useEffect(() => {
+        hoveredNodeIdRef.current = hoveredNodeId;
+    }, [hoveredNodeId]);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const localLegendRef = useRef<HTMLDivElement | null>(null);
+    const isTrackingRef = useRef(false);
+    const targetNodeIdRef = useRef<string | null>(null);
+    const prevVisibleNodesLengthRef = useRef<number>(0);
 
-    if (containerRef.current) {
-      observer.observe(containerRef.current);
-    }
+    const setLegendRef = useCallback((node: HTMLDivElement | null) => {
+        localLegendRef.current = node;
+        if (legendRef) {
+            if (typeof legendRef === 'function') {
+                (legendRef as any)(node);
+            } else {
+                (legendRef as any).current = node;
+            }
+        }
+    }, [legendRef]);
 
-    return () => observer.disconnect();
-  }, []);
+    // Detect if legend needs to be in compact mode based on container width.
+    // 730px = minimum canvas width for all 6 filter pills to fit on a single row.
+    // Below this the ribbon would wrap, so we fall back to the drawer on all screen
+    // types — including compressed desktop panel configurations.
+    useEffect(() => {
+        const observer = new ResizeObserver(entries => {
+            if (entries[0]) {
+                const width = entries[0].contentRect.width;
+                setIsCompactMode(width < 730);
+            }
+        });
 
-  const onNodeClickRef = useRef(onNodeClick);
-  const onInteractionRef = useRef(onInteraction);
-  const selectedNodeRef = useRef(selectedNode);
-  const peekedNodeRef = useRef(peekedNode);
-
-  useEffect(() => {
-    onNodeClickRef.current = onNodeClick;
-    onInteractionRef.current = onInteraction;
-    selectedNodeRef.current = selectedNode;
-    peekedNodeRef.current = peekedNode;
-    
-    // No longer kicking the simulation on selection to maintain absolute stability.
-  }, [onNodeClick, onInteraction, selectedNode, peekedNode]);
-
-  // NOTE: The details useMemo + simulation restart was removed.
-  // Previously, this restarted the simulation every time detailsCache changed
-  // (because setDetailsCache creates a new Map reference on every write),
-  // causing violent physics jitter on every node click.
-  // The simulation tick handler already uses live x/y coordinates on the nodes;
-  // no restart is needed for correct layout.
-
-  useEffect(() => {
-    if (isActive && simulationRef.current) {
-      // Coordinate Memory guard: if artist/label nodes already have fx/fy pinned from
-      // a saved canvasLayout, use a minimal alpha to wake the tick handler without
-      // running a full physics pass that would rotate/drift the settled web.
-      const nodes = simulationRef.current.nodes();
-      const artistLabelNodes = nodes.filter(n => n.type === 'artist' || n.type === 'label');
-      const allPinned = artistLabelNodes.length > 0 &&
-        artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
-                                     n.fy !== null && n.fy !== undefined);
-      wasAllPinnedAtStartRef.current = allPinned;
-      simulationRef.current.alpha(allPinned ? 0.001 : 0.3).restart();
-    }
-  }, [isActive]);
-
-
-
-  useEffect(() => {
-    if (!isLegendExpanded || !localLegendRef.current) return;
-    const handleClickOutside = (event: MouseEvent) => {
-      if (localLegendRef.current && !localLegendRef.current.contains(event.target as any)) {
-        setIsLegendExpanded(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside, true);
-    return () => document.removeEventListener('mousedown', handleClickOutside, true);
-  }, [isLegendExpanded]);
-
-  const handleZoomIn = () => {
-    if (svgRef.current && zoomRef.current) {
-        d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
-    }
-  };
-
-  const handleZoomOut = () => {
-    if (svgRef.current && zoomRef.current) {
-        isTrackingRef.current = false;
-        d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 0.75);
-    }
-  };
-
-  const handleCenter = () => {
-    if (fitGraphToScreenRef.current) {
-        fitGraphToScreenRef.current(750);
-    }
-  };
-
-  const { visibleNodes, visibleLinks } = useMemo(() => {
-    if (!data) return { visibleNodes: [], visibleLinks: [] };
-    const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
-    
-    // 1. Identify visible artists based on filters (Seed/Recommended)
-    const visibleArtists = data.nodes.filter(node => {
-        if (node.type !== 'artist') return false;
-        const isSeed = isNodeSeedInOwnScene(node, seedArtists);
-        return (isSeed && activeFilters.seed) || (!isSeed && activeFilters.recommended);
-    });
-    const visibleArtistIds = new Set<string>(visibleArtists.map(n => String(n.id).toLowerCase()));
-
-    // Standard shared-node graph logic (Reverted from duplication)
-    const connectedNodeIds = new Set<string>(visibleArtistIds);
-    data.links.forEach(link => {
-        const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id).toLowerCase();
-        const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id).toLowerCase();
-        if (visibleArtistIds.has(sourceId)) connectedNodeIds.add(targetId);
-        if (visibleArtistIds.has(targetId)) connectedNodeIds.add(sourceId);
-    });
-    const finalVisibleNodes = Array.from(
-      data.nodes.reduce((acc, node) => {
-        const nodeIdStr = String(node.id);
-        const nodeIdStrLower = nodeIdStr.toLowerCase();
-        if (!connectedNodeIds.has(nodeIdStrLower)) return acc;
-        
-        let isVisible = true;
-        if (node.type === 'artist') {
-          isVisible = visibleArtistIds.has(nodeIdStrLower);
+        if (containerRef.current) {
+            observer.observe(containerRef.current);
         }
 
-        if (isVisible && !acc.has(nodeIdStrLower)) {
-          acc.set(nodeIdStrLower, node);
+        return () => observer.disconnect();
+    }, []);
+
+    const onNodeClickRef = useRef(onNodeClick);
+    const onInteractionRef = useRef(onInteraction);
+    const selectedNodeRef = useRef(selectedNode);
+    const peekedNodeRef = useRef(peekedNode);
+
+    useEffect(() => {
+        onNodeClickRef.current = onNodeClick;
+        onInteractionRef.current = onInteraction;
+        selectedNodeRef.current = selectedNode;
+        peekedNodeRef.current = peekedNode;
+
+        // No longer kicking the simulation on selection to maintain absolute stability.
+    }, [onNodeClick, onInteraction, selectedNode, peekedNode]);
+
+    // NOTE: The details useMemo + simulation restart was removed.
+    // Previously, this restarted the simulation every time detailsCache changed
+    // (because setDetailsCache creates a new Map reference on every write),
+    // causing violent physics jitter on every node click.
+    // The simulation tick handler already uses live x/y coordinates on the nodes;
+    // no restart is needed for correct layout.
+
+    useEffect(() => {
+        if (isActive && simulationRef.current) {
+            // Coordinate Memory guard: if artist/label nodes already have fx/fy pinned from
+            // a saved canvasLayout, use a minimal alpha to wake the tick handler without
+            // running a full physics pass that would rotate/drift the settled web.
+            const nodes = simulationRef.current.nodes();
+            const artistLabelNodes = nodes.filter(n => n.type === 'artist' || n.type === 'label');
+            const allPinned = artistLabelNodes.length > 0 &&
+                artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
+                    n.fy !== null && n.fy !== undefined);
+            wasAllPinnedAtStartRef.current = allPinned;
+            simulationRef.current.alpha(allPinned ? 0.001 : 0.3).restart();
         }
-        return acc;
-      }, new Map<string, Node>()).values()
-    );
-    const finalVisibleNodeIds = new Set(finalVisibleNodes.map(n => String((n as Node).id).toLowerCase()));
-    const finalVisibleLinks = data.links
-      .filter(link => {
-        if (!link.source || !link.target) return false;
-        const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id || '').toLowerCase();
-        const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id || '').toLowerCase();
-        return sourceId && targetId && finalVisibleNodeIds.has(sourceId) && finalVisibleNodeIds.has(targetId);
-      })
-      .map(link => {
-        // Preserve object references if they exist, otherwise use IDs
-        // This prevents the 'undefined' coordinate bug in the tick function
-        return {
-          ...link,
-          source: link.source,
-          target: link.target
+    }, [isActive]);
+
+
+
+    useEffect(() => {
+        if (!isLegendExpanded || !localLegendRef.current) return;
+        const handleClickOutside = (event: MouseEvent) => {
+            if (localLegendRef.current && !localLegendRef.current.contains(event.target as any)) {
+                setIsLegendExpanded(false);
+            }
         };
-      });
-    return { visibleNodes: finalVisibleNodes, visibleLinks: finalVisibleLinks };
-  }, [data, activeFilters, seedArtists]);
-  
-  const visibleNodesRef = useRef(visibleNodes);
-  const nodeDegreesRef = useRef<Map<string, number>>(new Map());
-  const prevArtistIdsRef = useRef<Set<string>>(new Set());
-  const prevLayoutSignatureRef = useRef<string>("");
-  useEffect(() => {
-    visibleNodesRef.current = visibleNodes;
-  }, [visibleNodes, selectedNode, peekedNode]);
+        document.addEventListener('mousedown', handleClickOutside, true);
+        return () => document.removeEventListener('mousedown', handleClickOutside, true);
+    }, [isLegendExpanded]);
 
-  const selectionHighlightIds = useMemo(() => {
-    if (isPassiveSelection) return null;
-    const activeInteractionNode = selectedNode || peekedNode;
-    if (!activeInteractionNode) return null;
-    const selectedIdStr = String(activeInteractionNode.id);
-    const hasSceneNs = selectedIdStr.includes('::');
-    const canonSelected = stripSceneNamespace(activeInteractionNode.canonicalId || selectedIdStr);
-
-    const highlighted = new Set<string>([
-      selectedIdStr,
-      selectedIdStr.toLowerCase(),
-    ]);
-
-    if (!hasSceneNs) {
-      highlighted.add(normalizeArtistId(selectedIdStr));
-      highlighted.add(canonSelected);
-      highlighted.add(canonSelected.toLowerCase());
-      highlighted.add(normalizeArtistId(canonSelected));
-      visibleNodes.forEach(n => {
-        if (isSameNodeId(n.id, selectedIdStr)) {
-          highlighted.add(String(n.id));
-          highlighted.add(String(n.id).toLowerCase());
-        }
-      });
-    }
-    
-    const primaryConnections = new Set<string>();
-    visibleLinks.forEach(link => {
-        const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id);
-        const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
-        const canonSource = stripSceneNamespace(sourceId);
-        const canonTarget = stripSceneNamespace(targetId);
-
-        let isSourceSelected = false;
-        let isTargetSelected = false;
-
-        if (hasSceneNs) {
-            isSourceSelected = sourceId.toLowerCase() === selectedIdStr.toLowerCase();
-            isTargetSelected = targetId.toLowerCase() === selectedIdStr.toLowerCase();
-        } else {
-            isSourceSelected = highlighted.has(sourceId) || highlighted.has(sourceId.toLowerCase()) || highlighted.has(normalizeArtistId(canonSource));
-            isTargetSelected = highlighted.has(targetId) || highlighted.has(targetId.toLowerCase()) || highlighted.has(normalizeArtistId(canonTarget));
-        }
-
-        if (isSourceSelected) { 
-            highlighted.add(targetId); 
-            highlighted.add(targetId.toLowerCase());
-            primaryConnections.add(targetId); 
-            primaryConnections.add(targetId.toLowerCase());
-            if (!hasSceneNs) {
-                highlighted.add(normalizeArtistId(canonTarget));
-                primaryConnections.add(normalizeArtistId(canonTarget));
-            }
-        }
-        if (isTargetSelected) { 
-            highlighted.add(sourceId); 
-            highlighted.add(sourceId.toLowerCase());
-            primaryConnections.add(sourceId); 
-            primaryConnections.add(sourceId.toLowerCase());
-            if (!hasSceneNs) {
-                highlighted.add(normalizeArtistId(canonSource));
-                primaryConnections.add(normalizeArtistId(canonSource));
-            }
-        }
-    });
-    if (activeInteractionNode.type !== 'artist') return highlighted;
-    visibleLinks.forEach(link => {
-        // When scene-namespaced, do not expand 2nd-degree neighbors through cross-scene bridges
-        // so that the other scene's intra-scene constellation stays dimmed.
-        if (hasSceneNs && link.isCrossSceneBridge) return;
-
-        const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id);
-        const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
-
-        if (hasSceneNs) {
-            const activeSceneId = activeInteractionNode.sceneId;
-            const sourceNode = visibleNodes.find(n => n.id.toLowerCase() === sourceId.toLowerCase());
-            const targetNode = visibleNodes.find(n => n.id.toLowerCase() === targetId.toLowerCase());
-            if (activeSceneId && (sourceNode?.sceneId !== activeSceneId || targetNode?.sceneId !== activeSceneId)) {
-                return;
-            }
-        }
-
-        const isSourcePrimary = primaryConnections.has(sourceId) || primaryConnections.has(sourceId.toLowerCase());
-        const isTargetPrimary = primaryConnections.has(targetId) || primaryConnections.has(targetId.toLowerCase());
-        
-        if (isSourcePrimary) { 
-            highlighted.add(targetId); 
-            highlighted.add(targetId.toLowerCase());
-            if (!hasSceneNs) highlighted.add(normalizeArtistId(stripSceneNamespace(targetId)));
-        }
-        if (isTargetPrimary) { 
-            highlighted.add(sourceId); 
-            highlighted.add(sourceId.toLowerCase());
-            if (!hasSceneNs) highlighted.add(normalizeArtistId(stripSceneNamespace(sourceId)));
-        }
-    });
-    return highlighted;
-  }, [selectedNode, peekedNode, visibleLinks, visibleNodes, isPassiveSelection]);
-
-  const selectionHighlightIdsRef = useRef<Set<string> | null>(null);
-  useEffect(() => {
-    selectionHighlightIdsRef.current = selectionHighlightIds;
-  }, [selectionHighlightIds]);
-
-  const highlightedNodesRef = useRef<Set<string>>(new Set());
-  useEffect(() => {
-    highlightedNodesRef.current = highlightedNodes;
-  }, [highlightedNodes]);
-
-  const searchQueryRef = useRef(searchQuery);
-  useEffect(() => {
-    searchQueryRef.current = searchQuery;
-  }, [searchQuery]);
-
-  useEffect(() => {
-    const trimmedQuery = searchQuery.trim();
-    if (!trimmedQuery) { 
-        setHighlightedNodes(new Set()); 
-        return; 
-    }
-    const query = trimmedQuery.toLowerCase();
-    const newHighlighted = new Set<string>();
-    visibleNodes.forEach(node => {
-        // Mirror Legend filter 1:1: skip nodes inside dimmed scenes so search never pans to ghost clusters
-        if (isNodeInDimmedScene(node, dimmedSceneIdsSet)) return;
-        // Match against both the display label (title-cased) and the raw canonical id slug
-        const canonId = stripSceneNamespace(String(node.canonicalId || node.id));
-        const displayName = (node.label || canonId).replace(/-/g, ' ');
-        if (displayName.toLowerCase().includes(query) || canonId.toLowerCase().includes(query)) {
-            newHighlighted.add(String(node.id));
-            newHighlighted.add(String(node.id).toLowerCase());
-            newHighlighted.add(canonId);
-            newHighlighted.add(canonId.toLowerCase());
-            newHighlighted.add(normalizeArtistId(canonId));
-        }
-    });
-    setHighlightedNodes(newHighlighted);
-  }, [searchQuery, visibleNodes, dimmedSceneIdsSet]);
-
-  // Set tracking target when search highlight changes
-  useEffect(() => {
-    if (highlightedNodes.size > 0) {
-        const [matchedId] = highlightedNodes;
-        isTrackingRef.current = true;
-        targetNodeIdRef.current = String(matchedId);
-    }
-  }, [highlightedNodes]);
-
-  useEffect(() => {
-    const resizeObserver = new ResizeObserver(entries => {
-        if (entries[0]) {
-            const { width, height } = entries[0].contentRect;
-            if (width > 0 && height > 0) setDimensions({ width, height });
-        }
-    });
-    if (svgRef.current?.parentElement) resizeObserver.observe(svgRef.current.parentElement);
-    return () => resizeObserver.disconnect();
-  }, []);
-
-  const dimensionsRef = useRef(dimensions);
-  useEffect(() => {
-      dimensionsRef.current = dimensions;
-  }, [dimensions]);
-
-  const isSmallScreenRef = useRef(isSmallScreen);
-  useEffect(() => {
-      isSmallScreenRef.current = isSmallScreen;
-  }, [isSmallScreen]);
-
-  const fitGraphToScreenRef = useRef<((duration?: number) => boolean) | null>(null);
-  
-  const fitGraphToScreen = useCallback((duration: number = 1000): boolean => {
-      if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0 || visibleNodesRef.current.length === 0) return false;
-      isTrackingRef.current = false;
-      const width = dimensionsRef.current.width;
-      const height = dimensionsRef.current.height;
-      
-      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-      let validNodesCount = 0;
-      const dimmedSet = dimmedSceneIdsRef.current;
-      const nonDimmedNodes = dimmedSet.size > 0
-          ? visibleNodesRef.current.filter(n => !isNodeInDimmedScene(n, dimmedSet))
-          : visibleNodesRef.current;
-      const targetNodes = nonDimmedNodes.length > 0 ? nonDimmedNodes : visibleNodesRef.current;
-      targetNodes.forEach(n => {
-          if (n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y)) {
-              if (n.x < minX) minX = n.x;
-              if (n.x > maxX) maxX = n.x;
-              if (n.y < minY) minY = n.y;
-              if (n.y > maxY) maxY = n.y;
-              validNodesCount++;
-          }
-      });
-      
-      if (validNodesCount === 0) return false;
-
-      const contentWidth = maxX - minX;
-      const contentHeight = maxY - minY;
-      const cx = (minX + maxX) / 2;
-      const cy = (minY + maxY) / 2;
-      
-      const padding = isSmallScreenRef.current ? 40 : 80;
-      const scaleX = (width - padding * 2) / (contentWidth || 1);
-      const scaleY = (height - padding * 2) / (contentHeight || 1);
-      
-      const maxScale = isSmallScreenRef.current ? 0.75 : 1;
-      const fitScale = Math.min(scaleX, scaleY);
-      const minScale = Math.min(0.22, Math.max(0.05, fitScale));
-      let k = Math.max(minScale, Math.min(fitScale, maxScale));
-      
-      if (typeof window !== 'undefined' && window.innerWidth < 768) {
-          k = k * 1.5;
-      }
-      
-      const tx = width / 2 - cx * k;
-      const ty = height / 2 - cy * k;
-      
-      d3.select(svgRef.current).transition().duration(duration).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
-      return true;
-  }, []);
-
-  const focusSceneCluster = useCallback((targetSceneId: string, duration: number = 750): boolean => {
-    if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0) return false;
-    isTrackingRef.current = false;
-    const width = dimensionsRef.current.width;
-    const height = dimensionsRef.current.height;
-
-    let targetIndex = -1;
-    if (scenes && scenes.length > 0) {
-      targetIndex = scenes.findIndex((s, idx) => (s.sceneId || s.id || `scene-${idx + 1}`) === targetSceneId);
-    }
-    if (targetIndex === -1) {
-      const match = targetSceneId.match(/^scene-(\d+)$/i);
-      if (match) targetIndex = parseInt(match[1], 10) - 1;
-    }
-
-    const clusterNodes = visibleNodesRef.current.filter(n => {
-      if (n.sceneId && n.sceneId === targetSceneId) return true;
-      if (n.id && n.id.startsWith(targetSceneId + '::')) return true;
-      if (targetIndex >= 0 && n.sceneIndex === targetIndex) return true;
-      return false;
-    });
-
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    let validCount = 0;
-    clusterNodes.forEach(n => {
-      if (n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y)) {
-        if (n.x < minX) minX = n.x;
-        if (n.x > maxX) maxX = n.x;
-        if (n.y < minY) minY = n.y;
-        if (n.y > maxY) maxY = n.y;
-        validCount++;
-      }
-    });
-
-    let cx: number;
-    let cy: number;
-    let contentWidth: number;
-    let contentHeight: number;
-
-    if (validCount > 0) {
-      cx = (minX + maxX) / 2;
-      cy = (minY + maxY) / 2;
-      contentWidth = Math.max(300, maxX - minX);
-      contentHeight = Math.max(300, maxY - minY);
-    } else {
-      // V45 / Rule 44: When target scene has 0 nodes (uncurated / idle) and settled nodes exist,
-      // fit the existing settled scenes to screen so the constellation remains visible.
-      const settledNodes = visibleNodesRef.current.filter(n => n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y));
-      if (settledNodes.length > 0) {
-        return fitGraphToScreen(duration);
-      }
-      const fallbackIdx = targetIndex >= 0 ? targetIndex : 0;
-      const center = getSceneCenterOffset(fallbackIdx);
-      cx = center.x;
-      cy = center.y;
-      contentWidth = 700;
-      contentHeight = 700;
-    }
-
-    const padding = isSmallScreenRef.current ? 40 : 80;
-    const scaleX = (width - padding * 2) / (contentWidth || 1);
-    const scaleY = (height - padding * 2) / (contentHeight || 1);
-    const maxScale = isSmallScreenRef.current ? 1.0 : 1.25;
-    const fitScale = Math.min(scaleX, scaleY);
-    const minScale = 0.3;
-    let k = Math.max(minScale, Math.min(fitScale, maxScale));
-
-    const tx = width / 2 - cx * k;
-    const ty = height / 2 - cy * k;
-
-    if (duration === 0) {
-      zoomRef.current.transform(d3.select(svgRef.current), d3.zoomIdentity.translate(tx, ty).scale(k));
-    } else {
-      d3.select(svgRef.current).transition().duration(duration).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
-    }
-    return true;
-  }, [scenes, fitGraphToScreen]);
-
-  const focusSceneClusterRef = useRef(focusSceneCluster);
-  useEffect(() => {
-    focusSceneClusterRef.current = focusSceneCluster;
-  }, [focusSceneCluster]);
-
-  const lastFocusedClusterTimestampRef = useRef<number>(0);
-  useEffect(() => {
-    if (focusedSceneCluster && focusedSceneCluster.timestamp > lastFocusedClusterTimestampRef.current) {
-      lastFocusedClusterTimestampRef.current = focusedSceneCluster.timestamp;
-      focusSceneCluster(focusedSceneCluster.sceneId, 750);
-    }
-  }, [focusedSceneCluster, focusSceneCluster]);
-
-  useEffect(() => {
-      fitGraphToScreenRef.current = fitGraphToScreen;
-  }, [fitGraphToScreen]);
-
-  const hasInitialCentered = useRef(false);
-
-  // Reset initial centering flag when nodes are completely emptied (e.g. project reset or curation start)
-  useEffect(() => {
-    if (!data?.nodes || data.nodes.length === 0) {
-      hasInitialCentered.current = false;
-    }
-  }, [data?.nodes]);
-
-  const detectedSceneCount = useMemo(() => {
-    if (scenes && scenes.length > 0) return scenes.length;
-    if (!data?.nodes || data.nodes.length === 0) return 1;
-    const indices = data.nodes.map(n => n.sceneIndex ?? 0);
-    return Math.max(1, Math.max(...indices) + 1);
-  }, [scenes, data?.nodes]);
-
-  const lastSceneCountRef = useRef(detectedSceneCount);
-
-  // Count scenes that actually have mapped nodes or are completed
-  const mappedSceneCount = useMemo(() => {
-    if (scenes && scenes.length > 0) {
-      return scenes.filter(s => (s.graphData?.nodes?.length ?? 0) > 0 || s.status === 'completed').length;
-    }
-    return 0;
-  }, [scenes]);
-
-  const prevMappedSceneCountRef = useRef(0);
-
-  useEffect(() => {
-    if (lastSceneCountRef.current !== detectedSceneCount) {
-      const prevCount = lastSceneCountRef.current;
-      lastSceneCountRef.current = detectedSceneCount;
-      if (detectedSceneCount > prevCount) {
-        const targetScene = activeSceneId || `scene-${detectedSceneCount}`;
-        focusSceneCluster(targetScene, 750);
-      } else if (fitGraphToScreenRef.current) {
-        fitGraphToScreenRef.current(750);
-      }
-    }
-  }, [detectedSceneCount, activeSceneId, focusSceneCluster]);
-
-  // V45.1 (Phase B2.3): When upfront batch curation transitions mapped scenes from 0 -> >0,
-  // automatically focus on Scene 1 so the Connections panel centers on the primary cluster immediately.
-  useEffect(() => {
-    if (prevMappedSceneCountRef.current === 0 && mappedSceneCount > 0) {
-      prevMappedSceneCountRef.current = mappedSceneCount;
-      if (zoomRef.current && dimensionsRef.current.width > 0) {
-        const centered = focusSceneCluster(activeSceneId || 'scene-1', 0);
-        if (centered) hasInitialCentered.current = true;
-      } else {
-        setTimeout(() => {
-          if (zoomRef.current && dimensionsRef.current.width > 0) {
-            const centered = focusSceneCluster(activeSceneId || 'scene-1', 0);
-            if (centered) hasInitialCentered.current = true;
-          }
-        }, 50);
-      }
-    } else {
-      prevMappedSceneCountRef.current = mappedSceneCount;
-    }
-  }, [mappedSceneCount, activeSceneId, focusSceneCluster]);
-
-  useEffect(() => {
-    if (!svgRef.current || dimensions.width === 0) return;
-
-    const svg = d3.select(svgRef.current);
-    const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
-    const { width, height } = dimensions;
-
-    visibleNodes.forEach(n => {
-        if (n.x !== undefined && isNaN(n.x)) n.x = undefined;
-        if (n.y !== undefined && isNaN(n.y)) n.y = undefined;
-        if (n.fx !== undefined && n.fx !== null && isNaN(n.fx)) n.fx = null;
-        if (n.fy !== undefined && n.fy !== null && isNaN(n.fy)) n.fy = null;
-    });
-
-    // Title-case formatter: converts raw id slugs (e.g. "buggin", "hardcore-punk")
-    // to their display form ("Buggin", "Hardcore Punk") only for legacy cache docs
-    // where the .label field was not populated at write time.
-    const toDisplayLabel = (node: Node): string => {
-        const canonRaw = stripSceneNamespace(String(node.canonicalId || node.id || ''));
-        if (node.type === 'label') {
-            return cleanLabelDisplayName(node.label || canonRaw);
-        }
-        if (node.label && typeof node.label === 'string' && node.label.trim()) {
-            return node.label.trim();
-        }
-        return canonRaw
-            .replace(/-/g, ' ')
-            .replace(/\b\w/g, c => c.toUpperCase());
-    };
-
-    const formatRelationContext = (contexts: string[]): string => {
-        if (contexts.length === 0) {
-            return "shares scene lineage with";
-        }
-        if (contexts.length === 1) {
-            return contexts[0].trim();
-        }
-
-        const parts = contexts.map(c => {
-            const trimmed = c.trim();
-            const words = trimmed.split(/\s+/);
-            if (words.length > 1) {
-                const lastWord = words[words.length - 1].toLowerCase();
-                if (['with', 'alongside', 'by', 'to', 'for', 'of', 'from'].includes(lastWord)) {
-                    return {
-                        base: words.slice(0, -1).join(' '),
-                        prep: lastWord
-                    };
-                }
-            }
-            return {
-                base: trimmed,
-                prep: ''
-            };
-        });
-
-        const firstPrep = parts[0].prep;
-        const allSamePrep = firstPrep !== '' && parts.every(p => p.prep === firstPrep);
-
-        if (allSamePrep) {
-            const bases = parts.map(p => p.base);
-            let joinedBases = '';
-            if (bases.length === 2) {
-                joinedBases = `${bases[0]} and ${bases[1]}`;
-            } else {
-                joinedBases = `${bases.slice(0, -1).join(', ')}, and ${bases[bases.length - 1]}`;
-            }
-            return `${joinedBases} ${firstPrep}`;
-        } else {
-            const fullPhrases = parts.map(p => p.prep ? `${p.base} ${p.prep}` : p.base);
-            if (fullPhrases.length === 2) {
-                return `${fullPhrases[0]} and ${fullPhrases[1]}`;
-            } else {
-                return `${fullPhrases.slice(0, -1).join(', ')}, and ${fullPhrases[fullPhrases.length - 1]}`;
-            }
+    const handleZoomIn = () => {
+        if (svgRef.current && zoomRef.current) {
+            d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
         }
     };
 
-    const triggerNodeHover = (d: Node, isProgrammatic = false) => {
-        if (isProgrammatic && isPassiveSelectionRef.current) return;
-        const dimmedSet = dimmedSceneIdsRef.current;
-        if (isNodeInDimmedScene(d, dimmedSet)) return;
-        setHoveredNodeId(d.id);
-        hoveredNodeIdRef.current = d.id;
-        activeHoveredNodeRef.current = d;
-
-        const hasSceneNs = String(d.id).includes('::');
-        const isFirstDegreeLink = (l: any) => {
-            const sId = nodeId(l.source);
-            const tId = nodeId(l.target);
-            if (hasSceneNs) {
-                return sId.toLowerCase() === d.id.toLowerCase() || tId.toLowerCase() === d.id.toLowerCase();
-            }
-            return isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
-        };
-
-        const firstDegreeLinks = visibleLinks.filter(isFirstDegreeLink);
-
-        const neighborNodeIds = new Set<string>();
-        const dCanonId = stripSceneNamespace(d.canonicalId || d.id);
-        neighborNodeIds.add(d.id.toLowerCase());
-        if (!hasSceneNs) {
-            neighborNodeIds.add(normalizeArtistId(dCanonId));
-        }
-        firstDegreeLinks.forEach(l => {
-            const sId = nodeId(l.source);
-            const tId = nodeId(l.target);
-            neighborNodeIds.add(sId.toLowerCase());
-            neighborNodeIds.add(tId.toLowerCase());
-            if (!hasSceneNs) {
-                neighborNodeIds.add(normalizeArtistId(stripSceneNamespace(sId)));
-                neighborNodeIds.add(normalizeArtistId(stripSceneNamespace(tId)));
-            }
-        });
-
-        if (svgRef.current) {
-            const svg = d3.select(svgRef.current);
-
-            // Highlight connected visual lines and dim others
-            svg.selectAll<SVGLineElement, Link>("line.visual-line")
-                .transition().duration(200)
-                .attr("stroke", (l: any) => {
-                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return "#e4e4e7";
-                    const isConnected = isFirstDegreeLink(l);
-                    return isConnected ? "#F6E468" : "#e4e4e7";
-                })
-                .attr("stroke-opacity", (l: any) => {
-                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return 0.05;
-                    const isConnected = isFirstDegreeLink(l);
-                    return isConnected ? 0.9 : 0.05;
-                });
-
-            // Highlight connected Cross-Scene Bridge Lines on active node hover
-            svg.selectAll<SVGPathElement, Link>("path.bridge-visual-line")
-                .transition().duration(200)
-                .attr("stroke", (l: any) => {
-                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return "#e4e4e7";
-                    const isConnected = isFirstDegreeLink(l);
-                    return isConnected ? "#F6E468" : "#e4e4e7";
-                })
-                .attr("stroke-opacity", (l: any) => {
-                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return 0.05;
-                    const isConnected = isFirstDegreeLink(l);
-                    return isConnected ? 0.95 : 0.05;
-                })
-                .attr("stroke-width", (l: any) => {
-                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return 1.2;
-                    const isConnected = isFirstDegreeLink(l);
-                    return isConnected ? 2.0 : 1.2;
-                });
-
-            const isNodeInHoverSpotlight = (n: Node) => {
-                const nCanon = stripSceneNamespace(n.canonicalId || n.id);
-                return hasSceneNs
-                    ? neighborNodeIds.has(n.id.toLowerCase())
-                    : (neighborNodeIds.has(n.id.toLowerCase()) || neighborNodeIds.has(normalizeArtistId(nCanon)));
-            };
-
-            // Spotlight constellation nodes and dim others
-            const allNodesSel = svg.selectAll<SVGGElement, Node>("g.node-element");
-            allNodesSel
-                .transition().duration(200)
-                .style("opacity", (n: any) => {
-                    if (isNodeInDimmedScene(n, dimmedSet)) return 0.05;
-                    const nodeType = n.type as FilterKeys;
-                    const isFilteredOut = n.type !== 'artist' && 
-                                          Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
-                                          !activeFilters[nodeType];
-                    if (isFilteredOut) return 0.1;
-                    return isNodeInHoverSpotlight(n) ? 1 : 0.15;
-                });
-
-            // Elevate spotlighted labels (including contextual metadata) to full brightness on hover
-            allNodesSel.select("text.node-label")
-                .transition().duration(200)
-                .attr("fill", (n: Node) => {
-                    if (isNodeInHoverSpotlight(n)) return isNodeSeedInOwnScene(n, seedArtists) ? "#F6E468" : "#ffffff";
-                    if (isNodeSeedInOwnScene(n, seedArtists)) return "#F6E468";
-                    return (n.type === 'artist' || n.type === 'label') ? "#e4e4e7" : "#a1a1aa";
-                })
-                .attr("opacity", (n: Node) => isNodeInHoverSpotlight(n) ? 1 : ((n.type === 'artist' || n.type === 'label') ? 1 : 0.8));
-
-            if (d.type === 'artist') {
-                const isDirectNodeMatch = (id: string) =>
-                    id === d.id || (!String(d.id).includes('::') && isSameNodeId(id, d.id));
-                const directArtistLinks = visibleLinks.filter(l => {
-                    const sId = nodeId(l.source);
-                    const tId = nodeId(l.target);
-                    if (!isDirectNodeMatch(sId) && !isDirectNodeMatch(tId)) return false;
-                    const otherId = isDirectNodeMatch(sId) ? tId : sId;
-                    const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
-                    return otherNode?.type === 'artist';
-                });
-
-                // Aggregate all artist connections and group them
-                const sourceDisplayLabel = toDisplayLabel(d);
-                const fullNodesForFallback = (data?.nodes || visibleNodes).map(n => ({
-                    id: n.id,
-                    type: n.type,
-                    label: toDisplayLabel(n),
-                }));
-                const fullLinksForFallback = data?.links || visibleLinks;
-
-                const connectionsByArtist = new Map<string, { node: Node; contexts: string[]; legacyContext?: string; isBridge?: boolean }>();
-                directArtistLinks.forEach(l => {
-                    const sId = nodeId(l.source);
-                    const tId = nodeId(l.target);
-                    const isSource = isDirectNodeMatch(sId);
-                    const otherId = isSource ? tId : sId;
-                    const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
-                    if (!otherNode) return;
-                    
-                    const normOtherId = otherNode.id;
-                    const isBridgeLink = Boolean(l.isCrossSceneBridge) || Boolean(d.sceneId && otherNode.sceneId && d.sceneId !== otherNode.sceneId);
-                    if (!connectionsByArtist.has(normOtherId)) {
-                        connectionsByArtist.set(normOtherId, { node: otherNode, contexts: [], isBridge: isBridgeLink });
-                    }
-                    const entry = connectionsByArtist.get(normOtherId)!;
-                    if (isBridgeLink) {
-                        entry.isBridge = true;
-                    }
-                    const rawContextStr = isSource ? l.forwardContext : l.inverseContext;
-                    const sanitizedContext = sanitizeDirectionalLinkContext(
-                        rawContextStr,
-                        sourceDisplayLabel,
-                        toDisplayLabel(otherNode)
-                    );
-                    if (sanitizedContext && !entry.contexts.includes(sanitizedContext)) {
-                        entry.contexts.push(sanitizedContext);
-                    } else if (l.context && !entry.legacyContext) {
-                        entry.legacyContext = l.context;
-                    }
-                });
-
-                const connections = Array.from(connectionsByArtist.values()).map(({ node, contexts, legacyContext, isBridge }) => {
-                    const resolvedContexts = contexts.length > 0
-                        ? contexts
-                        : [
-                            resolveFallbackRelationContext({
-                                sourceNode: { id: d.id, type: d.type, label: sourceDisplayLabel },
-                                targetNode: { id: node.id, type: node.type, label: toDisplayLabel(node) },
-                                allNodes: fullNodesForFallback,
-                                allLinks: fullLinksForFallback,
-                                synthesisRationale: data?.synthesisRationale,
-                                legacyLinkContext: legacyContext,
-                            })
-                          ];
-                    const rawContext = formatRelationContext(resolvedContexts);
-                    const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
-                    const isCrossScenePeer = isBridge || Boolean(d.sceneId && node.sceneId && d.sceneId !== node.sceneId);
-                    const targetName = isCrossScenePeer
-                        ? resolveCrossSceneTargetName(node, scenesRef.current, toDisplayLabel(node))
-                        : toDisplayLabel(node);
-                    return {
-                        context: capitalizedContext,
-                        targetName,
-                        isBridge: Boolean(isCrossScenePeer)
-                    };
-                });
-
-                // Prioritize cross-scene bridge relationships first so they are never clipped below the fold
-                connections.sort((a, b) => {
-                    if (a.isBridge && !b.isBridge) return -1;
-                    if (!a.isBridge && b.isBridge) return 1;
-                    return 0;
-                });
-
-                // Fetch DNA/Recommendation Reason using canonical ID
-                const canonId = stripSceneNamespace(d.canonicalId || d.id);
-                const normId = normalizeArtistId(canonId);
-                const nodeDna = d.narrativeSnippet ||
-                                detailsCache?.get(canonId)?.recommendationReason ||
-                                detailsCache?.get(canonId.toLowerCase())?.recommendationReason ||
-                                detailsCache?.get(normId)?.recommendationReason ||
-                                detailsCache?.get(d.id)?.recommendationReason;
-
-                // Check raw connections for fallback type
-                const hasRawConnections = data.links.some(l => {
-                    const sId = nodeId(l.source);
-                    const tId = nodeId(l.target);
-                    return sId === d.id || tId === d.id;
-                });
-
-                let fallbackMessage = "";
-                if (directArtistLinks.length === 0 && !hasRawConnections) {
-                    fallbackMessage = "[Indirect recommendation]";
-                }
-
-                if ((connections.length > 0 || nodeDna || fallbackMessage) && !isProgrammatic) {
-                    const transform = d3.zoomTransform(svgRef.current);
-                    const canvasX = transform.applyX(d.x ?? 0);
-                    const canvasY = transform.applyY(d.y ?? 0);
-                    const containerRect = containerRef.current?.getBoundingClientRect();
-                    const screenX = containerRect ? containerRect.left + canvasX : canvasX;
-                    const screenY = containerRect ? containerRect.top + canvasY : canvasY;
-
-                    setHoveredLink({
-                        sourceId: toDisplayLabel(d),
-                        connections: connections.length > 0 ? connections : undefined,
-                        fallbackMessage: fallbackMessage || undefined,
-                        dna: nodeDna || undefined,
-                        x: canvasX,
-                        y: canvasY,
-                        screenX,
-                        screenY
-                    });
-                } else {
-                    setHoveredLink(null);
-                }
-            } else {
-                setHoveredLink(null);
-            }
-        }
-    };
-
-    const clearNodeHover = () => {
-        const dimmedSet = dimmedSceneIdsRef.current;
-        const rawActiveNode = !isPassiveSelectionRef.current ? (selectedNodeRef.current || peekedNodeRef.current) : null;
-        const activeNode = rawActiveNode && !isNodeInDimmedScene(rawActiveNode, dimmedSet) ? rawActiveNode : null;
-        if (activeNode) {
-            triggerNodeHover(activeNode, true);
-            setHoveredLink(null);
-            return;
-        }
-
-        setHoveredNodeId(null);
-        activeHoveredNodeRef.current = null;
-        setHoveredLink(null);
-
-        if (svgRef.current) {
-            const svg = d3.select(svgRef.current);
-
-            // Restore node opacities
-            const isSearchActive = searchQueryRef.current.trim().length > 0;
-            const hlNodes = highlightedNodesRef.current;
-            const selHighlight = rawActiveNode && isNodeInDimmedScene(rawActiveNode, dimmedSet) ? null : selectionHighlightIdsRef.current;
-
-            const allNodesSel = svg.selectAll<SVGGElement, Node>("g.node-element");
-            allNodesSel
-                .transition().duration(200)
-                .style("opacity", (n: any) => {
-                    if (isNodeInDimmedScene(n, dimmedSet)) return 0.05;
-                    const nodeType = n.type as FilterKeys;
-                    const isFilteredOut = n.type !== 'artist' && 
-                                          Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
-                                          !activeFilters[nodeType];
-                    if (isFilteredOut) return 0.05;
-
-                    if (isSearchActive) {
-                        if (hlNodes.size === 0) return 0.05;
-                        const isMatch = hlNodes.has(n.id) || 
-                                        hlNodes.has(String(n.id).toLowerCase()) || 
-                                        hlNodes.has(normalizeArtistId(String(n.id)));
-                        return isMatch ? 1 : 0.05;
-                    }
-
-                    if (selHighlight) return selHighlight.has(n.id) ? 1 : 0.1;
-                    return 1;
-                });
-
-            allNodesSel.select("text.node-label")
-                .transition().duration(200)
-                .attr("fill", (n: Node) => {
-                    if (isNodeSeedInOwnScene(n, seedArtists)) return "#F6E468";
-                    const isSearchMatch = isSearchActive && (hlNodes.has(n.id) || hlNodes.has(String(n.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(n.id))));
-                    const isSelMatch = Boolean(selHighlight && selHighlight.has(n.id));
-                    if (isSearchMatch || isSelMatch) return "#ffffff";
-                    return (n.type === 'artist' || n.type === 'label') ? "#e4e4e7" : "#a1a1aa";
-                })
-                .attr("opacity", (n: Node) => {
-                    const isSearchMatch = isSearchActive && (hlNodes.has(n.id) || hlNodes.has(String(n.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(n.id))));
-                    const isSelMatch = Boolean(selHighlight && selHighlight.has(n.id));
-                    if (isSearchMatch || isSelMatch) return 1;
-                    return (n.type === 'artist' || n.type === 'label') ? 1 : 0.8;
-                });
-
-            // Restore visual line strokes and 2-tier resting opacities
-            svg.selectAll<SVGLineElement, Link>("line.visual-line")
-                .transition().duration(200)
-                .attr("stroke", (l: any) => {
-                    if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return "#e4e4e7";
-                    if (isSearchActive) {
-                        const s = typeof l.source === 'string' ? l.source : l.source.id;
-                        const t = typeof l.target === 'string' ? l.target : l.target.id;
-                        const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
-                        const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
-                        return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
-                    }
-                    return "#e4e4e7";
-                })
-                .attr("stroke-opacity", (l: any) => {
-                    const s = typeof l.source === 'string' ? l.source : l.source.id;
-                    const t = typeof l.target === 'string' ? l.target : l.target.id;
-                    
-                    const sNode = visibleNodes.find(n => n.id === s);
-                    const tNode = visibleNodes.find(n => n.id === t);
-                    if (isLinkInDimmedScene(l, sNode, tNode, dimmedSet)) return 0.05;
-                    const isLinkFilteredOut = (node: Node | undefined) => {
-                        if (!node || node.type === 'artist') return false;
-                        const nodeType = node.type as FilterKeys;
-                        return Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && !activeFilters[nodeType];
-                    };
-                    if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
-
-                    if (isSearchActive) {
-                        if (hlNodes.size === 0) return 0.05;
-                        const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
-                        const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
-                        return (isMatchS && isMatchT) ? 0.6 : 0.05;
-                    }
-
-                    if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
-                    return computeRestingLinkOpacity(l, sNode, tNode, nodeDegreesRef.current);
-                });
-
-            // Restore Cross-Scene Bridge Lines to neutral grey (or 0.05 if either endpoint sits in a dimmed scene)
-            svg.selectAll<SVGPathElement, Link>("path.bridge-visual-line")
-                .transition().duration(200)
-                .attr("stroke", "#e4e4e7")
-                .attr("stroke-width", 1.2)
-                .attr("stroke-opacity", (l: any) => isLinkInDimmedScene(l, undefined, undefined, dimmedSet) ? 0.05 : 0.35);
-        }
-    };
-
-    triggerNodeHoverRef.current = triggerNodeHover;
-    clearNodeHoverRef.current = clearNodeHover;
-    
-    let container = svg.select<SVGGElement>("g.main-container");
-    if (container.empty()) {
-        svg.selectAll("*").remove(); 
-        // Glow filter removed to maintain true color fidelity
-        container = svg.append("g").attr("class", "main-container");
-        container.append("g").attr("class", "link-group").attr("stroke", "#e4e4e7");
-        container.append("g").attr("class", "node-group");
-        const zoom = d3.zoom<SVGSVGElement, unknown>()
-            .scaleExtent([0.1, 4])
-            .on("zoom", (event) => { 
-                container.attr("transform", event.transform); 
-                
-                // Update hovered link/node coordinates during zoom/pan
-                if (activeHoveredLinkRef.current && svgRef.current) {
-                    const d = activeHoveredLinkRef.current.link;
-                    const x1 = (d.source as any).x;
-                    const y1 = (d.source as any).y;
-                    const x2 = (d.target as any).x;
-                    const y2 = (d.target as any).y;
-                    if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-                        const midX = (x1 + x2) / 2;
-                        const midY = (y1 + y2) / 2;
-                        setHoveredLink(prev => prev ? {
-                            ...prev,
-                            x: event.transform.applyX(midX),
-                            y: event.transform.applyY(midY)
-                        } : null);
-                    }
-                } else if (activeHoveredNodeRef.current && svgRef.current) {
-                    const n = activeHoveredNodeRef.current;
-                    if (!isNaN(n.x!) && !isNaN(n.y!)) {
-                        const canvasX = event.transform.applyX(n.x!);
-                        const canvasY = event.transform.applyY(n.y!);
-                        const containerRect = containerRef.current?.getBoundingClientRect();
-                        const screenX = containerRect ? containerRect.left + canvasX : canvasX;
-                        const screenY = containerRect ? containerRect.top + canvasY : canvasY;
-                        setHoveredLink(prev => prev ? {
-                            ...prev,
-                            x: canvasX,
-                            y: canvasY,
-                            screenX,
-                            screenY
-                        } : null);
-                    }
-                }
-            })
-            .on("start", (event) => {
-                // Disable auto-tracking if the user initiates a manual pan/zoom
-                if (event.sourceEvent) {
-                    isTrackingRef.current = false;
-                    targetNodeIdRef.current = null;
-                }
-            });
-        svg.call(zoom).on("dblclick.zoom", null);
-        zoomRef.current = zoom;
-
-        // V45.1 (Phase B2.4): Execute initial camera centering immediately AFTER zoomRef.current is bound
-        if (!hasInitialCentered.current && visibleNodes.length > 0) {
-            const sceneCount = detectedSceneCount;
-            let centered = false;
-            if (sceneCount > 1) {
-                centered = focusSceneCluster(activeSceneId || 'scene-1', 0);
-            } else {
-                centered = fitGraphToScreen(0);
-            }
-            if (centered) {
-                hasInitialCentered.current = true;
-            }
-        }
-        
-        // Custom conditional double-click zoom to restore background zooming without hijacking mobile node taps
-        svg.on("dblclick", (event) => {
-            const isNode = event.target && event.target.closest && event.target.closest('.node-element');
-            if (isNode) return;
-            d3.select(svgRef.current).transition().duration(250).call(zoom.scaleBy, event.shiftKey ? 0.5 : 2, d3.pointer(event));
-        });
-    }
-
-    svg.on("click", (event) => { 
-        if (event.target === svgRef.current) {
+    const handleZoomOut = () => {
+        if (svgRef.current && zoomRef.current) {
             isTrackingRef.current = false;
-            targetNodeIdRef.current = null;
-            onNodeClickRef.current(null);
-            clearNodeHover();
-            if (activeHoveredNodeRef.current || activeHoveredLinkRef.current) {
-                setHoveredLink(null);
-            }
+            d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 0.75);
         }
-    });
+    };
 
-    svg.on("mouseleave", () => {
-        if (!isSmallScreen) {
-            clearNodeHover();
+    const handleCenter = () => {
+        if (fitGraphToScreenRef.current) {
+            fitGraphToScreenRef.current(750);
         }
-    });
+    };
 
-    if (!simulationRef.current) {
-        const simulation = d3.forceSimulation<Node, Link>()
-            .force("link", d3.forceLink<Node, Link>().id((d: any) => String(d.id)).strength(0.3))
-            .force("charge", createSceneIsolatedChargeForce(() => -600))
-            .force("collide", d3.forceCollide().radius(40))
-            .velocityDecay(0.36) 
-            .alphaMin(0.001)
-            .alphaDecay(0.022)
-            .on("tick", () => {
-                if (!svgRef.current) return;
-                const currentContainer = d3.select(svgRef.current).select(".main-container");
-                if (currentContainer.empty()) return;
+    const { visibleNodes, visibleLinks } = useMemo(() => {
+        if (!data) return { visibleNodes: [], visibleLinks: [] };
+        const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
 
-                 currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
-                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
-                    .attr("x1", (d: any) => {
-                        const val = (d.source as any).x;
-                        return isNaN(val) ? 0 : val;
-                    })
-                    .attr("y1", (d: any) => {
-                        const val = (d.source as any).y;
-                        return isNaN(val) ? 0 : val;
-                    })
-                    .attr("x2", (d: any) => {
-                        const val = (d.target as any).x;
-                        return isNaN(val) ? 0 : val;
-                    })
-                    .attr("y2", (d: any) => {
-                        const val = (d.target as any).y;
-                        return isNaN(val) ? 0 : val;
-                    });
+        // 1. Identify visible artists based on filters (Seed/Recommended)
+        const visibleArtists = data.nodes.filter(node => {
+            if (node.type !== 'artist') return false;
+            const isSeed = isNodeSeedInOwnScene(node, seedArtists);
+            return (isSeed && activeFilters.seed) || (!isSeed && activeFilters.recommended);
+        });
+        const visibleArtistIds = new Set<string>(visibleArtists.map(n => String(n.id).toLowerCase()));
 
-                 currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
-                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
-                    .attr("x1", (d: any) => {
-                        const val = (d.source as any).x;
-                        return isNaN(val) ? 0 : val;
-                    })
-                    .attr("y1", (d: any) => {
-                        const val = (d.source as any).y;
-                        return isNaN(val) ? 0 : val;
-                    })
-                    .attr("x2", (d: any) => {
-                        const val = (d.target as any).x;
-                        return isNaN(val) ? 0 : val;
-                    })
-                    .attr("y2", (d: any) => {
-                        const val = (d.target as any).y;
-                        return isNaN(val) ? 0 : val;
-                    });
+        // Standard shared-node graph logic (Reverted from duplication)
+        const connectedNodeIds = new Set<string>(visibleArtistIds);
+        data.links.forEach(link => {
+            const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id).toLowerCase();
+            const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id).toLowerCase();
+            if (visibleArtistIds.has(sourceId)) connectedNodeIds.add(targetId);
+            if (visibleArtistIds.has(targetId)) connectedNodeIds.add(sourceId);
+        });
+        const finalVisibleNodes = Array.from(
+            data.nodes.reduce((acc, node) => {
+                const nodeIdStr = String(node.id);
+                const nodeIdStrLower = nodeIdStr.toLowerCase();
+                if (!connectedNodeIds.has(nodeIdStrLower)) return acc;
 
-                 currentContainer.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
-                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
-                    .attr("d", (d: any) => computeBridgePathD(d, visibleNodesRef.current));
+                let isVisible = true;
+                if (node.type === 'artist') {
+                    isVisible = visibleArtistIds.has(nodeIdStrLower);
+                }
 
-                  // Update active hovered link/node coordinates
-                  if (activeHoveredLinkRef.current && svgRef.current) {
-                      const d = activeHoveredLinkRef.current.link;
-                      const x1 = (d.source as any).x;
-                      const y1 = (d.source as any).y;
-                      const x2 = (d.target as any).x;
-                      const y2 = (d.target as any).y;
-                      if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
-                          const midX = (x1 + x2) / 2;
-                          const midY = (y1 + y2) / 2;
-                          const transform = d3.zoomTransform(svgRef.current);
-                          setHoveredLink(prev => prev ? {
-                              ...prev,
-                              x: transform.applyX(midX),
-                              y: transform.applyY(midY)
-                          } : null);
-                      }
-                  } else if (activeHoveredNodeRef.current && svgRef.current) {
-                      const n = activeHoveredNodeRef.current;
-                      if (!isNaN(n.x!) && !isNaN(n.y!)) {
-                          const transform = d3.zoomTransform(svgRef.current);
-                          const canvasX = transform.applyX(n.x!);
-                          const canvasY = transform.applyY(n.y!);
-                          const containerRect = containerRef.current?.getBoundingClientRect();
-                          const screenX = containerRect ? containerRect.left + canvasX : canvasX;
-                          const screenY = containerRect ? containerRect.top + canvasY : canvasY;
-                          setHoveredLink(prev => prev ? {
-                              ...prev,
-                              x: canvasX,
-                              y: canvasY,
-                              screenX,
-                              screenY
-                          } : null);
-                      }
-                  }
-                
-                currentContainer.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")
-                    .style("display", (d: any) => (isNaN(d.x) || isNaN(d.y)) ? "none" : null)
-                    .attr("transform", (d: any) => {
-                        const x = isNaN(d.x) ? 0 : (d.x ?? 0);
-                        const y = isNaN(d.y) ? 0 : (d.y ?? 0);
-                        return `translate(${x},${y})`;
-                    });
+                if (isVisible && !acc.has(nodeIdStrLower)) {
+                    acc.set(nodeIdStrLower, node);
+                }
+                return acc;
+            }, new Map<string, Node>()).values()
+        );
+        const finalVisibleNodeIds = new Set(finalVisibleNodes.map(n => String((n as Node).id).toLowerCase()));
+        const finalVisibleLinks = data.links
+            .filter(link => {
+                if (!link.source || !link.target) return false;
+                const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id || '').toLowerCase();
+                const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id || '').toLowerCase();
+                return sourceId && targetId && finalVisibleNodeIds.has(sourceId) && finalVisibleNodeIds.has(targetId);
             })
-            .on("end", () => {
-                // [Rule 21] & [Rule 44]: When all artist/label nodes entered this pass already pinned
-                // from Coordinate Memory (1-tick render wake or Legend pill filter toggle),
-                // skip post-settle overlap mutation, rounding/pinning, and read-only Firestore writes.
-                // Do NOT return early so onSimulationCompleteRef and attemptInitialCentering() below always execute.
-                if (!wasAllPinnedAtStartRef.current) {
-                    const nodes = simulation.nodes();
-                    const currentLinks = (simulation.force("link") as d3.ForceLink<Node, Link>)?.links() || [];
-
-                    // Resolve any remaining node and text-label collisions across clusters before pinning coordinates ([Rule 21])
-                    resolveSceneNodeOverlaps(nodes, currentLinks);
-
-                    // Pin all nodes once the simulation settles to maintain absolute coordinate stability
-                    nodes.forEach(n => {
-                        if (n.x !== undefined && n.y !== undefined) {
-                            n.x = roundCoord2(n.x);
-                            n.y = roundCoord2(n.y);
-                            n.fx = n.x;
-                            n.fy = n.y;
-                        }
-                    });
-
-                    // Flush updated post-overlap coordinates directly to the live SVG DOM elements
-                    // so the settled visual layout immediately matches the saved canvasLayout pixel-for-pixel
-                    if (svgRef.current) {
-                        const currentContainer = d3.select(svgRef.current).select(".main-container");
-                        if (!currentContainer.empty()) {
-                            currentContainer.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")
-                                .style("display", (d: any) => (isNaN(d.x) || isNaN(d.y)) ? "none" : null)
-                                .attr("transform", (d: any) => {
-                                    const x = isNaN(d.x) ? 0 : (d.x ?? 0);
-                                    const y = isNaN(d.y) ? 0 : (d.y ?? 0);
-                                    return `translate(${x},${y})`;
-                                });
-
-                            currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
-                                .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
-                                .attr("x1", (d: any) => {
-                                    const val = (d.source as any).x;
-                                    return isNaN(val) ? 0 : val;
-                                })
-                                .attr("y1", (d: any) => {
-                                    const val = (d.source as any).y;
-                                    return isNaN(val) ? 0 : val;
-                                })
-                                .attr("x2", (d: any) => {
-                                    const val = (d.target as any).x;
-                                    return isNaN(val) ? 0 : val;
-                                })
-                                .attr("y2", (d: any) => {
-                                    const val = (d.target as any).y;
-                                    return isNaN(val) ? 0 : val;
-                                });
-
-                            currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
-                                .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
-                                .attr("x1", (d: any) => {
-                                    const val = (d.source as any).x;
-                                    return isNaN(val) ? 0 : val;
-                                })
-                                .attr("y1", (d: any) => {
-                                    const val = (d.source as any).y;
-                                    return isNaN(val) ? 0 : val;
-                                })
-                                .attr("x2", (d: any) => {
-                                    const val = (d.target as any).x;
-                                    return isNaN(val) ? 0 : val;
-                                })
-                                .attr("y2", (d: any) => {
-                                    const val = (d.target as any).y;
-                                    return isNaN(val) ? 0 : val;
-                                });
-
-                            currentContainer.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
-                                .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
-                                .attr("d", (d: any) => computeBridgePathD(d, visibleNodesRef.current));
-                        }
-                    }
-
-                    // Phase A — Coordinate Memory: collect ALL settled node positions
-                    // (artists, labels, and all metadata petals: genre, country, founded).
-                    // Zero Coordinate Amnesia requires every node type to be pinned.
-                    if (onCoordinatesSettledRef.current) {
-                        const settledLayout: CanvasNodeRef[] = nodes
-                            .filter(n => n.fx !== undefined && n.fx !== null
-                                      && n.fy !== undefined && n.fy !== null)
-                            .map(n => ({
-                                nodeId: n.id,
-                                x: roundCoord2(n.x as number),
-                                y: roundCoord2(n.y as number),
-                                fx: n.fx !== undefined && n.fx !== null ? roundCoord2(n.fx) : null,
-                                fy: n.fy !== undefined && n.fy !== null ? roundCoord2(n.fy) : null,
-                            }));
-                        if (settledLayout.length > 0) {
-                            onCoordinatesSettledRef.current(settledLayout);
-                        }
-                    }
-                }
-
-                // Notify parent that simulation has settled regardless of initial zoom state
-                if (onSimulationCompleteRef.current) {
-                    onSimulationCompleteRef.current();
-                }
-
-                const attemptInitialCentering = () => {
-                    if (dimensionsRef.current.width === 0 || !svgRef.current || !zoomRef.current) {
-                        return false;
-                    }
-                    const sceneCount = detectedSceneCount;
-                    let centered = false;
-                    if (sceneCount > 1 && focusSceneClusterRef.current) {
-                        centered = focusSceneClusterRef.current(activeSceneId || 'scene-1', 0);
-                    } else if (fitGraphToScreenRef.current) {
-                        centered = fitGraphToScreenRef.current(0);
-                        if (sceneCount <= 1) {
-                            setTimeout(() => {
-                                if (svgRef.current && zoomRef.current) {
-                                    d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
-                                }
-                            }, 50);
-                        }
-                    }
-                    return centered;
+            .map(link => {
+                // Preserve object references if they exist, otherwise use IDs
+                // This prevents the 'undefined' coordinate bug in the tick function
+                return {
+                    ...link,
+                    source: link.source,
+                    target: link.target
                 };
+            });
+        return { visibleNodes: finalVisibleNodes, visibleLinks: finalVisibleLinks };
+    }, [data, activeFilters, seedArtists]);
 
-                if (!hasInitialCentered.current) {
-                    setTimeout(() => {
-                        const centered = attemptInitialCentering();
-                        if (centered) {
-                            hasInitialCentered.current = true;
-                        }
-                    }, 50);
+    const visibleNodesRef = useRef(visibleNodes);
+    const nodeDegreesRef = useRef<Map<string, number>>(new Map());
+    const prevArtistIdsRef = useRef<Set<string>>(new Set());
+    const prevLayoutSignatureRef = useRef<string>("");
+    useEffect(() => {
+        visibleNodesRef.current = visibleNodes;
+    }, [visibleNodes, selectedNode, peekedNode]);
+
+    const selectionHighlightIds = useMemo(() => {
+        if (isPassiveSelection) return null;
+        const activeInteractionNode = selectedNode || peekedNode;
+        if (!activeInteractionNode) return null;
+        const selectedIdStr = String(activeInteractionNode.id);
+        const hasSceneNs = selectedIdStr.includes('::');
+        const canonSelected = stripSceneNamespace(activeInteractionNode.canonicalId || selectedIdStr);
+
+        const highlighted = new Set<string>([
+            selectedIdStr,
+            selectedIdStr.toLowerCase(),
+        ]);
+
+        if (!hasSceneNs) {
+            highlighted.add(normalizeArtistId(selectedIdStr));
+            highlighted.add(canonSelected);
+            highlighted.add(canonSelected.toLowerCase());
+            highlighted.add(normalizeArtistId(canonSelected));
+            visibleNodes.forEach(n => {
+                if (isSameNodeId(n.id, selectedIdStr)) {
+                    highlighted.add(String(n.id));
+                    highlighted.add(String(n.id).toLowerCase());
                 }
             });
-        simulationRef.current = simulation;
-    }
-
-    const simulation = simulationRef.current;
-
-    // Map of artist positions for easy lookup
-    const artistPositions = new Map<string, { x: number, y: number }>();
-    visibleNodes.forEach(n => {
-        if (n.type === 'artist' && n.x !== undefined && !isNaN(n.x) && n.y !== undefined && !isNaN(n.y)) {
-            artistPositions.set(n.id, { x: n.x, y: n.y });
         }
-    });
 
-    // --- LIVE COORDINATE HANDSHAKE ---
-    // Extract the live coordinates from the current simulation state before we overwrite them.
-    // This prevents stale JSON coordinates from 'teleporting' active nodes back in time.
-    // Guard against scene re-indexing collisions (e.g., scene-5 being re-indexed to scene-3):
-    // If the scene structure or order changed, discard live physics state so incoming composite
-    // coordinates are honored instead of stale simulation coordinates from a previous scene.
-    const currentSceneFingerprint = scenes.map(s => {
-      const sid = s.sceneId || s.id || '';
-      const seeds = s.curatedSeedArtists || s.seedArtists || '';
-      const custom = s.customName || '';
-      const filtersSig = s.discoveryFilters ? JSON.stringify(s.discoveryFilters) : '';
-      const firstNode = s.graphData?.nodes?.[0] ? stripSceneNamespace(s.graphData.nodes[0].canonicalId || s.graphData.nodes[0].id) : '';
-      const nodeCount = s.graphData?.nodes?.length ?? 0;
-      return `${sid}:${seeds}:${custom}:${filtersSig}:${nodeCount}:${firstNode}`;
-    }).join('|');
-    const isSceneStructureChanged = lastSceneFingerprintRef.current !== currentSceneFingerprint;
-    lastSceneFingerprintRef.current = currentSceneFingerprint;
+        const primaryConnections = new Set<string>();
+        visibleLinks.forEach(link => {
+            const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id);
+            const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
+            const canonSource = stripSceneNamespace(sourceId);
+            const canonTarget = stripSceneNamespace(targetId);
 
-    const currentLiveNodes = isSceneStructureChanged ? [] : simulation.nodes();
-    const livePhysicsState = new Map<string, { x?: number, y?: number, vx?: number, vy?: number, fx?: number | null, fy?: number | null }>();
-    currentLiveNodes.forEach(n => {
-        livePhysicsState.set(n.id, { x: n.x, y: n.y, vx: n.vx, vy: n.vy, fx: n.fx, fy: n.fy });
-    });
+            let isSourceSelected = false;
+            let isTargetSelected = false;
 
-    visibleNodes.forEach(n => {
-        // If the node already exists in the live physics engine, verify it is within its scene's territory before inheriting
-        const liveState = livePhysicsState.get(n.id);
-        if (liveState && liveState.x !== undefined && liveState.y !== undefined && !isNaN(liveState.x) && !isNaN(liveState.y)) {
-            const nodeSceneIdx = n.sceneIndex ?? 0;
-            const sceneCenter = getSceneCenterOffset(nodeSceneIdx);
-            const dx = Math.abs(liveState.x - sceneCenter.x);
-            const dy = Math.abs(liveState.y - sceneCenter.y);
-            const isWithinTerritory = dx <= SCENE_TERRITORY_MAX_DX && dy <= SCENE_TERRITORY_MAX_DY;
-            if (isWithinTerritory) {
-                n.x = liveState.x;
-                n.y = liveState.y;
-                n.vx = liveState.vx;
-                n.vy = liveState.vy;
-                n.fx = liveState.fx;
-                n.fy = liveState.fy;
-                return; // Skip fallback initialization
+            if (hasSceneNs) {
+                isSourceSelected = sourceId.toLowerCase() === selectedIdStr.toLowerCase();
+                isTargetSelected = targetId.toLowerCase() === selectedIdStr.toLowerCase();
+            } else {
+                isSourceSelected = highlighted.has(sourceId) || highlighted.has(sourceId.toLowerCase()) || highlighted.has(normalizeArtistId(canonSource));
+                isTargetSelected = highlighted.has(targetId) || highlighted.has(targetId.toLowerCase()) || highlighted.has(normalizeArtistId(canonTarget));
             }
-        }
 
-        // --- NEW NODE INITIALIZATION ---
-        if (n.x === undefined || isNaN(n.x) || n.y === undefined || isNaN(n.y)) {
-            // Sprout metadata nodes from their parent artist positions to avoid layout drift
-            if (n.type !== 'artist') {
-                const connectedArtists: { x: number, y: number }[] = [];
-                visibleLinks.forEach(l => {
-                    const s = typeof l.source === 'object' ? l.source.id : l.source;
-                    const t = typeof l.target === 'object' ? l.target.id : l.target;
-                    if (s === n.id && artistPositions.has(t)) {
-                        connectedArtists.push(artistPositions.get(t)!);
-                    } else if (t === n.id && artistPositions.has(s)) {
-                        connectedArtists.push(artistPositions.get(s)!);
-                    }
-                });
+            if (isSourceSelected) {
+                highlighted.add(targetId);
+                highlighted.add(targetId.toLowerCase());
+                primaryConnections.add(targetId);
+                primaryConnections.add(targetId.toLowerCase());
+                if (!hasSceneNs) {
+                    highlighted.add(normalizeArtistId(canonTarget));
+                    primaryConnections.add(normalizeArtistId(canonTarget));
+                }
+            }
+            if (isTargetSelected) {
+                highlighted.add(sourceId);
+                highlighted.add(sourceId.toLowerCase());
+                primaryConnections.add(sourceId);
+                primaryConnections.add(sourceId.toLowerCase());
+                if (!hasSceneNs) {
+                    highlighted.add(normalizeArtistId(canonSource));
+                    primaryConnections.add(normalizeArtistId(canonSource));
+                }
+            }
+        });
+        if (activeInteractionNode.type !== 'artist') return highlighted;
+        visibleLinks.forEach(link => {
+            // When scene-namespaced, do not expand 2nd-degree neighbors through cross-scene bridges
+            // so that the other scene's intra-scene constellation stays dimmed.
+            if (hasSceneNs && link.isCrossSceneBridge) return;
 
-                if (connectedArtists.length > 0) {
-                    const avgX = connectedArtists.reduce((sum, p) => sum + p.x, 0) / connectedArtists.length;
-                    const avgY = connectedArtists.reduce((sum, p) => sum + p.y, 0) / connectedArtists.length;
-                    const sceneCenter = getSceneCenterOffset(n.sceneIndex ?? 0);
-                    // Sprout metadata petals along an outward arc from scene center through parent artist
-                    const outwardAngle = Math.atan2(avgY - sceneCenter.y, avgX - sceneCenter.x);
-                    const typeOffset = n.type === 'founded' ? -0.45 : (n.type === 'genre' ? 0 : 0.45);
-                    const hashOffset = ((String(n.id).charCodeAt(0) % 5) - 2) * 0.08;
-                    const sproutAngle = outwardAngle + typeOffset + hashOffset;
-                    const sproutRadius = n.type === 'founded' ? 65 : (n.type === 'genre' ? 75 : 70);
-                    n.x = avgX + sproutRadius * Math.cos(sproutAngle);
-                    n.y = avgY + sproutRadius * Math.sin(sproutAngle);
-                    n.vx = 0;
-                    n.vy = 0;
+            const sourceId = String(typeof link.source === 'string' ? link.source : (link.source as Node).id);
+            const targetId = String(typeof link.target === 'string' ? link.target : (link.target as Node).id);
+
+            if (hasSceneNs) {
+                const activeSceneId = activeInteractionNode.sceneId;
+                const sourceNode = visibleNodes.find(n => n.id.toLowerCase() === sourceId.toLowerCase());
+                const targetNode = visibleNodes.find(n => n.id.toLowerCase() === targetId.toLowerCase());
+                if (activeSceneId && (sourceNode?.sceneId !== activeSceneId || targetNode?.sceneId !== activeSceneId)) {
                     return;
                 }
             }
 
-            // Fallback placement near the node's own Scene center offset
-            const sceneCenter = getSceneCenterOffset(n.sceneIndex ?? 0);
-            n.x = sceneCenter.x + (Math.random() - 0.5) * 100;
-            n.y = sceneCenter.y + (Math.random() - 0.5) * 100;
-            n.vx = 0;
-            n.vy = 0;
-        }
-    });
+            const isSourcePrimary = primaryConnections.has(sourceId) || primaryConnections.has(sourceId.toLowerCase());
+            const isTargetPrimary = primaryConnections.has(targetId) || primaryConnections.has(targetId.toLowerCase());
 
-    simulation.nodes(visibleNodes);
-    (simulation.force("link") as d3.ForceLink<Node, Link>).links(visibleLinks);
-
-    // Compute connection degrees for all visible nodes
-    // Exclude non-artist metadata links from nodeTotalWeights so high-degree genre/country hubs
-    // (e.g. nu-metal, united-states) do not inflate their collideForce.radius.
-    const visibleNodeById = new Map<string, Node>(visibleNodes.map(n => [n.id, n]));
-    const nodeDegrees = new Map<string, number>();
-    const artistArtistDegrees = new Map<string, number>();
-    const nodeTotalWeights = new Map<string, number>();
-    visibleLinks.forEach(l => {
-        if (l.isCrossSceneBridge) return;
-        const s = typeof l.source === 'object' ? l.source.id : l.source;
-        const t = typeof l.target === 'object' ? l.target.id : l.target;
-        nodeDegrees.set(s, (nodeDegrees.get(s) || 0) + 1);
-        nodeDegrees.set(t, (nodeDegrees.get(t) || 0) + 1);
-
-        const sNode = visibleNodeById.get(s);
-        const tNode = visibleNodeById.get(t);
-        if (sNode?.type === 'artist' && tNode?.type === 'artist') {
-            artistArtistDegrees.set(s, (artistArtistDegrees.get(s) || 0) + 1);
-            artistArtistDegrees.set(t, (artistArtistDegrees.get(t) || 0) + 1);
-            const weight = l.weight ?? 0.5;
-            nodeTotalWeights.set(s, (nodeTotalWeights.get(s) || 0) + weight);
-            nodeTotalWeights.set(t, (nodeTotalWeights.get(t) || 0) + weight);
-        }
-    });
-    nodeDegreesRef.current = nodeDegrees;
-
-    const forceX = d3.forceX<Node>();
-    const forceY = d3.forceY<Node>();
-    const collideForce = simulation.force("collide") as d3.ForceCollide<Node>;
-
-    // 1. Per-Scene Seed Anchoring & Gravity Profiles ([Rule 21])
-    // Compute node count and root count independently per sceneIndex so a 1-root, 34-node scene
-    // settles with identical link distances and gravity whether standalone or in a 5-scene board.
-    const sceneProfiles = new Map<number, ScenePhysicsProfile>();
-    const nodesByScene = new Map<number, Node[]>();
-    for (const n of visibleNodes) {
-        const idx = typeof n.sceneIndex === 'number' ? n.sceneIndex : 0;
-        const list = nodesByScene.get(idx);
-        if (list) list.push(n);
-        else nodesByScene.set(idx, [n]);
-    }
-    nodesByScene.forEach((sceneNodes, idx) => {
-        const sceneNumNodes = sceneNodes.length;
-        const sceneNumSeeds = Math.max(
-            1,
-            sceneNodes.filter((n) => n.type === 'artist' && isNodeSeedInOwnScene(n, seedArtists)).length
-        );
-        const isExpandedLayout = sceneNumSeeds > 1 || sceneNumNodes > 35;
-        const isFullyPinned =
-            sceneNodes.length > 0 &&
-            sceneNodes.every((n) => n.fx !== null && n.fx !== undefined && n.fy !== null && n.fy !== undefined);
-        sceneProfiles.set(idx, {
-            numNodes: sceneNumNodes,
-            numSeeds: sceneNumSeeds,
-            isExpandedLayout,
-            spacingMultiplier: isExpandedLayout ? 1.25 : 1.0,
-            globalGravityStrength: isExpandedLayout ? 0.03 : 0.045,
-            seedStrength: sceneNumSeeds > 1 ? 0.15 : 0.4,
-            isFullyPinned,
+            if (isSourcePrimary) {
+                highlighted.add(targetId);
+                highlighted.add(targetId.toLowerCase());
+                if (!hasSceneNs) highlighted.add(normalizeArtistId(stripSceneNamespace(targetId)));
+            }
+            if (isTargetPrimary) {
+                highlighted.add(sourceId);
+                highlighted.add(sourceId.toLowerCase());
+                if (!hasSceneNs) highlighted.add(normalizeArtistId(stripSceneNamespace(sourceId)));
+            }
         });
-    });
+        return highlighted;
+    }, [selectedNode, peekedNode, visibleLinks, visibleNodes, isPassiveSelection]);
 
-    const getSceneProfile = (d?: Node | null): ScenePhysicsProfile => {
-        const idx = d && typeof d.sceneIndex === 'number' ? d.sceneIndex : 0;
-        return (
-            sceneProfiles.get(idx) || {
-                numNodes: visibleNodes.length,
-                numSeeds: 1,
-                isExpandedLayout: false,
-                spacingMultiplier: 1.0,
-                globalGravityStrength: 0.045,
-                seedStrength: 0.4,
-                isFullyPinned: false,
-            }
-        );
-    };
+    const selectionHighlightIdsRef = useRef<Set<string> | null>(null);
+    useEffect(() => {
+        selectionHighlightIdsRef.current = selectionHighlightIds;
+    }, [selectionHighlightIds]);
 
-    forceX.strength((d: Node) => {
-        const profile = getSceneProfile(d);
-        const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-        return isSeed ? profile.seedStrength : profile.globalGravityStrength;
-    }).x((d: Node) => getSceneCenterOffset(d.sceneIndex ?? 0).x);
+    const highlightedNodesRef = useRef<Set<string>>(new Set());
+    useEffect(() => {
+        highlightedNodesRef.current = highlightedNodes;
+    }, [highlightedNodes]);
 
-    forceY.strength((d: Node) => {
-        const profile = getSceneProfile(d);
-        const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-        return isSeed ? profile.seedStrength : profile.globalGravityStrength;
-    }).y((d: Node) => getSceneCenterOffset(d.sceneIndex ?? 0).y);
+    const searchQueryRef = useRef(searchQuery);
+    useEffect(() => {
+        searchQueryRef.current = searchQuery;
+    }, [searchQuery]);
 
-    simulation.force('center', createSceneIsolatedCenterForce(0.005));
-
-    // 2 & 3. Scene-Isolated Balanced Repulsion: Spaced but cohesive ([Rule 21])
-    simulation.force('charge', createSceneIsolatedChargeForce((d: Node) => {
-        if (d.type === 'artist') {
-            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-            return isSeed ? -800 : -500; // Moderated repulsion
+    useEffect(() => {
+        const trimmedQuery = searchQuery.trim();
+        if (!trimmedQuery) {
+            setHighlightedNodes(new Set());
+            return;
         }
-        
-        // Metadata petals
-        const deg = nodeDegrees.get(d.id) ?? 1;
-        if (deg > 1) {
-            return -60; // Moderated repulsion for shared metadata nodes
-        }
-        
-        // Private petals stay close but have sufficient repulsion to avoid text collisions
-        switch (d.type) {
-            case 'founded': return -100;
-            case 'label': return -110;
-            case 'genre': return -120;
-            case 'country': return -100;
-            default: return -100;
-        }
-    }));
-
-    // 4. Automatic Collision Protection
-    collideForce.radius((d: Node) => {
-        const label = toDisplayLabel(d);
-        const textWidth = label.length * 6.0; 
-        const minRadius = d.type === 'artist' ? 32 : 20;
-        const baseRadius = textWidth / 2 + 10;
-        const centralityBonus = (nodeTotalWeights.get(d.id) || 0) * 5;
-        return Math.max(minRadius, baseRadius + centralityBonus);
-    });
-
-    simulation.force('x', forceX).force('y', forceY);
-
-    // BFS depth computation
-    const depths = computeNodeDepths(visibleNodes, visibleLinks, seedArtists);
-
-    // Condensed dynamic link distances (with per-scene density scaling)
-    (simulation.force("link") as d3.ForceLink<Node, Link>).distance(d => {
-        const s = d.source as Node;
-        const t = d.target as Node;
-        const sceneSpacingMultiplier = getSceneProfile(s).spacingMultiplier;
-
-        // If one of the nodes is a metadata node
-        if (s.type !== 'artist' || t.type !== 'artist') {
-            const metaNode = s.type !== 'artist' ? s : t;
-            const deg = nodeDegrees.get(metaNode.id) ?? 1;
-            
-            if (deg > 1) {
-                return 160 * sceneSpacingMultiplier; // Shared metadata floats wider in complex layouts
+        const query = trimmedQuery.toLowerCase();
+        const newHighlighted = new Set<string>();
+        visibleNodes.forEach(node => {
+            // Mirror Legend filter 1:1: skip nodes inside dimmed scenes so search never pans to ghost clusters
+            if (isNodeInDimmedScene(node, dimmedSceneIdsSet)) return;
+            // Match against both the display label (title-cased) and the raw canonical id slug
+            const canonId = stripSceneNamespace(String(node.canonicalId || node.id));
+            const displayName = (node.label || canonId).replace(/-/g, ' ');
+            if (displayName.toLowerCase().includes(query) || canonId.toLowerCase().includes(query)) {
+                newHighlighted.add(String(node.id));
+                newHighlighted.add(String(node.id).toLowerCase());
+                newHighlighted.add(canonId);
+                newHighlighted.add(canonId.toLowerCase());
+                newHighlighted.add(normalizeArtistId(canonId));
             }
-            
-            // Private petal: keep tight and category-specific
-            switch (metaNode.type) {
-                case 'founded': return 65;
-                case 'label': return 70;
-                case 'genre': return 75;
-                case 'country': return 75;
-                default: return 70;
-            }
-        }
+        });
+        setHighlightedNodes(newHighlighted);
+    }, [searchQuery, visibleNodes, dimmedSceneIdsSet]);
 
-        // Artist-to-Artist links: scale core skeleton using AI semantic weight
-        const weight = d.weight ?? 0.5;
-        return (300 - (weight * 220)) * sceneSpacingMultiplier;
-    });
-
-    // Re-tensioned dynamic link strengths (0 for Cross-Scene Bridge Lines so clusters stay independent)
-    (simulation.force("link") as d3.ForceLink<Node, Link>).strength(d => {
-        if (d.isCrossSceneBridge) return 0;
-        const s = d.source as Node;
-        const t = d.target as Node;
-        
-        if (s.type !== 'artist' || t.type !== 'artist') {
-            const metaNode = s.type !== 'artist' ? s : t;
-            const deg = nodeDegrees.get(metaNode.id) ?? 1;
-            
-            if (deg > 1) {
-                return 0.08; // Holds shared metadata in place without collapsing artists
-            }
-            return 0.35; // Elastic tether lets petals separate from labels without collapsing into artist
-        }
-        
-        const weight = d.weight ?? 0.5;
-        return 0.1 + (weight * 0.6); // Firm semantic tie = rigid; weak tie = elastic
-    });
-
-    const colorScale = d3.scaleOrdinal(zceneCategoricalPalette);
-
-    const getNodeColor = (node: Node) => {
-        if (node.type === 'artist') {
-            return isNodeSeedInOwnScene(node, seedArtists) ? nodeTypeColorMap.seed : nodeTypeColorMap.ai;
-        }
-        if (!node.type) return zceneFallbackColor;
-        return nodeTypeColorMap[node.type] || colorScale(node.type);
-    };
-
-    const nodeElements = container.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")
-        .data(visibleNodes, (d: any) => String(d.id))
-        .join(
-            enter => {
-                const g = enter.append("g")
-                    .attr("class", "node-element")
-                    .attr("cursor", "pointer");
-                
-                // Expanded invisible hit-box for forgiving touch/hover targets
-                g.append("circle")
-                    .attr("class", "hit-box")
-                    .attr("r", 35)
-                    .attr("fill", "transparent")
-                    .style("pointer-events", "all");
-
-                // Subtle halo ring for Root Artists and actively selected node
-                g.append("circle")
-                    .attr("class", "node-halo")
-                    .attr("r", 22)
-                    .attr("fill", "none")
-                    .attr("stroke", "transparent")
-                    .attr("stroke-width", 0)
-                    .style("pointer-events", "none");
-
-                g.append("text")
-                    .attr("class", "node-icon material-symbols-outlined")
-                    .attr("text-anchor", "middle")
-                    .attr("dominant-baseline", "central")
-                    .style("font-variation-settings", "'FILL' 1")
-                    .style("pointer-events", "none")
-                    .style("user-select", "none");
-
-                g.append("text")
-                    .attr("class", "node-label")
-                    .attr("text-anchor", "middle")
-                    .attr("fill", "#e4e4e7")
-                    .style("font-weight", "500")
-                    .style("pointer-events", "none")
-                    .style("text-shadow", "0 1px 2px rgba(0,0,0,0.8)");
-                return g;
-            }
-        );
-
-    // Bind event handlers on the merged selection so they always have the latest closures
-    nodeElements
-        .on("click", (event, d) => {
-            event.stopPropagation();
-            if (window.navigator && window.navigator.vibrate) {
-                window.navigator.vibrate(10);
-            }
-            
-            const isTouch = isSmallScreen || (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
-            
-            if (isTouch) {
-                const currentHoveredNodeId = hoveredNodeIdRef.current;
-                
-                // If first tap on this node, only trigger the connection snippet overlay
-                if (!currentHoveredNodeId || !isSameNodeId(currentHoveredNodeId, d.id)) {
-                    triggerNodeHoverRef.current(d);
-                    onInteractionRef.current?.();
-                    return; // Do not trigger Deep Cut navigation
-                }
-                // If second tap on the same active node, proceed to navigation
-            }
-            
+    // Set tracking target when search highlight changes
+    useEffect(() => {
+        if (highlightedNodes.size > 0) {
+            const [matchedId] = highlightedNodes;
             isTrackingRef.current = true;
-            targetNodeIdRef.current = d.id;
-            onNodeClickRef.current(d);
-            onInteractionRef.current?.();
-        })
-        .on("mouseenter", (event, d) => {
-            if (!isSmallScreen) {
-                if (containerRef.current && d.type === 'artist') {
-                    const rect = containerRef.current.getBoundingClientRect();
-                    const x = event.clientX - rect.left;
-                    const y = event.clientY - rect.top;
-                    const isLeft = x < rect.width / 2;
-                    const isTop = y < rect.height / 2;
-                    let quadrant: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' = 'top-right';
-                    if (isLeft && isTop) {
-                        quadrant = 'bottom-right';
-                    } else if (!isLeft && isTop) {
-                        quadrant = 'bottom-left';
-                    } else if (isLeft && !isTop) {
-                        quadrant = 'top-right';
-                    } else if (!isLeft && !isTop) {
-                        quadrant = 'top-left';
+            targetNodeIdRef.current = String(matchedId);
+        }
+    }, [highlightedNodes]);
+
+    useEffect(() => {
+        const resizeObserver = new ResizeObserver(entries => {
+            if (entries[0]) {
+                const { width, height } = entries[0].contentRect;
+                if (width > 0 && height > 0) setDimensions({ width, height });
+            }
+        });
+        if (svgRef.current?.parentElement) resizeObserver.observe(svgRef.current.parentElement);
+        return () => resizeObserver.disconnect();
+    }, []);
+
+    const dimensionsRef = useRef(dimensions);
+    useEffect(() => {
+        dimensionsRef.current = dimensions;
+    }, [dimensions]);
+
+    const isSmallScreenRef = useRef(isSmallScreen);
+    useEffect(() => {
+        isSmallScreenRef.current = isSmallScreen;
+    }, [isSmallScreen]);
+
+    const fitGraphToScreenRef = useRef<((duration?: number) => boolean) | null>(null);
+
+    const fitGraphToScreen = useCallback((duration: number = 1000): boolean => {
+        if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0 || visibleNodesRef.current.length === 0) return false;
+        isTrackingRef.current = false;
+        const width = dimensionsRef.current.width;
+        const height = dimensionsRef.current.height;
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        let validNodesCount = 0;
+        const dimmedSet = dimmedSceneIdsRef.current;
+        const nonDimmedNodes = dimmedSet.size > 0
+            ? visibleNodesRef.current.filter(n => !isNodeInDimmedScene(n, dimmedSet))
+            : visibleNodesRef.current;
+        const targetNodes = nonDimmedNodes.length > 0 ? nonDimmedNodes : visibleNodesRef.current;
+        targetNodes.forEach(n => {
+            if (n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y)) {
+                if (n.x < minX) minX = n.x;
+                if (n.x > maxX) maxX = n.x;
+                if (n.y < minY) minY = n.y;
+                if (n.y > maxY) maxY = n.y;
+                validNodesCount++;
+            }
+        });
+
+        if (validNodesCount === 0) return false;
+
+        const contentWidth = maxX - minX;
+        const contentHeight = maxY - minY;
+        const cx = (minX + maxX) / 2;
+        const cy = (minY + maxY) / 2;
+
+        const padding = isSmallScreenRef.current ? 40 : 80;
+        const scaleX = (width - padding * 2) / (contentWidth || 1);
+        const scaleY = (height - padding * 2) / (contentHeight || 1);
+
+        const maxScale = isSmallScreenRef.current ? 0.75 : 1;
+        const fitScale = Math.min(scaleX, scaleY);
+        const minScale = Math.min(0.22, Math.max(0.05, fitScale));
+        let k = Math.max(minScale, Math.min(fitScale, maxScale));
+
+        if (typeof window !== 'undefined' && window.innerWidth < 768) {
+            k = k * 1.5;
+        }
+
+        const tx = width / 2 - cx * k;
+        const ty = height / 2 - cy * k;
+
+        d3.select(svgRef.current).transition().duration(duration).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
+        return true;
+    }, []);
+
+    const focusSceneCluster = useCallback((targetSceneId: string, duration: number = 750): boolean => {
+        if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0) return false;
+        isTrackingRef.current = false;
+        const width = dimensionsRef.current.width;
+        const height = dimensionsRef.current.height;
+
+        let targetIndex = -1;
+        if (scenes && scenes.length > 0) {
+            targetIndex = scenes.findIndex((s, idx) => (s.sceneId || s.id || `scene-${idx + 1}`) === targetSceneId);
+        }
+        if (targetIndex === -1) {
+            const match = targetSceneId.match(/^scene-(\d+)$/i);
+            if (match) targetIndex = parseInt(match[1], 10) - 1;
+        }
+
+        const clusterNodes = visibleNodesRef.current.filter(n => {
+            if (n.sceneId && n.sceneId === targetSceneId) return true;
+            if (n.id && n.id.startsWith(targetSceneId + '::')) return true;
+            if (targetIndex >= 0 && n.sceneIndex === targetIndex) return true;
+            return false;
+        });
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        let validCount = 0;
+        clusterNodes.forEach(n => {
+            if (n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y)) {
+                if (n.x < minX) minX = n.x;
+                if (n.x > maxX) maxX = n.x;
+                if (n.y < minY) minY = n.y;
+                if (n.y > maxY) maxY = n.y;
+                validCount++;
+            }
+        });
+
+        let cx: number;
+        let cy: number;
+        let contentWidth: number;
+        let contentHeight: number;
+
+        if (validCount > 0) {
+            cx = (minX + maxX) / 2;
+            cy = (minY + maxY) / 2;
+            contentWidth = Math.max(300, maxX - minX);
+            contentHeight = Math.max(300, maxY - minY);
+        } else {
+            // V45 / Rule 44: When target scene has 0 nodes (uncurated / idle) and settled nodes exist,
+            // fit the existing settled scenes to screen so the constellation remains visible.
+            const settledNodes = visibleNodesRef.current.filter(n => n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y));
+            if (settledNodes.length > 0) {
+                return fitGraphToScreen(duration);
+            }
+            const fallbackIdx = targetIndex >= 0 ? targetIndex : 0;
+            const center = getSceneCenterOffset(fallbackIdx);
+            cx = center.x;
+            cy = center.y;
+            contentWidth = 700;
+            contentHeight = 700;
+        }
+
+        const padding = isSmallScreenRef.current ? 40 : 80;
+        const scaleX = (width - padding * 2) / (contentWidth || 1);
+        const scaleY = (height - padding * 2) / (contentHeight || 1);
+        const maxScale = isSmallScreenRef.current ? 1.0 : 1.25;
+        const fitScale = Math.min(scaleX, scaleY);
+        const minScale = 0.3;
+        let k = Math.max(minScale, Math.min(fitScale, maxScale));
+
+        const tx = width / 2 - cx * k;
+        const ty = height / 2 - cy * k;
+
+        if (duration === 0) {
+            zoomRef.current.transform(d3.select(svgRef.current), d3.zoomIdentity.translate(tx, ty).scale(k));
+        } else {
+            d3.select(svgRef.current).transition().duration(duration).call(zoomRef.current.transform as any, d3.zoomIdentity.translate(tx, ty).scale(k));
+        }
+        return true;
+    }, [scenes, fitGraphToScreen]);
+
+    const focusSceneClusterRef = useRef(focusSceneCluster);
+    useEffect(() => {
+        focusSceneClusterRef.current = focusSceneCluster;
+    }, [focusSceneCluster]);
+
+    const lastFocusedClusterTimestampRef = useRef<number>(0);
+    useEffect(() => {
+        if (focusedSceneCluster && focusedSceneCluster.timestamp > lastFocusedClusterTimestampRef.current) {
+            lastFocusedClusterTimestampRef.current = focusedSceneCluster.timestamp;
+            focusSceneCluster(focusedSceneCluster.sceneId, 750);
+        }
+    }, [focusedSceneCluster, focusSceneCluster]);
+
+    useEffect(() => {
+        fitGraphToScreenRef.current = fitGraphToScreen;
+    }, [fitGraphToScreen]);
+
+    const hasInitialCentered = useRef(false);
+
+    // Reset initial centering flag when nodes are completely emptied (e.g. project reset or curation start)
+    useEffect(() => {
+        if (!data?.nodes || data.nodes.length === 0) {
+            hasInitialCentered.current = false;
+        }
+    }, [data?.nodes]);
+
+    const detectedSceneCount = useMemo(() => {
+        if (scenes && scenes.length > 0) return scenes.length;
+        if (!data?.nodes || data.nodes.length === 0) return 1;
+        const indices = data.nodes.map(n => n.sceneIndex ?? 0);
+        return Math.max(1, Math.max(...indices) + 1);
+    }, [scenes, data?.nodes]);
+
+    const lastSceneCountRef = useRef(detectedSceneCount);
+
+    // Count scenes that actually have mapped nodes or are completed
+    const mappedSceneCount = useMemo(() => {
+        if (scenes && scenes.length > 0) {
+            return scenes.filter(s => (s.graphData?.nodes?.length ?? 0) > 0 || s.status === 'completed').length;
+        }
+        return 0;
+    }, [scenes]);
+
+    const prevMappedSceneCountRef = useRef(0);
+
+    useEffect(() => {
+        if (lastSceneCountRef.current !== detectedSceneCount) {
+            const prevCount = lastSceneCountRef.current;
+            lastSceneCountRef.current = detectedSceneCount;
+            if (detectedSceneCount > prevCount) {
+                const targetScene = activeSceneId || `scene-${detectedSceneCount}`;
+                focusSceneCluster(targetScene, 750);
+            } else if (fitGraphToScreenRef.current) {
+                fitGraphToScreenRef.current(750);
+            }
+        }
+    }, [detectedSceneCount, activeSceneId, focusSceneCluster]);
+
+    // V45.1 (Phase B2.3): When upfront batch curation transitions mapped scenes from 0 -> >0,
+    // automatically focus on Scene 1 so the Connections panel centers on the primary cluster immediately.
+    useEffect(() => {
+        if (prevMappedSceneCountRef.current === 0 && mappedSceneCount > 0) {
+            prevMappedSceneCountRef.current = mappedSceneCount;
+            if (zoomRef.current && dimensionsRef.current.width > 0) {
+                const centered = focusSceneCluster(activeSceneId || 'scene-1', 0);
+                if (centered) hasInitialCentered.current = true;
+            } else {
+                setTimeout(() => {
+                    if (zoomRef.current && dimensionsRef.current.width > 0) {
+                        const centered = focusSceneCluster(activeSceneId || 'scene-1', 0);
+                        if (centered) hasInitialCentered.current = true;
                     }
-                    setHoverQuadrant(quadrant);
-                }
-                triggerNodeHoverRef.current(d);
+                }, 50);
             }
-        })
-
-        .on("mouseleave", (event, d) => {
-            if (!isSmallScreen) {
-                clearNodeHoverRef.current();
-            }
-        });
-
-    nodeElements
-        .attr("class", d => `node-element ${d.isLoading || d.isPending ? 'animate-pulse' : ''}`);
-
-    nodeElements.select("circle.node-halo")
-        .attr("r", d => isNodeSeedInOwnScene(d, seedArtists) ? 22 : 20)
-        .attr("fill", d => isNodeSeedInOwnScene(d, seedArtists) ? "rgba(246, 228, 104, 0.08)" : "none")
-        .attr("stroke", d => isNodeSeedInOwnScene(d, seedArtists) ? "rgba(246, 228, 104, 0.35)" : "transparent")
-        .attr("stroke-width", d => isNodeSeedInOwnScene(d, seedArtists) ? 1.5 : 0);
-
-    nodeElements.select("text.node-icon")
-        .attr("fill", d => getNodeColor(d))
-        .attr("opacity", d => d.isLoading || d.isPending ? 0.35 : 1)
-        .style("font-size", d => {
-            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-            if (isSeed) return "32px";
-            if (d.type === 'artist') {
-                const aaDeg = artistArtistDegrees.get(d.id) ?? 0;
-                const sceneProfile = getSceneProfile(d);
-                const isMultiPodBridge = sceneProfile.numSeeds > 1 && (d.group || 1) > sceneProfile.numSeeds;
-                return (aaDeg >= 4 || isMultiPodBridge) ? "28px" : "25px";
-            }
-            if (d.type === 'label') {
-                const deg = nodeDegrees.get(d.id) ?? 1;
-                return deg >= 3 ? "26px" : "22px";
-            }
-            if (d.type === 'country' || d.type === 'founded') return "21px";
-            return "20px";
-        })
-        .text(d => {
-            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-            if (isSeed) return 'album';
-            if (d.type === 'artist') return 'equalizer';
-            if (d.type === 'genre') return 'library_music';
-            if (d.type === 'label') return 'label';
-            if (d.type === 'country') return 'location_on';
-            if (d.type === 'founded') return 'event';
-            return 'circle';
-        });
-
-    // Add loading spinner for loading nodes
-    nodeElements.each(function(d) {
-        const g = d3.select(this);
-        g.select(".loading-spinner").remove();
-        if (d.isLoading) {
-            g.append("foreignObject")
-                .attr("class", "loading-spinner")
-                .attr("x", -12)
-                .attr("y", -12)
-                .attr("width", 24)
-                .attr("height", 24)
-                .append("xhtml:div")
-                .attr("class", "flex items-center justify-center w-full h-full")
-                .html('<div class="animate-spin text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-2"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg></div>');
+        } else {
+            prevMappedSceneCountRef.current = mappedSceneCount;
         }
-    });
+    }, [mappedSceneCount, activeSceneId, focusSceneCluster]);
 
+    useEffect(() => {
+        if (!svgRef.current || dimensions.width === 0) return;
 
+        const svg = d3.select(svgRef.current);
+        const seedArtistSet = new Set(seedArtists.map(a => normalizeArtistId(a)));
+        const { width, height } = dimensions;
 
-    const isSearchActive = searchQueryRef.current.trim().length > 0;
-    const hlNodes = highlightedNodesRef.current;
-    const selHighlight = selectionHighlightIdsRef.current;
-
-    nodeElements.select("text.node-label")
-        .attr("y", d => isNodeSeedInOwnScene(d, seedArtists) ? 27 : 25)
-        .attr("fill", d => {
-            if (isNodeSeedInOwnScene(d, seedArtists)) return "#F6E468";
-            if (isSearchActive && (hlNodes.has(d.id) || hlNodes.has(String(d.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(d.id))))) return "#ffffff";
-            if (selHighlight && selHighlight.has(d.id)) return "#ffffff";
-            return (d.type === 'artist' || d.type === 'label') ? "#e4e4e7" : "#a1a1aa";
-        })
-        .attr("opacity", d => {
-            if (isSearchActive && (hlNodes.has(d.id) || hlNodes.has(String(d.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(d.id))))) return 1;
-            if (selHighlight && selHighlight.has(d.id)) return 1;
-            return (d.type === 'artist' || d.type === 'label') ? 1 : 0.8;
-        })
-        .style("font-size", d => {
-            if (isNodeSeedInOwnScene(d, seedArtists)) return "13px";
-            return (d.type === 'artist' || d.type === 'label') ? "12px" : "11px";
-        })
-        .style("font-weight", d => {
-            if (isNodeSeedInOwnScene(d, seedArtists)) return "600";
-            return (d.type === 'artist' || d.type === 'label') ? "500" : "400";
-        })
-        .text(d => toDisplayLabel(d));
-
-    const dimmedSet = dimmedSceneIdsRef.current;
-
-    nodeElements
-        .attr("cursor", d => isNodeInDimmedScene(d, dimmedSet) ? "default" : "pointer")
-        .style("opacity", d => {
-            if (isNodeInDimmedScene(d, dimmedSet)) return 0.05;
-            const nodeType = d.type as FilterKeys;
-            const isFilteredOut = d.type !== 'artist' && 
-                                  Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
-                                  !activeFilters[nodeType];
-            if (isFilteredOut) return 0.05;
-
-            if (isSearchActive) {
-                if (hlNodes.size === 0) return 0.05;
-                const isMatch = hlNodes.has(d.id) || 
-                                hlNodes.has(String(d.id).toLowerCase()) || 
-                                hlNodes.has(normalizeArtistId(String(d.id)));
-                return isMatch ? 1 : 0.05;
-            }
-
-            if (selHighlight) return selHighlight.has(d.id) ? 1 : 0.1;
-            return 1;
+        visibleNodes.forEach(n => {
+            if (n.x !== undefined && isNaN(n.x)) n.x = undefined;
+            if (n.y !== undefined && isNaN(n.y)) n.y = undefined;
+            if (n.fx !== undefined && n.fx !== null && isNaN(n.fx)) n.fx = null;
+            if (n.fy !== undefined && n.fy !== null && isNaN(n.fy)) n.fy = null;
         });
 
-    nodeElements.select("circle.hit-box").style("pointer-events", d => isNodeInDimmedScene(d, dimmedSet) ? "none" : "all");
-
-    const nodeId = (n: any) => String(typeof n === 'string' ? n : n.id);
-    const intraSceneLinks = visibleLinks.filter(l => !l.isCrossSceneBridge);
-    const bridgeLinks = visibleLinks.filter(l => Boolean(l.isCrossSceneBridge));
-
-    container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
-        .data(intraSceneLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
-        .join("line")
-        .attr("class", "visual-line")
-        .attr("stroke", (d: any) => {
-            if (isLinkInDimmedScene(d, undefined, undefined, dimmedSet)) return "#e4e4e7";
-            if (isSearchActive) {
-                const s = nodeId(d.source);
-                const t = nodeId(d.target);
-                const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
-                const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
-                return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
+        // Title-case formatter: converts raw id slugs (e.g. "buggin", "hardcore-punk")
+        // to their display form ("Buggin", "Hardcore Punk") only for legacy cache docs
+        // where the .label field was not populated at write time.
+        const toDisplayLabel = (node: Node): string => {
+            const canonRaw = stripSceneNamespace(String(node.canonicalId || node.id || ''));
+            if (node.type === 'label') {
+                return cleanLabelDisplayName(node.label || canonRaw);
             }
-            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
-            if (activeNode && !isNodeInDimmedScene(activeNode, dimmedSet)) {
-                const s = nodeId(d.source);
-                const t = nodeId(d.target);
-                if (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id)) {
-                    return "#F6E468";
+            if (node.label && typeof node.label === 'string' && node.label.trim()) {
+                return node.label.trim();
+            }
+            return canonRaw
+                .replace(/-/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase());
+        };
+
+        const formatRelationContext = (contexts: string[]): string => {
+            if (contexts.length === 0) {
+                return "shares scene lineage with";
+            }
+            if (contexts.length === 1) {
+                return contexts[0].trim();
+            }
+
+            const parts = contexts.map(c => {
+                const trimmed = c.trim();
+                const words = trimmed.split(/\s+/);
+                if (words.length > 1) {
+                    const lastWord = words[words.length - 1].toLowerCase();
+                    if (['with', 'alongside', 'by', 'to', 'for', 'of', 'from'].includes(lastWord)) {
+                        return {
+                            base: words.slice(0, -1).join(' '),
+                            prep: lastWord
+                        };
+                    }
+                }
+                return {
+                    base: trimmed,
+                    prep: ''
+                };
+            });
+
+            const firstPrep = parts[0].prep;
+            const allSamePrep = firstPrep !== '' && parts.every(p => p.prep === firstPrep);
+
+            if (allSamePrep) {
+                const bases = parts.map(p => p.base);
+                let joinedBases = '';
+                if (bases.length === 2) {
+                    joinedBases = `${bases[0]} and ${bases[1]}`;
+                } else {
+                    joinedBases = `${bases.slice(0, -1).join(', ')}, and ${bases[bases.length - 1]}`;
+                }
+                return `${joinedBases} ${firstPrep}`;
+            } else {
+                const fullPhrases = parts.map(p => p.prep ? `${p.base} ${p.prep}` : p.base);
+                if (fullPhrases.length === 2) {
+                    return `${fullPhrases[0]} and ${fullPhrases[1]}`;
+                } else {
+                    return `${fullPhrases.slice(0, -1).join(', ')}, and ${fullPhrases[fullPhrases.length - 1]}`;
                 }
             }
-            return "#e4e4e7";
-        })
-        .attr("stroke-width", 1)
-        .attr("stroke-opacity", (d: any) => {
-            const s = nodeId(d.source);
-            const t = nodeId(d.target);
+        };
 
-            const sNode = visibleNodes.find(n => n.id === s);
-            const tNode = visibleNodes.find(n => n.id === t);
-            if (isLinkInDimmedScene(d, sNode, tNode, dimmedSet)) return 0.05;
-            const isLinkFilteredOut = (node: Node | undefined) => {
-                if (!node || node.type === 'artist') return false;
-                const nodeType = node.type as FilterKeys;
-                return Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && !activeFilters[nodeType];
+        const triggerNodeHover = (d: Node, isProgrammatic = false) => {
+            if (isProgrammatic && isPassiveSelectionRef.current) return;
+            const dimmedSet = dimmedSceneIdsRef.current;
+            if (isNodeInDimmedScene(d, dimmedSet)) return;
+            setHoveredNodeId(d.id);
+            hoveredNodeIdRef.current = d.id;
+            activeHoveredNodeRef.current = d;
+
+            const hasSceneNs = String(d.id).includes('::');
+            const isFirstDegreeLink = (l: any) => {
+                const sId = nodeId(l.source);
+                const tId = nodeId(l.target);
+                if (hasSceneNs) {
+                    return sId.toLowerCase() === d.id.toLowerCase() || tId.toLowerCase() === d.id.toLowerCase();
+                }
+                return isSameNodeId(sId, d.id) || isSameNodeId(tId, d.id);
             };
-            if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
 
-            if (isSearchActive) {
-                if (hlNodes.size === 0) return 0.05;
-                const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
-                const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
-                return (isMatchS && isMatchT) ? 0.6 : 0.05;
+            const firstDegreeLinks = visibleLinks.filter(isFirstDegreeLink);
+
+            const neighborNodeIds = new Set<string>();
+            const dCanonId = stripSceneNamespace(d.canonicalId || d.id);
+            neighborNodeIds.add(d.id.toLowerCase());
+            if (!hasSceneNs) {
+                neighborNodeIds.add(normalizeArtistId(dCanonId));
             }
-
-            const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
-            if (activeNode && !isNodeInDimmedScene(activeNode, dimmedSet) && (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id))) {
-                return 0.9;
-            }
-
-            if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.3 : 0.05;
-            return computeRestingLinkOpacity(d, sNode, tNode, nodeDegreesRef.current);
-        })
-        .attr("stroke-dasharray", "3,3")
-        .style("pointer-events", "none");
-
-    container.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
-        .data(intraSceneLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
-        .join("line")
-        .attr("class", "interactive-link")
-        .attr("stroke", "transparent")
-        .attr("stroke-width", 16)
-        .style("cursor", "default");
-
-    // Cross-Scene Curved Bridge Lines (Default rest: neutral grey #e4e4e7, stroke-opacity 0.4, stroke-width 1.2)
-    container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
-        .data(bridgeLinks, (d: any) => `bridge:${nodeId(d.source)}-${nodeId(d.target)}`)
-        .join("path")
-        .attr("class", "bridge-visual-line")
-        .attr("fill", "none")
-        .attr("stroke", "#e4e4e7")
-        .attr("stroke-width", 1.2)
-        .attr("stroke-dasharray", "6,4")
-        .attr("stroke-opacity", (d: any) => isLinkInDimmedScene(d, undefined, undefined, dimmedSet) ? 0.05 : 0.4)
-        .attr("d", (d: any) => computeBridgePathD(d, visibleNodes))
-        .style("pointer-events", "none");
-
-    // Check if the set of artists has structurally changed
-    const currentArtists = visibleNodes.filter(n => n.type === 'artist');
-    const currentArtistIds = new Set(currentArtists.map(n => n.id));
-    
-    let isStructuralChange = false;
-    if (currentArtistIds.size !== prevArtistIdsRef.current.size) {
-        isStructuralChange = true;
-    } else {
-        for (const id of currentArtistIds) {
-            if (!prevArtistIdsRef.current.has(id)) {
-                isStructuralChange = true;
-                break;
-            }
-        }
-    }
-    prevArtistIdsRef.current = currentArtistIds;
-
-    // Check if layout or filters structurally changed (ignoring pure dimension resizes)
-    const layoutSignature = `${visibleNodes.map(n => n.id).join(',')}|${visibleLinks.map(l => `${nodeId(l.source)}-${nodeId(l.target)}`).join(',')}|${seedArtists.join(',')}|${JSON.stringify(activeFilters)}`;
-    const isLayoutChange = prevLayoutSignatureRef.current !== layoutSignature;
-    prevLayoutSignatureRef.current = layoutSignature;
-
-    // Check if the number of nodes actually changed, rather than just their properties (like active state)
-    const isLengthChange = visibleNodes.length !== prevVisibleNodesLengthRef.current;
-    prevVisibleNodesLengthRef.current = visibleNodes.length;
-
-    if (isLayoutChange) {
-        // Only trigger a high-energy restart and unpin nodes if the graph structure was actually modified
-        // (nodes added/removed). If it was just a metadata change (like selecting a node which changes its class),
-        // use a gentle wake (alpha = 0.2) and preserve pinned positions to prevent gravity wells.
-        const restartAlpha = isLengthChange ? (isStructuralChange ? 1.0 : 0.2) : 0.2;
-
-        if (isLengthChange) {
-            // Unpin nodes so they can settle into the new layout —
-            // BUT only unpin nodes that don't already have saved canvasLayout coordinates.
-            // Nodes with valid fx/fy were loaded from Firestore and must NOT be cleared;
-            // clearing them destroys Coordinate Memory and forces a random re-layout.
-            visibleNodes.forEach(n => {
-                const hasSavedCoords = n.fx !== null && n.fx !== undefined &&
-                                       n.fy !== null && n.fy !== undefined;
-                if (!hasSavedCoords) {
-                    n.fx = null;
-                    n.fy = null;
+            firstDegreeLinks.forEach(l => {
+                const sId = nodeId(l.source);
+                const tId = nodeId(l.target);
+                neighborNodeIds.add(sId.toLowerCase());
+                neighborNodeIds.add(tId.toLowerCase());
+                if (!hasSceneNs) {
+                    neighborNodeIds.add(normalizeArtistId(stripSceneNamespace(sId)));
+                    neighborNodeIds.add(normalizeArtistId(stripSceneNamespace(tId)));
                 }
             });
 
-            // If ALL artist/label nodes are pinned (full canvasLayout restore), use a
-            // near-zero alpha: the simulation just needs one tick to render, not to run physics.
-            const artistLabelNodes = visibleNodes.filter(n => n.type === 'artist' || n.type === 'label');
-            const allPinned = artistLabelNodes.length > 0 &&
-                artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
-                                           n.fy !== null && n.fy !== undefined);
-            wasAllPinnedAtStartRef.current = allPinned;
-            simulation.alpha(allPinned ? 0.001 : restartAlpha).alphaTarget(0).restart();
-        } else {
-            const artistLabelNodes = visibleNodes.filter(n => n.type === 'artist' || n.type === 'label');
-            const allPinned = artistLabelNodes.length > 0 &&
-                artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
-                                           n.fy !== null && n.fy !== undefined);
-            wasAllPinnedAtStartRef.current = allPinned;
-            simulation.alpha(allPinned ? 0.001 : restartAlpha).alphaTarget(0).restart();
+            if (svgRef.current) {
+                const svg = d3.select(svgRef.current);
+
+                // Highlight connected visual lines and dim others
+                svg.selectAll<SVGLineElement, Link>("line.visual-line")
+                    .transition().duration(200)
+                    .attr("stroke", (l: any) => {
+                        if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return "#e4e4e7";
+                        const isConnected = isFirstDegreeLink(l);
+                        return isConnected ? "#F6E468" : "#e4e4e7";
+                    })
+                    .attr("stroke-opacity", (l: any) => {
+                        if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return 0.05;
+                        const isConnected = isFirstDegreeLink(l);
+                        return isConnected ? 0.9 : 0.05;
+                    });
+
+                // Highlight connected Cross-Scene Bridge Lines on active node hover
+                svg.selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+                    .transition().duration(200)
+                    .attr("stroke", (l: any) => {
+                        if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return "#e4e4e7";
+                        const isConnected = isFirstDegreeLink(l);
+                        return isConnected ? "#F6E468" : "#e4e4e7";
+                    })
+                    .attr("stroke-opacity", (l: any) => {
+                        if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return 0.05;
+                        const isConnected = isFirstDegreeLink(l);
+                        return isConnected ? 0.95 : 0.05;
+                    })
+                    .attr("stroke-width", (l: any) => {
+                        if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return 1.2;
+                        const isConnected = isFirstDegreeLink(l);
+                        return isConnected ? 2.0 : 1.2;
+                    });
+
+                const isNodeInHoverSpotlight = (n: Node) => {
+                    const nCanon = stripSceneNamespace(n.canonicalId || n.id);
+                    return hasSceneNs
+                        ? neighborNodeIds.has(n.id.toLowerCase())
+                        : (neighborNodeIds.has(n.id.toLowerCase()) || neighborNodeIds.has(normalizeArtistId(nCanon)));
+                };
+
+                // Spotlight constellation nodes and dim others
+                const allNodesSel = svg.selectAll<SVGGElement, Node>("g.node-element");
+                allNodesSel
+                    .transition().duration(200)
+                    .style("opacity", (n: any) => {
+                        if (isNodeInDimmedScene(n, dimmedSet)) return 0.05;
+                        const nodeType = n.type as FilterKeys;
+                        const isFilteredOut = n.type !== 'artist' &&
+                            Object.prototype.hasOwnProperty.call(activeFilters, nodeType) &&
+                            !activeFilters[nodeType];
+                        if (isFilteredOut) return 0.1;
+                        return isNodeInHoverSpotlight(n) ? 1 : 0.15;
+                    });
+
+                // Elevate spotlighted labels (including contextual metadata) to full brightness on hover
+                allNodesSel.select("text.node-label")
+                    .transition().duration(200)
+                    .attr("fill", (n: Node) => {
+                        if (isNodeInHoverSpotlight(n)) return isNodeSeedInOwnScene(n, seedArtists) ? "#F6E468" : "#ffffff";
+                        if (isNodeSeedInOwnScene(n, seedArtists)) return "#F6E468";
+                        return (n.type === 'artist' || n.type === 'label') ? "#e4e4e7" : "#a1a1aa";
+                    })
+                    .attr("opacity", (n: Node) => isNodeInHoverSpotlight(n) ? 1 : ((n.type === 'artist' || n.type === 'label') ? 1 : 0.8));
+
+                if (d.type === 'artist') {
+                    const isDirectNodeMatch = (id: string) =>
+                        id === d.id || (!String(d.id).includes('::') && isSameNodeId(id, d.id));
+                    const directArtistLinks = visibleLinks.filter(l => {
+                        const sId = nodeId(l.source);
+                        const tId = nodeId(l.target);
+                        if (!isDirectNodeMatch(sId) && !isDirectNodeMatch(tId)) return false;
+                        const otherId = isDirectNodeMatch(sId) ? tId : sId;
+                        const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
+                        return otherNode?.type === 'artist';
+                    });
+
+                    // Aggregate all artist connections and group them
+                    const sourceDisplayLabel = toDisplayLabel(d);
+                    const fullNodesForFallback = (data?.nodes || visibleNodes).map(n => ({
+                        id: n.id,
+                        type: n.type,
+                        label: toDisplayLabel(n),
+                    }));
+                    const fullLinksForFallback = data?.links || visibleLinks;
+
+                    const connectionsByArtist = new Map<string, { node: Node; contexts: string[]; legacyContext?: string; isBridge?: boolean }>();
+                    directArtistLinks.forEach(l => {
+                        const sId = nodeId(l.source);
+                        const tId = nodeId(l.target);
+                        const isSource = isDirectNodeMatch(sId);
+                        const otherId = isSource ? tId : sId;
+                        const otherNode = visibleNodes.find(n => String(n.id).toLowerCase() === otherId.toLowerCase());
+                        if (!otherNode) return;
+
+                        const normOtherId = otherNode.id;
+                        const isBridgeLink = Boolean(l.isCrossSceneBridge) || Boolean(d.sceneId && otherNode.sceneId && d.sceneId !== otherNode.sceneId);
+                        if (!connectionsByArtist.has(normOtherId)) {
+                            connectionsByArtist.set(normOtherId, { node: otherNode, contexts: [], isBridge: isBridgeLink });
+                        }
+                        const entry = connectionsByArtist.get(normOtherId)!;
+                        if (isBridgeLink) {
+                            entry.isBridge = true;
+                        }
+                        const rawContextStr = isSource ? l.forwardContext : l.inverseContext;
+                        const sanitizedContext = sanitizeDirectionalLinkContext(
+                            rawContextStr,
+                            sourceDisplayLabel,
+                            toDisplayLabel(otherNode)
+                        );
+                        if (sanitizedContext && !entry.contexts.includes(sanitizedContext)) {
+                            entry.contexts.push(sanitizedContext);
+                        } else if (l.context && !entry.legacyContext) {
+                            entry.legacyContext = l.context;
+                        }
+                    });
+
+                    const connections = Array.from(connectionsByArtist.values()).map(({ node, contexts, legacyContext, isBridge }) => {
+                        const resolvedContexts = contexts.length > 0
+                            ? contexts
+                            : [
+                                resolveFallbackRelationContext({
+                                    sourceNode: { id: d.id, type: d.type, label: sourceDisplayLabel },
+                                    targetNode: { id: node.id, type: node.type, label: toDisplayLabel(node) },
+                                    allNodes: fullNodesForFallback,
+                                    allLinks: fullLinksForFallback,
+                                    synthesisRationale: data?.synthesisRationale,
+                                    legacyLinkContext: legacyContext,
+                                })
+                            ];
+                        const rawContext = formatRelationContext(resolvedContexts);
+                        const capitalizedContext = rawContext.charAt(0).toUpperCase() + rawContext.slice(1);
+                        const isCrossScenePeer = isBridge || Boolean(d.sceneId && node.sceneId && d.sceneId !== node.sceneId);
+                        const targetName = isCrossScenePeer
+                            ? resolveCrossSceneTargetName(node, scenesRef.current, toDisplayLabel(node))
+                            : toDisplayLabel(node);
+                        return {
+                            context: capitalizedContext,
+                            targetName,
+                            isBridge: Boolean(isCrossScenePeer)
+                        };
+                    });
+
+                    // Prioritize cross-scene bridge relationships first so they are never clipped below the fold
+                    connections.sort((a, b) => {
+                        if (a.isBridge && !b.isBridge) return -1;
+                        if (!a.isBridge && b.isBridge) return 1;
+                        return 0;
+                    });
+
+                    // Fetch DNA/Recommendation Reason using canonical ID
+                    const canonId = stripSceneNamespace(d.canonicalId || d.id);
+                    const normId = normalizeArtistId(canonId);
+                    const nodeDna = d.narrativeSnippet ||
+                        detailsCache?.get(canonId)?.recommendationReason ||
+                        detailsCache?.get(canonId.toLowerCase())?.recommendationReason ||
+                        detailsCache?.get(normId)?.recommendationReason ||
+                        detailsCache?.get(d.id)?.recommendationReason;
+
+                    // Check raw connections for fallback type
+                    const hasRawConnections = data.links.some(l => {
+                        const sId = nodeId(l.source);
+                        const tId = nodeId(l.target);
+                        return sId === d.id || tId === d.id;
+                    });
+
+                    let fallbackMessage = "";
+                    if (directArtistLinks.length === 0 && !hasRawConnections) {
+                        fallbackMessage = "[Indirect recommendation]";
+                    }
+
+                    if ((connections.length > 0 || nodeDna || fallbackMessage) && !isProgrammatic) {
+                        const transform = d3.zoomTransform(svgRef.current);
+                        const canvasX = transform.applyX(d.x ?? 0);
+                        const canvasY = transform.applyY(d.y ?? 0);
+                        const containerRect = containerRef.current?.getBoundingClientRect();
+                        const screenX = containerRect ? containerRect.left + canvasX : canvasX;
+                        const screenY = containerRect ? containerRect.top + canvasY : canvasY;
+
+                        setHoveredLink({
+                            sourceId: toDisplayLabel(d),
+                            connections: connections.length > 0 ? connections : undefined,
+                            fallbackMessage: fallbackMessage || undefined,
+                            dna: nodeDna || undefined,
+                            x: canvasX,
+                            y: canvasY,
+                            screenX,
+                            screenY
+                        });
+                    } else {
+                        setHoveredLink(null);
+                    }
+                } else {
+                    setHoveredLink(null);
+                }
+            }
+        };
+
+        const clearNodeHover = () => {
+            const dimmedSet = dimmedSceneIdsRef.current;
+            const rawActiveNode = !isPassiveSelectionRef.current ? (selectedNodeRef.current || peekedNodeRef.current) : null;
+            const activeNode = rawActiveNode && !isNodeInDimmedScene(rawActiveNode, dimmedSet) ? rawActiveNode : null;
+            if (activeNode) {
+                triggerNodeHover(activeNode, true);
+                setHoveredLink(null);
+                return;
+            }
+
+            setHoveredNodeId(null);
+            activeHoveredNodeRef.current = null;
+            setHoveredLink(null);
+
+            if (svgRef.current) {
+                const svg = d3.select(svgRef.current);
+
+                // Restore node opacities
+                const isSearchActive = searchQueryRef.current.trim().length > 0;
+                const hlNodes = highlightedNodesRef.current;
+                const selHighlight = rawActiveNode && isNodeInDimmedScene(rawActiveNode, dimmedSet) ? null : selectionHighlightIdsRef.current;
+
+                const allNodesSel = svg.selectAll<SVGGElement, Node>("g.node-element");
+                allNodesSel
+                    .transition().duration(200)
+                    .style("opacity", (n: any) => {
+                        if (isNodeInDimmedScene(n, dimmedSet)) return 0.05;
+                        const nodeType = n.type as FilterKeys;
+                        const isFilteredOut = n.type !== 'artist' &&
+                            Object.prototype.hasOwnProperty.call(activeFilters, nodeType) &&
+                            !activeFilters[nodeType];
+                        if (isFilteredOut) return 0.05;
+
+                        if (isSearchActive) {
+                            if (hlNodes.size === 0) return 0.05;
+                            const isMatch = hlNodes.has(n.id) ||
+                                hlNodes.has(String(n.id).toLowerCase()) ||
+                                hlNodes.has(normalizeArtistId(String(n.id)));
+                            return isMatch ? 1 : 0.05;
+                        }
+
+                        if (selHighlight) return selHighlight.has(n.id) ? 1 : 0.1;
+                        return 1;
+                    });
+
+                allNodesSel.select("text.node-label")
+                    .transition().duration(200)
+                    .attr("fill", (n: Node) => {
+                        if (isNodeSeedInOwnScene(n, seedArtists)) return "#F6E468";
+                        const isSearchMatch = isSearchActive && (hlNodes.has(n.id) || hlNodes.has(String(n.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(n.id))));
+                        const isSelMatch = Boolean(selHighlight && selHighlight.has(n.id));
+                        if (isSearchMatch || isSelMatch) return "#ffffff";
+                        return (n.type === 'artist' || n.type === 'label') ? "#e4e4e7" : "#a1a1aa";
+                    })
+                    .attr("opacity", (n: Node) => {
+                        const isSearchMatch = isSearchActive && (hlNodes.has(n.id) || hlNodes.has(String(n.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(n.id))));
+                        const isSelMatch = Boolean(selHighlight && selHighlight.has(n.id));
+                        if (isSearchMatch || isSelMatch) return 1;
+                        return (n.type === 'artist' || n.type === 'label') ? 1 : 0.8;
+                    });
+
+                // Restore visual line strokes and 2-tier resting opacities
+                svg.selectAll<SVGLineElement, Link>("line.visual-line")
+                    .transition().duration(200)
+                    .attr("stroke", (l: any) => {
+                        if (isLinkInDimmedScene(l, undefined, undefined, dimmedSet)) return "#e4e4e7";
+                        if (isSearchActive) {
+                            const s = typeof l.source === 'string' ? l.source : l.source.id;
+                            const t = typeof l.target === 'string' ? l.target : l.target.id;
+                            const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
+                            const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
+                            return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
+                        }
+                        return "#e4e4e7";
+                    })
+                    .attr("stroke-opacity", (l: any) => {
+                        const s = typeof l.source === 'string' ? l.source : l.source.id;
+                        const t = typeof l.target === 'string' ? l.target : l.target.id;
+
+                        const sNode = visibleNodes.find(n => n.id === s);
+                        const tNode = visibleNodes.find(n => n.id === t);
+                        if (isLinkInDimmedScene(l, sNode, tNode, dimmedSet)) return 0.05;
+                        const isLinkFilteredOut = (node: Node | undefined) => {
+                            if (!node || node.type === 'artist') return false;
+                            const nodeType = node.type as FilterKeys;
+                            return Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && !activeFilters[nodeType];
+                        };
+                        if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
+
+                        if (isSearchActive) {
+                            if (hlNodes.size === 0) return 0.05;
+                            const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
+                            const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
+                            return (isMatchS && isMatchT) ? 0.6 : 0.05;
+                        }
+
+                        if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.6 : 0.05;
+                        return computeRestingLinkOpacity(l, sNode, tNode, nodeDegreesRef.current);
+                    });
+
+                // Restore Cross-Scene Bridge Lines to neutral grey (or 0.05 if either endpoint sits in a dimmed scene)
+                svg.selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+                    .transition().duration(200)
+                    .attr("stroke", "#e4e4e7")
+                    .attr("stroke-width", 1.2)
+                    .attr("stroke-opacity", (l: any) => isLinkInDimmedScene(l, undefined, undefined, dimmedSet) ? 0.05 : 0.35);
+            }
+        };
+
+        triggerNodeHoverRef.current = triggerNodeHover;
+        clearNodeHoverRef.current = clearNodeHover;
+
+        let container = svg.select<SVGGElement>("g.main-container");
+        if (container.empty()) {
+            svg.selectAll("*").remove();
+            // Glow filter removed to maintain true color fidelity
+            container = svg.append("g").attr("class", "main-container");
+            container.append("g").attr("class", "link-group").attr("stroke", "#e4e4e7");
+            container.append("g").attr("class", "node-group");
+            const zoom = d3.zoom<SVGSVGElement, unknown>()
+                .scaleExtent([0.1, 4])
+                .on("zoom", (event) => {
+                    container.attr("transform", event.transform);
+
+                    // Update hovered link/node coordinates during zoom/pan
+                    if (activeHoveredLinkRef.current && svgRef.current) {
+                        const d = activeHoveredLinkRef.current.link;
+                        const x1 = (d.source as any).x;
+                        const y1 = (d.source as any).y;
+                        const x2 = (d.target as any).x;
+                        const y2 = (d.target as any).y;
+                        if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                            const midX = (x1 + x2) / 2;
+                            const midY = (y1 + y2) / 2;
+                            setHoveredLink(prev => prev ? {
+                                ...prev,
+                                x: event.transform.applyX(midX),
+                                y: event.transform.applyY(midY)
+                            } : null);
+                        }
+                    } else if (activeHoveredNodeRef.current && svgRef.current) {
+                        const n = activeHoveredNodeRef.current;
+                        if (!isNaN(n.x!) && !isNaN(n.y!)) {
+                            const canvasX = event.transform.applyX(n.x!);
+                            const canvasY = event.transform.applyY(n.y!);
+                            const containerRect = containerRef.current?.getBoundingClientRect();
+                            const screenX = containerRect ? containerRect.left + canvasX : canvasX;
+                            const screenY = containerRect ? containerRect.top + canvasY : canvasY;
+                            setHoveredLink(prev => prev ? {
+                                ...prev,
+                                x: canvasX,
+                                y: canvasY,
+                                screenX,
+                                screenY
+                            } : null);
+                        }
+                    }
+                })
+                .on("start", (event) => {
+                    // Disable auto-tracking if the user initiates a manual pan/zoom
+                    if (event.sourceEvent) {
+                        isTrackingRef.current = false;
+                        targetNodeIdRef.current = null;
+                    }
+                });
+            svg.call(zoom).on("dblclick.zoom", null);
+            zoomRef.current = zoom;
+
+            // V45.1 (Phase B2.4): Execute initial camera centering immediately AFTER zoomRef.current is bound
+            if (!hasInitialCentered.current && visibleNodes.length > 0) {
+                const sceneCount = detectedSceneCount;
+                let centered = false;
+                if (sceneCount > 1) {
+                    centered = focusSceneCluster(activeSceneId || 'scene-1', 0);
+                } else {
+                    centered = fitGraphToScreen(0);
+                }
+                if (centered) {
+                    hasInitialCentered.current = true;
+                }
+            }
+
+            // Custom conditional double-click zoom to restore background zooming without hijacking mobile node taps
+            svg.on("dblclick", (event) => {
+                const isNode = event.target && event.target.closest && event.target.closest('.node-element');
+                if (isNode) return;
+                d3.select(svgRef.current).transition().duration(250).call(zoom.scaleBy, event.shiftKey ? 0.5 : 2, d3.pointer(event));
+            });
         }
-    }
-  // Used dimensions.width > 0 to trigger initial mount safely while preserving physics isolation during resizes
-  }, [visibleNodes, visibleLinks, seedArtists, activeFilters, dimensions.width > 0]);
 
-  const getSceneClusterCenter = useCallback((targetSceneId: string) => {
-    let targetIndex = -1;
-    if (scenes && scenes.length > 0) {
-      targetIndex = scenes.findIndex((s, idx) => (s.sceneId || s.id || `scene-${idx + 1}`) === targetSceneId);
-    }
-    if (targetIndex === -1) {
-      const match = targetSceneId.match(/^scene-(\d+)$/i);
-      if (match) targetIndex = parseInt(match[1], 10) - 1;
-    }
+        svg.on("click", (event) => {
+            if (event.target === svgRef.current) {
+                isTrackingRef.current = false;
+                targetNodeIdRef.current = null;
+                onNodeClickRef.current(null);
+                clearNodeHover();
+                if (activeHoveredNodeRef.current || activeHoveredLinkRef.current) {
+                    setHoveredLink(null);
+                }
+            }
+        });
 
-    const clusterNodes = visibleNodesRef.current.filter(n => {
-      if (n.sceneId && n.sceneId === targetSceneId) return true;
-      if (n.id && n.id.startsWith(targetSceneId + '::')) return true;
-      if (targetIndex >= 0 && n.sceneIndex === targetIndex) return true;
-      return false;
-    });
+        svg.on("mouseleave", () => {
+            if (!isSmallScreen) {
+                clearNodeHover();
+            }
+        });
 
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    let validCount = 0;
-    clusterNodes.forEach(n => {
-      if (n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y)) {
-        if (n.x < minX) minX = n.x;
-        if (n.x > maxX) maxX = n.x;
-        if (n.y < minY) minY = n.y;
-        if (n.y > maxY) maxY = n.y;
-        validCount++;
-      }
-    });
+        if (!simulationRef.current) {
+            const simulation = d3.forceSimulation<Node, Link>()
+                .force("link", d3.forceLink<Node, Link>().id((d: any) => String(d.id)).strength(0.3))
+                .force("charge", createSceneIsolatedChargeForce(() => -600))
+                .force("collide", d3.forceCollide().radius(40))
+                .velocityDecay(0.36)
+                .alphaMin(0.001)
+                .alphaDecay(0.022)
+                .on("tick", () => {
+                    if (!svgRef.current) return;
+                    const currentContainer = d3.select(svgRef.current).select(".main-container");
+                    if (currentContainer.empty()) return;
 
-    if (validCount > 0) {
-      return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, validCount };
-    }
-    const fallbackIdx = targetIndex >= 0 ? targetIndex : 0;
-    const center = getSceneCenterOffset(fallbackIdx);
-    return { cx: center.x, cy: center.y, validCount: 0 };
-  }, [scenes]);
+                    currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
+                        .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                        .attr("x1", (d: any) => {
+                            const val = (d.source as any).x;
+                            return isNaN(val) ? 0 : val;
+                        })
+                        .attr("y1", (d: any) => {
+                            const val = (d.source as any).y;
+                            return isNaN(val) ? 0 : val;
+                        })
+                        .attr("x2", (d: any) => {
+                            const val = (d.target as any).x;
+                            return isNaN(val) ? 0 : val;
+                        })
+                        .attr("y2", (d: any) => {
+                            const val = (d.target as any).y;
+                            return isNaN(val) ? 0 : val;
+                        });
 
-  const resolveTargetNodeAndScene = useCallback((node: Node | null) => {
-    if (!node) return null;
-    const rawId = String(node.id || '');
-    const canonicalId = stripSceneNamespace(node.canonicalId || rawId).toLowerCase();
+                    currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
+                        .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                        .attr("x1", (d: any) => {
+                            const val = (d.source as any).x;
+                            return isNaN(val) ? 0 : val;
+                        })
+                        .attr("y1", (d: any) => {
+                            const val = (d.source as any).y;
+                            return isNaN(val) ? 0 : val;
+                        })
+                        .attr("x2", (d: any) => {
+                            const val = (d.target as any).x;
+                            return isNaN(val) ? 0 : val;
+                        })
+                        .attr("y2", (d: any) => {
+                            const val = (d.target as any).y;
+                            return isNaN(val) ? 0 : val;
+                        });
 
-    // Check if node already has explicit sceneId or scene-k:: prefix
-    let targetSceneId = node.sceneId;
-    if (!targetSceneId) {
-      const match = rawId.match(/^(scene-\d+)::/i);
-      if (match) targetSceneId = match[1];
-    }
+                    currentContainer.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+                        .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                        .attr("d", (d: any) => computeBridgePathD(d, visibleNodesRef.current));
 
-    // Look up candidate matching nodes in visibleNodesRef.current
-    const candidates = visibleNodesRef.current.filter(n => {
-      const nCanon = stripSceneNamespace(n.canonicalId || n.id).toLowerCase();
-      return nCanon === canonicalId || isSameNodeId(n.id, node.id);
-    });
+                    // Update active hovered link/node coordinates
+                    if (activeHoveredLinkRef.current && svgRef.current) {
+                        const d = activeHoveredLinkRef.current.link;
+                        const x1 = (d.source as any).x;
+                        const y1 = (d.source as any).y;
+                        const x2 = (d.target as any).x;
+                        const y2 = (d.target as any).y;
+                        if (!isNaN(x1) && !isNaN(y1) && !isNaN(x2) && !isNaN(y2)) {
+                            const midX = (x1 + x2) / 2;
+                            const midY = (y1 + y2) / 2;
+                            const transform = d3.zoomTransform(svgRef.current);
+                            setHoveredLink(prev => prev ? {
+                                ...prev,
+                                x: transform.applyX(midX),
+                                y: transform.applyY(midY)
+                            } : null);
+                        }
+                    } else if (activeHoveredNodeRef.current && svgRef.current) {
+                        const n = activeHoveredNodeRef.current;
+                        if (!isNaN(n.x!) && !isNaN(n.y!)) {
+                            const transform = d3.zoomTransform(svgRef.current);
+                            const canvasX = transform.applyX(n.x!);
+                            const canvasY = transform.applyY(n.y!);
+                            const containerRect = containerRef.current?.getBoundingClientRect();
+                            const screenX = containerRect ? containerRect.left + canvasX : canvasX;
+                            const screenY = containerRect ? containerRect.top + canvasY : canvasY;
+                            setHoveredLink(prev => prev ? {
+                                ...prev,
+                                x: canvasX,
+                                y: canvasY,
+                                screenX,
+                                screenY
+                            } : null);
+                        }
+                    }
 
-    if (candidates.length === 0) {
-      return { targetSceneId: targetSceneId || activeSceneId || 'scene-1', targetNode: null };
-    }
+                    currentContainer.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")
+                        .style("display", (d: any) => (isNaN(d.x) || isNaN(d.y)) ? "none" : null)
+                        .attr("transform", (d: any) => {
+                            const x = isNaN(d.x) ? 0 : (d.x ?? 0);
+                            const y = isNaN(d.y) ? 0 : (d.y ?? 0);
+                            return `translate(${x},${y})`;
+                        });
+                })
+                .on("end", () => {
+                    // [Rule 21] & [Rule 44]: When all artist/label nodes entered this pass already pinned
+                    // from Coordinate Memory (1-tick render wake or Legend pill filter toggle),
+                    // skip post-settle overlap mutation, rounding/pinning, and read-only Firestore writes.
+                    // Do NOT return early so onSimulationCompleteRef and attemptInitialCentering() below always execute.
+                    if (!wasAllPinnedAtStartRef.current) {
+                        const nodes = simulation.nodes();
+                        const currentLinks = (simulation.force("link") as d3.ForceLink<Node, Link>)?.links() || [];
 
-    // If node appears in multiple scenes, prefer instance in activeSceneId if present;
-    // otherwise pick earliest scene arrival (sceneIndex ascending)
-    let bestNode = candidates[0];
-    if (candidates.length > 1) {
-      const activeMatch = candidates.find(n => (n.sceneId === activeSceneId) || (n.id && n.id.startsWith((activeSceneId || '') + '::')));
-      if (activeMatch) {
-        bestNode = activeMatch;
-      } else {
-        const sorted = [...candidates].sort((a, b) => (a.sceneIndex ?? 999) - (b.sceneIndex ?? 999));
-        bestNode = sorted[0];
-      }
-    }
+                        // Resolve any remaining node and text-label collisions across clusters before pinning coordinates ([Rule 21])
+                        resolveSceneNodeOverlaps(nodes, currentLinks);
 
-    const resolvedSceneId = bestNode.sceneId || 
-      bestNode.id.match(/^(scene-\d+)::/i)?.[1] ||
-      (bestNode.sceneIndex !== undefined ? `scene-${bestNode.sceneIndex + 1}` : (targetSceneId || activeSceneId || 'scene-1'));
+                        // Pin all nodes once the simulation settles to maintain absolute coordinate stability
+                        nodes.forEach(n => {
+                            if (n.x !== undefined && n.y !== undefined) {
+                                n.x = roundCoord2(n.x);
+                                n.y = roundCoord2(n.y);
+                                n.fx = n.x;
+                                n.fy = n.y;
+                            }
+                        });
 
-    return { targetSceneId: resolvedSceneId, targetNode: bestNode };
-  }, [activeSceneId]);
+                        // Flush updated post-overlap coordinates directly to the live SVG DOM elements
+                        // so the settled visual layout immediately matches the saved canvasLayout pixel-for-pixel
+                        if (svgRef.current) {
+                            const currentContainer = d3.select(svgRef.current).select(".main-container");
+                            if (!currentContainer.empty()) {
+                                currentContainer.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")
+                                    .style("display", (d: any) => (isNaN(d.x) || isNaN(d.y)) ? "none" : null)
+                                    .attr("transform", (d: any) => {
+                                        const x = isNaN(d.x) ? 0 : (d.x ?? 0);
+                                        const y = isNaN(d.y) ? 0 : (d.y ?? 0);
+                                        return `translate(${x},${y})`;
+                                    });
 
-  const lastCameraFollowedNodeIdRef = useRef<string | null>(null);
-  const lastReorderCameraNonceRef = useRef<number>(0);
+                                currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
+                                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                                    .attr("x1", (d: any) => {
+                                        const val = (d.source as any).x;
+                                        return isNaN(val) ? 0 : val;
+                                    })
+                                    .attr("y1", (d: any) => {
+                                        const val = (d.source as any).y;
+                                        return isNaN(val) ? 0 : val;
+                                    })
+                                    .attr("x2", (d: any) => {
+                                        const val = (d.target as any).x;
+                                        return isNaN(val) ? 0 : val;
+                                    })
+                                    .attr("y2", (d: any) => {
+                                        const val = (d.target as any).y;
+                                        return isNaN(val) ? 0 : val;
+                                    });
 
-  // V47.20: Full-constellation camera fit after 0-Token Scene Reordering.
-  // Runs immediately BEFORE Smart Camera Follow so pre-seeding lastCameraFollowedNodeIdRef
-  // (when actively selected) prevents remapped selection from fighting or canceling fitGraphToScreen(750),
-  // while fitAll: false on mobile suppresses background camera jumps (Law 44).
-  useEffect(() => {
-    if (!reorderCameraSignal || reorderCameraSignal.nonce <= lastReorderCameraNonceRef.current) return;
-    lastReorderCameraNonceRef.current = reorderCameraSignal.nonce;
-    const activeNode = selectedNode || peekedNode;
-    if (!isPassiveSelection && activeNode) {
-      lastCameraFollowedNodeIdRef.current = String(activeNode.id || '');
-    }
-    isTrackingRef.current = false;
-    targetNodeIdRef.current = null;
-    if (reorderCameraSignal.fitAll && !isSmallScreenRef.current) {
-      fitGraphToScreen(750);
-    }
-  }, [reorderCameraSignal, selectedNode, peekedNode, isPassiveSelection, fitGraphToScreen]);
+                                currentContainer.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
+                                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                                    .attr("x1", (d: any) => {
+                                        const val = (d.source as any).x;
+                                        return isNaN(val) ? 0 : val;
+                                    })
+                                    .attr("y1", (d: any) => {
+                                        const val = (d.source as any).y;
+                                        return isNaN(val) ? 0 : val;
+                                    })
+                                    .attr("x2", (d: any) => {
+                                        const val = (d.target as any).x;
+                                        return isNaN(val) ? 0 : val;
+                                    })
+                                    .attr("y2", (d: any) => {
+                                        const val = (d.target as any).y;
+                                        return isNaN(val) ? 0 : val;
+                                    });
 
-  // Smart Camera Follow: direct camera across Scenarios A, B, and C when navigating DEEP CUTS or selecting nodes
-  useEffect(() => {
-    const isSearchActive = searchQuery.trim().length > 0;
-    if (isSearchActive) return;
+                                currentContainer.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+                                    .style("display", (d: any) => (isNaN((d.source as any).x) || isNaN((d.source as any).y) || isNaN((d.target as any).x) || isNaN((d.target as any).y)) ? "none" : null)
+                                    .attr("d", (d: any) => computeBridgePathD(d, visibleNodesRef.current));
+                            }
+                        }
 
-    const activeNode = selectedNode || peekedNode;
-    if (!activeNode) {
-      isTrackingRef.current = false;
-      targetNodeIdRef.current = null;
-      lastCameraFollowedNodeIdRef.current = null;
-      return;
-    }
+                        // Phase A — Coordinate Memory: collect ALL settled node positions
+                        // (artists, labels, and all metadata petals: genre, country, founded).
+                        // Zero Coordinate Amnesia requires every node type to be pinned.
+                        if (onCoordinatesSettledRef.current) {
+                            const settledLayout: CanvasNodeRef[] = nodes
+                                .filter(n => n.fx !== undefined && n.fx !== null
+                                    && n.fy !== undefined && n.fy !== null)
+                                .map(n => ({
+                                    nodeId: n.id,
+                                    x: roundCoord2(n.x as number),
+                                    y: roundCoord2(n.y as number),
+                                    fx: n.fx !== undefined && n.fx !== null ? roundCoord2(n.fx) : null,
+                                    fy: n.fy !== undefined && n.fy !== null ? roundCoord2(n.fy) : null,
+                                }));
+                            if (settledLayout.length > 0) {
+                                onCoordinatesSettledRef.current(settledLayout);
+                            }
+                        }
+                    }
 
-    // Guardrail 2: On initial load / passive selection, Scene 1 framing is handled by focusSceneCluster on mount
-    if (isPassiveSelection) {
-      return;
-    }
+                    // Notify parent that simulation has settled regardless of initial zoom state
+                    if (onSimulationCompleteRef.current) {
+                        onSimulationCompleteRef.current();
+                    }
 
-    const activeIdStr = String(activeNode.id || '');
-    if (lastCameraFollowedNodeIdRef.current === activeIdStr) {
-      return;
-    }
-    lastCameraFollowedNodeIdRef.current = activeIdStr;
+                    const attemptInitialCentering = () => {
+                        if (dimensionsRef.current.width === 0 || !svgRef.current || !zoomRef.current) {
+                            return false;
+                        }
+                        const sceneCount = detectedSceneCount;
+                        let centered = false;
+                        if (sceneCount > 1 && focusSceneClusterRef.current) {
+                            centered = focusSceneClusterRef.current(activeSceneId || 'scene-1', 0);
+                        } else if (fitGraphToScreenRef.current) {
+                            centered = fitGraphToScreenRef.current(0);
+                            if (sceneCount <= 1) {
+                                setTimeout(() => {
+                                    if (svgRef.current && zoomRef.current) {
+                                        d3.select(svgRef.current).transition().duration(300).call(zoomRef.current.scaleBy, 1.5);
+                                    }
+                                }, 50);
+                            }
+                        }
+                        return centered;
+                    };
 
-    if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0) return;
+                    if (!hasInitialCentered.current) {
+                        setTimeout(() => {
+                            const centered = attemptInitialCentering();
+                            if (centered) {
+                                hasInitialCentered.current = true;
+                            }
+                        }, 50);
+                    }
+                });
+            simulationRef.current = simulation;
+        }
 
-    const resolution = resolveTargetNodeAndScene(activeNode);
-    if (!resolution) return;
-    const { targetSceneId, targetNode } = resolution;
+        const simulation = simulationRef.current;
 
-    const transform = d3.zoomTransform(svgRef.current);
-    const currentK = transform.k;
-    const { width, height } = dimensionsRef.current;
-    const worldCenterX = (width / 2 - transform.x) / currentK;
-    const worldCenterY = (height / 2 - transform.y) / currentK;
+        // Map of artist positions for easy lookup
+        const artistPositions = new Map<string, { x: number, y: number }>();
+        visibleNodes.forEach(n => {
+            if (n.type === 'artist' && n.x !== undefined && !isNaN(n.x) && n.y !== undefined && !isNaN(n.y)) {
+                artistPositions.set(n.id, { x: n.x, y: n.y });
+            }
+        });
 
-    const targetClusterCenter = getSceneClusterCenter(targetSceneId);
-    const distToTargetCluster = Math.hypot(worldCenterX - targetClusterCenter.cx, worldCenterY - targetClusterCenter.cy);
+        // --- LIVE COORDINATE HANDSHAKE ---
+        // Extract the live coordinates from the current simulation state before we overwrite them.
+        // This prevents stale JSON coordinates from 'teleporting' active nodes back in time.
+        // Guard against scene re-indexing collisions (e.g., scene-5 being re-indexed to scene-3):
+        // If the scene structure or order changed, discard live physics state so incoming composite
+        // coordinates are honored instead of stale simulation coordinates from a previous scene.
+        const currentSceneFingerprint = scenes.map(s => {
+            const sid = s.sceneId || s.id || '';
+            const seeds = s.curatedSeedArtists || s.seedArtists || '';
+            const custom = s.customName || '';
+            const filtersSig = s.discoveryFilters ? JSON.stringify(s.discoveryFilters) : '';
+            const firstNode = s.graphData?.nodes?.[0] ? stripSceneNamespace(s.graphData.nodes[0].canonicalId || s.graphData.nodes[0].id) : '';
+            const nodeCount = s.graphData?.nodes?.length ?? 0;
+            return `${sid}:${seeds}:${custom}:${filtersSig}:${nodeCount}:${firstNode}`;
+        }).join('|');
+        const isSceneStructureChanged = lastSceneFingerprintRef.current !== currentSceneFingerprint;
+        lastSceneFingerprintRef.current = currentSceneFingerprint;
 
-    // Scenario A (Zoomed Out Overview) or Scenario B (Camera Centered on Another Scene)
-    if (currentK < 0.65 || distToTargetCluster > 500) {
-      isTrackingRef.current = false;
-      targetNodeIdRef.current = null;
-      focusSceneCluster(targetSceneId, 750);
-      return;
-    }
+        const currentLiveNodes = isSceneStructureChanged ? [] : simulation.nodes();
+        const livePhysicsState = new Map<string, { x?: number, y?: number, vx?: number, vy?: number, fx?: number | null, fy?: number | null }>();
+        currentLiveNodes.forEach(n => {
+            livePhysicsState.set(n.id, { x: n.x, y: n.y, vx: n.vx, vy: n.vy, fx: n.fx, fy: n.fy });
+        });
 
-    // Scenario C (Zoomed In Within the Same Scene)
-    if (targetNode && typeof targetNode.x === 'number' && typeof targetNode.y === 'number' && !isNaN(targetNode.x) && !isNaN(targetNode.y)) {
-      const sx = transform.x + currentK * targetNode.x;
-      const sy = transform.y + currentK * targetNode.y;
-      const margin = 80;
-      const isOffScreen = sx < margin || sx > width - margin || sy < margin || sy > height - margin;
+        visibleNodes.forEach(n => {
+            // If the node already exists in the live physics engine, verify it is within its scene's territory before inheriting
+            const liveState = livePhysicsState.get(n.id);
+            if (liveState && liveState.x !== undefined && liveState.y !== undefined && !isNaN(liveState.x) && !isNaN(liveState.y)) {
+                const nodeSceneIdx = n.sceneIndex ?? 0;
+                const sceneCenter = getSceneCenterOffset(nodeSceneIdx);
+                const dx = Math.abs(liveState.x - sceneCenter.x);
+                const dy = Math.abs(liveState.y - sceneCenter.y);
+                const isWithinTerritory = dx <= SCENE_TERRITORY_MAX_DX && dy <= SCENE_TERRITORY_MAX_DY;
+                if (isWithinTerritory) {
+                    n.x = liveState.x;
+                    n.y = liveState.y;
+                    n.vx = liveState.vx;
+                    n.vy = liveState.vy;
+                    n.fx = liveState.fx;
+                    n.fy = liveState.fy;
+                    return; // Skip fallback initialization
+                }
+            }
 
-      if (isOffScreen) {
+            // --- NEW NODE INITIALIZATION ---
+            if (n.x === undefined || isNaN(n.x) || n.y === undefined || isNaN(n.y)) {
+                // Sprout metadata nodes from their parent artist positions to avoid layout drift
+                if (n.type !== 'artist') {
+                    const connectedArtists: { x: number, y: number }[] = [];
+                    visibleLinks.forEach(l => {
+                        const s = typeof l.source === 'object' ? l.source.id : l.source;
+                        const t = typeof l.target === 'object' ? l.target.id : l.target;
+                        if (s === n.id && artistPositions.has(t)) {
+                            connectedArtists.push(artistPositions.get(t)!);
+                        } else if (t === n.id && artistPositions.has(s)) {
+                            connectedArtists.push(artistPositions.get(s)!);
+                        }
+                    });
+
+                    if (connectedArtists.length > 0) {
+                        const avgX = connectedArtists.reduce((sum, p) => sum + p.x, 0) / connectedArtists.length;
+                        const avgY = connectedArtists.reduce((sum, p) => sum + p.y, 0) / connectedArtists.length;
+                        const sceneCenter = getSceneCenterOffset(n.sceneIndex ?? 0);
+                        // Sprout metadata petals along an outward arc from scene center through parent artist
+                        const outwardAngle = Math.atan2(avgY - sceneCenter.y, avgX - sceneCenter.x);
+                        const typeOffset = n.type === 'founded' ? -0.45 : (n.type === 'genre' ? 0 : 0.45);
+                        const hashOffset = ((String(n.id).charCodeAt(0) % 5) - 2) * 0.08;
+                        const sproutAngle = outwardAngle + typeOffset + hashOffset;
+                        const sproutRadius = n.type === 'founded' ? 65 : (n.type === 'genre' ? 75 : 70);
+                        n.x = avgX + sproutRadius * Math.cos(sproutAngle);
+                        n.y = avgY + sproutRadius * Math.sin(sproutAngle);
+                        n.vx = 0;
+                        n.vy = 0;
+                        return;
+                    }
+                }
+
+                // Fallback placement near the node's own Scene center offset
+                const sceneCenter = getSceneCenterOffset(n.sceneIndex ?? 0);
+                n.x = sceneCenter.x + (Math.random() - 0.5) * 100;
+                n.y = sceneCenter.y + (Math.random() - 0.5) * 100;
+                n.vx = 0;
+                n.vy = 0;
+            }
+        });
+
+        simulation.nodes(visibleNodes);
+        (simulation.force("link") as d3.ForceLink<Node, Link>).links(visibleLinks);
+
+        // Compute connection degrees for all visible nodes
+        // Exclude non-artist metadata links from nodeTotalWeights so high-degree genre/country hubs
+        // (e.g. nu-metal, united-states) do not inflate their collideForce.radius.
+        const visibleNodeById = new Map<string, Node>(visibleNodes.map(n => [n.id, n]));
+        const nodeDegrees = new Map<string, number>();
+        const artistArtistDegrees = new Map<string, number>();
+        const nodeTotalWeights = new Map<string, number>();
+        visibleLinks.forEach(l => {
+            if (l.isCrossSceneBridge) return;
+            const s = typeof l.source === 'object' ? l.source.id : l.source;
+            const t = typeof l.target === 'object' ? l.target.id : l.target;
+            nodeDegrees.set(s, (nodeDegrees.get(s) || 0) + 1);
+            nodeDegrees.set(t, (nodeDegrees.get(t) || 0) + 1);
+
+            const sNode = visibleNodeById.get(s);
+            const tNode = visibleNodeById.get(t);
+            if (sNode?.type === 'artist' && tNode?.type === 'artist') {
+                artistArtistDegrees.set(s, (artistArtistDegrees.get(s) || 0) + 1);
+                artistArtistDegrees.set(t, (artistArtistDegrees.get(t) || 0) + 1);
+                const weight = l.weight ?? 0.5;
+                nodeTotalWeights.set(s, (nodeTotalWeights.get(s) || 0) + weight);
+                nodeTotalWeights.set(t, (nodeTotalWeights.get(t) || 0) + weight);
+            }
+        });
+        nodeDegreesRef.current = nodeDegrees;
+
+        const forceX = d3.forceX<Node>();
+        const forceY = d3.forceY<Node>();
+        const collideForce = simulation.force("collide") as d3.ForceCollide<Node>;
+
+        // 1. Per-Scene Seed Anchoring & Gravity Profiles ([Rule 21])
+        // Compute node count and root count independently per sceneIndex so a 1-root, 34-node scene
+        // settles with identical link distances and gravity whether standalone or in a 5-scene board.
+        const sceneProfiles = new Map<number, ScenePhysicsProfile>();
+        const nodesByScene = new Map<number, Node[]>();
+        for (const n of visibleNodes) {
+            const idx = typeof n.sceneIndex === 'number' ? n.sceneIndex : 0;
+            const list = nodesByScene.get(idx);
+            if (list) list.push(n);
+            else nodesByScene.set(idx, [n]);
+        }
+        nodesByScene.forEach((sceneNodes, idx) => {
+            const sceneNumNodes = sceneNodes.length;
+            const sceneNumSeeds = Math.max(
+                1,
+                sceneNodes.filter((n) => n.type === 'artist' && isNodeSeedInOwnScene(n, seedArtists)).length
+            );
+            const isExpandedLayout = sceneNumSeeds > 1 || sceneNumNodes > 35;
+            const isFullyPinned =
+                sceneNodes.length > 0 &&
+                sceneNodes.every((n) => n.fx !== null && n.fx !== undefined && n.fy !== null && n.fy !== undefined);
+            sceneProfiles.set(idx, {
+                numNodes: sceneNumNodes,
+                numSeeds: sceneNumSeeds,
+                isExpandedLayout,
+                spacingMultiplier: isExpandedLayout ? 1.25 : 1.0,
+                globalGravityStrength: isExpandedLayout ? 0.03 : 0.045,
+                seedStrength: sceneNumSeeds > 1 ? 0.15 : 0.4,
+                isFullyPinned,
+            });
+        });
+
+        const getSceneProfile = (d?: Node | null): ScenePhysicsProfile => {
+            const idx = d && typeof d.sceneIndex === 'number' ? d.sceneIndex : 0;
+            return (
+                sceneProfiles.get(idx) || {
+                    numNodes: visibleNodes.length,
+                    numSeeds: 1,
+                    isExpandedLayout: false,
+                    spacingMultiplier: 1.0,
+                    globalGravityStrength: 0.045,
+                    seedStrength: 0.4,
+                    isFullyPinned: false,
+                }
+            );
+        };
+
+        forceX.strength((d: Node) => {
+            const profile = getSceneProfile(d);
+            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
+            return isSeed ? profile.seedStrength : profile.globalGravityStrength;
+        }).x((d: Node) => getSceneCenterOffset(d.sceneIndex ?? 0).x);
+
+        forceY.strength((d: Node) => {
+            const profile = getSceneProfile(d);
+            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
+            return isSeed ? profile.seedStrength : profile.globalGravityStrength;
+        }).y((d: Node) => getSceneCenterOffset(d.sceneIndex ?? 0).y);
+
+        simulation.force('center', createSceneIsolatedCenterForce(0.005));
+
+        // 2 & 3. Scene-Isolated Balanced Repulsion: Spaced but cohesive ([Rule 21])
+        simulation.force('charge', createSceneIsolatedChargeForce((d: Node) => {
+            if (d.type === 'artist') {
+                const isSeed = isNodeSeedInOwnScene(d, seedArtists);
+                return isSeed ? -800 : -500; // Moderated repulsion
+            }
+
+            // Metadata petals
+            const deg = nodeDegrees.get(d.id) ?? 1;
+            if (deg > 1) {
+                return -60; // Moderated repulsion for shared metadata nodes
+            }
+
+            // Private petals stay close but have sufficient repulsion to avoid text collisions
+            switch (d.type) {
+                case 'founded': return -100;
+                case 'label': return -110;
+                case 'genre': return -120;
+                case 'country': return -100;
+                default: return -100;
+            }
+        }));
+
+        // 4. Automatic Collision Protection
+        collideForce.radius((d: Node) => {
+            const label = toDisplayLabel(d);
+            const textWidth = label.length * 6.0;
+            const minRadius = d.type === 'artist' ? 32 : 20;
+            const baseRadius = textWidth / 2 + 10;
+            const centralityBonus = (nodeTotalWeights.get(d.id) || 0) * 5;
+            return Math.max(minRadius, baseRadius + centralityBonus);
+        });
+
+        simulation.force('x', forceX).force('y', forceY);
+
+        // BFS depth computation
+        const depths = computeNodeDepths(visibleNodes, visibleLinks, seedArtists);
+
+        // Condensed dynamic link distances (with per-scene density scaling)
+        (simulation.force("link") as d3.ForceLink<Node, Link>).distance(d => {
+            const s = d.source as Node;
+            const t = d.target as Node;
+            const sceneSpacingMultiplier = getSceneProfile(s).spacingMultiplier;
+
+            // If one of the nodes is a metadata node
+            if (s.type !== 'artist' || t.type !== 'artist') {
+                const metaNode = s.type !== 'artist' ? s : t;
+                const deg = nodeDegrees.get(metaNode.id) ?? 1;
+
+                if (deg > 1) {
+                    return 160 * sceneSpacingMultiplier; // Shared metadata floats wider in complex layouts
+                }
+
+                // Private petal: keep tight and category-specific
+                switch (metaNode.type) {
+                    case 'founded': return 65;
+                    case 'label': return 70;
+                    case 'genre': return 75;
+                    case 'country': return 75;
+                    default: return 70;
+                }
+            }
+
+            // Artist-to-Artist links: scale core skeleton using AI semantic weight
+            const weight = d.weight ?? 0.5;
+            return (300 - (weight * 220)) * sceneSpacingMultiplier;
+        });
+
+        // Re-tensioned dynamic link strengths (0 for Cross-Scene Bridge Lines so clusters stay independent)
+        (simulation.force("link") as d3.ForceLink<Node, Link>).strength(d => {
+            if (d.isCrossSceneBridge) return 0;
+            const s = d.source as Node;
+            const t = d.target as Node;
+
+            if (s.type !== 'artist' || t.type !== 'artist') {
+                const metaNode = s.type !== 'artist' ? s : t;
+                const deg = nodeDegrees.get(metaNode.id) ?? 1;
+
+                if (deg > 1) {
+                    return 0.08; // Holds shared metadata in place without collapsing artists
+                }
+                return 0.35; // Elastic tether lets petals separate from labels without collapsing into artist
+            }
+
+            const weight = d.weight ?? 0.5;
+            return 0.1 + (weight * 0.6); // Firm semantic tie = rigid; weak tie = elastic
+        });
+
+        const colorScale = d3.scaleOrdinal(zceneCategoricalPalette);
+
+        const getNodeColor = (node: Node) => {
+            if (node.type === 'artist') {
+                return isNodeSeedInOwnScene(node, seedArtists) ? nodeTypeColorMap.seed : nodeTypeColorMap.ai;
+            }
+            if (!node.type) return zceneFallbackColor;
+            return nodeTypeColorMap[node.type] || colorScale(node.type);
+        };
+
+        const nodeElements = container.select(".node-group").selectAll<SVGGElement, Node>("g.node-element")
+            .data(visibleNodes, (d: any) => String(d.id))
+            .join(
+                enter => {
+                    const g = enter.append("g")
+                        .attr("class", "node-element")
+                        .attr("cursor", "pointer");
+
+                    // Expanded invisible hit-box for forgiving touch/hover targets
+                    g.append("circle")
+                        .attr("class", "hit-box")
+                        .attr("r", 35)
+                        .attr("fill", "transparent")
+                        .style("pointer-events", "all");
+
+                    // Subtle halo ring for Root Artists and actively selected node
+                    g.append("circle")
+                        .attr("class", "node-halo")
+                        .attr("r", 22)
+                        .attr("fill", "none")
+                        .attr("stroke", "transparent")
+                        .attr("stroke-width", 0)
+                        .style("pointer-events", "none");
+
+                    g.append("text")
+                        .attr("class", "node-icon material-symbols-outlined")
+                        .attr("text-anchor", "middle")
+                        .attr("dominant-baseline", "central")
+                        .style("font-variation-settings", "'FILL' 1")
+                        .style("pointer-events", "none")
+                        .style("user-select", "none");
+
+                    g.append("text")
+                        .attr("class", "node-label")
+                        .attr("text-anchor", "middle")
+                        .attr("fill", "#e4e4e7")
+                        .style("font-weight", "500")
+                        .style("pointer-events", "none")
+                        .style("text-shadow", "0 1px 2px rgba(0,0,0,0.8)");
+                    return g;
+                }
+            );
+
+        // Bind event handlers on the merged selection so they always have the latest closures
+        nodeElements
+            .on("click", (event, d) => {
+                event.stopPropagation();
+                if (window.navigator && window.navigator.vibrate) {
+                    window.navigator.vibrate(10);
+                }
+
+                const isTouch = isSmallScreen || (typeof window !== 'undefined' && window.matchMedia('(pointer: coarse)').matches);
+
+                if (isTouch) {
+                    const currentHoveredNodeId = hoveredNodeIdRef.current;
+
+                    // If first tap on this node, only trigger the connection snippet overlay
+                    if (!currentHoveredNodeId || !isSameNodeId(currentHoveredNodeId, d.id)) {
+                        triggerNodeHoverRef.current(d);
+                        onInteractionRef.current?.();
+                        return; // Do not trigger Deep Cut navigation
+                    }
+                    // If second tap on the same active node, proceed to navigation
+                }
+
+                isTrackingRef.current = true;
+                targetNodeIdRef.current = d.id;
+                onNodeClickRef.current(d);
+                onInteractionRef.current?.();
+            })
+            .on("mouseenter", (event, d) => {
+                if (!isSmallScreen) {
+                    if (containerRef.current && d.type === 'artist') {
+                        const rect = containerRef.current.getBoundingClientRect();
+                        const x = event.clientX - rect.left;
+                        const y = event.clientY - rect.top;
+                        const isLeft = x < rect.width / 2;
+                        const isTop = y < rect.height / 2;
+                        let quadrant: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' = 'top-right';
+                        if (isLeft && isTop) {
+                            quadrant = 'bottom-right';
+                        } else if (!isLeft && isTop) {
+                            quadrant = 'bottom-left';
+                        } else if (isLeft && !isTop) {
+                            quadrant = 'top-right';
+                        } else if (!isLeft && !isTop) {
+                            quadrant = 'top-left';
+                        }
+                        setHoverQuadrant(quadrant);
+                    }
+                    triggerNodeHoverRef.current(d);
+                }
+            })
+
+            .on("mouseleave", (event, d) => {
+                if (!isSmallScreen) {
+                    clearNodeHoverRef.current();
+                }
+            });
+
+        nodeElements
+            .attr("class", d => `node-element ${d.isLoading || d.isPending ? 'animate-pulse' : ''}`);
+
+        nodeElements.select("circle.node-halo")
+            .attr("r", d => isNodeSeedInOwnScene(d, seedArtists) ? 22 : 20)
+            .attr("fill", d => isNodeSeedInOwnScene(d, seedArtists) ? "rgba(246, 228, 104, 0.08)" : "none")
+            .attr("stroke", d => isNodeSeedInOwnScene(d, seedArtists) ? "rgba(246, 228, 104, 0.35)" : "transparent")
+            .attr("stroke-width", d => isNodeSeedInOwnScene(d, seedArtists) ? 1.5 : 0);
+
+        nodeElements.select("text.node-icon")
+            .attr("fill", d => getNodeColor(d))
+            .attr("opacity", d => d.isLoading || d.isPending ? 0.35 : 1)
+            .style("font-size", d => {
+                const isSeed = isNodeSeedInOwnScene(d, seedArtists);
+                if (isSeed) return "32px";
+                if (d.type === 'artist') {
+                    const aaDeg = artistArtistDegrees.get(d.id) ?? 0;
+                    const sceneProfile = getSceneProfile(d);
+                    const isMultiPodBridge = sceneProfile.numSeeds > 1 && (d.group || 1) > sceneProfile.numSeeds;
+                    return (aaDeg >= 4 || isMultiPodBridge) ? "28px" : "25px";
+                }
+                if (d.type === 'label') {
+                    const deg = nodeDegrees.get(d.id) ?? 1;
+                    return deg >= 3 ? "26px" : "22px";
+                }
+                if (d.type === 'country' || d.type === 'founded') return "21px";
+                return "20px";
+            })
+            .text(d => {
+                const isSeed = isNodeSeedInOwnScene(d, seedArtists);
+                if (isSeed) return 'album';
+                if (d.type === 'artist') return 'equalizer';
+                if (d.type === 'genre') return 'library_music';
+                if (d.type === 'label') return 'label';
+                if (d.type === 'country') return 'location_on';
+                if (d.type === 'founded') return 'event';
+                return 'circle';
+            });
+
+        // Add loading spinner for loading nodes
+        nodeElements.each(function (d) {
+            const g = d3.select(this);
+            g.select(".loading-spinner").remove();
+            if (d.isLoading) {
+                g.append("foreignObject")
+                    .attr("class", "loading-spinner")
+                    .attr("x", -12)
+                    .attr("y", -12)
+                    .attr("width", 24)
+                    .attr("height", 24)
+                    .append("xhtml:div")
+                    .attr("class", "flex items-center justify-center w-full h-full")
+                    .html('<div class="animate-spin text-primary"><svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-loader-2"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="m16.2 16.2 2.9 2.9"/><path d="M12 18v4"/><path d="m4.9 19.1 2.9-2.9"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg></div>');
+            }
+        });
+
+
+
+        const isSearchActive = searchQueryRef.current.trim().length > 0;
+        const hlNodes = highlightedNodesRef.current;
+        const selHighlight = selectionHighlightIdsRef.current;
+
+        nodeElements.select("text.node-label")
+            .attr("y", d => isNodeSeedInOwnScene(d, seedArtists) ? 27 : 25)
+            .attr("fill", d => {
+                if (isNodeSeedInOwnScene(d, seedArtists)) return "#F6E468";
+                if (isSearchActive && (hlNodes.has(d.id) || hlNodes.has(String(d.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(d.id))))) return "#ffffff";
+                if (selHighlight && selHighlight.has(d.id)) return "#ffffff";
+                return (d.type === 'artist' || d.type === 'label') ? "#e4e4e7" : "#a1a1aa";
+            })
+            .attr("opacity", d => {
+                if (isSearchActive && (hlNodes.has(d.id) || hlNodes.has(String(d.id).toLowerCase()) || hlNodes.has(normalizeArtistId(String(d.id))))) return 1;
+                if (selHighlight && selHighlight.has(d.id)) return 1;
+                return (d.type === 'artist' || d.type === 'label') ? 1 : 0.8;
+            })
+            .style("font-size", d => {
+                if (isNodeSeedInOwnScene(d, seedArtists)) return "13px";
+                return (d.type === 'artist' || d.type === 'label') ? "12px" : "11px";
+            })
+            .style("font-weight", d => {
+                if (isNodeSeedInOwnScene(d, seedArtists)) return "600";
+                return (d.type === 'artist' || d.type === 'label') ? "500" : "400";
+            })
+            .text(d => toDisplayLabel(d));
+
+        const dimmedSet = dimmedSceneIdsRef.current;
+
+        nodeElements
+            .attr("cursor", d => isNodeInDimmedScene(d, dimmedSet) ? "default" : "pointer")
+            .style("opacity", d => {
+                if (isNodeInDimmedScene(d, dimmedSet)) return 0.05;
+                const nodeType = d.type as FilterKeys;
+                const isFilteredOut = d.type !== 'artist' &&
+                    Object.prototype.hasOwnProperty.call(activeFilters, nodeType) &&
+                    !activeFilters[nodeType];
+                if (isFilteredOut) return 0.05;
+
+                if (isSearchActive) {
+                    if (hlNodes.size === 0) return 0.05;
+                    const isMatch = hlNodes.has(d.id) ||
+                        hlNodes.has(String(d.id).toLowerCase()) ||
+                        hlNodes.has(normalizeArtistId(String(d.id)));
+                    return isMatch ? 1 : 0.05;
+                }
+
+                if (selHighlight) return selHighlight.has(d.id) ? 1 : 0.1;
+                return 1;
+            });
+
+        nodeElements.select("circle.hit-box").style("pointer-events", d => isNodeInDimmedScene(d, dimmedSet) ? "none" : "all");
+
+        const nodeId = (n: any) => String(typeof n === 'string' ? n : n.id);
+        const intraSceneLinks = visibleLinks.filter(l => !l.isCrossSceneBridge);
+        const bridgeLinks = visibleLinks.filter(l => Boolean(l.isCrossSceneBridge));
+
+        container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
+            .data(intraSceneLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
+            .join("line")
+            .attr("class", "visual-line")
+            .attr("stroke", (d: any) => {
+                if (isLinkInDimmedScene(d, undefined, undefined, dimmedSet)) return "#e4e4e7";
+                if (isSearchActive) {
+                    const s = nodeId(d.source);
+                    const t = nodeId(d.target);
+                    const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
+                    const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
+                    return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
+                }
+                const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
+                if (activeNode && !isNodeInDimmedScene(activeNode, dimmedSet)) {
+                    const s = nodeId(d.source);
+                    const t = nodeId(d.target);
+                    if (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id)) {
+                        return "#F6E468";
+                    }
+                }
+                return "#e4e4e7";
+            })
+            .attr("stroke-width", 1)
+            .attr("stroke-opacity", (d: any) => {
+                const s = nodeId(d.source);
+                const t = nodeId(d.target);
+
+                const sNode = visibleNodes.find(n => n.id === s);
+                const tNode = visibleNodes.find(n => n.id === t);
+                if (isLinkInDimmedScene(d, sNode, tNode, dimmedSet)) return 0.05;
+                const isLinkFilteredOut = (node: Node | undefined) => {
+                    if (!node || node.type === 'artist') return false;
+                    const nodeType = node.type as FilterKeys;
+                    return Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && !activeFilters[nodeType];
+                };
+                if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
+
+                if (isSearchActive) {
+                    if (hlNodes.size === 0) return 0.05;
+                    const isMatchS = hlNodes.has(s) || hlNodes.has(String(s).toLowerCase());
+                    const isMatchT = hlNodes.has(t) || hlNodes.has(String(t).toLowerCase());
+                    return (isMatchS && isMatchT) ? 0.6 : 0.05;
+                }
+
+                const activeNode = selectedNode || peekedNode || activeHoveredNodeRef.current;
+                if (activeNode && !isNodeInDimmedScene(activeNode, dimmedSet) && (isSameNodeId(s, activeNode.id) || isSameNodeId(t, activeNode.id))) {
+                    return 0.9;
+                }
+
+                if (selHighlight) return (selHighlight.has(s) && selHighlight.has(t)) ? 0.3 : 0.05;
+                return computeRestingLinkOpacity(d, sNode, tNode, nodeDegreesRef.current);
+            })
+            .attr("stroke-dasharray", "3,3")
+            .style("pointer-events", "none");
+
+        container.select(".link-group").selectAll<SVGLineElement, Link>("line.interactive-link")
+            .data(intraSceneLinks, (d: any) => `${nodeId(d.source)}-${nodeId(d.target)}`)
+            .join("line")
+            .attr("class", "interactive-link")
+            .attr("stroke", "transparent")
+            .attr("stroke-width", 16)
+            .style("cursor", "default");
+
+        // Cross-Scene Curved Bridge Lines (Default rest: neutral grey #e4e4e7, stroke-opacity 0.4, stroke-width 1.2)
+        container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+            .data(bridgeLinks, (d: any) => `bridge:${nodeId(d.source)}-${nodeId(d.target)}`)
+            .join("path")
+            .attr("class", "bridge-visual-line")
+            .attr("fill", "none")
+            .attr("stroke", "#e4e4e7")
+            .attr("stroke-width", 1.2)
+            .attr("stroke-dasharray", "6,4")
+            .attr("stroke-opacity", (d: any) => isLinkInDimmedScene(d, undefined, undefined, dimmedSet) ? 0.05 : 0.4)
+            .attr("d", (d: any) => computeBridgePathD(d, visibleNodes))
+            .style("pointer-events", "none");
+
+        // Check if the set of artists has structurally changed
+        const currentArtists = visibleNodes.filter(n => n.type === 'artist');
+        const currentArtistIds = new Set(currentArtists.map(n => n.id));
+
+        let isStructuralChange = false;
+        if (currentArtistIds.size !== prevArtistIdsRef.current.size) {
+            isStructuralChange = true;
+        } else {
+            for (const id of currentArtistIds) {
+                if (!prevArtistIdsRef.current.has(id)) {
+                    isStructuralChange = true;
+                    break;
+                }
+            }
+        }
+        prevArtistIdsRef.current = currentArtistIds;
+
+        // Check if layout or filters structurally changed (ignoring pure dimension resizes)
+        const layoutSignature = `${visibleNodes.map(n => n.id).join(',')}|${visibleLinks.map(l => `${nodeId(l.source)}-${nodeId(l.target)}`).join(',')}|${seedArtists.join(',')}|${JSON.stringify(activeFilters)}`;
+        const isLayoutChange = prevLayoutSignatureRef.current !== layoutSignature;
+        prevLayoutSignatureRef.current = layoutSignature;
+
+        // Check if the number of nodes actually changed, rather than just their properties (like active state)
+        const isLengthChange = visibleNodes.length !== prevVisibleNodesLengthRef.current;
+        prevVisibleNodesLengthRef.current = visibleNodes.length;
+
+        if (isLayoutChange) {
+            // Only trigger a high-energy restart and unpin nodes if the graph structure was actually modified
+            // (nodes added/removed). If it was just a metadata change (like selecting a node which changes its class),
+            // use a gentle wake (alpha = 0.2) and preserve pinned positions to prevent gravity wells.
+            const restartAlpha = isLengthChange ? (isStructuralChange ? 1.0 : 0.2) : 0.2;
+
+            if (isLengthChange) {
+                // Unpin nodes so they can settle into the new layout —
+                // BUT only unpin nodes that don't already have saved canvasLayout coordinates.
+                // Nodes with valid fx/fy were loaded from Firestore and must NOT be cleared;
+                // clearing them destroys Coordinate Memory and forces a random re-layout.
+                visibleNodes.forEach(n => {
+                    const hasSavedCoords = n.fx !== null && n.fx !== undefined &&
+                        n.fy !== null && n.fy !== undefined;
+                    if (!hasSavedCoords) {
+                        n.fx = null;
+                        n.fy = null;
+                    }
+                });
+
+                // If ALL artist/label nodes are pinned (full canvasLayout restore), use a
+                // near-zero alpha: the simulation just needs one tick to render, not to run physics.
+                const artistLabelNodes = visibleNodes.filter(n => n.type === 'artist' || n.type === 'label');
+                const allPinned = artistLabelNodes.length > 0 &&
+                    artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
+                        n.fy !== null && n.fy !== undefined);
+                wasAllPinnedAtStartRef.current = allPinned;
+                simulation.alpha(allPinned ? 0.001 : restartAlpha).alphaTarget(0).restart();
+            } else {
+                const artistLabelNodes = visibleNodes.filter(n => n.type === 'artist' || n.type === 'label');
+                const allPinned = artistLabelNodes.length > 0 &&
+                    artistLabelNodes.every(n => n.fx !== null && n.fx !== undefined &&
+                        n.fy !== null && n.fy !== undefined);
+                wasAllPinnedAtStartRef.current = allPinned;
+                simulation.alpha(allPinned ? 0.001 : restartAlpha).alphaTarget(0).restart();
+            }
+        }
+        // Used dimensions.width > 0 to trigger initial mount safely while preserving physics isolation during resizes
+    }, [visibleNodes, visibleLinks, seedArtists, activeFilters, dimensions.width > 0]);
+
+    const getSceneClusterCenter = useCallback((targetSceneId: string) => {
+        let targetIndex = -1;
+        if (scenes && scenes.length > 0) {
+            targetIndex = scenes.findIndex((s, idx) => (s.sceneId || s.id || `scene-${idx + 1}`) === targetSceneId);
+        }
+        if (targetIndex === -1) {
+            const match = targetSceneId.match(/^scene-(\d+)$/i);
+            if (match) targetIndex = parseInt(match[1], 10) - 1;
+        }
+
+        const clusterNodes = visibleNodesRef.current.filter(n => {
+            if (n.sceneId && n.sceneId === targetSceneId) return true;
+            if (n.id && n.id.startsWith(targetSceneId + '::')) return true;
+            if (targetIndex >= 0 && n.sceneIndex === targetIndex) return true;
+            return false;
+        });
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        let validCount = 0;
+        clusterNodes.forEach(n => {
+            if (n.x !== undefined && n.y !== undefined && !isNaN(n.x) && !isNaN(n.y)) {
+                if (n.x < minX) minX = n.x;
+                if (n.x > maxX) maxX = n.x;
+                if (n.y < minY) minY = n.y;
+                if (n.y > maxY) maxY = n.y;
+                validCount++;
+            }
+        });
+
+        if (validCount > 0) {
+            return { cx: (minX + maxX) / 2, cy: (minY + maxY) / 2, validCount };
+        }
+        const fallbackIdx = targetIndex >= 0 ? targetIndex : 0;
+        const center = getSceneCenterOffset(fallbackIdx);
+        return { cx: center.x, cy: center.y, validCount: 0 };
+    }, [scenes]);
+
+    const resolveTargetNodeAndScene = useCallback((node: Node | null) => {
+        if (!node) return null;
+        const rawId = String(node.id || '');
+        const canonicalId = stripSceneNamespace(node.canonicalId || rawId).toLowerCase();
+
+        // Check if node already has explicit sceneId or scene-k:: prefix
+        let targetSceneId = node.sceneId;
+        if (!targetSceneId) {
+            const match = rawId.match(/^(scene-\d+)::/i);
+            if (match) targetSceneId = match[1];
+        }
+
+        // Look up candidate matching nodes in visibleNodesRef.current
+        const candidates = visibleNodesRef.current.filter(n => {
+            const nCanon = stripSceneNamespace(n.canonicalId || n.id).toLowerCase();
+            return nCanon === canonicalId || isSameNodeId(n.id, node.id);
+        });
+
+        if (candidates.length === 0) {
+            return { targetSceneId: targetSceneId || activeSceneId || 'scene-1', targetNode: null };
+        }
+
+        // If node appears in multiple scenes, prefer instance in activeSceneId if present;
+        // otherwise pick earliest scene arrival (sceneIndex ascending)
+        let bestNode = candidates[0];
+        if (candidates.length > 1) {
+            const activeMatch = candidates.find(n => (n.sceneId === activeSceneId) || (n.id && n.id.startsWith((activeSceneId || '') + '::')));
+            if (activeMatch) {
+                bestNode = activeMatch;
+            } else {
+                const sorted = [...candidates].sort((a, b) => (a.sceneIndex ?? 999) - (b.sceneIndex ?? 999));
+                bestNode = sorted[0];
+            }
+        }
+
+        const resolvedSceneId = bestNode.sceneId ||
+            bestNode.id.match(/^(scene-\d+)::/i)?.[1] ||
+            (bestNode.sceneIndex !== undefined ? `scene-${bestNode.sceneIndex + 1}` : (targetSceneId || activeSceneId || 'scene-1'));
+
+        return { targetSceneId: resolvedSceneId, targetNode: bestNode };
+    }, [activeSceneId]);
+
+    const lastCameraFollowedNodeIdRef = useRef<string | null>(null);
+    const lastReorderCameraNonceRef = useRef<number>(0);
+
+    // V47.20: Full-constellation camera fit after 0-Token Scene Reordering.
+    // Runs immediately BEFORE Smart Camera Follow so pre-seeding lastCameraFollowedNodeIdRef
+    // (when actively selected) prevents remapped selection from fighting or canceling fitGraphToScreen(750),
+    // while fitAll: false on mobile suppresses background camera jumps (Law 44).
+    useEffect(() => {
+        if (!reorderCameraSignal || reorderCameraSignal.nonce <= lastReorderCameraNonceRef.current) return;
+        lastReorderCameraNonceRef.current = reorderCameraSignal.nonce;
+        const activeNode = selectedNode || peekedNode;
+        if (!isPassiveSelection && activeNode) {
+            lastCameraFollowedNodeIdRef.current = String(activeNode.id || '');
+        }
         isTrackingRef.current = false;
         targetNodeIdRef.current = null;
-        const targetTx = width / 2 - currentK * targetNode.x;
-        const targetTy = height / 2 - currentK * targetNode.y;
-        d3.select(svgRef.current)
-          .transition()
-          .duration(600)
-          .call(zoomRef.current.transform as any, d3.zoomIdentity.translate(targetTx, targetTy).scale(currentK));
-      }
-    }
-  }, [selectedNode, peekedNode, searchQuery, isPassiveSelection, resolveTargetNodeAndScene, getSceneClusterCenter, focusSceneCluster]);
+        if (reorderCameraSignal.fitAll && !isSmallScreenRef.current) {
+            fitGraphToScreen(750);
+        }
+    }, [reorderCameraSignal, selectedNode, peekedNode, isPassiveSelection, fitGraphToScreen]);
 
-  // Pin Hover Box and highlight connections when selectedNode or peekedNode changes
-  useEffect(() => {
-    if (isPassiveSelection) {
-      if (clearNodeHoverRef.current) clearNodeHoverRef.current();
-      setHoveredLink(null);
-      return;
-    }
-    const activeNode = selectedNode || peekedNode;
-    if (activeNode && !isNodeInDimmedScene(activeNode, dimmedSceneIdsSet) && triggerNodeHoverRef.current) {
-        triggerNodeHoverRef.current(activeNode, true);
-    } else if (clearNodeHoverRef.current) {
-        clearNodeHoverRef.current();
-    }
-  }, [selectedNode, peekedNode, isPassiveSelection, dimmedSceneIdsSet]);
+    // Smart Camera Follow: direct camera across Scenarios A, B, and C when navigating DEEP CUTS or selecting nodes
+    useEffect(() => {
+        const isSearchActive = searchQuery.trim().length > 0;
+        if (isSearchActive) return;
 
-  // Unified D3 Timer Lerp Camera
-  // Fluidly interpolates the camera to track the active node (physics bouncing or CSS resizing)
-  // completely decoupled from React renders and independent of transition() abort bugs.
-  useEffect(() => {
-      const timer = d3.timer(() => {
-          if (!isTrackingRef.current || !targetNodeIdRef.current || !svgRef.current || !zoomRef.current) return;
-          if (dimensionsRef.current.width === 0) return;
+        const activeNode = selectedNode || peekedNode;
+        if (!activeNode) {
+            isTrackingRef.current = false;
+            targetNodeIdRef.current = null;
+            lastCameraFollowedNodeIdRef.current = null;
+            return;
+        }
 
-          // visibleNodesRef.current always contains the live, mutated physics coordinates
-          const node = visibleNodesRef.current.find(n => n.id === targetNodeIdRef.current) ||
-                       visibleNodesRef.current.find(n => isSameNodeId(n.id, targetNodeIdRef.current));
-          if (!node || isNaN(node.x!) || isNaN(node.y!)) return;
+        // Guardrail 2: On initial load / passive selection, Scene 1 framing is handled by focusSceneCluster on mount
+        if (isPassiveSelection) {
+            return;
+        }
 
-          const { width, height } = dimensionsRef.current;
-          const currentTransform = d3.zoomTransform(svgRef.current);
-          const k = currentTransform.k;
-          
-          const targetTx = width / 2 - k * node.x!;
-          const targetTy = height / 2 - k * node.y!;
-          
-          const dx = targetTx - currentTransform.x;
-          const dy = targetTy - currentTransform.y;
-          
-          // Only update if distance is significant to avoid micro-jitters
-          if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
-              const lerpFactor = 0.08;
-              const newTx = currentTransform.x + dx * lerpFactor;
-              const newTy = currentTransform.y + dy * lerpFactor;
-              
-              zoomRef.current.transform(d3.select(svgRef.current), d3.zoomIdentity.translate(newTx, newTy).scale(k));
-          }
-      });
-      return () => timer.stop();
-  }, []);
+        const activeIdStr = String(activeNode.id || '');
+        if (lastCameraFollowedNodeIdRef.current === activeIdStr) {
+            return;
+        }
+        lastCameraFollowedNodeIdRef.current = activeIdStr;
 
-  useEffect(() => {
-    if (!svgRef.current) return;
-    const svg = d3.select(svgRef.current);
-    const container = svg.select<SVGGElement>("g.main-container");
-    if (container.empty()) return;
-    const nodeElements = container.select(".node-group").selectAll<SVGGElement, Node>("g.node-element");
-    
-    const isSearchActive = searchQuery.trim().length > 0;
-    const rawSelectionNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null));
-    const isActiveSelectionDimmed = Boolean(rawSelectionNode && isNodeInDimmedScene(rawSelectionNode, dimmedSceneIdsSet));
-    const effectiveSelHighlight = isActiveSelectionDimmed ? null : selectionHighlightIds;
-    if (activeHoveredNodeRef.current && isNodeInDimmedScene(activeHoveredNodeRef.current, dimmedSceneIdsSet)) {
-        activeHoveredNodeRef.current = null;
-        hoveredNodeIdRef.current = null;
-        setHoveredNodeId(null);
-        setHoveredLink(null);
-    }
+        if (!svgRef.current || !zoomRef.current || dimensionsRef.current.width === 0) return;
 
-    nodeElements.attr("cursor", d => isNodeInDimmedScene(d, dimmedSceneIdsSet) ? "default" : "pointer");
-    nodeElements.select("circle.hit-box").style("pointer-events", d => isNodeInDimmedScene(d, dimmedSceneIdsSet) ? "none" : "all");
+        const resolution = resolveTargetNodeAndScene(activeNode);
+        if (!resolution) return;
+        const { targetSceneId, targetNode } = resolution;
 
-    nodeElements
-        .transition().duration(300)
-        .style("opacity", d => {
-            if (isNodeInDimmedScene(d, dimmedSceneIdsSet)) return 0.05;
-            const nodeType = d.type as FilterKeys;
-            const isFilteredOut = d.type !== 'artist' && 
-                                  Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && 
-                                  !activeFilters[nodeType];
-            if (isFilteredOut) return 0.05;
+        const transform = d3.zoomTransform(svgRef.current);
+        const currentK = transform.k;
+        const { width, height } = dimensionsRef.current;
+        const worldCenterX = (width / 2 - transform.x) / currentK;
+        const worldCenterY = (height / 2 - transform.y) / currentK;
 
-            // Search priority: If search query is non-empty, it takes absolute top priority
-            if (isSearchActive) {
-                if (highlightedNodes.size === 0) return 0.05;
-                const isMatch = highlightedNodes.has(d.id) || 
-                                highlightedNodes.has(String(d.id).toLowerCase()) || 
-                                highlightedNodes.has(normalizeArtistId(String(d.id)));
-                return isMatch ? 1 : 0.05;
+        const targetClusterCenter = getSceneClusterCenter(targetSceneId);
+        const distToTargetCluster = Math.hypot(worldCenterX - targetClusterCenter.cx, worldCenterY - targetClusterCenter.cy);
+
+        // Scenario A (Zoomed Out Overview) or Scenario B (Camera Centered on Another Scene)
+        if (currentK < 0.65 || distToTargetCluster > 500) {
+            isTrackingRef.current = false;
+            targetNodeIdRef.current = null;
+            focusSceneCluster(targetSceneId, 750);
+            return;
+        }
+
+        // Scenario C (Zoomed In Within the Same Scene)
+        if (targetNode && typeof targetNode.x === 'number' && typeof targetNode.y === 'number' && !isNaN(targetNode.x) && !isNaN(targetNode.y)) {
+            const sx = transform.x + currentK * targetNode.x;
+            const sy = transform.y + currentK * targetNode.y;
+            const margin = 80;
+            const isOffScreen = sx < margin || sx > width - margin || sy < margin || sy > height - margin;
+
+            if (isOffScreen) {
+                isTrackingRef.current = false;
+                targetNodeIdRef.current = null;
+                const targetTx = width / 2 - currentK * targetNode.x;
+                const targetTy = height / 2 - currentK * targetNode.y;
+                d3.select(svgRef.current)
+                    .transition()
+                    .duration(600)
+                    .call(zoomRef.current.transform as any, d3.zoomIdentity.translate(targetTx, targetTy).scale(currentK));
             }
+        }
+    }, [selectedNode, peekedNode, searchQuery, isPassiveSelection, resolveTargetNodeAndScene, getSceneClusterCenter, focusSceneCluster]);
 
-            if (effectiveSelHighlight) {
-                if (effectiveSelHighlight.has(d.id)) return 1;
-                if (d.type === 'artist') return 0.4;
-                return 0.1;
+    // Pin Hover Box and highlight connections when selectedNode or peekedNode changes
+    useEffect(() => {
+        if (isPassiveSelection) {
+            if (clearNodeHoverRef.current) clearNodeHoverRef.current();
+            setHoveredLink(null);
+            return;
+        }
+        const activeNode = selectedNode || peekedNode;
+        if (activeNode && !isNodeInDimmedScene(activeNode, dimmedSceneIdsSet) && triggerNodeHoverRef.current) {
+            triggerNodeHoverRef.current(activeNode, true);
+        } else if (clearNodeHoverRef.current) {
+            clearNodeHoverRef.current();
+        }
+    }, [selectedNode, peekedNode, isPassiveSelection, dimmedSceneIdsSet]);
+
+    // Unified D3 Timer Lerp Camera
+    // Fluidly interpolates the camera to track the active node (physics bouncing or CSS resizing)
+    // completely decoupled from React renders and independent of transition() abort bugs.
+    useEffect(() => {
+        const timer = d3.timer(() => {
+            if (!isTrackingRef.current || !targetNodeIdRef.current || !svgRef.current || !zoomRef.current) return;
+            if (dimensionsRef.current.width === 0) return;
+
+            // visibleNodesRef.current always contains the live, mutated physics coordinates
+            const node = visibleNodesRef.current.find(n => n.id === targetNodeIdRef.current) ||
+                visibleNodesRef.current.find(n => isSameNodeId(n.id, targetNodeIdRef.current));
+            if (!node || isNaN(node.x!) || isNaN(node.y!)) return;
+
+            const { width, height } = dimensionsRef.current;
+            const currentTransform = d3.zoomTransform(svgRef.current);
+            const k = currentTransform.k;
+
+            const targetTx = width / 2 - k * node.x!;
+            const targetTy = height / 2 - k * node.y!;
+
+            const dx = targetTx - currentTransform.x;
+            const dy = targetTy - currentTransform.y;
+
+            // Only update if distance is significant to avoid micro-jitters
+            if (Math.abs(dx) > 0.5 || Math.abs(dy) > 0.5) {
+                const lerpFactor = 0.08;
+                const newTx = currentTransform.x + dx * lerpFactor;
+                const newTy = currentTransform.y + dy * lerpFactor;
+
+                zoomRef.current.transform(d3.select(svgRef.current), d3.zoomIdentity.translate(newTx, newTy).scale(k));
             }
-            return 1;
         });
+        return () => timer.stop();
+    }, []);
 
-    nodeElements.select("circle.node-halo")
-        .transition().duration(300)
-        .attr("r", d => isNodeSeedInOwnScene(d, seedArtists) ? 22 : 20)
-        .attr("fill", d => {
-            const activeNode = (!isSearchActive && !isPassiveSelection && !isActiveSelectionDimmed) ? (selectedNode || peekedNode) : null;
-            const hasActiveNs = activeNode && String(activeNode.id).includes('::');
-            const isSelected = activeNode
-                ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
-                : false;
-            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-            if (isSelected) return "rgba(246, 228, 104, 0.14)";
-            return isSeed ? "rgba(246, 228, 104, 0.08)" : "none";
-        })
-        .attr("stroke-width", d => {
-            const activeNode = (!isSearchActive && !isPassiveSelection && !isActiveSelectionDimmed) ? (selectedNode || peekedNode) : null;
-            const hasActiveNs = activeNode && String(activeNode.id).includes('::');
-            const isSelected = activeNode 
-                ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
-                : false;
-            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-            if (isSelected) return 2;
-            return isSeed ? 1.5 : 0;
-        })
-        .attr("stroke", d => {
-            const activeNode = (!isSearchActive && !isPassiveSelection && !isActiveSelectionDimmed) ? (selectedNode || peekedNode) : null;
-            const hasActiveNs = activeNode && String(activeNode.id).includes('::');
-            const isSelected = activeNode 
-                ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
-                : false;
-            const isSeed = isNodeSeedInOwnScene(d, seedArtists);
-            if (isSelected) return "rgba(246, 228, 104, 0.85)";
-            return isSeed ? "rgba(246, 228, 104, 0.35)" : "transparent";
-        });
+    useEffect(() => {
+        if (!svgRef.current) return;
+        const svg = d3.select(svgRef.current);
+        const container = svg.select<SVGGElement>("g.main-container");
+        if (container.empty()) return;
+        const nodeElements = container.select(".node-group").selectAll<SVGGElement, Node>("g.node-element");
 
-    nodeElements.select("text.node-label")
-        .transition().duration(300)
-        .attr("fill", d => {
-            if (isNodeSeedInOwnScene(d, seedArtists)) return "#F6E468";
-            const isSearchMatch = isSearchActive && (highlightedNodes.has(d.id) || highlightedNodes.has(String(d.id).toLowerCase()) || highlightedNodes.has(normalizeArtistId(String(d.id))));
-            const isSelMatch = Boolean(effectiveSelHighlight && effectiveSelHighlight.has(d.id));
-            if (isSearchMatch || isSelMatch) return "#ffffff";
-            return (d.type === 'artist' || d.type === 'label') ? "#e4e4e7" : "#a1a1aa";
-        })
-        .attr("opacity", d => {
-            const isSearchMatch = isSearchActive && (highlightedNodes.has(d.id) || highlightedNodes.has(String(d.id).toLowerCase()) || highlightedNodes.has(normalizeArtistId(String(d.id))));
-            const isSelMatch = Boolean(effectiveSelHighlight && effectiveSelHighlight.has(d.id));
-            if (isSearchMatch || isSelMatch) return 1;
-            return (d.type === 'artist' || d.type === 'label') ? 1 : 0.8;
-        });
+        const isSearchActive = searchQuery.trim().length > 0;
+        const rawSelectionNode = (!isPassiveSelection ? (selectedNode || peekedNode) : (peekedNode || null));
+        const isActiveSelectionDimmed = Boolean(rawSelectionNode && isNodeInDimmedScene(rawSelectionNode, dimmedSceneIdsSet));
+        const effectiveSelHighlight = isActiveSelectionDimmed ? null : selectionHighlightIds;
+        if (activeHoveredNodeRef.current && isNodeInDimmedScene(activeHoveredNodeRef.current, dimmedSceneIdsSet)) {
+            activeHoveredNodeRef.current = null;
+            hoveredNodeIdRef.current = null;
+            setHoveredNodeId(null);
+            setHoveredLink(null);
+        }
 
-    const activeHoverNode = (!isActiveSelectionDimmed ? rawSelectionNode : null) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
+        nodeElements.attr("cursor", d => isNodeInDimmedScene(d, dimmedSceneIdsSet) ? "default" : "pointer");
+        nodeElements.select("circle.hit-box").style("pointer-events", d => isNodeInDimmedScene(d, dimmedSceneIdsSet) ? "none" : "all");
 
-    container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
-        .transition().duration(300)
-        .attr("stroke", (d: any) => {
-            if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return "#e4e4e7";
-            if (isSearchActive) {
+        nodeElements
+            .transition().duration(300)
+            .style("opacity", d => {
+                if (isNodeInDimmedScene(d, dimmedSceneIdsSet)) return 0.05;
+                const nodeType = d.type as FilterKeys;
+                const isFilteredOut = d.type !== 'artist' &&
+                    Object.prototype.hasOwnProperty.call(activeFilters, nodeType) &&
+                    !activeFilters[nodeType];
+                if (isFilteredOut) return 0.05;
+
+                // Search priority: If search query is non-empty, it takes absolute top priority
+                if (isSearchActive) {
+                    if (highlightedNodes.size === 0) return 0.05;
+                    const isMatch = highlightedNodes.has(d.id) ||
+                        highlightedNodes.has(String(d.id).toLowerCase()) ||
+                        highlightedNodes.has(normalizeArtistId(String(d.id)));
+                    return isMatch ? 1 : 0.05;
+                }
+
+                if (effectiveSelHighlight) {
+                    if (effectiveSelHighlight.has(d.id)) return 1;
+                    if (d.type === 'artist') return 0.4;
+                    return 0.1;
+                }
+                return 1;
+            });
+
+        nodeElements.select("circle.node-halo")
+            .transition().duration(300)
+            .attr("r", d => isNodeSeedInOwnScene(d, seedArtists) ? 22 : 20)
+            .attr("fill", d => {
+                const activeNode = (!isSearchActive && !isPassiveSelection && !isActiveSelectionDimmed) ? (selectedNode || peekedNode) : null;
+                const hasActiveNs = activeNode && String(activeNode.id).includes('::');
+                const isSelected = activeNode
+                    ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
+                    : false;
+                const isSeed = isNodeSeedInOwnScene(d, seedArtists);
+                if (isSelected) return "rgba(246, 228, 104, 0.14)";
+                return isSeed ? "rgba(246, 228, 104, 0.08)" : "none";
+            })
+            .attr("stroke-width", d => {
+                const activeNode = (!isSearchActive && !isPassiveSelection && !isActiveSelectionDimmed) ? (selectedNode || peekedNode) : null;
+                const hasActiveNs = activeNode && String(activeNode.id).includes('::');
+                const isSelected = activeNode
+                    ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
+                    : false;
+                const isSeed = isNodeSeedInOwnScene(d, seedArtists);
+                if (isSelected) return 2;
+                return isSeed ? 1.5 : 0;
+            })
+            .attr("stroke", d => {
+                const activeNode = (!isSearchActive && !isPassiveSelection && !isActiveSelectionDimmed) ? (selectedNode || peekedNode) : null;
+                const hasActiveNs = activeNode && String(activeNode.id).includes('::');
+                const isSelected = activeNode
+                    ? (hasActiveNs ? activeNode.id.toLowerCase() === d.id.toLowerCase() : isSameNodeId(activeNode.id, d.id))
+                    : false;
+                const isSeed = isNodeSeedInOwnScene(d, seedArtists);
+                if (isSelected) return "rgba(246, 228, 104, 0.85)";
+                return isSeed ? "rgba(246, 228, 104, 0.35)" : "transparent";
+            });
+
+        nodeElements.select("text.node-label")
+            .transition().duration(300)
+            .attr("fill", d => {
+                if (isNodeSeedInOwnScene(d, seedArtists)) return "#F6E468";
+                const isSearchMatch = isSearchActive && (highlightedNodes.has(d.id) || highlightedNodes.has(String(d.id).toLowerCase()) || highlightedNodes.has(normalizeArtistId(String(d.id))));
+                const isSelMatch = Boolean(effectiveSelHighlight && effectiveSelHighlight.has(d.id));
+                if (isSearchMatch || isSelMatch) return "#ffffff";
+                return (d.type === 'artist' || d.type === 'label') ? "#e4e4e7" : "#a1a1aa";
+            })
+            .attr("opacity", d => {
+                const isSearchMatch = isSearchActive && (highlightedNodes.has(d.id) || highlightedNodes.has(String(d.id).toLowerCase()) || highlightedNodes.has(normalizeArtistId(String(d.id))));
+                const isSelMatch = Boolean(effectiveSelHighlight && effectiveSelHighlight.has(d.id));
+                if (isSearchMatch || isSelMatch) return 1;
+                return (d.type === 'artist' || d.type === 'label') ? 1 : 0.8;
+            });
+
+        const activeHoverNode = (!isActiveSelectionDimmed ? rawSelectionNode : null) || (!isPassiveSelection ? activeHoveredNodeRef.current : null);
+
+        container.select(".link-group").selectAll<SVGLineElement, Link>("line.visual-line")
+            .transition().duration(300)
+            .attr("stroke", (d: any) => {
+                if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return "#e4e4e7";
+                if (isSearchActive) {
+                    const s = typeof d.source === 'string' ? d.source : d.source.id;
+                    const t = typeof d.target === 'string' ? d.target : d.target.id;
+                    const isMatchS = highlightedNodes.has(s) || highlightedNodes.has(String(s).toLowerCase());
+                    const isMatchT = highlightedNodes.has(t) || highlightedNodes.has(String(t).toLowerCase());
+                    return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
+                }
+                if (!activeHoverNode) return "#e4e4e7";
                 const s = typeof d.source === 'string' ? d.source : d.source.id;
                 const t = typeof d.target === 'string' ? d.target : d.target.id;
-                const isMatchS = highlightedNodes.has(s) || highlightedNodes.has(String(s).toLowerCase());
-                const isMatchT = highlightedNodes.has(t) || highlightedNodes.has(String(t).toLowerCase());
-                return (isMatchS && isMatchT) ? "#F6E468" : "#e4e4e7";
-            }
-            if (!activeHoverNode) return "#e4e4e7";
-            const s = typeof d.source === 'string' ? d.source : d.source.id;
-            const t = typeof d.target === 'string' ? d.target : d.target.id;
-            const hasActiveNs = String(activeHoverNode.id).includes('::');
-            const isFirstDegree = hasActiveNs
-                ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
-                : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
-            return isFirstDegree ? "#F6E468" : "#e4e4e7";
-        })
-        .attr("stroke-opacity", (d: any) => {
-            const s = typeof d.source === 'string' ? d.source : d.source.id;
-            const t = typeof d.target === 'string' ? d.target : d.target.id;
-            
-            const sNode = visibleNodes.find(n => n.id === s);
-            const tNode = visibleNodes.find(n => n.id === t);
-            if (isLinkInDimmedScene(d, sNode, tNode, dimmedSceneIdsSet)) return 0.05;
-            const isLinkFilteredOut = (node: Node | undefined) => {
-                if (!node || node.type === 'artist') return false;
-                const nodeType = node.type as FilterKeys;
-                return Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && !activeFilters[nodeType];
-            };
-            if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
-
-            if (isSearchActive) {
-                if (highlightedNodes.size === 0) return 0.05;
-                const isMatchS = highlightedNodes.has(s) || highlightedNodes.has(String(s).toLowerCase());
-                const isMatchT = highlightedNodes.has(t) || highlightedNodes.has(String(t).toLowerCase());
-                return (isMatchS && isMatchT) ? 0.6 : 0.05;
-            }
-
-            if (activeHoverNode) {
                 const hasActiveNs = String(activeHoverNode.id).includes('::');
                 const isFirstDegree = hasActiveNs
                     ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
                     : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
-                if (isFirstDegree) return 0.9;
-            }
+                return isFirstDegree ? "#F6E468" : "#e4e4e7";
+            })
+            .attr("stroke-opacity", (d: any) => {
+                const s = typeof d.source === 'string' ? d.source : d.source.id;
+                const t = typeof d.target === 'string' ? d.target : d.target.id;
 
-            if (effectiveSelHighlight) return (effectiveSelHighlight.has(s) && effectiveSelHighlight.has(t)) ? 0.3 : 0.05;
-            return computeRestingLinkOpacity(d, sNode, tNode, nodeDegreesRef.current);
-        });
+                const sNode = visibleNodes.find(n => n.id === s);
+                const tNode = visibleNodes.find(n => n.id === t);
+                if (isLinkInDimmedScene(d, sNode, tNode, dimmedSceneIdsSet)) return 0.05;
+                const isLinkFilteredOut = (node: Node | undefined) => {
+                    if (!node || node.type === 'artist') return false;
+                    const nodeType = node.type as FilterKeys;
+                    return Object.prototype.hasOwnProperty.call(activeFilters, nodeType) && !activeFilters[nodeType];
+                };
+                if (isLinkFilteredOut(sNode) || isLinkFilteredOut(tNode)) return 0.05;
 
-    // Cross-Scene Bridge Lines: Default rest (neutral grey #e4e4e7, opacity 0.35, width 1.2; 0.05 if either endpoint is in a dimmed scene)
-    // Active hover or selection (peekedNode, selectedNode, or activeHoveredNodeRef when !isPassiveSelection and non-dimmed) illuminates connected bridges in yellow #F6E468
-    container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
-        .transition().duration(300)
-        .attr("stroke", (d: any) => {
-            if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return "#e4e4e7";
-            if (!activeHoverNode) return "#e4e4e7";
-            const s = typeof d.source === 'string' ? d.source : d.source.id;
-            const t = typeof d.target === 'string' ? d.target : d.target.id;
-            const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
-            const isConnected = hasActiveHoverNs
-                ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
-                : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
-            return isConnected ? "#F6E468" : "#e4e4e7";
-        })
-        .attr("stroke-opacity", (d: any) => {
-            if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return 0.05;
-            if (!activeHoverNode) return 0.35;
-            const s = typeof d.source === 'string' ? d.source : d.source.id;
-            const t = typeof d.target === 'string' ? d.target : d.target.id;
-            const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
-            const isConnected = hasActiveHoverNs
-                ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
-                : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
-            if (isConnected) return 0.95;
-            if (effectiveSelHighlight && (effectiveSelHighlight.has(s) || effectiveSelHighlight.has(t))) {
-                return 0.3;
-            }
-            return 0.1;
-        })
-        .attr("stroke-width", (d: any) => {
-            if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return 1.2;
-            if (!activeHoverNode) return 1.2;
-            const s = typeof d.source === 'string' ? d.source : d.source.id;
-            const t = typeof d.target === 'string' ? d.target : d.target.id;
-            const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
-            const isConnected = hasActiveHoverNs
-                ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
-                : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
-            return isConnected ? 2.0 : 1.2;
-        });
-  }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes, selectedNode, peekedNode, searchQuery, seedArtists, isPassiveSelection, dimmedSceneIdsSet]);
+                if (isSearchActive) {
+                    if (highlightedNodes.size === 0) return 0.05;
+                    const isMatchS = highlightedNodes.has(s) || highlightedNodes.has(String(s).toLowerCase());
+                    const isMatchT = highlightedNodes.has(t) || highlightedNodes.has(String(t).toLowerCase());
+                    return (isMatchS && isMatchT) ? 0.6 : 0.05;
+                }
 
-  return (
-    <div 
-        ref={containerRef}
-        className="w-full h-full relative overflow-hidden bg-transparent touch-none" 
-        style={{ cursor: 'grab', touchAction: 'none' }}
-        onMouseLeave={() => {
-            if (!isSmallScreen) {
-                clearNodeHoverRef.current();
-            }
-        }}
-    >
-        <svg ref={svgRef} className="w-full h-full touch-none" />
-        
-        {hoveredLink && !isSmallScreen && typeof document !== 'undefined' && (() => {
-            const tooltipHeight = desktopTooltipRef.current?.offsetHeight || measuredTooltipHeight || 380;
-            const containerRect = containerRef.current?.getBoundingClientRect();
-            const nodeScreenX = hoveredLink.screenX ?? (containerRect ? containerRect.left + hoveredLink.x : hoveredLink.x);
-            const nodeScreenY = hoveredLink.screenY ?? (containerRect ? containerRect.top + hoveredLink.y : hoveredLink.y);
+                if (activeHoverNode) {
+                    const hasActiveNs = String(activeHoverNode.id).includes('::');
+                    const isFirstDegree = hasActiveNs
+                        ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
+                        : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
+                    if (isFirstDegree) return 0.9;
+                }
 
-            const { left: portalLeft, top: portalTop } = computeDesktopTooltipPosition({
-                nodeScreenX,
-                nodeScreenY,
-                tooltipHeight,
-                tooltipWidth: 320,
-                nodeRadius: 35,
-                margin: 16,
-                minTop: 72,
+                if (effectiveSelHighlight) return (effectiveSelHighlight.has(s) && effectiveSelHighlight.has(t)) ? 0.3 : 0.05;
+                return computeRestingLinkOpacity(d, sNode, tNode, nodeDegreesRef.current);
             });
 
-            return createPortal(
+        // Cross-Scene Bridge Lines: Default rest (neutral grey #e4e4e7, opacity 0.35, width 1.2; 0.05 if either endpoint is in a dimmed scene)
+        // Active hover or selection (peekedNode, selectedNode, or activeHoveredNodeRef when !isPassiveSelection and non-dimmed) illuminates connected bridges in yellow #F6E468
+        container.select(".link-group").selectAll<SVGPathElement, Link>("path.bridge-visual-line")
+            .transition().duration(300)
+            .attr("stroke", (d: any) => {
+                if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return "#e4e4e7";
+                if (!activeHoverNode) return "#e4e4e7";
+                const s = typeof d.source === 'string' ? d.source : d.source.id;
+                const t = typeof d.target === 'string' ? d.target : d.target.id;
+                const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
+                const isConnected = hasActiveHoverNs
+                    ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
+                    : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
+                return isConnected ? "#F6E468" : "#e4e4e7";
+            })
+            .attr("stroke-opacity", (d: any) => {
+                if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return 0.05;
+                if (!activeHoverNode) return 0.35;
+                const s = typeof d.source === 'string' ? d.source : d.source.id;
+                const t = typeof d.target === 'string' ? d.target : d.target.id;
+                const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
+                const isConnected = hasActiveHoverNs
+                    ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
+                    : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
+                if (isConnected) return 0.95;
+                if (effectiveSelHighlight && (effectiveSelHighlight.has(s) || effectiveSelHighlight.has(t))) {
+                    return 0.3;
+                }
+                return 0.1;
+            })
+            .attr("stroke-width", (d: any) => {
+                if (isLinkInDimmedScene(d, undefined, undefined, dimmedSceneIdsSet)) return 1.2;
+                if (!activeHoverNode) return 1.2;
+                const s = typeof d.source === 'string' ? d.source : d.source.id;
+                const t = typeof d.target === 'string' ? d.target : d.target.id;
+                const hasActiveHoverNs = String(activeHoverNode.id).includes('::');
+                const isConnected = hasActiveHoverNs
+                    ? (s.toLowerCase() === activeHoverNode.id.toLowerCase() || t.toLowerCase() === activeHoverNode.id.toLowerCase())
+                    : (isSameNodeId(s, activeHoverNode.id) || isSameNodeId(t, activeHoverNode.id));
+                return isConnected ? 2.0 : 1.2;
+            });
+    }, [selectionHighlightIds, highlightedNodes, activeFilters, visibleNodes, selectedNode, peekedNode, searchQuery, seedArtists, isPassiveSelection, dimmedSceneIdsSet]);
+
+    return (
+        <div
+            ref={containerRef}
+            className="w-full h-full relative overflow-hidden bg-transparent touch-none"
+            style={{ cursor: 'grab', touchAction: 'none' }}
+            onMouseLeave={() => {
+                if (!isSmallScreen) {
+                    clearNodeHoverRef.current();
+                }
+            }}
+        >
+            <svg ref={svgRef} className="w-full h-full touch-none" />
+
+            {hoveredLink && !isSmallScreen && typeof document !== 'undefined' && (() => {
+                const tooltipHeight = desktopTooltipRef.current?.offsetHeight || measuredTooltipHeight || 380;
+                const containerRect = containerRef.current?.getBoundingClientRect();
+                const nodeScreenX = hoveredLink.screenX ?? (containerRect ? containerRect.left + hoveredLink.x : hoveredLink.x);
+                const nodeScreenY = hoveredLink.screenY ?? (containerRect ? containerRect.top + hoveredLink.y : hoveredLink.y);
+
+                const { left: portalLeft, top: portalTop } = computeDesktopTooltipPosition({
+                    nodeScreenX,
+                    nodeScreenY,
+                    tooltipHeight,
+                    tooltipWidth: 320,
+                    nodeRadius: 35,
+                    margin: 16,
+                    minTop: 72,
+                });
+
+                return createPortal(
+                    <div
+                        ref={desktopTooltipRef}
+                        style={{
+                            position: 'fixed',
+                            left: `${portalLeft}px`,
+                            top: `${portalTop}px`,
+                            width: '320px',
+                            maxWidth: '320px',
+                            pointerEvents: 'none',
+                            zIndex: 60,
+                        }}
+                        className="bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left max-h-[520px] overflow-hidden"
+                        data-testid="musicgraph-desktop-hover-tooltip"
+                    >
+                        <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                            {/* Zone 1: Spiderweb DNA (Narrative First) */}
+                            {hoveredLink.dna && (
+                                <div className="shrink-0">
+                                    <p className="text-sm leading-relaxed font-normal text-zinc-400 m-0">
+                                        {(() => {
+                                            const cleanedDna = hoveredLink.dna || '';
+                                            const target = hoveredLink.sourceId || '';
+                                            if (!cleanedDna || !target) return cleanedDna;
+
+                                            const regex = new RegExp(`(${escapeRegExp(target)})`, 'gi');
+                                            const parts = cleanedDna.split(regex);
+
+                                            return (
+                                                <>
+                                                    {parts.map((part, i) =>
+                                                        part.toLowerCase() === target.toLowerCase() ? (
+                                                            <span key={i} className="text-primary font-normal">{part}</span>
+                                                        ) : (
+                                                            <React.Fragment key={i}>{part}</React.Fragment>
+                                                        )
+                                                    )}
+                                                </>
+                                            );
+                                        })()}
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Zone 2: Direct Connections / Fallback */}
+                            {((hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage) && (
+                                <div className={`flex flex-col gap-1 ${hoveredLink.dna ? "mt-1 pt-1.5" : ""}`}>
+                                    {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
+                                        hoveredLink.connections.map((c, i) => (
+                                            <div key={i} className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
+                                                <span className="text-zinc-500 font-normal shrink-0">•</span>
+                                                <span>
+                                                    <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
+                                                    <span className="text-primary font-normal">{c.targetName}</span>
+                                                </span>
+                                            </div>
+                                        ))
+                                    ) : hoveredLink.fallbackMessage ? (
+                                        <div className="text-sm italic text-zinc-500 font-normal leading-normal shrink-0">
+                                            {hoveredLink.fallbackMessage}
+                                        </div>
+                                    ) : null}
+                                </div>
+                            )}
+                        </div>
+                    </div>,
+                    document.body
+                );
+            })()}
+
+            {hoveredLink && isSmallScreen && (
                 <div
-                    ref={desktopTooltipRef}
                     style={{
-                        position: 'fixed',
-                        left: `${portalLeft}px`,
-                        top: `${portalTop}px`,
-                        width: '320px',
-                        maxWidth: '320px',
-                        pointerEvents: 'none',
-                        zIndex: 60,
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        pointerEvents: isCardExpanded || (hoveredLink.connections && hoveredLink.connections.length > 3) ? 'auto' : 'none',
+                        zIndex: 50
                     }}
-                    className="bg-zinc-950/95 border border-zinc-700/80 px-3.5 py-2.5 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md rounded-xl flex flex-col gap-2 text-left max-h-[520px] overflow-hidden"
-                    data-testid="musicgraph-desktop-hover-tooltip"
+                    className="bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left max-h-[55vh] overflow-hidden"
+                    data-testid="musicgraph-mobile-banner"
                 >
-                    <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-thin scrollbar-thumb-zinc-800">
+                    <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-hide">
                         {/* Zone 1: Spiderweb DNA (Narrative First) */}
                         {hoveredLink.dna && (
                             <div className="shrink-0">
@@ -2886,7 +2954,7 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                         {((hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage) && (
                             <div className={`flex flex-col gap-1 ${hoveredLink.dna ? "mt-1 pt-1.5" : ""}`}>
                                 {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
-                                    hoveredLink.connections.map((c, i) => (
+                                    (isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
                                         <div key={i} className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
                                             <span className="text-zinc-500 font-normal shrink-0">•</span>
                                             <span>
@@ -2903,205 +2971,136 @@ const MusicGraph: React.FC<MusicGraphProps> = ({
                             </div>
                         )}
                     </div>
-                </div>,
-                document.body
-            );
-        })()}
 
-        {hoveredLink && isSmallScreen && (
-            <div
-                style={{
-                    position: 'absolute',
-                    top: 0,
-                    left: 0,
-                    right: 0,
-                    pointerEvents: isCardExpanded || (hoveredLink.connections && hoveredLink.connections.length > 3) ? 'auto' : 'none',
-                    zIndex: 50
-                }}
-                className="bg-zinc-950/95 border-b border-zinc-700/80 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.8)] backdrop-blur-md w-full flex flex-col gap-2 text-left max-h-[55vh] overflow-hidden"
-                data-testid="musicgraph-mobile-banner"
-            >
-                <div className="overflow-y-auto shrink min-h-0 flex flex-col gap-2 scrollbar-hide">
-                    {/* Zone 1: Spiderweb DNA (Narrative First) */}
-                    {hoveredLink.dna && (
-                        <div className="shrink-0">
-                            <p className="text-sm leading-relaxed font-normal text-zinc-400 m-0">
-                                {(() => {
-                                    const cleanedDna = hoveredLink.dna || '';
-                                    const target = hoveredLink.sourceId || '';
-                                    if (!cleanedDna || !target) return cleanedDna;
-
-                                    const regex = new RegExp(`(${escapeRegExp(target)})`, 'gi');
-                                    const parts = cleanedDna.split(regex);
-
-                                    return (
-                                        <>
-                                            {parts.map((part, i) =>
-                                                part.toLowerCase() === target.toLowerCase() ? (
-                                                    <span key={i} className="text-primary font-normal">{part}</span>
-                                                ) : (
-                                                    <React.Fragment key={i}>{part}</React.Fragment>
-                                                )
-                                            )}
-                                        </>
-                                    );
-                                })()}
-                            </p>
+                    {/* Dynamic CTA / Close Button */}
+                    {hoveredLink.connections && hoveredLink.connections.length > 3 && !isCardExpanded && (
+                        <div className="pt-2 shrink-0 flex justify-center pointer-events-auto">
+                            <Button variant="secondary" size="sm" onClick={() => setIsCardExpanded(true)}>
+                                View {hoveredLink.connections.length - 3} more connections
+                            </Button>
                         </div>
                     )}
 
-                    {/* Zone 2: Direct Connections / Fallback */}
-                    {((hoveredLink.connections && hoveredLink.connections.length > 0) || hoveredLink.fallbackMessage) && (
-                        <div className={`flex flex-col gap-1 ${hoveredLink.dna ? "mt-1 pt-1.5" : ""}`}>
-                            {hoveredLink.connections && hoveredLink.connections.length > 0 ? (
-                                (isCardExpanded ? hoveredLink.connections : hoveredLink.connections.slice(0, 3)).map((c, i) => (
-                                    <div key={i} className="text-sm font-medium text-zinc-300 leading-tight flex gap-1">
-                                        <span className="text-zinc-500 font-normal shrink-0">•</span>
-                                        <span>
-                                            <span className="text-zinc-400 font-normal">{c.context}</span>{" "}
-                                            <span className="text-primary font-normal">{c.targetName}</span>
-                                        </span>
-                                    </div>
-                                ))
-                            ) : hoveredLink.fallbackMessage ? (
-                                <div className="text-sm italic text-zinc-500 font-normal leading-normal shrink-0">
-                                    {hoveredLink.fallbackMessage}
-                                </div>
-                            ) : null}
+                    {isCardExpanded && (
+                        <div className="pt-2 shrink-0 flex justify-center pointer-events-auto">
+                            <Button variant="secondary" size="sm" onClick={() => setHoveredLink(null)}>
+                                Close
+                            </Button>
                         </div>
                     )}
                 </div>
-                
-                {/* Dynamic CTA / Close Button */}
-                {hoveredLink.connections && hoveredLink.connections.length > 3 && !isCardExpanded && (
-                    <div className="pt-2 shrink-0 flex justify-center pointer-events-auto">
-                        <Button variant="secondary" size="sm" onClick={() => setIsCardExpanded(true)}>
-                            View {hoveredLink.connections.length - 3} more connections
-                        </Button>
-                    </div>
-                )}
-                
-                {isCardExpanded && (
-                    <div className="pt-2 shrink-0 flex justify-center pointer-events-auto">
-                        <Button variant="secondary" size="sm" onClick={() => setHoveredLink(null)}>
-                            Close
-                        </Button>
-                    </div>
-                )}
-            </div>
-        )}
+            )}
 
-        <div className={`absolute ${isSmallScreen ? 'bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] right-4' : 'bottom-6 right-6'} flex flex-col gap-3 z-30`}>
-            <button onClick={handleCenter} className={CanvasControlStyles}>
-                <span className="material-symbols-outlined !text-[20px]">center_focus_strong</span>
-            </button>
-            <button onClick={handleZoomIn} className={CanvasControlStyles}>
-                <span className="material-symbols-outlined !text-[20px]">add</span>
-            </button>
-            <button onClick={handleZoomOut} className={CanvasControlStyles}>
-                <span className="material-symbols-outlined !text-[20px]">remove</span>
-            </button>
-        </div>
-        {/* Legend / filter ribbon.
+            <div className={`absolute ${isSmallScreen ? 'bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] right-4' : 'bottom-6 right-6'} flex flex-col gap-3 z-30`}>
+                <button onClick={handleCenter} className={CanvasControlStyles}>
+                    <span className="material-symbols-outlined !text-[20px]">center_focus_strong</span>
+                </button>
+                <button onClick={handleZoomIn} className={CanvasControlStyles}>
+                    <span className="material-symbols-outlined !text-[20px]">add</span>
+                </button>
+                <button onClick={handleZoomOut} className={CanvasControlStyles}>
+                    <span className="material-symbols-outlined !text-[20px]">remove</span>
+                </button>
+            </div>
+            {/* Legend / filter ribbon.
              Two rendering paths, driven purely by canvas width:
              • !isCompactMode (canvas ≥ 730px) → permanent single-row pill ribbon, centred at top.
              •  isCompactMode (canvas < 730px)  → tap-to-reveal floating drawer, bottom-left.
                Applies to both compressed desktop panel configs AND genuine mobile viewports. */}
-        <div
-            ref={setLegendRef}
-            className={`absolute z-30 pointer-events-none flex flex-col ${
-                isCompactMode
+            <div
+                ref={setLegendRef}
+                className={`absolute z-30 pointer-events-none flex flex-col ${isCompactMode
                     ? `${isSmallScreen ? 'bottom-[calc(env(safe-area-inset-bottom)+4.5rem)] left-4' : 'bottom-6 left-6'} items-start`
                     : 'top-6 left-1/2 -translate-x-1/2 items-center w-full max-w-[95%]'
-            }`}
-        >
-            {!isCompactMode ? (
-                /* Wide canvas: single-row ribbon — flex-nowrap prevents wrapping ever occurring */
-                <div className="flex flex-nowrap justify-center overflow-hidden border border-zinc-700 bg-zinc-900/90 backdrop-blur-md p-3 items-center gap-3 pointer-events-auto shadow-2xl rounded-xl">
-                    {legendOrder.map(f => (
-                        <div
-                            key={f}
-                            onClick={() => { toggleFilter(f); if (onLegendInteraction) onLegendInteraction(); }}
-                            className={`flex items-center gap-2 cursor-pointer py-1.5 px-3 transition-all rounded-xl ${activeFilters[f] ? 'bg-zinc-800 ring-1 ring-zinc-700' : 'opacity-40 hover:opacity-60'}`}
+                    }`}
+            >
+                {!isCompactMode ? (
+                    /* Wide canvas: single-row ribbon — flex-nowrap prevents wrapping ever occurring */
+                    <div className="flex flex-nowrap justify-center overflow-hidden border border-zinc-700 bg-zinc-900/90 backdrop-blur-md p-3 items-center gap-3 pointer-events-auto shadow-2xl rounded-xl">
+                        {legendOrder.map(f => (
+                            <div
+                                key={f}
+                                onClick={() => { toggleFilter(f); if (onLegendInteraction) onLegendInteraction(); }}
+                                className={`flex items-center gap-2 cursor-pointer py-1.5 px-3 transition-all rounded-xl ${activeFilters[f] ? 'bg-zinc-800 ring-1 ring-zinc-700' : 'opacity-40 hover:opacity-60'}`}
+                            >
+                                {legendConfig[f]?.shape}
+                                <span className="text-sm font-medium text-zinc-200 whitespace-nowrap">{legendConfig[f]?.label}</span>
+                            </div>
+                        ))}
+                    </div>
+                ) : (
+                    /* Narrow canvas: tap-to-reveal drawer (mobile OR compressed desktop panels) */
+                    <div className="flex flex-col items-start gap-4 pointer-events-none w-full relative">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setIsLegendExpanded(!isLegendExpanded); if (onLegendInteraction) onLegendInteraction(); }}
+                            className={`${CanvasControlStyles} pointer-events-auto relative z-40 ${isLegendExpanded ? 'bg-zinc-800 border-primary/50 text-primary' : ''}`}
                         >
-                            {legendConfig[f]?.shape}
-                            <span className="text-sm font-medium text-zinc-200 whitespace-nowrap">{legendConfig[f]?.label}</span>
-                        </div>
-                    ))}
-                </div>
-            ) : (
-                /* Narrow canvas: tap-to-reveal drawer (mobile OR compressed desktop panels) */
-                <div className="flex flex-col items-start gap-4 pointer-events-none w-full relative">
-                    <button
-                        onClick={(e) => { e.stopPropagation(); setIsLegendExpanded(!isLegendExpanded); if (onLegendInteraction) onLegendInteraction(); }}
-                        className={`${CanvasControlStyles} pointer-events-auto relative z-40 ${isLegendExpanded ? 'bg-zinc-800 border-primary/50 text-primary' : ''}`}
-                    >
-                        <span className="material-symbols-outlined !text-[20px]">{isLegendExpanded ? 'close' : 'filter_list'}</span>
-                    </button>
+                            <span className="material-symbols-outlined !text-[20px]">{isLegendExpanded ? 'close' : 'filter_list'}</span>
+                        </button>
 
-                    <div
-                        className={`w-[280px] border border-zinc-700 bg-zinc-900/98 backdrop-blur-xl p-4 pointer-events-auto shadow-2xl transition-all duration-300 origin-bottom-left absolute bottom-16 left-0 z-50 ${isLegendExpanded ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-90 pointer-events-none invisible'} rounded-2xl`}
-                    >
-                        <div className="grid grid-cols-2 gap-2">
-                            {legendOrder.map(f => (
-                                <div
-                                    key={f}
-                                    onClick={() => { toggleFilter(f); if (onLegendInteraction) onLegendInteraction(); }}
-                                    className={`flex items-center gap-2 py-2.5 px-3 transition-all cursor-pointer rounded-xl border ${activeFilters[f] ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-zinc-950/40 border-transparent opacity-60 hover:opacity-80'}`}
-                                >
-                                    <div className="shrink-0 w-6 h-6 flex items-center justify-center">
-                                        {legendConfig[f]?.shape}
+                        <div
+                            className={`w-[280px] border border-zinc-700 bg-zinc-900/98 backdrop-blur-xl p-4 pointer-events-auto shadow-2xl transition-all duration-300 origin-bottom-left absolute bottom-16 left-0 z-50 ${isLegendExpanded ? 'opacity-100 translate-y-0 scale-100' : 'opacity-0 translate-y-4 scale-90 pointer-events-none invisible'} rounded-2xl`}
+                        >
+                            <div className="grid grid-cols-2 gap-2">
+                                {legendOrder.map(f => (
+                                    <div
+                                        key={f}
+                                        onClick={() => { toggleFilter(f); if (onLegendInteraction) onLegendInteraction(); }}
+                                        className={`flex items-center gap-2 py-2.5 px-3 transition-all cursor-pointer rounded-xl border ${activeFilters[f] ? 'bg-zinc-800 border-zinc-600 text-white' : 'bg-zinc-950/40 border-transparent opacity-60 hover:opacity-80'}`}
+                                    >
+                                        <div className="shrink-0 w-6 h-6 flex items-center justify-center">
+                                            {legendConfig[f]?.shape}
+                                        </div>
+                                        <span className="text-[11px] font-medium truncate">{legendConfig[f]?.label}</span>
                                     </div>
-                                    <span className="text-[11px] font-medium truncate">{legendConfig[f]?.label}</span>
-                                </div>
-                            ))}
+                                ))}
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
-        </div>
-        
-        <div className={`absolute right-6 z-40 flex justify-end transition-all duration-300 ${!isCompactMode ? 'top-[88px]' : 'top-6'}`}>
-            <div 
-                className={`group relative h-[38px] flex items-center transition-all duration-300 ease-in-out overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-md shadow-xl origin-right ${isSearchExpanded ? 'w-64 focus-within:ring-1 focus-within:ring-primary' : 'w-[38px] cursor-pointer'}`}
-                onClick={(e) => { 
-                    if (!isSearchExpanded) {
-                        e.stopPropagation(); 
-                        setIsSearchExpanded(true); 
-                        setTimeout(() => graphSearchInputRef.current?.focus(), 50); 
-                    }
-                }}
-            >
-                <span className={`material-symbols-outlined absolute left-[9px] top-1/2 -translate-y-1/2 transition-colors duration-300 z-10 pointer-events-none ${isSearchExpanded ? 'text-zinc-500 !text-[20px]' : 'text-zinc-400 group-hover:text-white !text-[20px]'}`}>
-                    search
-                </span>
-                
-                <input autoComplete="off" data-1p-ignore="true" data-lpignore="true" 
-                    ref={graphSearchInputRef}
-                    type="search" 
-                    placeholder="Find in connections..." 
-                    value={searchQuery} 
-                    onChange={(e) => { setSearchQuery(e.target.value); if (selectedNode) onNodeClick(null); }} 
-                    onFocus={() => { if (selectedNode) onNodeClick(null); }} 
-                    onBlur={() => { if (!searchQuery.trim()) setIsSearchExpanded(false); }}
-                    className={`w-full h-full appearance-none bg-transparent text-white placeholder:text-zinc-500 focus:outline-none transition-opacity duration-300 pl-10 pr-[38px] text-sm ${isSearchExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`} 
-                />
-                
-                <div className={`absolute right-[3px] top-1/2 -translate-y-1/2 flex items-center z-10 transition-opacity duration-300 ${isSearchExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                    {searchQuery && (
-                        <button 
-                            onMouseDown={(e) => { e.preventDefault(); setSearchQuery(''); graphSearchInputRef.current?.focus(); }} 
-                            className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-[10px] text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors leading-none" 
-                            aria-label="Clear search"
-                        >
-                            <span className="material-symbols-outlined !text-[18px]">close</span>
-                        </button>
-                    )}
+                )}
+            </div>
+
+            <div className={`absolute right-6 z-40 flex justify-end transition-all duration-300 ${!isCompactMode ? 'top-[88px]' : 'top-6'}`}>
+                <div
+                    className={`group relative h-[38px] flex items-center transition-all duration-300 ease-in-out overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-md shadow-xl origin-right ${isSearchExpanded ? 'w-64 focus-within:ring-1 focus-within:ring-primary' : 'w-[38px] cursor-pointer'}`}
+                    onClick={(e) => {
+                        if (!isSearchExpanded) {
+                            e.stopPropagation();
+                            setIsSearchExpanded(true);
+                            setTimeout(() => graphSearchInputRef.current?.focus(), 50);
+                        }
+                    }}
+                >
+                    <span className={`material-symbols-outlined absolute left-[9px] top-1/2 -translate-y-1/2 transition-colors duration-300 z-10 pointer-events-none ${isSearchExpanded ? 'text-zinc-500 !text-[20px]' : 'text-zinc-400 group-hover:text-white !text-[20px]'}`}>
+                        search
+                    </span>
+
+                    <input autoComplete="off" data-1p-ignore="true" data-lpignore="true"
+                        ref={graphSearchInputRef}
+                        type="search"
+                        placeholder="Find in connections..."
+                        value={searchQuery}
+                        onChange={(e) => { setSearchQuery(e.target.value); if (selectedNode) onNodeClick(null); }}
+                        onFocus={() => { if (selectedNode) onNodeClick(null); }}
+                        onBlur={() => { if (!searchQuery.trim()) setIsSearchExpanded(false); }}
+                        className={`w-full h-full appearance-none bg-transparent text-white placeholder:text-zinc-500 focus:outline-none transition-opacity duration-300 pl-10 pr-[38px] text-sm ${isSearchExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
+                    />
+
+                    <div className={`absolute right-[3px] top-1/2 -translate-y-1/2 flex items-center z-10 transition-opacity duration-300 ${isSearchExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
+                        {searchQuery && (
+                            <button
+                                onMouseDown={(e) => { e.preventDefault(); setSearchQuery(''); graphSearchInputRef.current?.focus(); }}
+                                className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-[10px] text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors leading-none"
+                                aria-label="Clear search"
+                            >
+                                <span className="material-symbols-outlined !text-[18px]">close</span>
+                            </button>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>
-    </div>
-  );
+    );
 };
 
 export default MusicGraph;
