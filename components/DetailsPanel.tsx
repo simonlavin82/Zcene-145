@@ -4610,7 +4610,6 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                                     placeholder="Find in zine..."
                                     isMobile={false}
                                     size="toolbar"
-                                    className="flex-1 min-w-0 max-w-md lg:max-w-lg"
                                     inputTestId="zine-search-input"
                                 />
                                 <div className="flex items-center gap-2 shrink-0">

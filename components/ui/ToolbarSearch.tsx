@@ -12,7 +12,14 @@ export interface ToolbarSearchProps {
   onMobileOpenChange?: (open: boolean) => void;
   /** 'toolbar' = h-10 / w-10 (40px, Zine parity); 'control' = h-[38px] / w-[38px] (38px, Dashboard ViewToggle parity). */
   size?: 'toolbar' | 'control';
-  /** Classes applied to the desktop inline container (e.g. flex-1 min-w-0 max-w-md). */
+  /**
+   * Desktop inline width strategy (ignored on mobile, where takeover is always full-width):
+   * - 'optimum' (default): 256px cap (`w-full flex-1 min-w-0 max-w-64`) matching Connections' crisp proportion
+   * - 'full': unconstrained width (`w-full flex-1 min-w-0`) for standalone table/modal filters
+   * - 'custom': omits default width/flex classes so caller controls sizing via `className` without Tailwind v4 cascade conflicts
+   */
+  width?: 'optimum' | 'full' | 'custom';
+  /** Optional extra classes applied to the desktop inline container. */
   className?: string;
   /** Classes applied to the mobile absolute inset-0 takeover overlay (e.g. z-20 px-4 bg-zinc-950/95 backdrop-blur-md). */
   overlayClassName?: string;
@@ -33,6 +40,7 @@ export const ToolbarSearch: React.FC<ToolbarSearchProps> = ({
   isMobileOpen,
   onMobileOpenChange,
   size = 'toolbar',
+  width = 'optimum',
   className = '',
   overlayClassName = 'z-20',
   ariaLabel,
@@ -54,14 +62,23 @@ export const ToolbarSearch: React.FC<ToolbarSearchProps> = ({
 
   const heightClass = size === 'control' ? 'h-[38px]' : 'h-10';
   const triggerSizeClass = size === 'control' ? 'w-[38px] h-[38px]' : 'w-10 h-10';
+  const widthClass =
+    width === 'optimum'
+      ? 'w-full flex-1 min-w-0 max-w-64'
+      : width === 'full'
+      ? 'w-full flex-1 min-w-0'
+      : '';
+  const desktopWrapperClassName = ['relative', widthClass, className].filter(Boolean).join(' ');
   const hasActiveQuery = value.trim().length > 0;
   const resolvedAriaLabel = ariaLabel || placeholder;
 
-  const inputClassName = `w-full ${heightClass} appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all py-2 pl-10 pr-10 text-sm`;
+  const baseInputClassName = `w-full ${heightClass} appearance-none rounded-xl border border-zinc-700 bg-zinc-950 text-white placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none transition-all py-2 pl-10 text-sm`;
+  const desktopInputClassName = `${baseInputClassName} ${value ? 'pr-10' : 'pr-3'}`;
+  const mobileInputClassName = `${baseInputClassName} pr-10`;
 
   if (!isMobile) {
     return (
-      <div className={`relative ${className}`}>
+      <div className={desktopWrapperClassName}>
         <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-zinc-500 !text-[18px] z-10 pointer-events-none">
           search
         </span>
@@ -85,7 +102,7 @@ export const ToolbarSearch: React.FC<ToolbarSearchProps> = ({
               inputRef.current?.blur();
             }
           }}
-          className={inputClassName}
+          className={desktopInputClassName}
         />
         {value && (
           <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center z-10">
@@ -181,7 +198,7 @@ export const ToolbarSearch: React.FC<ToolbarSearchProps> = ({
                 inputRef.current?.blur();
               }
             }}
-            className={inputClassName}
+            className={mobileInputClassName}
           />
           <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center z-10">
             <button

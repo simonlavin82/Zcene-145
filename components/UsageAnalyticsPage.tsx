@@ -3424,7 +3424,6 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                             isMobileOpen={isArchiveSearchOpen}
                                             onMobileOpenChange={setIsArchiveSearchOpen}
                                             size="control"
-                                            className="w-full md:w-72 shrink-0"
                                             overlayClassName="z-20"
                                             triggerTestId="archive-search-trigger"
                                             inputTestId="archive-search-input"

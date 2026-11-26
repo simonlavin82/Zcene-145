@@ -503,7 +503,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                   isMobileOpen={isSearchExpanded}
                   onMobileOpenChange={setIsSearchExpanded}
                   size="control"
-                  className="flex-1 min-w-0 max-w-sm lg:max-w-md"
                   overlayClassName="z-30"
                   triggerTestId="dashboard-search-trigger"
                   inputTestId="dashboard-search-input"

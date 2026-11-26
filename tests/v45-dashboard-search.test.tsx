@@ -292,8 +292,16 @@ describe('Architecture V45: Dashboard Search Parity (Artist & Label Nodes, Multi
     expect(searchInput).toBeInTheDocument();
     expect(searchInput.className).toContain('bg-zinc-950');
     expect(searchInput.className).toContain('h-[38px]');
+    expect(searchInput.className).toContain('pr-3');
+    // Desktop inline container inherits ToolbarSearch optimum 256px cap (max-w-64) with flex shrink guardrails
+    expect(searchInput.parentElement?.className).toContain('max-w-64');
+    expect(searchInput.parentElement?.className).toContain('flex-1');
+    expect(searchInput.parentElement?.className).toContain('min-w-0');
+    expect(searchInput.parentElement?.className).not.toContain('max-w-md');
+    expect(searchInput.parentElement?.className).not.toContain('max-w-sm');
 
     fireEvent.change(searchInput, { target: { value: 'zzzz-no-match' } });
+    expect(searchInput.className).toContain('pr-10');
     expect(screen.getByText(/No Zcenes found matching/i)).toBeInTheDocument();
 
     fireEvent.keyDown(searchInput, { key: 'Escape' });
@@ -382,5 +390,20 @@ describe('Architecture V45: Dashboard Search Parity (Artist & Label Nodes, Multi
     expect(activeTrigger.className).toContain('border-primary/70');
     expect(activeTrigger.className).toContain('text-primary');
     expect(screen.getByTestId('toolbar-search-active-dot')).toBeInTheDocument();
+
+    // Verify ToolbarSearch desktop width strategies: optimum (default 256px), full, and custom (cascade-safe)
+    const { unmount: unmountWidths } = render(
+      <>
+        <ToolbarSearch value="" onChange={vi.fn()} placeholder="Optimum" isMobile={false} inputTestId="ts-width-optimum" />
+        <ToolbarSearch value="" onChange={vi.fn()} placeholder="Full" isMobile={false} width="full" inputTestId="ts-width-full" />
+        <ToolbarSearch value="" onChange={vi.fn()} placeholder="Custom" isMobile={false} width="custom" className="w-full max-w-48" inputTestId="ts-width-custom" />
+      </>
+    );
+    expect(screen.getByTestId('ts-width-optimum').parentElement?.className).toContain('max-w-64');
+    expect(screen.getByTestId('ts-width-full').parentElement?.className).toContain('w-full');
+    expect(screen.getByTestId('ts-width-full').parentElement?.className).not.toContain('max-w-64');
+    expect(screen.getByTestId('ts-width-custom').parentElement?.className).toContain('max-w-48');
+    expect(screen.getByTestId('ts-width-custom').parentElement?.className).not.toContain('max-w-64');
+    unmountWidths();
   });
 });

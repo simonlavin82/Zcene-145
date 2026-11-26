@@ -219,6 +219,10 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
 
     const searchInput = screen.getByTestId('archive-search-input');
     expect(searchInput).toHaveAttribute('placeholder', 'Find in archive...');
+    expect(searchInput.parentElement?.className).toContain('max-w-64');
+    expect(searchInput.parentElement?.className).toContain('flex-1');
+    expect(searchInput.parentElement?.className).toContain('min-w-0');
+    expect(searchInput.parentElement?.className).not.toContain('md:w-72');
 
     fireEvent.change(searchInput, { target: { value: 'Spaced' } });
     expect(screen.getByText('Buggin')).toBeInTheDocument();

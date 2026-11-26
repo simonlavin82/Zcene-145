@@ -3634,6 +3634,11 @@ describe('DetailsPanel', () => {
                     expect(searchInput).toBeInTheDocument();
                     expect(searchInput.className).toContain('h-10');
                     expect(searchInput.className).toContain('bg-zinc-950');
+                    expect(searchInput.parentElement?.className).toContain('max-w-64');
+                    expect(searchInput.parentElement?.className).toContain('flex-1');
+                    expect(searchInput.parentElement?.className).toContain('min-w-0');
+                    expect(searchInput.parentElement?.className).not.toContain('max-w-lg');
+                    expect(searchInput.parentElement?.className).not.toContain('max-w-md');
 
                     expect(document.getElementById('magazine-card-fugazi-us')).toBeInTheDocument();
                     expect(document.getElementById('magazine-card-jawbox-us')).toBeInTheDocument();
