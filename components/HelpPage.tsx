@@ -1068,7 +1068,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                     Audio Previews &amp; Voice Dictation
                                 </h4>
                                 <p className="text-sm text-zinc-400 leading-relaxed">
-                                    Only one 30-second preview plays at a time across the app. Voice dictation in Zine Curator&apos;s Notes uses your browser&apos;s built-in Speech Recognition API (supported in Chrome, Edge, and Safari) and requires microphone permission when prompted.
+                                    Only one 30-second preview plays at a time across the app. Continuous voice dictation in Zine Curator&apos;s Notes and Deep Connections uses your browser&apos;s built-in Speech Recognition API (supported in Chrome, Edge, and Safari) and keeps listening across pauses until you click Stop.
                                 </p>
                             </div>
                         </div>

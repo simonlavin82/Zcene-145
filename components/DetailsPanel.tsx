@@ -17,6 +17,7 @@ import { formatSystemTimestamp, extractInitials } from '../utils/formatters';
 import { Select, Input, InputSizes, LayoutSizes, Button, ToolbarSearch } from './DesignSystem';
 import { Flame, Pin } from 'lucide-react';
 import { useDominantColor } from '../hooks/useDominantColor';
+import { useContinuousDictation, combineDictationText } from '../hooks/useContinuousDictation';
 import { AudioPreviewPlayer, AlbumAudioPreviewButton, stopGlobalAudio, audioController } from './AudioPreviewPlayer';
 const SENTINEL_INSIGHT = 'No insight provided.';
 
@@ -982,7 +983,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         return Array.from(labelSet).join(', ');
     }, [isArtistNode, node.id, (details?.details as any)?.label, (node as any)?.recordLabel, (node as any)?.labels, graphData?.links, graphData?.nodes]);
 
-    const [isListening, setIsListening] = useState(false);
     const [imageTier, setImageTier] = useState<'source' | 'placeholder'>('source');
     const [imgLoaded, setImgLoaded] = useState(false);
     const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -1324,9 +1324,31 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
         wasPinnedRef.current = isPinned;
     }, [isPinned, isFullScreenMode, node.id]);
 
+    const handleChatFinalTranscript = useCallback((chunk: string) => {
+        setChatInput((prev) => combineDictationText(prev, chunk));
+    }, []);
+
+    const chatDictation = useContinuousDictation({
+        onFinalTranscript: handleChatFinalTranscript,
+    });
+
+    const displayedChatInput = combineDictationText(chatInput, chatDictation.interimTranscript);
+
+    useEffect(() => {
+        if (chatMode !== 'live') {
+            chatDictation.stop({ flushInterim: false });
+        }
+    }, [chatMode, chatDictation.stop]);
+
+    useEffect(() => {
+        chatDictation.stop({ flushInterim: false });
+    }, [node.id, chatDictation.stop]);
+
     const handleSend = () => {
-        if (!chatInput.trim() || isChatLoading) return;
-        onSendMessage(chatInput);
+        const flushed = chatDictation.stop({ flushInterim: false });
+        const finalMessage = combineDictationText(chatInput, flushed).trim();
+        if (!finalMessage || isChatLoading) return;
+        onSendMessage(finalMessage);
         setChatInput('');
     };
 
@@ -1335,21 +1357,6 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
             e.preventDefault();
             handleSend();
         }
-    };
-
-    const handleSpeechToText = () => {
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (!SpeechRecognition) {
-            alert("Speech recognition is not supported in this browser.");
-            return;
-        }
-        const recognition = new SpeechRecognition();
-        recognition.lang = 'en-US';
-        setIsListening(true);
-        recognition.start();
-        recognition.onresult = (event: any) => setChatInput(event.results[0][0].transcript);
-        recognition.onerror = () => setIsListening(false);
-        recognition.onend = () => setIsListening(false);
     };
 
 
@@ -2196,7 +2203,10 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                             <div className="flex items-center gap-3">
                                                                 {onClearChat && chatHistory.length > 0 && (
                                                                     <button
-                                                                        onClick={onClearChat}
+                                                                        onClick={() => {
+                                                                            chatDictation.stop({ flushInterim: false });
+                                                                            onClearChat();
+                                                                        }}
                                                                         className="px-3 py-1.5 text-[10px] text-zinc-500 hover:text-red-400 hover:bg-red-500/10 uppercase tracking-widest font-semibold rounded-lg transition-colors border border-transparent flex items-center justify-center"
                                                                     >
                                                                         Clear Chat
@@ -2210,36 +2220,59 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                                 <div className="flex flex-col flex-1 gap-2">
                                                                     <div className="relative flex-1 flex flex-col">
                                                                         <textarea
-                                                                            value={chatInput}
-                                                                            onChange={(e) => setChatInput(e.target.value)}
+                                                                            value={displayedChatInput}
+                                                                            onChange={(e) => {
+                                                                                if (chatDictation.interimTranscript) {
+                                                                                    chatDictation.clearInterim();
+                                                                                }
+                                                                                setChatInput(e.target.value);
+                                                                            }}
                                                                             onKeyDown={handleKeyDown}
                                                                             placeholder="Consult Zcene AI..."
-                                                                            className="flex-1 w-full h-full bg-zinc-950 border border-zinc-700 py-2 pl-4 pr-16 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none scrollbar-thin scrollbar-thumb-zinc-700"
+                                                                            className={`flex-1 w-full h-full bg-zinc-950 border ${chatDictation.isListening ? 'border-red-500/50' : 'border-zinc-700'} pt-2.5 pb-12 pl-4 pr-11 text-sm text-white placeholder:text-zinc-500 focus:outline-none focus:border-primary transition-all rounded-xl resize-none scrollbar-thin scrollbar-thumb-zinc-700`}
                                                                         />
-                                                                        <div className="absolute right-2 bottom-3 flex flex-col items-center gap-2">
-                                                                            {!chatInput.trim() ? (
+                                                                        {displayedChatInput && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onMouseDown={(e) => e.preventDefault()}
+                                                                                onClick={() => {
+                                                                                    chatDictation.stop({ flushInterim: false });
+                                                                                    setChatInput('');
+                                                                                }}
+                                                                                className="absolute right-2 top-2 w-7 h-7 flex flex-shrink-0 items-center justify-center text-zinc-500 hover:text-white transition-colors rounded-lg cursor-pointer"
+                                                                                title="Clear message"
+                                                                                aria-label="Clear message"
+                                                                            >
+                                                                                <span className="material-symbols-outlined !text-[18px]">close</span>
+                                                                            </button>
+                                                                        )}
+                                                                        <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
+                                                                            {chatDictation.isSupported && (
                                                                                 <button
-                                                                                    onClick={handleSpeechToText}
-                                                                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-colors rounded-xl ${isListening ? 'text-primary animate-pulse' : 'text-zinc-500 active:text-zinc-300'}`}
-                                                                                    title="Speak"
+                                                                                    type="button"
+                                                                                    onClick={chatDictation.toggle}
+                                                                                    className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-all rounded-xl cursor-pointer ${
+                                                                                        chatDictation.isListening
+                                                                                            ? 'bg-red-500/15 border border-red-500/50 text-red-400 hover:bg-red-500/25'
+                                                                                            : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
+                                                                                    }`}
+                                                                                    title={chatDictation.isListening ? 'Stop voice input' : 'Voice input'}
+                                                                                    aria-label={chatDictation.isListening ? 'Stop dictation' : 'Start dictation'}
                                                                                 >
-                                                                                    <MicIcon className="!text-[22px]" />
-                                                                                </button>
-                                                                            ) : (
-                                                                                <button
-                                                                                    onClick={() => setChatInput('')}
-                                                                                    className="w-8 h-8 flex flex-shrink-0 items-center justify-center text-zinc-500 active:text-white transition-colors rounded-xl"
-                                                                                    title="Clear message"
-                                                                                >
-                                                                                    <span className="material-symbols-outlined !text-[18px]">close</span>
+                                                                                    {chatDictation.isListening ? (
+                                                                                        <span className="material-symbols-outlined !text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>stop</span>
+                                                                                    ) : (
+                                                                                        <span className="material-symbols-outlined !text-[20px]">mic</span>
+                                                                                    )}
                                                                                 </button>
                                                                             )}
                                                                             <button
+                                                                                type="button"
                                                                                 onClick={handleSend}
-                                                                                disabled={!chatInput.trim() || isChatLoading}
-                                                                                className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-all duration-300 rounded-xl ${!chatInput.trim() || isChatLoading
+                                                                                disabled={!displayedChatInput.trim() || isChatLoading}
+                                                                                className={`w-8 h-8 flex flex-shrink-0 items-center justify-center transition-all duration-300 rounded-xl ${!displayedChatInput.trim() || isChatLoading
                                                                                     ? 'bg-zinc-800 text-zinc-600'
-                                                                                    : 'bg-primary text-brand-black active:scale-95'
+                                                                                    : 'bg-primary text-brand-black active:scale-95 cursor-pointer'
                                                                                     }`}
                                                                                 title="Send"
                                                                             >
@@ -2247,7 +2280,7 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                                             </button>
                                                                         </div>
                                                                     </div>
-                                                                    <div className="flex justify-start px-1">
+                                                                    <div className="flex justify-between items-center px-1">
                                                                         {(() => {
                                                                             const isSessionUnlockedAndActive = hasActiveDeepWebSession && liveMessageCount < 3;
                                                                             const displayedMessagesUsed = isSessionUnlockedAndActive
@@ -2260,6 +2293,12 @@ export const NodeDetailsCard: React.FC<NodeDetailsCardProps> = ({
                                                                                 </div>
                                                                             );
                                                                         })()}
+                                                                        {chatDictation.isListening && (
+                                                                            <div className="text-[10px] text-red-400 font-mono tracking-wider flex items-center gap-1.5">
+                                                                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                                                                                Listening...
+                                                                            </div>
+                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             ) : (
@@ -2789,62 +2828,36 @@ export const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
     const cleanIntro = normalizeZineIntro(intro) || '';
     const [isEditorOpen, setIsEditorOpen] = useState(false);
     const [draftIntro, setDraftIntro] = useState(cleanIntro);
-    const [isListening, setIsListening] = useState(false);
-    const recognitionRef = useRef<any>(null);
+    const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
-    const handleDictation = () => {
-        const SpeechRecognition = typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
-        if (!SpeechRecognition) return;
-        if (isListening) {
-            if (recognitionRef.current) {
-                try { recognitionRef.current.stop(); } catch (_) {}
-            }
-            setIsListening(false);
-            return;
-        }
-        try {
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'en-US';
-            recognitionRef.current = recognition;
-            setIsListening(true);
-            recognition.start();
-            recognition.onresult = (event: any) => {
-                const transcript = event.results?.[0]?.[0]?.transcript || '';
-                if (transcript) {
-                    setDraftIntro((prev) => {
-                        const combined = prev.trim() ? `${prev.trim()} ${transcript}` : transcript;
-                        return combined.slice(0, 600);
-                    });
-                }
-            };
-            recognition.onerror = () => setIsListening(false);
-            recognition.onend = () => setIsListening(false);
-        } catch (_) {
-            setIsListening(false);
-        }
-    };
-
-    useEffect(() => {
-        return () => {
-            if (recognitionRef.current) {
-                try { recognitionRef.current.stop(); } catch (_) {}
-            }
-        };
+    const handleNoteFinalTranscript = useCallback((chunk: string) => {
+        setDraftIntro((prev) => combineDictationText(prev, chunk, 600));
     }, []);
+
+    const noteDictation = useContinuousDictation({
+        onFinalTranscript: handleNoteFinalTranscript,
+    });
+
+    const displayedIntro = combineDictationText(draftIntro, noteDictation.interimTranscript, 600);
 
     useEffect(() => {
         if (!isEditingZine) {
-            if (recognitionRef.current) {
-                try { recognitionRef.current.stop(); } catch (_) {}
-            }
-            setIsListening(false);
+            noteDictation.stop({ flushInterim: false });
             setIsEditorOpen(false);
         }
-    }, [isEditingZine]);
+    }, [isEditingZine, noteDictation.stop]);
 
     useEffect(() => {
         setDraftIntro(cleanIntro);
     }, [cleanIntro]);
+
+    useEffect(() => {
+        const el = textareaRef.current;
+        if (!el || !isEditorOpen) return;
+        el.style.height = 'auto';
+        const nextHeight = Math.min(280, Math.max(112, el.scrollHeight));
+        el.style.height = `${nextHeight}px`;
+    }, [displayedIntro, isEditorOpen]);
 
     if (!isEditingZine || !onSaveIntro) {
         if (!cleanIntro) return null;
@@ -2860,11 +2873,10 @@ export const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (recognitionRef.current) {
-            try { recognitionRef.current.stop(); } catch (_) {}
-            setIsListening(false);
-        }
-        const normalized = normalizeZineIntro(draftIntro) || null;
+        const flushed = noteDictation.stop({ flushInterim: false });
+        const finalText = combineDictationText(draftIntro, flushed, 600);
+        const normalized = normalizeZineIntro(finalText) || null;
+        setDraftIntro(normalized || '');
         setIsEditorOpen(false);
         onSaveIntro(normalized);
     };
@@ -2878,60 +2890,83 @@ export const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
             >
                 <div className="flex items-center justify-between">
                     <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400">
-                        Curator's Note / Dedication
+                        Curator&apos;s Note
                     </span>
                     <span className="text-[10px] font-mono text-zinc-500">
-                        {draftIntro.length}/600
+                        {displayedIntro.length}/600
                     </span>
                 </div>
                 <div className="relative">
                     <textarea
+                        ref={textareaRef}
                         autoFocus
-                        rows={2}
+                        rows={4}
                         maxLength={600}
                         data-testid={`zine-intro-input-${sectionKey}`}
-                        placeholder="Optional dedication or curator's intro note below the title..."
-                        value={draftIntro}
-                        onChange={(e) => setDraftIntro(e.target.value)}
-                        className="w-full rounded-xl border border-zinc-700 bg-zinc-950 text-white text-sm p-3 pr-20 placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none resize-y"
+                        placeholder="Add a curator's note below the title..."
+                        value={displayedIntro}
+                        onChange={(e) => {
+                            if (noteDictation.interimTranscript) {
+                                noteDictation.clearInterim();
+                            }
+                            setDraftIntro(e.target.value.slice(0, 600));
+                        }}
+                        className={`w-full min-h-[112px] rounded-xl border ${noteDictation.isListening ? 'border-red-500/50' : 'border-zinc-700'} bg-zinc-950 text-white text-sm leading-relaxed pt-3 pb-11 pl-3.5 pr-11 placeholder:text-zinc-500 focus:ring-1 focus:ring-primary focus:outline-none resize-y transition-colors`}
                     />
-                    <div className="absolute right-2 bottom-3 flex items-center gap-1">
-                        {typeof window !== 'undefined' && ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition) && (
+                    {displayedIntro && (
+                        <button
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                                noteDictation.stop({ flushInterim: false });
+                                setDraftIntro('');
+                            }}
+                            className="absolute right-2 top-2 w-7 h-7 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
+                            title="Clear note"
+                            aria-label="Clear note"
+                        >
+                            <span className="material-symbols-outlined !text-[18px]">close</span>
+                        </button>
+                    )}
+                    {noteDictation.isSupported && (
+                        <div className="absolute right-2 bottom-2 flex items-center gap-1">
                             <button
                                 type="button"
-                                onClick={handleDictation}
-                                className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors cursor-pointer ${isListening ? 'text-primary animate-pulse' : 'text-zinc-400 hover:text-white'}`}
-                                title={isListening ? 'Stop listening' : 'Dictate note'}
-                                aria-label={isListening ? 'Stop dictation' : 'Start dictation'}
+                                onClick={noteDictation.toggle}
+                                className={`w-8 h-8 flex items-center justify-center rounded-xl transition-all cursor-pointer ${
+                                    noteDictation.isListening
+                                        ? 'bg-red-500/15 border border-red-500/50 text-red-400 hover:bg-red-500/25'
+                                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800/80'
+                                }`}
+                                title={noteDictation.isListening ? 'Stop voice input' : 'Voice input'}
+                                aria-label={noteDictation.isListening ? 'Stop dictation' : 'Start dictation'}
                             >
-                                <span className="material-symbols-outlined !text-[20px]">mic</span>
+                                {noteDictation.isListening ? (
+                                    <span className="material-symbols-outlined !text-[18px]" style={{ fontVariationSettings: "'FILL' 1" }}>stop</span>
+                                ) : (
+                                    <span className="material-symbols-outlined !text-[20px]">mic</span>
+                                )}
                             </button>
-                        )}
-                        {draftIntro && (
-                            <button
-                                type="button"
-                                onMouseDown={(e) => e.preventDefault()}
-                                onClick={() => setDraftIntro('')}
-                                className="w-8 h-8 flex items-center justify-center rounded-lg text-zinc-400 hover:text-white transition-colors cursor-pointer"
-                                title="Clear note"
-                                aria-label="Clear note"
-                            >
-                                <span className="material-symbols-outlined !text-[18px]">close</span>
-                            </button>
+                        </div>
+                    )}
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                    <div className="min-h-[16px] flex items-center">
+                        {noteDictation.isListening && (
+                            <span className="text-[10px] text-red-400 font-mono tracking-wider flex items-center gap-1.5">
+                                <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse"></span>
+                                Listening...
+                            </span>
                         )}
                     </div>
-                </div>
-                <div className="flex items-center justify-end gap-2">
+                    <div className="flex items-center gap-2">
                     <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         data-testid={`zine-intro-cancel-${sectionKey}`}
                         onClick={() => {
-                            if (recognitionRef.current) {
-                                try { recognitionRef.current.stop(); } catch (_) {}
-                                setIsListening(false);
-                            }
+                            noteDictation.stop({ flushInterim: false });
                             setIsEditorOpen(false);
                             setDraftIntro(cleanIntro);
                         }}
@@ -2945,10 +2980,7 @@ export const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
                             size="sm"
                             data-testid={`zine-intro-remove-${sectionKey}`}
                             onClick={() => {
-                                if (recognitionRef.current) {
-                                    try { recognitionRef.current.stop(); } catch (_) {}
-                                    setIsListening(false);
-                                }
+                                noteDictation.stop({ flushInterim: false });
                                 setIsEditorOpen(false);
                                 setDraftIntro('');
                                 onSaveIntro(null);
@@ -2966,6 +2998,7 @@ export const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
                     >
                         Save Note
                     </Button>
+                    </div>
                 </div>
             </form>
         );
@@ -3020,7 +3053,7 @@ export const ZineIntroNote: React.FC<ZineIntroNoteProps> = ({
                 className="rounded-xl border border-dashed border-zinc-700/80 bg-zinc-900/40 hover:border-primary/60 hover:bg-zinc-900/70 transition-colors px-3.5 py-2 text-xs font-medium text-zinc-400 hover:text-white inline-flex items-center gap-1.5 cursor-pointer"
             >
                 <span className="material-symbols-outlined !text-[16px]">edit_note</span>
-                <span>+ Add Intro / Dedication Note</span>
+                <span>+ Add Note</span>
             </button>
         </div>
     );

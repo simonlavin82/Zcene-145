@@ -2933,12 +2933,13 @@ describe('DetailsPanel', () => {
                 });
                 expect(textarea.value).toBe('This is the first sentence. And the second.');
 
-                // Clear note via ×
+                // Clear note via × (clears draft & stops dictation cleanly)
                 const clearBtn = screen.getByLabelText('Clear note');
                 fireEvent.click(clearBtn);
                 expect(textarea.value).toBe('');
 
-                // Overflow speech result (>600 chars)
+                // Restart dictation for overflow clamping test (>600 chars)
+                fireEvent.click(screen.getByLabelText('Start dictation'));
                 act(() => {
                     resultCallback?.({ results: [[{ transcript: 'A'.repeat(700) }]] });
                 });
@@ -2950,6 +2951,284 @@ describe('DetailsPanel', () => {
                 expect(stopSpy).toHaveBeenCalled();
 
                 delete (window as any).SpeechRecognition;
+            });
+
+            it('auto-restarts continuously across silence (no-speech / onend) without duplicating finalized text and flushes live interim words on Stop & Save (V47.20)', () => {
+                vi.useFakeTimers();
+                try {
+                    const instances: any[] = [];
+                    class ContinuousMockSpeechRecognition {
+                        continuous = false;
+                        interimResults = false;
+                        lang = '';
+                        onresult: any = null;
+                        onerror: any = null;
+                        onend: any = null;
+                        start = vi.fn();
+                        stop = vi.fn();
+                        constructor() {
+                            instances.push(this);
+                        }
+                    }
+                    (window as any).SpeechRecognition = ContinuousMockSpeechRecognition;
+
+                    const onSaveIntro = vi.fn();
+                    render(<ZineIntroNote sectionKey="scene-1" isEditingZine={true} onSaveIntro={onSaveIntro} />);
+                    fireEvent.click(screen.getByTestId('zine-intro-add-scene-1'));
+
+                    fireEvent.click(screen.getByLabelText('Start dictation'));
+                    expect(instances).toHaveLength(1);
+                    expect(instances[0].continuous).toBe(true);
+                    expect(instances[0].interimResults).toBe(true);
+                    expect(screen.getByLabelText('Stop dictation')).toBeInTheDocument();
+
+                    // Final segment 1
+                    act(() => {
+                        instances[0].onresult?.({
+                            resultIndex: 0,
+                            results: [Object.assign([{ transcript: 'First thought.' }], { isFinal: true })],
+                        });
+                    });
+                    const textarea = screen.getByTestId('zine-intro-input-scene-1') as HTMLTextAreaElement;
+                    expect(textarea.value).toBe('First thought.');
+
+                    // Browser emits no-speech + onend during a thinking pause -> auto-restarts a fresh instance
+                    act(() => {
+                        instances[0].onerror?.({ error: 'no-speech' });
+                        instances[0].onend?.();
+                        vi.advanceTimersByTime(200);
+                    });
+                    expect(instances).toHaveLength(2);
+                    expect(instances[1].start).toHaveBeenCalledTimes(1);
+                    expect(screen.getByLabelText('Stop dictation')).toBeInTheDocument();
+
+                    // Live interim preview appears inline AND reflects in N/600 counter
+                    act(() => {
+                        instances[1].onresult?.({
+                            resultIndex: 0,
+                            results: [Object.assign([{ transcript: 'trailing words' }], { isFinal: false })],
+                        });
+                    });
+                    expect(textarea.value).toBe('First thought. trailing words');
+                    expect(screen.getByText(`${'First thought. trailing words'.length}/600`)).toBeInTheDocument();
+
+                    // Clicking Stop flushes trailing interim words into committed text without duplication
+                    fireEvent.click(screen.getByLabelText('Stop dictation'));
+                    expect(screen.getByLabelText('Start dictation')).toBeInTheDocument();
+                    expect(textarea.value).toBe('First thought. trailing words');
+
+                    // Restart & emit another live interim chunk, then click Save Note directly -> flushes before saving
+                    fireEvent.click(screen.getByLabelText('Start dictation'));
+                    expect(instances).toHaveLength(3);
+                    act(() => {
+                        instances[2].onresult?.({
+                            resultIndex: 0,
+                            results: [Object.assign([{ transcript: 'saved live' }], { isFinal: false })],
+                        });
+                    });
+                    fireEvent.click(screen.getByTestId('zine-intro-save-scene-1'));
+                    expect(onSaveIntro).toHaveBeenCalledWith('First thought. trailing words saved live');
+                } finally {
+                    delete (window as any).SpeechRecognition;
+                    vi.useRealTimers();
+                }
+            });
+
+            it('hard-stops immediately on fatal permission/hardware errors (not-allowed / audio-capture) with zero restart loop (V47.20)', () => {
+                vi.useFakeTimers();
+                try {
+                    const instances: any[] = [];
+                    class FatalMockSpeechRecognition {
+                        continuous = false;
+                        interimResults = false;
+                        lang = '';
+                        onresult: any = null;
+                        onerror: any = null;
+                        onend: any = null;
+                        start = vi.fn();
+                        stop = vi.fn();
+                        constructor() {
+                            instances.push(this);
+                        }
+                    }
+                    (window as any).SpeechRecognition = FatalMockSpeechRecognition;
+
+                    render(<ZineIntroNote sectionKey="scene-1" isEditingZine={true} onSaveIntro={vi.fn()} />);
+                    fireEvent.click(screen.getByTestId('zine-intro-add-scene-1'));
+
+                    // Fatal permission error -> stops immediately, no restart timer scheduled
+                    fireEvent.click(screen.getByLabelText('Start dictation'));
+                    expect(instances).toHaveLength(1);
+                    act(() => {
+                        instances[0].onerror?.({ error: 'not-allowed' });
+                        instances[0].onend?.();
+                        vi.advanceTimersByTime(1000);
+                    });
+                    expect(instances).toHaveLength(1);
+                    expect(screen.getByLabelText('Start dictation')).toBeInTheDocument();
+
+                    // Fatal hardware error -> stops immediately, no restart loop
+                    fireEvent.click(screen.getByLabelText('Start dictation'));
+                    expect(instances).toHaveLength(2);
+                    act(() => {
+                        instances[1].onerror?.({ error: 'audio-capture' });
+                        instances[1].onend?.();
+                        vi.advanceTimersByTime(1000);
+                    });
+                    expect(instances).toHaveLength(2);
+                    expect(screen.getByLabelText('Start dictation')).toBeInTheDocument();
+                } finally {
+                    delete (window as any).SpeechRecognition;
+                    vi.useRealTimers();
+                }
+            });
+
+            it('Deep Connections Consult Zcene AI keeps Mic -> Stop accessible alongside Clear (×) and Send (↑), appends transcripts, and flushes/stops cleanly on Send (V47.20)', () => {
+                const instances: any[] = [];
+                class ChatMockSpeechRecognition {
+                    continuous = false;
+                    interimResults = false;
+                    lang = '';
+                    onresult: any = null;
+                    onerror: any = null;
+                    onend: any = null;
+                    start = vi.fn();
+                    stop = vi.fn();
+                    constructor() {
+                        instances.push(this);
+                    }
+                }
+                (window as any).SpeechRecognition = ChatMockSpeechRecognition;
+
+                try {
+                    const onSendMessage = vi.fn();
+                    render(
+                        <NodeDetailsCard
+                            node={{ id: 'madball-us', type: 'artist', label: 'Madball' } as any}
+                            details={{
+                                summary: 'NYHC pioneers.',
+                                details: { artist: 'Madball', genre: 'Hardcore', origin: 'New York, USA', founded: '1988' },
+                                members: [],
+                                discography: [],
+                                links: [],
+                            } as any}
+                            isLoading={false}
+                            isGlobalLoading={false}
+                            graphData={{ nodes: [], links: [] } as any}
+                            libraryArtists={[]}
+                            seedArtists={['Madball']}
+                            onAddArtist={() => {}}
+                            isSmallScreen={false}
+                            onClose={() => {}}
+                            onNodeClick={() => {}}
+                            onNavigate={() => {}}
+                            chatHistory={[]}
+                            onSendMessage={onSendMessage}
+                            isChatLoading={false}
+                            chatMode="live"
+                            onChatModeChange={() => {}}
+                            liveMessageCount={1}
+                            hasActiveDeepWebSession={true}
+                            isInStack={false}
+                            onToggleStack={() => {}}
+                            stack={[]}
+                        />
+                    );
+
+                    const chatBox = screen.getByPlaceholderText('Consult Zcene AI...') as HTMLTextAreaElement;
+                    fireEvent.click(screen.getByLabelText('Start dictation'));
+                    expect(instances).toHaveLength(1);
+                    expect(screen.getByLabelText('Stop dictation')).toBeInTheDocument();
+
+                    // Finalized phrase 1 -> Stop dictation MUST stay visible alongside Clear (×) and Send (↑)
+                    act(() => {
+                        instances[0].onresult?.({
+                            resultIndex: 0,
+                            results: [Object.assign([{ transcript: 'What is the name of' }], { isFinal: true })],
+                        });
+                    });
+                    expect(chatBox.value).toBe('What is the name of');
+                    expect(screen.getByLabelText('Stop dictation')).toBeInTheDocument();
+                    expect(screen.getByLabelText('Clear message')).toBeInTheDocument();
+                    expect(screen.getByTitle('Send')).not.toBeDisabled();
+
+                    // Live interim phrase 2 renders inline -> clicking Send flushes & stops cleanly
+                    act(() => {
+                        instances[0].onresult?.({
+                            resultIndex: 1,
+                            results: [
+                                Object.assign([{ transcript: 'What is the name of' }], { isFinal: true }),
+                                Object.assign([{ transcript: 'their debut album?' }], { isFinal: false }),
+                            ],
+                        });
+                    });
+                    expect(chatBox.value).toBe('What is the name of their debut album?');
+
+                    fireEvent.click(screen.getByTitle('Send'));
+                    expect(instances[0].stop).toHaveBeenCalled();
+                    expect(onSendMessage).toHaveBeenCalledWith('What is the name of their debut album?');
+                    expect(chatBox.value).toBe('');
+                    expect(screen.getByLabelText('Start dictation')).toBeInTheDocument();
+                } finally {
+                    delete (window as any).SpeechRecognition;
+                }
+            });
+
+            it('ZineIntroNote renders clean Curator Note / + Add Note copy, 4-row expanded textarea, and clears both committed and interim text on Clear (×) (V47.20)', () => {
+                const instances: any[] = [];
+                class CopyMockSpeechRecognition {
+                    continuous = false;
+                    interimResults = false;
+                    lang = '';
+                    onresult: any = null;
+                    onerror: any = null;
+                    onend: any = null;
+                    start = vi.fn();
+                    stop = vi.fn();
+                    constructor() {
+                        instances.push(this);
+                    }
+                }
+                (window as any).SpeechRecognition = CopyMockSpeechRecognition;
+
+                try {
+                    render(<ZineIntroNote sectionKey="scene-1" isEditingZine={true} onSaveIntro={vi.fn()} />);
+
+                    const addBtn = screen.getByTestId('zine-intro-add-scene-1');
+                    expect(addBtn).toHaveTextContent('+ Add Note');
+                    expect(addBtn.textContent).not.toMatch(/Dedication|Intro/i);
+
+                    fireEvent.click(addBtn);
+
+                    const form = screen.getByTestId('zine-intro-form-scene-1');
+                    expect(form.textContent).toContain("Curator's Note");
+                    expect(form.textContent).not.toMatch(/Dedication/i);
+
+                    const textarea = screen.getByTestId('zine-intro-input-scene-1') as HTMLTextAreaElement;
+                    expect(textarea.rows).toBe(4);
+                    expect(textarea.className).toContain('min-h-[112px]');
+                    expect(textarea.placeholder).toBe("Add a curator's note below the title...");
+
+                    // Start dictation, produce both final and interim text, then click Clear (×)
+                    fireEvent.click(screen.getByLabelText('Start dictation'));
+                    act(() => {
+                        instances[0].onresult?.({
+                            resultIndex: 0,
+                            results: [
+                                Object.assign([{ transcript: 'Committed line.' }], { isFinal: true }),
+                                Object.assign([{ transcript: 'live interim' }], { isFinal: false }),
+                            ],
+                        });
+                    });
+                    expect(textarea.value).toBe('Committed line. live interim');
+
+                    fireEvent.click(screen.getByLabelText('Clear note'));
+                    expect(textarea.value).toBe('');
+                    expect(instances[0].stop).toHaveBeenCalled();
+                    expect(screen.getByLabelText('Start dictation')).toBeInTheDocument();
+                } finally {
+                    delete (window as any).SpeechRecognition;
+                }
             });
         });
 

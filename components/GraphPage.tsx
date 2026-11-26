@@ -1352,9 +1352,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
   });
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showLimitDialog, setShowLimitDialog] = useState(false);
-  
-  const [isListeningForArtists, setIsListeningForArtists] = useState(false);
-  const [isListeningForGraph, setIsListeningForGraph] = useState(false);
 
   // Tooltip Target Refs
   const artistInputRef = useRef<HTMLInputElement>(null);
@@ -1646,28 +1643,6 @@ const GraphPage: React.FC<GraphPageProps> = ({
     }
     setVisibleTooltips(newVisibleTooltips);
   }, [isActive, data.nodes.length, onboardingProgress, isSmallScreen, activeTab, isLoading, selectedNode, selectedSeedArtists.length, isShareIdActive]);
-
-  const handleSpeechToText = (target: 'artists' | 'graph') => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { alert("Speech recognition is not supported."); return; }
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    if (target === 'artists') setIsListeningForArtists(true);
-    else setIsListeningForGraph(true);
-    recognition.start();
-    recognition.onresult = (event: any) => {
-      const transcript = event.results[0][0].transcript;
-      if (target === 'artists') {
-          setSearchTerm(prev => prev ? `${prev}, ${transcript}` : transcript);
-          if (!onboardingProgress.step1) updateOnboarding('step1');
-      } else {
-          setSearchQuery(transcript);
-          if (selectedNode) onNodeClick(null);
-      }
-    };
-    recognition.onerror = () => { setIsListeningForArtists(false); setIsListeningForGraph(false); };
-    recognition.onend = () => { setIsListeningForArtists(false); setIsListeningForGraph(false); };
-  };
 
   useEffect(() => {
     if (isExpectingUpload && libraryArtists.length > 0) {
