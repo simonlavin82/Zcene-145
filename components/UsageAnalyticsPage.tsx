@@ -2168,6 +2168,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     const isActiveRef = useRef(isActive);
     const previewStateRef = useRef({ simulateNormalUser, inspectedAuthor });
     const lastHandledLedgerRequestNonceRef = useRef<number | null>(null);
+    const ledgerSectionRef = useRef<HTMLDivElement>(null);
+    const pendingDeepLinkScrollRef = useRef(false);
     const [inspectedUserStack, setInspectedUserStack] = useState<StackItem[]>([]);
     const [isLoadingInspectedStack, setIsLoadingInspectedStack] = useState<boolean>(false);
     const [ledgerData, setLedgerData] = useState<UserTelemetry[]>([]);
@@ -2224,6 +2226,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         setExpandedRow(null);
         setSimulateNormalUser(false);
         setInspectedAuthor(null);
+        pendingDeepLinkScrollRef.current = false;
         setActiveLedgerTab('activity');
         setArchiveSearchQuery('');
         setIsArchiveSearchOpen(false);
@@ -2234,6 +2237,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
         if (!requestedLedgerTab) return;
         if (lastHandledLedgerRequestNonceRef.current === requestedLedgerTab.nonce) return;
         lastHandledLedgerRequestNonceRef.current = requestedLedgerTab.nonce;
+        pendingDeepLinkScrollRef.current = true;
 
         setActiveLedgerTab(requestedLedgerTab.tab);
         setArchiveSearchQuery('');
@@ -2639,10 +2643,38 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     }, [isActive, fetchLedger, profile?.tokenBalance]);
 
     useEffect(() => {
-        if (isActive && containerRef.current && typeof containerRef.current.scrollTo === 'function') {
+        if (
+            isActive &&
+            !pendingDeepLinkScrollRef.current &&
+            containerRef.current &&
+            typeof containerRef.current.scrollTo === 'function'
+        ) {
             containerRef.current.scrollTo(0, 0);
         }
     }, [isActive]);
+
+    useEffect(() => {
+        if (
+            !isActive ||
+            !isNormalUserView ||
+            !pendingDeepLinkScrollRef.current ||
+            !requestedLedgerTab ||
+            activeLedgerTab !== requestedLedgerTab.tab ||
+            !ledgerSectionRef.current
+        ) {
+            return;
+        }
+        const rafId = window.requestAnimationFrame(() => {
+            if (!isMountedRef.current || !pendingDeepLinkScrollRef.current) return;
+            const targetEl = ledgerSectionRef.current;
+            if (!targetEl) return;
+            pendingDeepLinkScrollRef.current = false;
+            if (typeof targetEl.scrollIntoView === 'function') {
+                targetEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+        });
+        return () => window.cancelAnimationFrame(rafId);
+    }, [isActive, isNormalUserView, activeLedgerTab, requestedLedgerTab]);
 
     const filteredLedger = useMemo(() => {
         if (isNormalUserView) {
@@ -3170,7 +3202,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                     )}
 
                     {isNormalUserView ? (
-                        <div className="space-y-6">
+                        <div ref={ledgerSectionRef} className="space-y-6 scroll-mt-6">
                             {/* Top-Level Ledger Tab Switcher */}
                             <div
                                 role="tablist"

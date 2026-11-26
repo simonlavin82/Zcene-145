@@ -774,122 +774,168 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(dsSrc).toContain('z-[10000]');
   });
 
-  it('13. requestedLedgerTab deep-links straight to Stack Archive for Standard Users (even when already on /analytics) and lands Admins on their own interactive Stack Archive exiting any customer inspection', async () => {
+  it('13. requestedLedgerTab deep-links straight to Stack Archive with smooth anchor scroll (never on normal load or manual tab clicks) for both Standard Users and Admins', async () => {
     const onRestoreStackItem = vi.fn().mockResolvedValue(undefined);
     const onPermanentDeleteStackItem = vi.fn().mockResolvedValue(undefined);
-
-    // Part A: Standard User already on /analytics -> requestedLedgerTab activates Stack Archive
-    const standardProps = makeBaseAnalyticsProps({
-      archivedStack: sampleArchivedStack,
-      onRestoreStackItem,
-      onPermanentDeleteStackItem,
-      requestedLedgerTab: null,
-    });
-    const { rerender, unmount } = render(<UsageAnalyticsPage {...standardProps} />);
-
-    expect(await screen.findByTestId('token-transactions-ledger')).toBeInTheDocument();
-    expect(screen.getByTestId('ledger-tab-activity')).toHaveAttribute('aria-selected', 'true');
-
-    rerender(
-      <UsageAnalyticsPage
-        {...standardProps}
-        requestedLedgerTab={{ tab: 'stack_archive', nonce: 1 }}
-      />
-    );
-
-    expect(await screen.findByTestId('stack-archive-ledger')).toBeInTheDocument();
-    expect(screen.getByTestId('ledger-tab-stack-archive')).toHaveAttribute('aria-selected', 'true');
-    expect(screen.getByText('Buggin')).toBeInTheDocument();
-
-    // User clicks back to Token Activity, then triggers a new nonce deep-link -> switches back cleanly
-    fireEvent.click(screen.getByTestId('ledger-tab-activity'));
-    expect(screen.getByTestId('token-transactions-ledger')).toBeInTheDocument();
-
-    rerender(
-      <UsageAnalyticsPage
-        {...standardProps}
-        requestedLedgerTab={{ tab: 'stack_archive', nonce: 2 }}
-      />
-    );
-    expect(await screen.findByTestId('stack-archive-ledger')).toBeInTheDocument();
-    unmount();
-
-    // Part B: Admin inspecting a customer -> requestedLedgerTab exits customer inspection & opens Admin's own interactive Stack Archive
-    const customerUid = 'uid-cust-preview';
-    const customerEmail = 'simon.lavin1@gmail.com';
-    mockGetDoc.mockImplementation(async (ref: any) => {
-      if (ref?.path === 'adminLedger/system') return { exists: () => true, data: () => ({ jitEnabled: true }) };
-      return { exists: () => true, data: () => ({ email: ref?.path?.includes(ADMIN_UID) ? ADMIN_EMAIL : customerEmail, tokenBalance: 0 }) };
-    });
-    mockGetDocs.mockImplementation(async (ref: any) => {
-      if (ref?.path === 'users') {
-        return {
-          docs: [
-            { id: ADMIN_UID, data: () => ({ email: ADMIN_EMAIL, tokenBalance: 0 }) },
-            { id: customerUid, data: () => ({ email: customerEmail, tokenBalance: 69 }) },
-          ],
-        };
-      }
-      if (ref?.path === `users/${customerUid}/stack`) {
-        return {
-          docs: [
-            {
-              id: 'cust_arch_1',
-              data: () => ({ id: 'fiddlehead-us', displayName: 'Fiddlehead', type: 'artist', dateSaved: 1762000000000, archivedAt: 1762500000000, status: 'archived', discoveredVia: 'Have Heart' }),
-            },
-          ],
-        };
-      }
-      return { docs: [] };
+    const originalScrollIntoView = Element.prototype.scrollIntoView;
+    const scrollIntoViewMock = vi.fn();
+    Object.defineProperty(Element.prototype, 'scrollIntoView', {
+      configurable: true,
+      writable: true,
+      value: scrollIntoViewMock,
     });
 
-    const adminOwnArchived: StackItem[] = [
-      {
-        id: 'admin-archived-band',
-        docId: 'admin-archived-band_p1',
-        displayName: 'Admin Own Discovery',
-        type: 'artist',
-        dateSaved: 1762000000000,
-        archivedAt: 1762900000000,
-        status: 'archived',
-        discoveredVia: 'Spaced',
-      },
-    ];
+    try {
+      // Part A: Standard User transitioning from inactive (/dashboard) -> active (/analytics) with requestedLedgerTab
+      const standardProps = makeBaseAnalyticsProps({
+        isActive: false,
+        archivedStack: sampleArchivedStack,
+        onRestoreStackItem,
+        onPermanentDeleteStackItem,
+        requestedLedgerTab: null,
+      });
+      const { rerender, unmount } = render(<UsageAnalyticsPage {...standardProps} />);
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
-    const adminProps = makeBaseAnalyticsProps({
-      user: { uid: ADMIN_UID, email: ADMIN_EMAIL },
-      isAdmin: true,
-      stackCount: 2,
-      archivedStack: adminOwnArchived,
-      onRestoreStackItem,
-      onPermanentDeleteStackItem,
-      requestedLedgerTab: null,
-    });
+      // Normal visit to /analytics (no requestedLedgerTab) must NOT call scrollIntoView
+      rerender(<UsageAnalyticsPage {...standardProps} isActive={true} />);
+      expect(await screen.findByTestId('token-transactions-ledger')).toBeInTheDocument();
+      expect(screen.getByTestId('ledger-tab-activity')).toHaveAttribute('aria-selected', 'true');
+      await new Promise((r) => setTimeout(r, 30));
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
-    const { rerender: rerenderAdmin } = render(<UsageAnalyticsPage {...adminProps} />);
-    expect(await screen.findByText(customerEmail)).toBeInTheDocument();
+      // Manual tab toggles must NOT trigger deep-link scrollIntoView
+      fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
+      expect(screen.getByTestId('stack-archive-ledger')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('ledger-tab-activity'));
+      expect(screen.getByTestId('token-transactions-ledger')).toBeInTheDocument();
+      await new Promise((r) => setTimeout(r, 30));
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
 
-    // First enter customer Inspect Wallet
-    const inspectBtns = screen.getAllByRole('button', { name: /Inspect Wallet/i });
-    fireEvent.click(inspectBtns[1]);
-    expect(await screen.findByTestId('ledger-tab-stack-archive')).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
-    expect(await screen.findByTestId('stack-archive-readonly-badge')).toBeInTheDocument();
-    expect(screen.getByText('Fiddlehead')).toBeInTheDocument();
+      // Navigate away (isActive=false), then deep-link back (isActive=true + requestedLedgerTab) -> smooth scroll fires once
+      rerender(<UsageAnalyticsPage {...standardProps} isActive={false} />);
+      rerender(
+        <UsageAnalyticsPage
+          {...standardProps}
+          isActive={true}
+          requestedLedgerTab={{ tab: 'stack_archive', nonce: 1 }}
+        />
+      );
 
-    // Now deep-link from Admin's MyStackDialog -> exits customer inspection & opens Admin's own interactive Stack Archive
-    rerenderAdmin(
-      <UsageAnalyticsPage
-        {...adminProps}
-        requestedLedgerTab={{ tab: 'stack_archive', nonce: 1 }}
-      />
-    );
+      expect(await screen.findByTestId('stack-archive-ledger')).toBeInTheDocument();
+      expect(screen.getByTestId('ledger-tab-stack-archive')).toHaveAttribute('aria-selected', 'true');
+      expect(screen.getByText('Buggin')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+        expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      });
 
-    expect(await screen.findByText('Admin Own Discovery')).toBeInTheDocument();
-    expect(screen.queryByText('Fiddlehead')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('stack-archive-readonly-badge')).not.toBeInTheDocument();
-    expect(screen.getByTestId('archive-restore-admin-archived-band_p1')).toBeInTheDocument();
-    expect(screen.getByTestId('archive-delete-admin-archived-band_p1')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Return to Admin View/i })).toBeInTheDocument();
+      // Already on /analytics -> manual click to Token Activity + new nonce deep-link -> switches & smooth scrolls again
+      fireEvent.click(screen.getByTestId('ledger-tab-activity'));
+      expect(screen.getByTestId('token-transactions-ledger')).toBeInTheDocument();
+
+      rerender(
+        <UsageAnalyticsPage
+          {...standardProps}
+          isActive={true}
+          requestedLedgerTab={{ tab: 'stack_archive', nonce: 2 }}
+        />
+      );
+      expect(await screen.findByTestId('stack-archive-ledger')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(scrollIntoViewMock).toHaveBeenCalledTimes(2);
+      });
+      unmount();
+
+      // Part B: Admin inspecting a customer -> requestedLedgerTab exits customer inspection, opens Admin's own interactive Stack Archive, and smooth scrolls
+      scrollIntoViewMock.mockClear();
+      const customerUid = 'uid-cust-preview';
+      const customerEmail = 'simon.lavin1@gmail.com';
+      mockGetDoc.mockImplementation(async (ref: any) => {
+        if (ref?.path === 'adminLedger/system') return { exists: () => true, data: () => ({ jitEnabled: true }) };
+        return { exists: () => true, data: () => ({ email: ref?.path?.includes(ADMIN_UID) ? ADMIN_EMAIL : customerEmail, tokenBalance: 0 }) };
+      });
+      mockGetDocs.mockImplementation(async (ref: any) => {
+        if (ref?.path === 'users') {
+          return {
+            docs: [
+              { id: ADMIN_UID, data: () => ({ email: ADMIN_EMAIL, tokenBalance: 0 }) },
+              { id: customerUid, data: () => ({ email: customerEmail, tokenBalance: 69 }) },
+            ],
+          };
+        }
+        if (ref?.path === `users/${customerUid}/stack`) {
+          return {
+            docs: [
+              {
+                id: 'cust_arch_1',
+                data: () => ({ id: 'fiddlehead-us', displayName: 'Fiddlehead', type: 'artist', dateSaved: 1762000000000, archivedAt: 1762500000000, status: 'archived', discoveredVia: 'Have Heart' }),
+              },
+            ],
+          };
+        }
+        return { docs: [] };
+      });
+
+      const adminOwnArchived: StackItem[] = [
+        {
+          id: 'admin-archived-band',
+          docId: 'admin-archived-band_p1',
+          displayName: 'Admin Own Discovery',
+          type: 'artist',
+          dateSaved: 1762000000000,
+          archivedAt: 1762900000000,
+          status: 'archived',
+          discoveredVia: 'Spaced',
+        },
+      ];
+
+      const adminProps = makeBaseAnalyticsProps({
+        user: { uid: ADMIN_UID, email: ADMIN_EMAIL },
+        isAdmin: true,
+        stackCount: 2,
+        archivedStack: adminOwnArchived,
+        onRestoreStackItem,
+        onPermanentDeleteStackItem,
+        requestedLedgerTab: null,
+      });
+
+      const { rerender: rerenderAdmin } = render(<UsageAnalyticsPage {...adminProps} />);
+      expect(await screen.findByText(customerEmail)).toBeInTheDocument();
+
+      // First enter customer Inspect Wallet
+      const inspectBtns = screen.getAllByRole('button', { name: /Inspect Wallet/i });
+      fireEvent.click(inspectBtns[1]);
+      expect(await screen.findByTestId('ledger-tab-stack-archive')).toBeInTheDocument();
+      fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
+      expect(await screen.findByTestId('stack-archive-readonly-badge')).toBeInTheDocument();
+      expect(screen.getByText('Fiddlehead')).toBeInTheDocument();
+      expect(scrollIntoViewMock).not.toHaveBeenCalled();
+
+      // Now deep-link from Admin's MyStackDialog -> exits customer inspection, opens Admin's own interactive Stack Archive, and smooth scrolls
+      rerenderAdmin(
+        <UsageAnalyticsPage
+          {...adminProps}
+          requestedLedgerTab={{ tab: 'stack_archive', nonce: 1 }}
+        />
+      );
+
+      expect(await screen.findByText('Admin Own Discovery')).toBeInTheDocument();
+      expect(screen.queryByText('Fiddlehead')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('stack-archive-readonly-badge')).not.toBeInTheDocument();
+      expect(screen.getByTestId('archive-restore-admin-archived-band_p1')).toBeInTheDocument();
+      expect(screen.getByTestId('archive-delete-admin-archived-band_p1')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /Return to Admin View/i })).toBeInTheDocument();
+      await waitFor(() => {
+        expect(scrollIntoViewMock).toHaveBeenCalledTimes(1);
+        expect(scrollIntoViewMock).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' });
+      });
+    } finally {
+      Object.defineProperty(Element.prototype, 'scrollIntoView', {
+        configurable: true,
+        writable: true,
+        value: originalScrollIntoView,
+      });
+    }
   });
 });
