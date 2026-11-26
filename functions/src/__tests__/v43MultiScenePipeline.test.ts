@@ -18,6 +18,7 @@ vi.mock('@google/genai', async (importOriginal) => {
 
 import {
   OVERARCHING_ZINE_SCHEMA,
+  isContrivedContrastBridgeContext,
   assessOverarchingZineQuality,
   generateOverarchingZineBackend,
   generateSemanticLinkWeights,
@@ -579,6 +580,310 @@ describe('V43 Backend Multi-Scene Pipeline & Overarching Zine Synthesis ([Rule 2
     expect(mockGenerateContent).toHaveBeenCalledTimes(2);
     // Attempt 1 retained (0 bridges, higher word count) rather than rewarding Attempt 2's 3 bridges!
     expect(res.crossSceneLinks).toEqual([]);
+  });
+
+  it('forbids contrast/opposite/foil/counterweight bridges in OVERARCHING_ZINE_SCHEMA and Step 3B prompts while keeping thematic contrast welcomed in Zine prose (V47.20)', async () => {
+    const rationaleDesc = OVERARCHING_ZINE_SCHEMA.properties.overarchingRationale.description;
+    const bridgesDesc = OVERARCHING_ZINE_SCHEMA.properties.crossSceneBridges.description;
+    const bridgeTypeDesc = OVERARCHING_ZINE_SCHEMA.properties.crossSceneBridges.items.properties.bridgeType.description;
+    const forwardDesc = OVERARCHING_ZINE_SCHEMA.properties.crossSceneBridges.items.properties.forwardContext.description;
+    const inverseDesc = OVERARCHING_ZINE_SCHEMA.properties.crossSceneBridges.items.properties.inverseContext.description;
+
+    // Prose contrast remains explicitly welcomed
+    expect(rationaleDesc).toMatch(/weaving or contrasting/i);
+    expect(rationaleDesc).toMatch(/NEVER use literal technical labels like ['"]Scene 1['"] or ['"]Scene 2['"]/i);
+
+    // Graph bridges strictly forbid contrast/opposite/foil/counterweight framing
+    for (const desc of [bridgesDesc, bridgeTypeDesc, forwardDesc, inverseDesc]) {
+      expect(desc.toLowerCase()).not.toContain('stylistic parallel/contrast');
+      expect(desc).toMatch(/counterweight|foil|contrast/i);
+    }
+
+    const s1: ProjectScene = {
+      ...createEmptyProjectScene(0, 'Madball'),
+      seedIds: ['madball-us'],
+      status: 'ready',
+      graphData: {
+        nodes: [{ id: 'madball-us', label: 'Madball', type: 'artist', group: 1, isSeed: true }],
+        links: [],
+      },
+    };
+    const s2: ProjectScene = {
+      ...createEmptyProjectScene(1, 'Radiohead'),
+      seedIds: ['radiohead-gb'],
+      status: 'ready',
+      graphData: {
+        nodes: [{ id: 'radiohead-gb', label: 'Radiohead', type: 'artist', group: 1, isSeed: true }],
+        links: [],
+      },
+    };
+
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        overarchingRationale: 'Editorial prose contrasting **Madball** and **Radiohead**.',
+        crossSceneBridges: [],
+      }),
+      usageMetadata: { promptTokenCount: 500, candidatesTokenCount: 100, totalTokenCount: 600 },
+    });
+
+    await generateOverarchingZineBackend([s1, s2], {});
+    const callConfig = mockGenerateContent.mock.calls[0][0].config;
+    const sysInst = String(callConfig.systemInstruction || '');
+    const userPrompt = String(mockGenerateContent.mock.calls[0][0].contents || '');
+
+    expect(sysInst).toContain('ZERO CONTRAST BRIDGES');
+    expect(sysInst).toContain('Thematic contrast belongs ONLY in the Overarching Zine editorial prose, NEVER as graph edges');
+    expect(sysInst).not.toContain('counters raw Nordic extremity with');
+    expect(sysInst).not.toContain('contrasts warm analog soul devotion against');
+    expect(userPrompt).toContain('NEVER contrast/opposite/foil/counterweight bridges');
+  });
+
+  it('strips contrived contrast/foil/counterweight sonic_lineage bridges post-sanitization via isContrivedContrastBridgeContext while preserving legitimate musical phrasing (V47.20)', async () => {
+    // Contrived contrast/opposite/foil/counterweight predicates MUST be rejected
+    const contrivedPhrases = [
+      'Provides a sweeping atmospheric counterweight to',
+      'Provides a glamorous cynical pop foil to',
+      'contrasts warm analog soul devotion against',
+      'counters raw Nordic extremity with',
+      'stands in stark sonic polarity to',
+      'serves as the antithesis of',
+      'juxtaposes lush dream pop against',
+      'offers a melodic counterpoint to',
+      'occupies the opposite pole from',
+      'stands diametrically opposed to',
+      'offers a sharp contrast to',
+      'stands in stark contrast with',
+    ];
+    for (const phrase of contrivedPhrases) {
+      expect(isContrivedContrastBridgeContext(phrase), `expected rejected: "${phrase}"`).toBe(true);
+    }
+
+    // Legitimate musical & historical lineage phrases MUST NOT false-positive
+    const legitimatePhrases = [
+      'shared quiet-loud contrasting dynamics with',
+      'built interlocking guitar counterpoint alongside',
+      'anchored 1960s counterculture venues alongside',
+      'shaped counter-melodies alongside',
+      'pioneered quiet-loud contrast with',
+      'reacted against arena-rock polish alongside',
+      'evolved in parallel with',
+      'passed the melodic post-hardcore torch to',
+      'shared underground touring bills with',
+      'released formative early records on',
+    ];
+    for (const phrase of legitimatePhrases) {
+      expect(isContrivedContrastBridgeContext(phrase), `expected preserved: "${phrase}"`).toBe(false);
+    }
+
+    // Verify post-sanitization ordering: artist named "Counterweight" is stripped before contrast check,
+    // while a bridge with contrast ONLY in inverseContext is dropped completely.
+    const scene1: ProjectScene = {
+      ...createEmptyProjectScene(0, 'Counterweight'),
+      seedIds: ['counterweight-us'],
+      status: 'ready',
+      graphData: {
+        nodes: [
+          { id: 'counterweight-us', label: 'Counterweight', type: 'artist', group: 1, isSeed: true },
+          { id: 'hatebreed-us', label: 'Hatebreed', type: 'artist', group: 2, isSeed: false },
+        ],
+        links: [],
+      },
+    };
+    const scene2: ProjectScene = {
+      ...createEmptyProjectScene(1, 'Earth Crisis'),
+      seedIds: ['earth-crisis-us'],
+      status: 'ready',
+      graphData: {
+        nodes: [
+          { id: 'earth-crisis-us', label: 'Earth Crisis', type: 'artist', group: 1, isSeed: true },
+          { id: 'pulp-gb', label: 'Pulp', type: 'artist', group: 2, isSeed: false },
+        ],
+        links: [],
+      },
+    };
+
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        overarchingRationale: 'Editorial overview across **Counterweight** and **Earth Crisis**.',
+        crossSceneBridges: [
+          {
+            sourceSceneId: 'scene-1',
+            sourceCanonicalId: 'counterweight-us',
+            targetSceneId: 'scene-2',
+            targetCanonicalId: 'earth-crisis-us',
+            bridgeType: 'sonic_lineage',
+            forwardContext: 'Counterweight shared DIY hardcore touring bills with Earth Crisis',
+            inverseContext: 'Earth Crisis traded metallic hardcore riffs alongside Counterweight',
+            weight: 0.85,
+          },
+          {
+            sourceSceneId: 'scene-1',
+            sourceCanonicalId: 'hatebreed-us',
+            targetSceneId: 'scene-2',
+            targetCanonicalId: 'pulp-gb',
+            bridgeType: 'sonic_lineage',
+            forwardContext: 'emerged during the same mid-1990s era alongside',
+            inverseContext: 'Provides a glamorous cynical pop foil to',
+            weight: 0.5,
+          },
+        ],
+      }),
+      usageMetadata: { promptTokenCount: 600, candidatesTokenCount: 150, totalTokenCount: 750 },
+    });
+
+    const res = await generateOverarchingZineBackend([scene1, scene2], {});
+    const sonic = res.crossSceneLinks.filter((l) => l.bridgeType === 'sonic_lineage');
+    expect(sonic).toHaveLength(1);
+    expect(sonic[0].sourceCanonicalId).toBe('counterweight-us');
+    expect(sonic[0].targetCanonicalId).toBe('earth-crisis-us');
+    expect(sonic[0].forwardContext).toBe('shared DIY hardcore touring bills with');
+  });
+
+  it('selectively bridges genuinely connected pairs on a 3-scene board (NYC Hardcore / Mix / Brit Indie), strips contrived outer-pair contrast bridges, and sets effectiveMinSonicBridges=0 on single-label overlap (V47.20)', async () => {
+    const buildScene = (idx: number, seed: string, nodes: Array<{ id: string; label: string; type: 'artist' | 'label' }>): ProjectScene => ({
+      ...createEmptyProjectScene(idx, seed),
+      seedIds: [nodes[0].id],
+      status: 'ready',
+      synthesisRationale: `${seed} scene editorial overview.`,
+      graphData: {
+        nodes: nodes.map((n, i) => ({ ...n, group: i === 0 ? 1 : 2, isSeed: i === 0 })),
+        links: [],
+      },
+    });
+
+    const nycHardcore = buildScene(0, 'Madball', [
+      { id: 'madball-us', label: 'Madball', type: 'artist' },
+      { id: 'agnostic-front-us', label: 'Agnostic Front', type: 'artist' },
+      { id: 'hatebreed-us', label: 'Hatebreed', type: 'artist' },
+      { id: 'earth-crisis-us', label: 'Earth Crisis', type: 'artist' },
+      { id: 'victory-records', label: 'Victory Records', type: 'label' },
+    ]);
+    const mixScene = buildScene(1, 'Madball::Radiohead', [
+      { id: 'madball-us', label: 'Madball', type: 'artist' },
+      { id: 'radiohead-gb', label: 'Radiohead', type: 'artist' },
+      { id: 'sick-of-it-all-us', label: 'Sick of It All', type: 'artist' },
+      { id: 'blur-gb', label: 'Blur', type: 'artist' },
+    ]);
+    const britIndie = buildScene(2, 'Radiohead', [
+      { id: 'radiohead-gb', label: 'Radiohead', type: 'artist' },
+      { id: 'sigur-ros-is', label: 'Sigur Rós', type: 'artist' },
+      { id: 'pulp-gb', label: 'Pulp', type: 'artist' },
+      { id: 'suede-gb', label: 'Suede', type: 'artist' },
+      { id: 'parlophone', label: 'Parlophone', type: 'label' },
+    ]);
+
+    const richThreeSceneEditorial =
+      Array.from({ length: 4 }, (_, p) =>
+        `Chapter ${p + 1} surveys the gritty street-level conviction of **Madball**, **Agnostic Front**, **Sick of It All**, **Hatebreed**, **Earth Crisis**, and **Victory Records** alongside the cerebral British alternative wing of **Radiohead**, **Blur**, **Pulp**, **Suede**, **Sigur Rós**, and **Parlophone**, tracing how the crossover constellation holds both worlds in sharp thematic contrast without fabricating historical links between unrelated outer movements while honoring real underground lineages on each flank across decades of independent touring, basement shows, studio craft, and regional solidarity.`
+      ).join('\n\n') +
+      '\n\nThree dynamics anchor this multi-scene constellation:\n' +
+      '* **Agnostic Front** and **Sick of It All** reinforce the **Madball** hardcore lineage across New York.\n' +
+      '* **Blur**, **Pulp**, and **Suede** orbit **Radiohead** and **Parlophone** in 1990s British alternative rock.\n' +
+      '* The Zine contrasts hardcore street urgency with atmospheric **Sigur Rós** minimalism in prose alone.';
+
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        overarchingRationale: richThreeSceneEditorial,
+        crossSceneBridges: [
+          {
+            sourceSceneId: 'scene-1',
+            sourceCanonicalId: 'agnostic-front-us',
+            targetSceneId: 'scene-2',
+            targetCanonicalId: 'sick-of-it-all-us',
+            bridgeType: 'sonic_lineage',
+            forwardContext: 'forged New York hardcore brotherhood alongside',
+            inverseContext: 'carried the New York hardcore torch alongside',
+            weight: 0.9,
+          },
+          {
+            sourceSceneId: 'scene-2',
+            sourceCanonicalId: 'blur-gb',
+            targetSceneId: 'scene-3',
+            targetCanonicalId: 'pulp-gb',
+            bridgeType: 'sonic_lineage',
+            forwardContext: 'shared 1990s British festival bills with',
+            inverseContext: 'traded 1990s Britpop chart rivalry with',
+            weight: 0.85,
+          },
+          {
+            sourceSceneId: 'scene-3',
+            sourceCanonicalId: 'sigur-ros-is',
+            targetSceneId: 'scene-1',
+            targetCanonicalId: 'hatebreed-us',
+            bridgeType: 'sonic_lineage',
+            forwardContext: 'Provides a sweeping atmospheric counterweight to',
+            inverseContext: 'counters atmospheric post-rock restraint with',
+            weight: 0.55,
+          },
+          {
+            sourceSceneId: 'scene-3',
+            sourceCanonicalId: 'pulp-gb',
+            targetSceneId: 'scene-1',
+            targetCanonicalId: 'earth-crisis-us',
+            bridgeType: 'sonic_lineage',
+            forwardContext: 'Provides a glamorous cynical pop foil to',
+            inverseContext: 'stands in stark ideological contrast to',
+            weight: 0.5,
+          },
+        ],
+      }),
+      usageMetadata: { promptTokenCount: 1500, candidatesTokenCount: 600, totalTokenCount: 2100 },
+    });
+
+    const threeSceneRes = await generateOverarchingZineBackend([nycHardcore, mixScene, britIndie], {});
+    // Attempt 1 passed with zero retry (2 valid genuine bridges >= effectiveMinSonicBridges=1)
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    const sonicLinks = threeSceneRes.crossSceneLinks.filter((l) => l.bridgeType === 'sonic_lineage');
+    expect(sonicLinks).toHaveLength(2);
+    // Zero outer-pair (scene-1 <-> scene-3) contrived bridges survived!
+    expect(
+      sonicLinks.some(
+        (l) =>
+          (l.sourceSceneId === 'scene-1' && l.targetSceneId === 'scene-3') ||
+          (l.sourceSceneId === 'scene-3' && l.targetSceneId === 'scene-1')
+      )
+    ).toBe(false);
+    // Deterministic identity bridges (madball-us, radiohead-gb) preserved
+    const idLinks = threeSceneRes.crossSceneLinks.filter((l) => l.bridgeType === 'identity');
+    expect(idLinks.map((l) => l.sourceCanonicalId).sort()).toEqual(['madball-us', 'radiohead-gb']);
+
+    // Part B: Single coincidental shared label (Island Records across Reggae & Thrash Metal) -> effectiveMinSonicBridges = 0 -> ZERO retry!
+    vi.clearAllMocks();
+    const reggaeScene = buildScene(0, 'Bob Marley', [
+      { id: 'bob-marley-jm', label: 'Bob Marley', type: 'artist' },
+      { id: 'peter-tosh-jm', label: 'Peter Tosh', type: 'artist' },
+      { id: 'burning-spear-jm', label: 'Burning Spear', type: 'artist' },
+      { id: 'toots-and-the-maytals-jm', label: 'Toots and the Maytals', type: 'artist' },
+      { id: 'island-records', label: 'Island Records', type: 'label' },
+    ]);
+    const thrashScene = buildScene(1, 'Anthrax', [
+      { id: 'anthrax-us', label: 'Anthrax', type: 'artist' },
+      { id: 'overkill-us', label: 'Overkill', type: 'artist' },
+      { id: 'nuclear-assault-us', label: 'Nuclear Assault', type: 'artist' },
+      { id: 'sod-us', label: 'S.O.D.', type: 'artist' },
+      { id: 'island-records', label: 'Island Records', type: 'label' },
+    ]);
+    const singleLabelEditorial =
+      Array.from({ length: 4 }, (_, p) =>
+        `Movement ${p + 1} compares Kingston roots visionaries **Bob Marley**, **Peter Tosh**, **Burning Spear**, and **Toots and the Maytals** against New York thrash pioneers **Anthrax**, **Overkill**, **Nuclear Assault**, and **S.O.D.**, noting that while **Island Records** briefly distributed releases from both distant worlds, **Roots Reggae** and **East Coast Thrash** evolved along completely independent cultural tracks with distinct rhythms, studio traditions, live scenes, and regional histories that shine brightest through honest editorial contrast rather than forced cross-scene links.`
+      ).join('\n\n') +
+      '\n\nThree key observations frame this pairing:\n' +
+      '* **Island Records** is a coincidental catalog overlap across two unrelated movements.\n' +
+      '* **Bob Marley** and **Peter Tosh** anchored Kingston dub and roots traditions.\n' +
+      '* **Anthrax** and **Overkill** drove high-velocity New York thrash metal.';
+
+    mockGenerateContent.mockResolvedValueOnce({
+      text: JSON.stringify({
+        overarchingRationale: singleLabelEditorial,
+        crossSceneBridges: [],
+      }),
+      usageMetadata: { promptTokenCount: 1100, candidatesTokenCount: 450, totalTokenCount: 1550 },
+    });
+
+    const singleLabelRes = await generateOverarchingZineBackend([reggaeScene, thrashScene], {});
+    expect(mockGenerateContent).toHaveBeenCalledTimes(1);
+    expect(singleLabelRes.crossSceneLinks.filter((l) => l.bridgeType === 'sonic_lineage')).toEqual([]);
+    expect(singleLabelRes.crossSceneLinks.filter((l) => l.bridgeType === 'identity')).toHaveLength(1);
   });
 
   it('injects full input parity via ISO-stripped artistSnippets lookup and 2400-char sceneEditorialSummary (V45.8)', async () => {

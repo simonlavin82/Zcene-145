@@ -1086,7 +1086,7 @@ export const OVERARCHING_ZINE_SCHEMA = {
     crossSceneBridges: {
       type: Type.ARRAY,
       description:
-        "Up to 5 grounded cross-scene connections linking a canonical artist/label in one Scene to a distinct canonical artist/label in another Scene. Return 0 to 2 honest stylistic parallel/contrast bridges (or []) if the scenes have no genuine historical lineage—never fabricate ties.",
+        "Up to 5 strictly grounded cross-scene connections linking a canonical artist/label in one Scene to a distinct canonical artist/label in another Scene ONLY where genuine musical, touring, record label, personnel, regional-scene, or direct sonic-influence lineage exists. NEVER create contrast, opposite, foil, counterweight, juxtaposition, or polarity bridges. On 3+ scene boards, bridge only the scene pairs that genuinely connect and leave unrelated scene pairs unbridged; return [] if no genuine cross-scene lineage exists.",
       items: {
         type: Type.OBJECT,
         properties: {
@@ -1098,15 +1098,17 @@ export const OVERARCHING_ZINE_SCHEMA = {
             type: Type.STRING,
             enum: ["identity", "sonic_lineage"],
             description:
-              "'identity' if the exact same artist/label appears in both scenes; 'sonic_lineage' if connecting two distinct artists/labels across scenes via verified historical lineage OR honest stylistic parallel/contrast.",
+              "'identity' if the exact same artist/label appears in both scenes; 'sonic_lineage' ONLY if connecting two distinct artists/labels across scenes via genuine historical, touring, label, personnel, regional-scene, or direct sonic-influence lineage — NEVER for opposites, foils, counterweights, or thematic contrast.",
           },
           forwardContext: {
             type: Type.STRING,
-            description: "3-8 word directional predicate from source to target omitting both endpoint names (Rule 26). Must reflect real lineage or honest stylistic parallel/contrast—never invented collabs or tours.",
+            description:
+              "3-8 word directional predicate from source to target omitting both endpoint names (Rule 26). Must reflect genuine musical, touring, label, personnel, regional-scene, or direct influence lineage — never invented collabs/tours and never contrast, opposite, foil, or counterweight framing.",
           },
           inverseContext: {
             type: Type.STRING,
-            description: "3-8 word directional predicate from target to source omitting both endpoint names (Rule 26). Must reflect real lineage or honest stylistic parallel/contrast—never invented collabs or tours.",
+            description:
+              "3-8 word directional predicate from target to source omitting both endpoint names (Rule 26). Must reflect genuine musical, touring, label, personnel, regional-scene, or direct influence lineage — never invented collabs/tours and never contrast, opposite, foil, or counterweight framing.",
           },
           weight: { type: Type.NUMBER },
         },
@@ -1125,6 +1127,39 @@ export const OVERARCHING_ZINE_SCHEMA = {
   },
   required: ["overarchingRationale", "crossSceneBridges"],
 };
+
+const CONTRIVED_CONTRAST_BRIDGE_PATTERNS: RegExp[] = [
+  /\bcounterweights?\b/i,
+  /\bcounterbalance(?:s|d)?\b/i,
+  /\b(?:provides?|offers?|serves?\s+as|acts?\s+as|stands?\s+as)\s+(?:a|an|the)\s+(?:[\w-]+\s+){0,4}counterpoint\s+(?:to|for|against)\b/i,
+  /\bfoil\s+(?:to|for|against)\b/i,
+  /\b(?:a|an)\s+(?:[\w-]+\s+){0,4}foil\b/i,
+  /\bcontrasts\b.*\b(?:against|with|to)\b/i,
+  /\bin\s+(?:[\w-]+\s+){0,3}contrast\s+(?:to|with|against)\b/i,
+  /\b(?:provides?|offers?|presents?|forms?|creates?|serves?\s+as|acts?\s+as|stands?\s+as)\s+(?:a|an|the)?\s*(?:[\w-]+\s+){0,3}contrast\s+(?:to|with|against)\b/i,
+  /\bcounters\b.*\bwith\b/i,
+  /^(?:directly\s+)?counters\b/i,
+  /\b(?:sonic\s+|aesthetic\s+|emotional\s+|stylistic\s+)?polarity\b/i,
+  /\b(?:polar\s+)?opposite(?:\s+pole|\s+end)?\s+(?:of|to|from)\b/i,
+  /\boppos(?:ing|ite)\s+(?:pole|end|ethos|aesthetic|extreme|side|spectrum)\b/i,
+  /\bstands?\s+in\s+(?:stark\s+|sharp\s+|direct\s+|total\s+)?opposition\s+to\b/i,
+  /\bantithes(?:is|es)\b/i,
+  /\bantithetical\b/i,
+  /\bjuxtapos(?:e[sd]?|ing|ition)\b/i,
+  /\bdiametric(?:al|ally)?\b/i,
+  /\bantipod(?:e|al)\b/i,
+];
+
+/**
+ * Deterministic post-sanitization guard that detects contrived opposite/foil/counterweight
+ * framing in AI-generated `sonic_lineage` bridge predicates while preserving legitimate
+ * musical phrasing (e.g., "contrasting dynamics", "guitar counterpoint", "counterculture").
+ */
+export function isContrivedContrastBridgeContext(phrase: string | null | undefined): boolean {
+  const clean = (phrase || "").trim();
+  if (!clean) return false;
+  return CONTRIVED_CONTRAST_BRIDGE_PATTERNS.some((re) => re.test(clean));
+}
 
 /**
  * Sanitizes the raw Overarching Zine Editorial rationale:
@@ -1311,14 +1346,25 @@ export const generateOverarchingZineBackend = async (
       }
     }
   }
-  // V45.9 Overlap-aware & roster-scaled quality floors:
-  // - Never force fabricated bridges when scenes share 0 deterministic entities (unrelated/clashing scenes).
-  // - When deterministic overlap exists, enforce >= 2 grounded bridges (protecting against coincidental major-label overlap
-  //   while still rejecting sparse 1-bridge Direct Hit regressions and encouraging 3-5 bridges in the prompt).
+  // V45.9 / V47.20 Precision Overlap-Gated & Roster-Scaled Quality Floors:
+  // - Never force bridges when scenes share 0 deterministic entities OR only a single coincidental shared label
+  //   (e.g., Island/Columbia across unrelated genres).
+  // - Require >= 1 grounded genuine-lineage bridge only when scenes share at least one canonical artist OR >= 2
+  //   deterministic shared entities (acting as a rescue net if Attempt 1 contrast bridges get stripped, without
+  //   pressuring padding on sparsely connected pairs).
   // - Scale bolded entity floor smoothly on sparse/niche rosters while keeping >= 10 on standard rosters.
   const effectiveMinBoldEntities = Math.min(10, Math.max(4, Math.floor(allUniqueBareEntities.size * 0.5)));
+  const hasSharedArtistOverlap = deterministicBridges.some((b) => {
+    const srcMap = sceneNodeLookup.get(b.sourceSceneId);
+    const entry =
+      srcMap?.get(b.sourceCanonicalId) ||
+      srcMap?.get(normalizeCanonicalEntityId(b.sourceCanonicalId));
+    return entry?.type === "artist";
+  });
   const effectiveMinSonicBridges =
-    deterministicBridges.length === 0 ? 0 : Math.min(2, distinctCrossScenePairCapacity);
+    hasSharedArtistOverlap || deterministicBridges.length >= 2
+      ? Math.min(1, distinctCrossScenePairCapacity)
+      : 0;
   const wordTargetRange = scenes.length >= 4 ? "360 to 540" : "320 to 450";
   const blockStructureGuidance =
     scenes.length >= 4
@@ -1327,12 +1373,12 @@ export const generateOverarchingZineBackend = async (
   const boldTargetCount = Math.min(12, Math.max(effectiveMinBoldEntities + 2, 6));
 
   const systemInstruction = `You are a late-night record curator — the kind of person who pulls an obscure 7" from a crate at 2am and illuminates how separate musical movements, eras, and scenes either connect through shared lineage or illuminate each other through sharp contrast.
-Your task is to write the Overarching Zine Editorial (Master Multi-Scene Synthesis) for a multi-scene Zcene board containing ${scenes.length} distinct Scenes, AND identify up to 5 grounded 'sonic_lineage' cross-scene bridges linking DISTINCT artists or record labels across different Scenes (aiming for 3 to 5 when genuine historical lineage exists, or 0 to 2 honest stylistic parallels/contrasts—or []—if the movements are historically unrelated).
+Your task is to write the Overarching Zine Editorial (Master Multi-Scene Synthesis) for a multi-scene Zcene board containing ${scenes.length} distinct Scenes, AND identify up to 5 strictly grounded 'sonic_lineage' cross-scene bridges linking DISTINCT artists or record labels across different Scenes ONLY where genuine musical, touring, record label, personnel, regional-scene, or direct sonic-influence lineage exists (aiming for 2 to 5 when real cross-scene lineage exists, fewer when only a subset of scenes connect, or [] if no authentic lineage bridges exist).
 
 FACTUAL RESTRAINT & ANTI-FABRICATION (NON-NEGOTIABLE):
 - NEVER fabricate collaborations, tours, shared band members, record label signings, or direct historical influence between artists or scenes that did not actually interact.
 - ONLY cite artists and record labels that appear in the provided scene rosters (plus accurate genres, cities, eras, and movements).
-- If two scenes come from unrelated eras, geographies, or genres with zero historical overlap, NEVER force a fictional lineage. Instead, frame the editorial honestly through aesthetic contrast, sonic polarity, parallel DIY/independent ethos, or opposing cultural philosophies.
+- If two scenes come from unrelated eras, geographies, or genres with zero historical overlap, NEVER force a fictional lineage. Frame the Overarching Zine editorial prose honestly through aesthetic contrast, sonic polarity, parallel DIY/independent ethos, or opposing cultural philosophies — while leaving unrelated scene pairs UNBRIDGED in 'crossSceneBridges'.
 
 FORMATTING & EDITORIAL RULES (Rule 24 & Rule 44 — non-negotiable):
 - LENGTH & 3-COLUMN MAGAZINE RHYTHM: Write ${wordTargetRange} words in Markdown for 'overarchingRationale', structured as ${blockStructureGuidance} so Zcene's 3-column print layout balances evenly:
@@ -1343,14 +1389,14 @@ FORMATTING & EDITORIAL RULES (Rule 24 & Rule 44 — non-negotiable):
 - ENTITY COVERAGE FLOOR: **Bold** at least ${boldTargetCount} distinct artists, record labels, genres, and movements on first mention across ALL scenes (drawing from secondary peers and independent labels in the provided rosters, not just the root artists).
 - NEGATIVE CONSTRAINT: NEVER use literal technical or UI labels such as "Scene 1", "Scene 2", "Scene 3", "Scene N", or temporary tab names in the narrative prose. Instead, refer to each constellation organically by its flagship seed artists, genres, regional undergrounds, and eras (e.g., "the East Bay punk explosion", "the Bakersfield Nu Metal vanguard", "Oxford's cerebral alternative movement").
 - NEGATIVE CONSTRAINT: NEVER use em-dashes (—) or long hyphens for dramatic effect or clause separation. Use standard editorial punctuation (commas, colons, or semicolons).
-- CROSS-SCENE BRIDGES (GROUNDED & NON-DUPLICATIVE): Deterministic 'identity' bridges (exact same artist/label appearing in both scenes) are ALREADY computed automatically and listed below. Do NOT repeat those identity pairs. Return up to 5 NEW 'sonic_lineage' bridges where 'sourceCanonicalId' !== 'targetCanonicalId' and 'sourceSceneId' !== 'targetSceneId', referencing exact IDs from the provided rosters. Aim for 3 to 5 strong lineage bridges when scenes share real history; when scenes are historically unrelated, ONLY include honest stylistic parallel/contrast bridges (or return [] rather than inventing history).
-- Each bridge's 'forwardContext' and 'inverseContext' MUST be a concise 3-to-8 word directional verb/prepositional predicate phrase OMITTING both endpoint names (Rule 26)—using real lineage phrasing when historically true (e.g., "passed the melodic post-hardcore torch to" / "inherited the melodic post-hardcore blueprint from") OR honest contrast/parallel phrasing when scenes are unrelated (e.g., "contrasts warm analog soul devotion against" / "counters raw Nordic extremity with"). Never output generic "is connected to".`;
+- CROSS-SCENE BRIDGES (STRICT GENUINE LINEAGE ONLY — ZERO CONTRAST BRIDGES): Deterministic 'identity' bridges (exact same artist/label appearing in both scenes) are ALREADY computed automatically and listed below. Do NOT repeat those identity pairs. Return up to 5 NEW 'sonic_lineage' bridges where 'sourceCanonicalId' !== 'targetCanonicalId' and 'sourceSceneId' !== 'targetSceneId', referencing exact IDs from the provided rosters. Every 'sonic_lineage' bridge MUST reflect genuine musical, touring, record label, shared-personnel, regional-scene, or direct sonic-influence lineage. STRICTLY FORBIDDEN: NEVER create contrast, opposite, foil, counterweight, antithesis, juxtaposition, or polarity bridges (e.g., never connect unrelated artists just because one is aggressive and the other is atmospheric or pop). Thematic contrast belongs ONLY in the Overarching Zine editorial prose, NEVER as graph edges. On 3+ scene boards, bridge ONLY the scene pairs that genuinely connect (e.g., bridging a crossover scene to each movement it touches while leaving two unrelated outer scenes unbridged), and returning [] or fewer bridges is strictly better than forcing a weak or contrived link.
+- Each bridge's 'forwardContext' and 'inverseContext' MUST be a concise 3-to-8 word directional verb/prepositional predicate phrase OMITTING both endpoint names (Rule 26) that describes real lineage (e.g., "passed the melodic post-hardcore torch to" / "inherited the melodic post-hardcore blueprint from", "released formative early records on" / "championed the early catalog of", "shared underground touring bills with"). Never output generic "is connected to" and NEVER output contrast, opposite, foil, counterweight, or polarity predicates.`;
 
   const prompt = `Synthesize the Overarching Zine Editorial and Cross-Scene Bridges across these ${scenes.length} Scenes:
 
 ${JSON.stringify(sceneSummaries, null, 2)}
 
-Deterministic Shared-Entity Bridges Already Detected (already wired — do NOT repeat these pairs; return up to 5 grounded distinct 'sonic_lineage' bridges, or [] if the scenes are historically unrelated):
+Deterministic Shared-Entity Bridges Already Detected (already wired — do NOT repeat these pairs; return up to 5 strictly grounded 'sonic_lineage' bridges ONLY where real musical, touring, label, personnel, regional-scene, or direct influence lineage exists — NEVER contrast/opposite/foil/counterweight bridges — leaving unrelated scene pairs unbridged or returning []):
 ${JSON.stringify(
   deterministicBridges.map((b) => ({
     sourceSceneId: b.sourceSceneId,
@@ -1453,6 +1499,19 @@ ${JSON.stringify(
         srcNorm === tgtNorm ||
         Boolean(srcBare && tgtBare && srcBare === tgtBare);
 
+      const resolvedBridgeType: "identity" | "sonic_lineage" =
+        isSameCanonical || rawBridge.bridgeType === "identity" ? "identity" : "sonic_lineage";
+
+      if (
+        resolvedBridgeType === "sonic_lineage" &&
+        (isContrivedContrastBridgeContext(cleanForward) || isContrivedContrastBridgeContext(cleanInverse))
+      ) {
+        console.warn(
+          `[generateOverarchingZineBackend] Dropped contrived contrast bridge ${sourceNodeId} <-> ${targetNodeId} ("${cleanForward}" / "${cleanInverse}").`
+        );
+        continue;
+      }
+
       valid.push({
         id: `${sourceNodeId}--${targetNodeId}`,
         sourceSceneId: rawBridge.sourceSceneId,
@@ -1461,7 +1520,7 @@ ${JSON.stringify(
         targetNodeId,
         sourceCanonicalId: srcEntry.canonicalId,
         targetCanonicalId: tgtEntry.canonicalId,
-        bridgeType: isSameCanonical || rawBridge.bridgeType === "identity" ? "identity" : "sonic_lineage",
+        bridgeType: resolvedBridgeType,
         forwardContext: cleanForward,
         inverseContext: cleanInverse,
         weight: typeof rawBridge.weight === "number" ? Math.max(0.1, Math.min(1.0, rawBridge.weight)) : 0.85,
@@ -1491,9 +1550,9 @@ ${JSON.stringify(
   let cleanRationale = sanitizeOverarchingRationale(rawResult?.overarchingRationale || "", scenes);
   let validAiBridges = buildValidAiBridges(rawResult?.crossSceneBridges);
 
-  // V45.8 / V45.9 Deterministic Quality Gate & Bounded Single Corrective Retry:
+  // V45.8 / V45.9 / V47.20 Deterministic Quality Gate & Bounded Single Corrective Retry:
   // Enforces editorial parity (length, 3-column bullet rhythm, roster-scaled bold entities)
-  // and overlap-aware bridge floors without ever pressuring fabricated history on unrelated scenes.
+  // and precision overlap-gated bridge floors without ever pressuring fabricated history or contrast edges.
   if (rawResult && totalEntityCount >= 8 && distinctCrossScenePairCapacity >= 3) {
     const attempt1Assessment = assessOverarchingZineQuality(
       cleanRationale,
@@ -1507,8 +1566,8 @@ ${JSON.stringify(
       );
       const bridgeRepairLine =
         effectiveMinSonicBridges > 0
-          ? `- Return ${effectiveMinSonicBridges} to 5 NEW grounded 'sonic_lineage' bridges linking DISTINCT entities across different scenes (sourceCanonicalId !== targetCanonicalId; do NOT repeat already-detected identity bridges).`
-          : `- Keep 'crossSceneBridges' strictly grounded (0 to 2 honest stylistic parallel/contrast bridges, or [] if the scenes are historically unrelated).`;
+          ? `- Return ${effectiveMinSonicBridges} to 5 NEW strictly grounded 'sonic_lineage' bridges ONLY across scene pairs that genuinely connect via musical, touring, record label, personnel, regional-scene, or direct influence lineage (sourceCanonicalId !== targetCanonicalId; do NOT repeat already-detected identity bridges; NEVER output contrast, opposite, foil, or counterweight bridges; leave unrelated scene pairs unbridged).`
+          : `- Keep 'crossSceneBridges' strictly grounded in real musical, touring, label, personnel, regional-scene, or direct influence lineage (NEVER contrast, opposite, foil, or counterweight bridges; leave unrelated scene pairs unbridged or return []).`;
       const repairPrompt = `${prompt}
 
 QUALITY GATE CORRECTION REQUIRED (Attempt 2):
@@ -1517,7 +1576,7 @@ Please produce a complete, upgraded replacement that fixes the failed structural
 - Ensure 'overarchingRationale' is ${wordTargetRange} words (strictly >= 280 words) with ${blockStructureGuidance}, ending with a 1-sentence colon lead-in followed immediately by 3 Markdown bullets ('* ...').
 - Bold at least ${boldTargetCount} distinct artists, record labels, genres, and movements drawn strictly from the provided rosters across ALL scenes.
 ${bridgeRepairLine}
-- ANTI-FABRICATION RULE: NEVER invent collaborations, tours, shared members, label ties, or historical influence. If scenes are historically unrelated, expand through rich comparative contrast of their real rosters, eras, and sonic ethos.`;
+- ANTI-FABRICATION RULE: NEVER invent collaborations, tours, shared members, label ties, or historical influence. If scenes are historically unrelated, expand the Overarching Zine prose through rich comparative contrast of their real rosters, eras, and sonic ethos while leaving unrelated scene pairs unbridged in 'crossSceneBridges'.`;
 
       try {
         const retryResult = await executeOverarchingSynthesis(
