@@ -1565,9 +1565,16 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(dsSrc).toContain('<ResponsiveTableFrame');
     expect(dsSrc).toContain('DataTable.tsx');
     expect(dsSrc).toContain('POST HARDCORE');
+    expect(dsSrc).toContain('Tables &amp; Lists');
+    expect(dsSrc).toContain('Cards &amp; Crates');
     expect(dsSrc).toContain('auto_stories');
     expect(dsSrc).toContain('picture_as_pdf');
     expect(dsSrc).toContain('visibility_off');
+    expect(dsSrc).not.toContain('#aaff00');
+    expect(dsSrc).not.toContain('Old — Removed');
+    expect(dsSrc).not.toContain('\\u2014');
+    expect(dsSrc).not.toContain('**Standard Container Layouts**');
+    expect(dsSrc).not.toContain('layoutDropdownRef');
     expect(dsSrc).not.toContain('>folder<');
     expect(dsSrc).not.toContain('icon="folder"');
     expect(dsSrc).not.toContain('RootsBreakdownButton');
