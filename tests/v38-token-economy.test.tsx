@@ -2,7 +2,7 @@ import React from 'react';
 import fs from 'fs';
 import path from 'path';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, within } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor, within, act } from '@testing-library/react';
 import {
   ADMIN_EMAIL,
   TOKEN_PRICING,
@@ -96,7 +96,7 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(isAdminEmail('member@example.com')).toBe(false);
   });
 
-  it('renders TokenConfirmationDialog in Standard Sufficient mode without password input or cache/USD leaks', () => {
+  it('renders TokenConfirmationDialog in Standard Sufficient mode without password input or cache/USD leaks', async () => {
     const onConfirm = vi.fn();
     render(
       <TokenConfirmationDialog
@@ -114,12 +114,16 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
 
     expect(screen.queryByTestId('token-password-input')).not.toBeInTheDocument();
     expect(screen.getByTestId('token-gate-cost')).toHaveTextContent('5 Tokens');
+    expect(screen.getByText('Wallet Balance:')).toBeInTheDocument();
+    expect(screen.getByText('45 Tokens')).toBeInTheDocument();
     expect(screen.queryByText(/\$0\.0000/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Direct Hit/i)).not.toBeInTheDocument();
 
     const confirmBtn = screen.getByTestId('token-authorize-button');
-    expect(confirmBtn).toHaveTextContent('Confirm & Spend 5 Tokens');
-    fireEvent.click(confirmBtn);
+    expect(confirmBtn.textContent?.trim()).toBe('Confirm');
+    await act(async () => {
+      fireEvent.click(confirmBtn);
+    });
     expect(onConfirm).toHaveBeenCalledWith('authorized');
   });
 
@@ -142,13 +146,14 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
 
     expect(screen.getByText('Top Up Required to Continue')).toBeInTheDocument();
     expect(screen.getByTestId('low-balance-topup-box')).toBeInTheDocument();
+    expect(screen.getByText('Wallet Balance:')).toBeInTheDocument();
     expect(screen.getByText('Need +6T more')).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId('gate-topup-gbp_5'));
     expect(onOpenTopUp).toHaveBeenCalledWith('gbp_5');
   });
 
-  it('renders TokenConfirmationDialog in Admin Unlimited mode with raw USD telemetry', () => {
+  it('renders TokenConfirmationDialog in Admin Unlimited mode with raw USD telemetry', async () => {
     const onConfirm = vi.fn();
     render(
       <TokenConfirmationDialog
@@ -169,7 +174,9 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
 
     const confirmBtn = screen.getByTestId('token-authorize-button');
     expect(confirmBtn).toHaveTextContent('Confirm (Admin)');
-    fireEvent.click(confirmBtn);
+    await act(async () => {
+      fireEvent.click(confirmBtn);
+    });
     expect(onConfirm).toHaveBeenCalledWith('authorized');
   });
 
@@ -714,7 +721,7 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
 
     const tokenConfirmBtn = screen.getByTestId('token-authorize-button');
     expect(tokenConfirmBtn).toHaveClass('px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95');
-    expect(tokenConfirmBtn).toHaveTextContent('Confirm & Spend 3 Tokens');
+    expect(tokenConfirmBtn.textContent?.trim()).toBe('Confirm');
   });
 
   it('guarantees monotonic chatHistories merge protecting in-flight Deep Connections messages against stale Firestore snapshots and preserving CLEAR CHAT', () => {

@@ -571,7 +571,7 @@ describe('DetailsPanel', () => {
         expect(screen.queryByTestId('token-password-input')).not.toBeInTheDocument();
         expect(await screen.findByTestId('token-gate-cost')).toHaveTextContent('3 Tokens');
 
-        // Click Confirm & Spend 3 Tokens
+        // Click Confirm (3 Tokens)
         const confirmBtn = screen.getByTestId('token-authorize-button');
         fireEvent.click(confirmBtn);
 
@@ -648,7 +648,7 @@ describe('DetailsPanel', () => {
 
         const confirmBtn = await screen.findByTestId('token-authorize-button');
         expect(confirmBtn).not.toBeDisabled();
-        expect(confirmBtn).toHaveTextContent('Confirm & Spend 3 Tokens');
+        expect(confirmBtn.textContent?.trim()).toBe('Confirm');
 
         fireEvent.click(confirmBtn);
 

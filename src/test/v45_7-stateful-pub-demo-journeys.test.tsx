@@ -690,7 +690,7 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
     await flushMicrotasks(6);
 
     // Confirm Token Spend modal
-    const confirmSpendBtn = await waitForSync(() => getButtonByText(/Confirm & Spend|Confirm \(Admin\)/i, true));
+    const confirmSpendBtn = await waitForSync(() => getButtonByText(/^Confirm$|^Confirm \(Admin\)$/i, true));
     fireEvent.click(confirmSpendBtn);
     await flushMicrotasks(8);
 
@@ -778,7 +778,7 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
     await flushMicrotasks(4);
     await confirmAndClickOverwriteExisting();
 
-    fireEvent.click(await waitForSync(() => getButtonByText(/Confirm & Spend|Confirm \(Admin\)/i, true)));
+    fireEvent.click(await waitForSync(() => getButtonByText(/^Confirm$|^Confirm \(Admin\)$/i, true)));
     await flushMicrotasks(8);
 
     const confirmGenBtn = await waitForSync(() => getButtonByText(/Confirm & Generate/i, true));
@@ -887,7 +887,7 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
     fireEvent.click(await waitForSync(() => getButtonByText(/Update Zcene/i, true)));
     await flushMicrotasks(4);
     await confirmAndClickOverwriteExisting();
-    fireEvent.click(await waitForSync(() => getButtonByText(/Confirm & Spend|Confirm \(Admin\)/i, true)));
+    fireEvent.click(await waitForSync(() => getButtonByText(/^Confirm$|^Confirm \(Admin\)$/i, true)));
     await flushMicrotasks(8);
     const confirmGenBtn = await waitForSync(() => getButtonByText(/Confirm & Generate/i, true));
     fireEvent.click(confirmGenBtn);
@@ -966,7 +966,7 @@ describe('V45.7 Stateful Closed-Loop "Pub Demo" Integration Journeys', { timeout
 
     fireEvent.click(await waitForSync(() => getButtonByText(/Create Zcene/i, true)));
     await flushMicrotasks(6);
-    fireEvent.click(await waitForSync(() => getButtonByText(/Confirm & Spend|Confirm \(Admin\)/i, true)));
+    fireEvent.click(await waitForSync(() => getButtonByText(/^Confirm$|^Confirm \(Admin\)$/i, true)));
     await flushMicrotasks(8);
     const confirmGenBtn = await waitForSync(() => getButtonByText(/Confirm & Generate/i, true));
     fireEvent.click(confirmGenBtn);

@@ -1201,10 +1201,6 @@ export const TokenConfirmationDialog: React.FC<{
     uniqueMissingArtists.length === 0 &&
     uniqueEnrichmentArtists.length === 0;
 
-  const barMax = Math.max(tokenBalance, effectiveTokenCost, 50);
-  const currentBarPct = Math.min(100, Math.round((tokenBalance / barMax) * 100));
-  const afterBarPct = Math.min(100, Math.round((remainingBalance / barMax) * 100));
-
   return (
     <ModalBackdrop className="z-[130]" onClick={() => !isBusy && onClose()}>
       <ModalContainer data-testid="token-gate-modal">
@@ -1351,32 +1347,21 @@ export const TokenConfirmationDialog: React.FC<{
                   </span>
                 </div>
 
-                {/* Juice Bar Preview */}
-                <div className="space-y-1.5 pt-1">
-                  <div className="flex items-center justify-between text-[11px] font-mono">
-                    <span className="text-zinc-500">Your Balance: <strong className="text-zinc-200">{tokenBalance}T</strong></span>
-                    {hasSufficientBalance ? (
-                      <span className="text-zinc-400">
-                        After: <strong className="text-emerald-400">{remainingBalance}T</strong>
-                      </span>
-                    ) : (
-                      <span className="text-amber-400 font-semibold">
-                        Need +{deficit}T more
-                      </span>
-                    )}
-                  </div>
-                  <div className="w-full h-2 rounded-full bg-zinc-800 overflow-hidden relative">
-                    <div
-                      className={`h-full transition-all duration-300 ${hasSufficientBalance ? 'bg-zinc-600' : 'bg-amber-500/70'}`}
-                      style={{ width: `${currentBarPct}%` }}
-                    />
-                    {hasSufficientBalance && (
-                      <div
-                        className="h-full bg-primary absolute top-0 left-0 transition-all duration-300"
-                        style={{ width: `${afterBarPct}%` }}
-                      />
-                    )}
-                  </div>
+                <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between gap-2 font-mono text-xs">
+                  <span className="text-zinc-500 whitespace-nowrap">Wallet Balance:</span>
+                  {hasSufficientBalance ? (
+                    <span className="text-zinc-200 text-right">
+                      {tokenBalance}T <span className="text-zinc-500">→</span>{' '}
+                      <strong className="text-primary">
+                        {remainingBalance} {remainingBalance === 1 ? 'Token' : 'Tokens'}
+                      </strong>
+                    </span>
+                  ) : (
+                    <span className="text-zinc-200 text-right">
+                      {tokenBalance}T <span className="text-zinc-500">·</span>{' '}
+                      <strong className="text-amber-400 font-semibold">Need +{deficit}T more</strong>
+                    </span>
+                  )}
                 </div>
 
                 {type !== 'live_chat_search' && (
@@ -1428,7 +1413,7 @@ export const TokenConfirmationDialog: React.FC<{
               type="button"
               disabled={isBusy}
               onClick={onBack}
-              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Back
             </button>
@@ -1438,7 +1423,7 @@ export const TokenConfirmationDialog: React.FC<{
               data-testid="token-cancel-button"
               disabled={isBusy}
               onClick={onClose}
-              className="px-4 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Cancel
             </button>
@@ -1450,7 +1435,7 @@ export const TokenConfirmationDialog: React.FC<{
               data-testid="token-authorize-button"
               disabled={isBusy}
               onClick={() => triggerTopUp('gbp_10')}
-              className="px-4 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer"
+              className="px-4 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer whitespace-nowrap"
             >
               Top Up Tokens
             </button>
@@ -1468,7 +1453,7 @@ export const TokenConfirmationDialog: React.FC<{
                   <span>{type === 'live_chat_search' ? 'Unlocking...' : 'Confirming...'}</span>
                 </>
               ) : (
-                <span>{isAdmin ? 'Confirm (Admin)' : `Confirm & Spend ${effectiveTokenCost} Tokens`}</span>
+                <span>{isAdmin ? 'Confirm (Admin)' : 'Confirm'}</span>
               )}
             </button>
           )}
