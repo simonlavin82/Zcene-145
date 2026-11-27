@@ -1181,37 +1181,33 @@ export const TokenConfirmationDialog: React.FC<{
     }
   };
 
-  const modalTitle = isAdmin
-    ? type === 'live_synthesis'
-      ? 'Confirm Live Synthesis'
-      : type === 'live_chat_search'
-        ? 'Unlock Deep Connections (Admin)'
-        : 'Confirm Curation (Admin)'
-    : !hasSufficientBalance
-      ? 'Top Up Required to Continue'
-      : type === 'live_chat_search'
-        ? 'Unlock Deep Connections'
-        : effectiveTokenCost >= TOKEN_PRICING.COMPLEX_QUERY || type === 'live_synthesis'
-          ? 'Confirm Complex Synthesis'
-          : 'Confirm Zcene Curation';
-
-  const isPureAdminCacheHit =
-    isAdmin &&
-    type !== 'live_synthesis' &&
-    uniqueMissingArtists.length === 0 &&
-    uniqueEnrichmentArtists.length === 0;
+  const modalTitle = !isAdmin && !hasSufficientBalance
+    ? 'Top Up Required to Continue'
+    : type === 'live_chat_search'
+      ? 'Unlock Deep Connections'
+      : effectiveTokenCost >= TOKEN_PRICING.COMPLEX_QUERY || type === 'live_synthesis'
+        ? 'Confirm Complex Synthesis'
+        : 'Confirm Zcene Curation';
 
   return (
     <ModalBackdrop className="z-[130]" onClick={() => !isBusy && onClose()}>
       <ModalContainer data-testid="token-gate-modal">
         <ModalHeader className="shrink-0">
-          <div className="flex items-center gap-2">
-            <span className="material-symbols-outlined text-primary !text-[18px]">
-              {isAdmin ? 'verified_user' : !hasSufficientBalance ? 'account_balance_wallet' : 'bolt'}
+          <div className="flex items-center gap-2 min-w-0 flex-wrap">
+            <span className="material-symbols-outlined text-primary !text-[18px] shrink-0">
+              {!isAdmin && !hasSufficientBalance ? 'account_balance_wallet' : 'bolt'}
             </span>
-            <h3 className="text-lg font-medium text-white" data-testid="token-gate-title">
+            <h3 className="text-base sm:text-lg font-medium text-white truncate" data-testid="token-gate-title">
               {modalTitle}
             </h3>
+            {isAdmin && (
+              <span
+                data-testid="token-gate-admin-badge"
+                className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0"
+              >
+                Admin · 0T
+              </span>
+            )}
           </div>
           <button
             type="button"
@@ -1227,172 +1223,86 @@ export const TokenConfirmationDialog: React.FC<{
           data-testid="token-gate-modal-body"
           className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-5 space-y-4 text-sm text-zinc-400"
         >
-          {isAdmin ? (
-            <>
-              <div className="flex items-center justify-between bg-emerald-950/30 border border-emerald-500/30 rounded-xl px-3.5 py-2">
-                <span className="text-xs text-emerald-300 font-medium">Admin Bypass Active</span>
-                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-semibold">
-                  ADMIN UNLIMITED · 0T
+          <p className="leading-relaxed text-zinc-300">
+            {type === 'live_chat_search'
+              ? 'Unlock 3 Deep Connections consults. Works across all artists and Zcenes with no expiration.'
+              : effectiveTokenCost >= TOKEN_PRICING.COMPLEX_QUERY || type === 'live_synthesis'
+                ? 'Curate this multi-artist or custom-anchored Zcene and save it permanently to your Zcenes.'
+                : 'Curate this Zcene and unlock it permanently in your Zcenes.'}
+          </p>
+
+          <div className="bg-zinc-900/60 p-4 border border-zinc-800 rounded-xl space-y-3">
+            {allSelectedSubjects.length > 0 && (
+              <div className="space-y-1.5 pb-2.5 border-b border-zinc-800">
+                <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">
+                  {type === 'live_chat_search' ? 'Session Scope' : 'Selected Artists'}
                 </span>
+                <div className="flex flex-wrap gap-1.5">
+                  {allSelectedSubjects.map(subject => (
+                    <span
+                      key={subject}
+                      className="text-xs font-mono bg-zinc-800/90 text-zinc-200 px-2.5 py-0.5 border border-zinc-700/70 rounded-full"
+                    >
+                      {subject}
+                    </span>
+                  ))}
+                </div>
               </div>
+            )}
 
-              <div className="bg-zinc-900/60 p-4 border border-zinc-800 rounded-xl space-y-2.5">
-                <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
-                  <span className="text-zinc-500">Query Mode:</span>
-                  <span className="text-zinc-300 font-semibold uppercase tracking-wider">
-                    {type === 'live_chat_search'
-                      ? 'Deep Connections (3 Msgs)'
-                      : isPureAdminCacheHit
-                        ? 'Direct Topology Hit'
-                        : type === 'live_synthesis'
-                          ? 'Filtered Live Synthesis'
-                          : 'Graph Synthesis'}
-                  </span>
-                </div>
-                <div className="flex justify-between font-mono text-xs border-b border-zinc-800 pb-1.5">
-                  <span className="text-zinc-500">Estimated Backend Cost:</span>
-                  <div className="text-right">
-                    <span className="text-primary font-bold">
-                      {type === 'live_chat_search'
-                        ? '~$0.01 – $0.03'
-                        : isPureAdminCacheHit
-                          ? '$0.0000 Direct Hit'
-                          : '~$0.40 – $0.85 (~£0.30 – £0.65)'}
-                    </span>
-                    <span className="text-[9px] text-zinc-500 block mt-0.5">
-                      Standard user price: {effectiveTokenCost} Tokens
-                    </span>
-                  </div>
-                </div>
+            <div className="flex items-center justify-between font-mono text-xs">
+              <span className="text-zinc-400">Token Cost:</span>
+              <span className="text-primary font-bold text-sm" data-testid="token-gate-cost">
+                {effectiveTokenCost} Tokens
+              </span>
+            </div>
 
-                {readyArtists.length > 0 && (
-                  <div className="space-y-1 pb-1.5 border-b border-zinc-800">
-                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">
-                      Ready (Cached)
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {readyArtists.map(artist => (
-                        <span key={artist} className="text-[10px] font-mono bg-zinc-800/80 text-zinc-300 px-2 py-0.5 border border-zinc-700/50 rounded-full">
-                          {artist}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {uniqueEnrichmentArtists.length > 0 && (
-                  <div className="space-y-1 pb-1.5 border-b border-zinc-800">
-                    <span className="text-[10px] font-semibold text-amber-400 uppercase tracking-widest block">
-                      Enrichment Required
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {uniqueEnrichmentArtists.map(artist => (
-                        <span key={artist} className="text-[10px] font-mono bg-amber-950/20 text-amber-400 px-2 py-0.5 border border-amber-900/30 rounded-full">
-                          {artist}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {uniqueMissingArtists.length > 0 && (
-                  <div className="space-y-1">
-                    <span className="text-[10px] font-semibold text-red-400 uppercase tracking-widest block">
-                      Live Synthesis Required
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {uniqueMissingArtists.map(artist => (
-                        <span key={artist} className="text-[10px] font-mono bg-red-950/20 text-red-400 px-2 py-0.5 border border-red-900/30 rounded-full">
-                          {artist}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            <>
-              <p className="leading-relaxed text-zinc-300">
-                {type === 'live_chat_search'
-                  ? 'Unlock 3 Deep Connections consults. Works across all artists and Zcenes with no expiration.'
-                  : effectiveTokenCost >= TOKEN_PRICING.COMPLEX_QUERY
-                    ? 'Curate this multi-artist or custom-anchored Zcene web and save it permanently to your Zcenes.'
-                    : 'Curate this Zcene web and unlock it permanently in your Zcenes.'}
-              </p>
-
-              <div className="bg-zinc-900/60 p-4 border border-zinc-800 rounded-xl space-y-3">
-                {allSelectedSubjects.length > 0 && (
-                  <div className="space-y-1.5 pb-2.5 border-b border-zinc-800">
-                    <span className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest block">
-                      {type === 'live_chat_search' ? 'Session Scope' : 'Selected Artists'}
-                    </span>
-                    <div className="flex flex-wrap gap-1.5">
-                      {allSelectedSubjects.map(subject => (
-                        <span
-                          key={subject}
-                          className="text-xs font-mono bg-zinc-800/90 text-zinc-200 px-2.5 py-0.5 border border-zinc-700/70 rounded-full"
-                        >
-                          {subject}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                <div className="flex items-center justify-between font-mono text-xs">
-                  <span className="text-zinc-400">Token Cost:</span>
-                  <span className="text-primary font-bold text-sm" data-testid="token-gate-cost">
-                    {effectiveTokenCost} Tokens
-                  </span>
-                </div>
-
-                <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between gap-2 font-mono text-xs">
-                  <span className="text-zinc-500 whitespace-nowrap">Wallet Balance:</span>
-                  {hasSufficientBalance ? (
-                    <span className="text-zinc-200 text-right">
-                      {tokenBalance}T <span className="text-zinc-500">→</span>{' '}
-                      <strong className="text-primary">
-                        {remainingBalance} {remainingBalance === 1 ? 'Token' : 'Tokens'}
-                      </strong>
-                    </span>
-                  ) : (
-                    <span className="text-zinc-200 text-right">
-                      {tokenBalance}T <span className="text-zinc-500">·</span>{' '}
-                      <strong className="text-amber-400 font-semibold">Need +{deficit}T more</strong>
-                    </span>
-                  )}
-                </div>
-
-                {type !== 'live_chat_search' && (
-                  <p className="text-[11px] text-zinc-500 leading-relaxed pt-1 border-t border-zinc-800/70">
-                    Includes a 1-Token artist lookup if uncached; the remaining balance is only charged when you confirm generation. Failed or interrupted curations are automatically refunded to your token balance immediately.
-                  </p>
-                )}
-              </div>
-
-              {!hasSufficientBalance && (
-                <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-3.5 space-y-2.5" data-testid="low-balance-topup-box">
-                  <p className="text-xs text-amber-200/90 leading-relaxed">
-                    Top up your Zcene wallet to continue immediately without losing your selection:
-                  </p>
-                  <div className="grid grid-cols-3 gap-2">
-                    {TOP_UP_TIER_LIST.map(tier => (
-                      <button
-                        key={tier.id}
-                        type="button"
-                        data-testid={`gate-topup-${tier.id}`}
-                        onClick={() => triggerTopUp(tier.id)}
-                        className="flex flex-col items-center justify-center py-2 px-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-amber-500/40 hover:border-primary transition-colors cursor-pointer"
-                      >
-                        <span className="text-xs font-semibold text-white">{tier.priceDisplay}</span>
-                        <span className="text-[10px] font-mono text-primary">+{tier.tokens}T</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+            <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between gap-2 font-mono text-xs">
+              <span className="text-zinc-500 whitespace-nowrap">Wallet Balance:</span>
+              {isAdmin ? (
+                <strong className="text-emerald-400 text-right">Admin Bypass · 0T Charged</strong>
+              ) : hasSufficientBalance ? (
+                <span className="text-zinc-200 text-right">
+                  {tokenBalance}T <span className="text-zinc-500">→</span>{' '}
+                  <strong className="text-primary">
+                    {remainingBalance} {remainingBalance === 1 ? 'Token' : 'Tokens'}
+                  </strong>
+                </span>
+              ) : (
+                <span className="text-zinc-200 text-right">
+                  {tokenBalance}T <span className="text-zinc-500">·</span>{' '}
+                  <strong className="text-amber-400 font-semibold">Need +{deficit}T more</strong>
+                </span>
               )}
-            </>
+            </div>
+
+            {type !== 'live_chat_search' && (
+              <p className="text-[11px] text-zinc-500 leading-relaxed pt-1 border-t border-zinc-800/70">
+                Includes a 1-Token artist lookup if uncached; the remaining balance is only charged when you confirm generation.
+              </p>
+            )}
+          </div>
+
+          {!isAdmin && !hasSufficientBalance && (
+            <div className="bg-amber-950/20 border border-amber-500/30 rounded-xl p-3.5 space-y-2.5" data-testid="low-balance-topup-box">
+              <p className="text-xs text-amber-200/90 leading-relaxed">
+                Top up your Zcene wallet to continue immediately without losing your selection:
+              </p>
+              <div className="grid grid-cols-3 gap-2">
+                {TOP_UP_TIER_LIST.map(tier => (
+                  <button
+                    key={tier.id}
+                    type="button"
+                    data-testid={`gate-topup-${tier.id}`}
+                    onClick={() => triggerTopUp(tier.id)}
+                    className="flex flex-col items-center justify-center py-2 px-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 border border-amber-500/40 hover:border-primary transition-colors cursor-pointer"
+                  >
+                    <span className="text-xs font-semibold text-white">{tier.priceDisplay}</span>
+                    <span className="text-[10px] font-mono text-primary">+{tier.tokens}T</span>
+                  </button>
+                ))}
+              </div>
+            </div>
           )}
         </ModalBody>
 
@@ -1408,55 +1318,68 @@ export const TokenConfirmationDialog: React.FC<{
         )}
 
         <ModalFooter className="shrink-0">
-          {onBack ? (
-            <button
-              type="button"
-              disabled={isBusy}
-              onClick={onBack}
-              className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+          <div className="flex items-center justify-between gap-2 w-full">
+            <a
+              href="/help#token-economy"
+              target="_blank"
+              rel="noopener noreferrer"
+              data-testid="token-pricing-help-link"
+              className="text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 hover:decoration-primary/60 cursor-pointer whitespace-nowrap shrink-0"
             >
-              Back
-            </button>
-          ) : (
-            <button
-              type="button"
-              data-testid="token-cancel-button"
-              disabled={isBusy}
-              onClick={onClose}
-              className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              Cancel
-            </button>
-          )}
-
-          {!isAdmin && !hasSufficientBalance ? (
-            <button
-              type="button"
-              data-testid="token-authorize-button"
-              disabled={isBusy}
-              onClick={() => triggerTopUp('gbp_10')}
-              className="px-4 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer whitespace-nowrap"
-            >
-              Top Up Tokens
-            </button>
-          ) : (
-            <button
-              type="button"
-              data-testid="token-authorize-button"
-              disabled={isBusy}
-              onClick={handleConfirmClick}
-              className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
-            >
-              {isBusy ? (
-                <>
-                  <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
-                  <span>{type === 'live_chat_search' ? 'Unlocking...' : 'Confirming...'}</span>
-                </>
+              Token Pricing
+            </a>
+            <div className="flex items-center justify-end gap-2 shrink-0">
+              {onBack ? (
+                <button
+                  type="button"
+                  disabled={isBusy}
+                  onClick={onBack}
+                  className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Back
+                </button>
               ) : (
-                <span>{isAdmin ? 'Confirm (Admin)' : 'Confirm'}</span>
+                <button
+                  type="button"
+                  data-testid="token-cancel-button"
+                  disabled={isBusy}
+                  onClick={onClose}
+                  className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Cancel
+                </button>
               )}
-            </button>
-          )}
+
+              {!isAdmin && !hasSufficientBalance ? (
+                <button
+                  type="button"
+                  data-testid="token-authorize-button"
+                  disabled={isBusy}
+                  onClick={() => triggerTopUp('gbp_10')}
+                  className="px-4 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                >
+                  Top Up Tokens
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  data-testid="token-authorize-button"
+                  disabled={isBusy}
+                  onClick={handleConfirmClick}
+                  className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+                >
+                  {isBusy ? (
+                    <>
+                      <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
+                      <span>{type === 'live_chat_search' ? 'Unlocking...' : 'Confirming...'}</span>
+                    </>
+                  ) : (
+                    <span>Confirm</span>
+                  )}
+                </button>
+              )}
+            </div>
+          </div>
         </ModalFooter>
       </ModalContainer>
     </ModalBackdrop>

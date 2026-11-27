@@ -10112,13 +10112,13 @@ const App: React.FC = () => {
       if (isAppPath || isDashboardPath || isProjectPath || pathname === '/help' || pathname.startsWith('/design') || pathname === '/engine' || pathname === '/analytics' || isTrashPath || shareIdFromQuery || projectIdFromQuery || isSharePath) {
         // Optimization: Pre-capture pathname + search for redirection if auth is not ready
         if (!isAuthInitialized) {
-          authRedirectPathRef.current = pathname + window.location.search;
+          authRedirectPathRef.current = pathname + window.location.search + window.location.hash;
           return;
         }
 
         // Allow access to app if we have a deep link ID, even if not logged in
         if (!user && !projectIdFromQuery && !shareIdFromQuery && !isProjectPath && !isSharePath) {
-          authRedirectPathRef.current = pathname + window.location.search;
+          authRedirectPathRef.current = pathname + window.location.search + window.location.hash;
           if (currentViewRef.current !== View.Home) {
             setCurrentView(View.Home);
             navigate('/', true);

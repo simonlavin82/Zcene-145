@@ -1025,6 +1025,8 @@ export const TokenEconomicsKeyStrip: React.FC<{ isNormalUserView: boolean }> = (
     const singleUsd = tokensToUsd(TOKEN_PRICING.SINGLE_SEED).toFixed(2);
     const complexGbp = tokensToGbp(TOKEN_PRICING.COMPLEX_QUERY).toFixed(2);
     const complexUsd = tokensToUsd(TOKEN_PRICING.COMPLEX_QUERY).toFixed(2);
+    const multiSceneMaxGbp = tokensToGbp(TOKEN_PRICING.COMPLEX_QUERY * 5).toFixed(2);
+    const multiSceneMaxUsd = tokensToUsd(TOKEN_PRICING.COMPLEX_QUERY * 5).toFixed(2);
     const deepGbp = tokensToGbp(TOKEN_PRICING.DEEP_WEB_CONSULT).toFixed(2);
     const deepUsd = tokensToUsd(TOKEN_PRICING.DEEP_WEB_CONSULT).toFixed(2);
     const preflightGbp = tokensToGbp(TOKEN_PRICING.PREFLIGHT_FLASH_FEE).toFixed(2);
@@ -1045,11 +1047,15 @@ export const TokenEconomicsKeyStrip: React.FC<{ isNormalUserView: boolean }> = (
             </div>
             <span className="hidden sm:inline text-zinc-700 select-none">•</span>
             <span className="whitespace-nowrap">
-                Single-Root Zcene (<span className="font-mono text-white">5T</span>) = <span className="font-mono text-zinc-300">£{singleGbp} / ~${singleUsd}</span>
+                Single-Root (<span className="font-mono text-white">5T</span>) = <span className="font-mono text-zinc-300">£{singleGbp} / ~${singleUsd}</span>
             </span>
             <span className="hidden sm:inline text-zinc-700 select-none">•</span>
             <span className="whitespace-nowrap">
-                Complex Zcene (<span className="font-mono text-white">10T</span>) = <span className="font-mono text-zinc-300">£{complexGbp} / ~${complexUsd}</span>
+                Multi-Root / Anchored (<span className="font-mono text-white">10T</span>) = <span className="font-mono text-zinc-300">£{complexGbp} / ~${complexUsd}</span>
+            </span>
+            <span className="hidden sm:inline text-zinc-700 select-none">•</span>
+            <span className="whitespace-nowrap">
+                Multi-Scene (<span className="font-mono text-white">10T–50T</span>) = <span className="font-mono text-zinc-300">£{complexGbp}–£{multiSceneMaxGbp} / ~${complexUsd}–${multiSceneMaxUsd}</span>
             </span>
             <span className="hidden sm:inline text-zinc-700 select-none">•</span>
             <span className="whitespace-nowrap">

@@ -116,6 +116,9 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(screen.getByTestId('token-gate-cost')).toHaveTextContent('5 Tokens');
     expect(screen.getByText('Wallet Balance:')).toBeInTheDocument();
     expect(screen.getByText('45 Tokens')).toBeInTheDocument();
+    const pricingLink = screen.getByTestId('token-pricing-help-link');
+    expect(pricingLink).toHaveAttribute('href', '/help#token-economy');
+    expect(pricingLink).toHaveAttribute('target', '_blank');
     expect(screen.queryByText(/\$0\.0000/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Direct Hit/i)).not.toBeInTheDocument();
 
@@ -153,7 +156,7 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(onOpenTopUp).toHaveBeenCalledWith('gbp_5');
   });
 
-  it('renders TokenConfirmationDialog in Admin Unlimited mode with raw USD telemetry', async () => {
+  it('renders TokenConfirmationDialog in Admin customer-parity mode with ADMIN · 0T badge and 0T bypass row', async () => {
     const onConfirm = vi.fn();
     render(
       <TokenConfirmationDialog
@@ -169,11 +172,13 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
       />
     );
 
-    expect(screen.getByText(/ADMIN UNLIMITED · 0T/i)).toBeInTheDocument();
-    expect(screen.getByText(/\$0\.0000 Direct Hit/i)).toBeInTheDocument();
+    expect(screen.getByTestId('token-gate-title')).toHaveTextContent('Confirm Zcene Curation');
+    expect(screen.getByTestId('token-gate-admin-badge')).toHaveTextContent(/Admin · 0T/i);
+    expect(screen.getByTestId('token-gate-cost')).toHaveTextContent('5 Tokens');
+    expect(screen.getByText('Admin Bypass · 0T Charged')).toBeInTheDocument();
 
     const confirmBtn = screen.getByTestId('token-authorize-button');
-    expect(confirmBtn).toHaveTextContent('Confirm (Admin)');
+    expect(confirmBtn.textContent?.trim()).toBe('Confirm');
     await act(async () => {
       fireEvent.click(confirmBtn);
     });
@@ -518,7 +523,7 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
     expect(screen.queryByText(/\$0\.0068/i)).not.toBeInTheDocument();
   });
 
-  it('deduplicates Admin TokenConfirmationDialog artist pills so cached seeds never appear under Live Synthesis Required', () => {
+  it('deduplicates Admin TokenConfirmationDialog artist pills across cached and missing arrays', () => {
     render(
       <TokenConfirmationDialog
         isOpen={true}
@@ -533,11 +538,10 @@ describe('Architecture V38 — Token Economy & Split-Debit Contract', () => {
       />
     );
 
-    expect(screen.getByText(/Ready \(Cached\)/i)).toBeInTheDocument();
-    expect(screen.queryByText(/Live Synthesis Required/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Selected Artists/i)).toBeInTheDocument();
     expect(screen.getAllByText('One Step Closer')).toHaveLength(1);
-    expect(screen.getByText(/Direct Topology Hit/i)).toBeInTheDocument();
-    expect(screen.getByText(/\$0\.0000 Direct Hit/i)).toBeInTheDocument();
+    expect(screen.getByTestId('token-gate-admin-badge')).toHaveTextContent(/Admin · 0T/i);
+    expect(screen.getByText('Admin Bypass · 0T Charged')).toBeInTheDocument();
   });
 
   it('synchronizes BACKEND_REGRESSION_RUNBOOK heading with Architecture V47.20', () => {

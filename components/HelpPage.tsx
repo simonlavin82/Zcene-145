@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Flame, Pin } from 'lucide-react';
 import { View } from '../types';
 import { InstagramIcon, MicIcon, StackIcon } from './Icons';
@@ -514,12 +514,49 @@ const HelpPage: React.FC<HelpPageProps> = ({
     tokenBalance = 0
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
+    const [activeSectionId, setActiveSectionId] = useState<string>('');
+
+    const scrollToSection = (sectionId: string, offset: number = 80) => {
+        const element = document.getElementById(sectionId);
+        const container = containerRef.current;
+        if (element && container) {
+            const containerRect = container.getBoundingClientRect();
+            const elementRect = element.getBoundingClientRect();
+            const relativeTop = elementRect.top - containerRect.top;
+            const targetScrollTop = container.scrollTop + relativeTop - offset;
+            container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
+        }
+    };
 
     useEffect(() => {
-        if (isActive && containerRef.current) {
-            containerRef.current.scrollTo(0, 0);
-        }
-    }, [isActive]);
+        if (!isActive || !containerRef.current) return;
+
+        let raf1 = 0;
+        let raf2 = 0;
+
+        const syncHashNavigation = () => {
+            const hashId = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '').trim() : '';
+            if (hashId && document.getElementById(hashId)) {
+                setActiveSectionId(hashId);
+                raf1 = requestAnimationFrame(() => {
+                    raf2 = requestAnimationFrame(() => {
+                        scrollToSection(hashId, isSmallScreen ? 160 : 80);
+                    });
+                });
+            } else {
+                setActiveSectionId('');
+                containerRef.current?.scrollTo(0, 0);
+            }
+        };
+
+        syncHashNavigation();
+        window.addEventListener('hashchange', syncHashNavigation);
+        return () => {
+            window.removeEventListener('hashchange', syncHashNavigation);
+            if (raf1) cancelAnimationFrame(raf1);
+            if (raf2) cancelAnimationFrame(raf2);
+        };
+    }, [isActive, isSmallScreen]);
 
     // Exact live parity with GraphPage.tsx legendConfig & legendOrder
     const legendItems: LegendItemProps[] = [
@@ -575,26 +612,16 @@ const HelpPage: React.FC<HelpPageProps> = ({
         { id: 'contact-support', title: 'Official Support & Contact' }
     ];
 
-    const scrollToSection = (sectionId: string, offset: number = 80) => {
-        const element = document.getElementById(sectionId);
-        const container = containerRef.current;
-        if (element && container) {
-            const containerRect = container.getBoundingClientRect();
-            const elementRect = element.getBoundingClientRect();
-            const relativeTop = elementRect.top - containerRect.top;
-            const targetScrollTop = container.scrollTop + relativeTop - offset;
-            container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
-        }
-    };
-
     const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
         e.preventDefault();
+        setActiveSectionId(sectionId);
         scrollToSection(sectionId, 80);
     };
 
     const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
         const sectionId = e.target.value;
         if (!sectionId) return;
+        setActiveSectionId(sectionId);
         scrollToSection(sectionId, 160);
         e.target.value = "";
     };
@@ -648,16 +675,24 @@ const HelpPage: React.FC<HelpPageProps> = ({
                         <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
                     </div>
                     <nav className="space-y-1">
-                        {sections.map(section => (
-                            <a
-                                key={section.id}
-                                href={`#${section.id}`}
-                                onClick={(e) => handleNavClick(e, section.id)}
-                                className="block text-zinc-400 hover:text-primary hover:bg-zinc-800/50 py-1.5 px-2 rounded-xl transition-colors text-sm"
-                            >
-                                {section.title}
-                            </a>
-                        ))}
+                        {sections.map(section => {
+                            const isCurrentSection = activeSectionId === section.id;
+                            return (
+                                <a
+                                    key={section.id}
+                                    href={`#${section.id}`}
+                                    onClick={(e) => handleNavClick(e, section.id)}
+                                    aria-current={isCurrentSection ? 'location' : undefined}
+                                    className={`block py-1.5 px-2 rounded-xl transition-colors text-sm ${
+                                        isCurrentSection
+                                            ? 'text-primary bg-zinc-800/60 font-medium'
+                                            : 'text-zinc-400 hover:text-primary hover:bg-zinc-800/50'
+                                    }`}
+                                >
+                                    {section.title}
+                                </a>
+                            );
+                        })}
                     </nav>
                 </aside>
 
@@ -952,7 +987,18 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 </div>
                                 <h4 className="text-base font-medium text-white">10 Tokens (~£1.00)</h4>
                                 <p className="text-sm text-zinc-400 leading-relaxed">
-                                    Bridge multiple root artists or constrain discovery with Level 2 &amp; 3 era sliders, country boundaries, and canonical styles or labels.
+                                    Bridge 2–5 root artists or constrain discovery with Level 2 &amp; 3 era sliders, country boundaries, and canonical styles or labels.
+                                </p>
+                            </div>
+
+                            <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <span className="text-xs font-bold uppercase tracking-wider text-primary">Multi-Scene</span>
+                                    <span className="text-lg font-mono font-bold text-white">10T–50T</span>
+                                </div>
+                                <h4 className="text-base font-medium text-white">10–50 Tokens (~£1.00–£5.00)</h4>
+                                <p className="text-sm text-zinc-400 leading-relaxed">
+                                    Connect 2–5 scenes on one board (5T Single-Root or 10T Multi-Root / Anchored per scene), including Overarching Zine and cross-scene bridges at 0T extra. Adding a scene costs only that scene; removing a scene into an unseen 2+ scene combo costs 5T to re-synthesize (0T on archive hits or 1-scene collapse).
                                 </p>
                             </div>
 
@@ -978,7 +1024,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 </p>
                             </div>
 
-                            <div className="p-6 bg-zinc-900/50 border border-emerald-500/30 rounded-xl space-y-3 md:col-span-2">
+                            <div className="p-6 bg-zinc-900/50 border border-emerald-500/30 rounded-xl space-y-3">
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold uppercase tracking-wider text-emerald-400">Shared Links &amp; Clones</span>
                                     <span className="text-lg font-mono font-bold text-emerald-300">0T</span>

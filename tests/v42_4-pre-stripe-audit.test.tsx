@@ -161,8 +161,9 @@ describe('Architecture V42.4: Pre-Stripe Copy Audit, Ad-Hoc T-Shirt Ordering & S
     expect(modalsSrc).toContain('Questions about billing or token balances? Contact support at');
     expect(modalsSrc).toContain('ZCENE_SUPPORT_EMAIL');
 
-    // TokenConfirmationDialog
-    expect(modalsSrc).toContain('Failed or interrupted curations are automatically refunded to your token balance immediately.');
+    // TokenConfirmationDialog links directly to /help#token-economy (where Automated Error Refund Guarantee lives)
+    expect(modalsSrc).toContain('href="/help#token-economy"');
+    expect(modalsSrc).toContain('Token Pricing');
 
     // UsageAnalyticsPage User Wallet Strip
     expect(analyticsSrc).toContain('Need assistance with a token top-up, transaction dispute, or refund?');
