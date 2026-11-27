@@ -980,7 +980,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 </p>
                             </div>
 
-                            <div className="p-6 bg-zinc-900/50 border border-primary/40 rounded-xl space-y-3 relative">
+                            <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-3">
                                 <div className="flex items-center justify-between">
                                     <span className="text-xs font-bold uppercase tracking-wider text-primary">Multi-Root / Anchored</span>
                                     <span className="text-lg font-mono font-bold text-white">{TOKEN_PRICING.COMPLEX_QUERY}T</span>
@@ -998,7 +998,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                                 </div>
                                 <h4 className="text-base font-medium text-white">10–50 Tokens (~£1.00–£5.00)</h4>
                                 <p className="text-sm text-zinc-400 leading-relaxed">
-                                    Connect 2–5 scenes on one board (5T Single-Root or 10T Multi-Root / Anchored per scene), including Overarching Zine and cross-scene bridges at 0T extra. Adding a scene costs only that scene; removing a scene into an unseen 2+ scene combo costs 5T to re-synthesize (0T on archive hits or 1-scene collapse).
+                                    Connect 2–5 scenes (5T or 10T each) with Overarching Zine and bridges included at 0T extra. Adding a scene costs only that scene; removing one into an unseen 2+ scene mix costs 5T.
                                 </p>
                             </div>
 

@@ -10072,17 +10072,12 @@ const App: React.FC = () => {
   const lastProcessedSelectedRef = useRef<string | null>(null);
   const lastProcessedSessionKeyRef = useRef<string>('');
 
-  // Gracefully clean up legacy hash routing URLs to clean pathnames on entry
+  // Gracefully clean up legacy HashRouter URLs (#/...) to clean pathnames on entry
+  // without clobbering standard in-page anchor hashes like /help#token-economy
   useEffect(() => {
     const hash = window.location.hash;
-    if (hash) {
-      let legacyPath = '';
-      if (hash.startsWith('#/')) {
-        legacyPath = hash.substring(2);
-      } else if (hash.startsWith('#')) {
-        legacyPath = hash.substring(1);
-      }
-      
+    if (hash && hash.startsWith('#/')) {
+      const legacyPath = hash.substring(2);
       if (legacyPath && legacyPath !== '/') {
         const [pathPart, queryPart] = legacyPath.split('?');
         const searchStr = queryPart ? `?${queryPart}` : window.location.search;

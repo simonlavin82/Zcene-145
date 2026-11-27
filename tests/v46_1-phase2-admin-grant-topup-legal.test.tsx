@@ -249,11 +249,14 @@ describe('Phase 2 (v46.1): Admin Token Grant UI, Flexible Simulation Top-Up Moda
     fireEvent.click(footerTermsBtn);
     expect(footerNav).toHaveBeenCalledWith(View.Terms);
 
-    // Ensure /terms route is wired in App.tsx and exempted in GlobalWall.tsx
+    // Ensure /terms & /help routes are wired in App.tsx and exempted with popstate re-guarding in GlobalWall.tsx
     const appSrc = fs.readFileSync(path.resolve(__dirname, '../App.tsx'), 'utf-8');
     const wallSrc = fs.readFileSync(path.resolve(__dirname, '../components/GlobalWall.tsx'), 'utf-8');
     expect(appSrc).toContain("pathname === '/terms'");
     expect(appSrc).toContain('[View.Terms]: \'/terms\'');
+    expect(appSrc).toContain("if (hash && hash.startsWith('#/'))");
     expect(wallSrc).toContain("pathname === '/terms'");
+    expect(wallSrc).toContain("pathname === '/help'");
+    expect(wallSrc).toContain("window.addEventListener('popstate', syncPathname)");
   });
 });

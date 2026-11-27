@@ -61,20 +61,15 @@ const GlobalWall: React.FC<GlobalWallProps> = ({ children }) => {
     return <>{children}</>;
   }
 
-  // Preserve intentional public /z/:id shared Zcene guest preview & /terms legal page behavior
-  const isPublicRoute =
-    typeof window !== 'undefined' &&
-    (window.location.pathname.startsWith('/z/') || window.location.pathname === '/terms');
-  if (isPublicRoute) {
-    return <>{children}</>;
-  }
-
   return <GlobalWallGate>{children}</GlobalWallGate>;
 };
 
 // Separated into its own component so hooks only run when the wall is active.
 const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => isBetaUnlocked());
+  const [pathname, setPathname] = useState<string>(() =>
+    typeof window !== 'undefined' ? window.location.pathname : '/'
+  );
 
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -83,11 +78,24 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (!isUnlocked) {
+    if (typeof window === 'undefined') return;
+    const syncPathname = () => setPathname(window.location.pathname);
+    window.addEventListener('popstate', syncPathname);
+    return () => window.removeEventListener('popstate', syncPathname);
+  }, []);
+
+  // Preserve intentional public /z/:id shared Zcene preview, /terms legal page,
+  // and /help documentation (re-evaluated live on popstate so unauthenticated
+  // redirects back to '/' re-engage the beta wall immediately).
+  const isPublicRoute =
+    pathname.startsWith('/z/') || pathname === '/terms' || pathname === '/help';
+
+  useEffect(() => {
+    if (!isUnlocked && !isPublicRoute) {
       // Auto-focus the input when the wall first renders.
       inputRef.current?.focus();
     }
-  }, [isUnlocked]);
+  }, [isUnlocked, isPublicRoute]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,7 +141,7 @@ const GlobalWallGate: React.FC<GlobalWallProps> = ({ children }) => {
     }
   };
 
-  if (isUnlocked) {
+  if (isUnlocked || isPublicRoute) {
     return <>{children}</>;
   }
 
