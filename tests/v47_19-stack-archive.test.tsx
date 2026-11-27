@@ -1537,8 +1537,17 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(dsSrc).toContain('<ArtistVerificationCard');
     expect(dsSrc).toContain('<DisambiguationRadio');
     expect(dsSrc).toContain('<ModalFooterLink');
+    expect(dsSrc).toContain('<ProjectMobileListCard');
+    expect(dsSrc).toContain('auto_stories');
+    expect(dsSrc).toContain('picture_as_pdf');
+    expect(dsSrc).toContain('visibility_off');
     expect(dsSrc).not.toContain('RootsBreakdownButton');
     expect(dsSrc).not.toContain('Ad Space');
     expect(dsSrc).not.toContain('Fixed Footer Ad');
+    expect(dsSrc).not.toContain('Organic View');
+    expect(dsSrc).not.toContain('Cluster View');
+    expect(dsSrc).not.toContain('Roots Breakdown');
+    expect(dsSrc).not.toContain('shopping_bag');
+    expect(dsSrc).not.toContain('**18px**');
   });
 });

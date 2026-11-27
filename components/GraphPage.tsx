@@ -166,7 +166,6 @@ const COLLAPSED_WIDTH = 64;
 const MIN_GRAPH_WIDTH = 400;
 
 // --- Components ---
-import { GenerativeRationaleModal } from './SharedModals';
 
 const DiscoveryFiltersPanel: React.FC<{
   filters: DiscoveryFilters;

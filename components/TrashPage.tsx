@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef } from 'react';
+import React, { useState, useMemo } from 'react';
 import Header from './Header';
 import ViewToggle from './ViewToggle';
 import { DashboardProjectCard } from './DashboardProjectCard';
@@ -8,8 +8,8 @@ import { getProjectDisplayTitle } from '../services/artistCacheService';
 import { computeProjectCardMetrics, parseProjectScenes, stripSceneNamespace } from '../shared/multiSceneUtils';
 import { formatSystemTimestamp } from '../utils/formatters';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
-import { BackButton } from './DesignSystem';
-import { PROJECT_TABLE_COLUMNS, ProjectMetricPill, ProjectStatusBadge } from './ui/ProjectMetrics';
+import { BackButton, ToolbarSearch } from './DesignSystem';
+import { PROJECT_TABLE_COLUMNS, ProjectTableMetricValue, ProjectStatusBadge, ProjectMobileListCard } from './ui/ProjectMetrics';
 
 export interface TrashPageProps {
   user: User | null;
@@ -67,11 +67,9 @@ export const TrashPage: React.FC<TrashPageProps> = ({
   tokenBalance = 0,
 }) => {
   const [view, setView] = useState<'grid' | 'list'>('grid');
-  const effectiveView = isSmallScreen ? 'grid' : view;
   const [sortBy, setSortBy] = useState<'recent' | 'alphabetical'>('recent');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
-  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [projectToPurge, setProjectToPurge] = useState<string | null>(null);
 
@@ -189,6 +187,64 @@ export const TrashPage: React.FC<TrashPageProps> = ({
     return trashedProjects.find(p => p.id === projectToPurge) || null;
   }, [projectToPurge, trashedProjects]);
 
+  const getDaysLeft = (project: Project): number => {
+    const purgeMs = project.purgeAt?.toMillis
+      ? project.purgeAt.toMillis()
+      : project.purgeAt?.toDate
+      ? project.purgeAt.toDate().getTime()
+      : project.purgeAt?.seconds
+      ? project.purgeAt.seconds * 1000
+      : typeof project.purgeAt === 'string' || typeof project.purgeAt === 'number'
+      ? new Date(project.purgeAt).getTime()
+      : project.trashedAt
+      ? (project.trashedAt?.toMillis ? project.trashedAt.toMillis() : new Date(project.trashedAt).getTime()) + 30 * 24 * 3600 * 1000
+      : Date.now();
+    return Math.max(0, Math.ceil((purgeMs - Date.now()) / (1000 * 60 * 60 * 24)));
+  };
+
+  const renderTrashRowActions = (project: Project) => (
+    <div className="flex items-center justify-end relative">
+      <button
+        type="button"
+        onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
+        className="w-9 h-9 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center shrink-0 relative before:absolute before:inset-[-4px] before:content-['']"
+        aria-label={`Actions for ${getProjectDisplayTitle(project)}`}
+      >
+        <span className="material-symbols-outlined !text-xl">more_vert</span>
+      </button>
+      {activeMenuId === project.id && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
+          <div className="absolute right-0 top-10 w-56 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left antialiased space-y-0.5">
+            {onRestoreProject && (
+              <button
+                onClick={() => {
+                  setActiveMenuId(null);
+                  onRestoreProject(project.id);
+                }}
+                className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
+              >
+                <span className="material-symbols-outlined !text-[18px] text-emerald-400">restore</span>
+                Restore (0T)
+              </button>
+            )}
+            <div className="border-t border-zinc-800/80 my-2" />
+            <button
+              onClick={() => {
+                setActiveMenuId(null);
+                setProjectToPurge(project.id);
+              }}
+              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
+            >
+              <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete_forever</span>
+              Delete Forever
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div className="h-full w-full overflow-y-auto bg-background-dark text-white selection:bg-primary selection:text-black flex flex-col relative">
       <Header
@@ -231,19 +287,23 @@ export const TrashPage: React.FC<TrashPageProps> = ({
             </div>
 
             {/* Toolbar Controls */}
-            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap flex-shrink-0">
-              {/* Sort Selector Toggle */}
-              <ViewToggle
-                value={sortBy}
-                onChange={(s) => setSortBy(s as 'recent' | 'alphabetical')}
-                options={[
-                  { id: 'recent', icon: 'schedule', label: 'Sort by Recent' },
-                  { id: 'alphabetical', icon: 'sort_by_alpha', label: 'Sort Alphabetically' }
-                ]}
-              />
+            <div className="relative flex items-center gap-2 h-[38px] w-full md:w-auto flex-shrink-0">
+              <div
+                className={`flex items-center gap-2 shrink-0 transition-opacity duration-150 ${isSmallScreen && isSearchExpanded ? 'opacity-0 pointer-events-none' : ''}`}
+                aria-hidden={isSmallScreen && isSearchExpanded ? true : undefined}
+                inert={isSmallScreen && isSearchExpanded}
+              >
+                {/* Sort Selector Toggle */}
+                <ViewToggle
+                  value={sortBy}
+                  onChange={(s) => setSortBy(s as 'recent' | 'alphabetical')}
+                  options={[
+                    { id: 'recent', icon: 'schedule', label: 'Sort by Recent' },
+                    { id: 'alphabetical', icon: 'sort_by_alpha', label: 'Sort Alphabetically' }
+                  ]}
+                />
 
-              {/* Grid/List View Toggle (desktop/tablet >= 768px only; mobile locks to zero-overflow Card View) */}
-              {!isSmallScreen && (
+                {/* Grid/List View Toggle (full desktop/mobile parity) */}
                 <ViewToggle
                   value={view}
                   onChange={(v) => setView(v as 'grid' | 'list')}
@@ -252,60 +312,22 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                     { id: 'list', icon: 'list', label: 'List View' }
                   ]}
                 />
-              )}
-
-              {/* Deep Search Input */}
-              <div
-                className={`group relative h-[38px] flex items-center transition-all duration-300 ease-in-out overflow-hidden rounded-xl border border-zinc-700 bg-zinc-900/80 backdrop-blur-md shadow-xl origin-left ${isSearchExpanded ? 'w-56 sm:w-64 focus-within:ring-1 focus-within:ring-primary' : 'w-[38px] cursor-pointer'}`}
-                onClick={(e) => {
-                  if (!isSearchExpanded) {
-                    e.stopPropagation();
-                    setIsSearchExpanded(true);
-                    setTimeout(() => searchInputRef.current?.focus(), 50);
-                  }
-                }}
-                title={!isSearchExpanded ? "Find in trash..." : undefined}
-              >
-                <span className={`material-symbols-outlined absolute left-[9px] top-1/2 -translate-y-1/2 transition-colors duration-300 z-10 pointer-events-none ${isSearchExpanded ? 'text-zinc-500 !text-[20px]' : 'text-zinc-400 group-hover:text-white !text-[20px]'}`}>
-                  search
-                </span>
-
-                <input
-                  autoComplete="off"
-                  data-1p-ignore="true"
-                  data-lpignore="true"
-                  ref={searchInputRef}
-                  type="search"
-                  placeholder="Find in trash..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  onBlur={() => { if (!searchQuery.trim()) setIsSearchExpanded(false); }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') {
-                      setSearchQuery('');
-                      setIsSearchExpanded(false);
-                      searchInputRef.current?.blur();
-                    }
-                  }}
-                  className={`w-full h-full appearance-none bg-transparent text-white placeholder:text-zinc-500 focus:outline-none transition-opacity duration-300 pl-10 pr-[38px] text-sm ${isSearchExpanded ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}
-                />
-
-                <div className={`absolute right-[3px] top-1/2 -translate-y-1/2 flex items-center z-10 transition-opacity duration-300 ${isSearchExpanded ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-                  {searchQuery && (
-                    <button
-                      onMouseDown={(e) => {
-                        e.preventDefault();
-                        setSearchQuery('');
-                        searchInputRef.current?.focus();
-                      }}
-                      className="w-8 h-8 flex flex-shrink-0 items-center justify-center rounded-[10px] text-zinc-400 hover:text-white hover:bg-zinc-800/50 transition-colors leading-none cursor-pointer"
-                      aria-label="Clear search"
-                    >
-                      <span className="material-symbols-outlined !text-[18px]">close</span>
-                    </button>
-                  )}
-                </div>
               </div>
+
+              {/* Unified Toolbar Search */}
+              <ToolbarSearch
+                value={searchQuery}
+                onChange={setSearchQuery}
+                placeholder="Find in trash..."
+                isMobile={isSmallScreen}
+                isMobileOpen={isSearchExpanded}
+                onMobileOpenChange={setIsSearchExpanded}
+                size="control"
+                overlayClassName="z-20"
+                triggerTestId="trash-search-trigger"
+                inputTestId="trash-search-input"
+                overlayTestId="trash-search-overlay"
+              />
             </div>
           </div>
 
@@ -346,7 +368,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                 Clear Search
               </button>
             </div>
-          ) : effectiveView === 'grid' ? (
+          ) : view === 'grid' ? (
             /* Grid View */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredProjects.map((project) => (
@@ -363,16 +385,52 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                 />
               ))}
             </div>
+          ) : isSmallScreen ? (
+            /* Single-Branch Responsive Mobile Compact List View (< 768px — zero desktop table DOM) */
+            <div data-testid="trash-mobile-list" className="space-y-3">
+              {filteredProjects.map((project) => {
+                const {
+                  sceneCount,
+                  rootArtistsCount,
+                  recommendedCount,
+                  labelCount,
+                  deepCutsCount,
+                } = computeProjectCardMetrics(project);
+                const daysLeft = getDaysLeft(project);
+
+                return (
+                  <ProjectMobileListCard
+                    key={project.id}
+                    data-testid={`trash-mobile-list-card-${project.id}`}
+                    title={getProjectDisplayTitle(project)}
+                    formattedDate={project.updatedAt ? formatSystemTimestamp(project.updatedAt) : 'New Project'}
+                    icon="auto_delete"
+                    iconClassName="text-amber-400"
+                    sceneCount={sceneCount || 1}
+                    rootArtistsCount={rootArtistsCount}
+                    recommendedCount={recommendedCount}
+                    labelCount={labelCount > 0 ? labelCount : null}
+                    deepCutsCount={deepCutsCount}
+                    status="trashed"
+                    daysLeft={daysLeft}
+                    isMenuOpen={activeMenuId === project.id}
+                    actionMenuSlot={renderTrashRowActions(project)}
+                  />
+                );
+              })}
+            </div>
           ) : (
-            /* Tabular List View */
-            <div className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
-              <table className="w-full text-left border-collapse min-w-[640px]">
+            /* 9-Column Desktop Tabular List View (>= 768px) */
+            <div data-testid="trash-desktop-table" className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
+              <table className="w-full text-left border-collapse min-w-[780px]">
                 <thead>
                   <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
                     {PROJECT_TABLE_COLUMNS.map((col) => (
                       <th
                         key={col.key}
-                        className={`py-4 px-6 font-semibold ${col.align === 'right' ? 'text-right' : ''}`}
+                        className={`py-3.5 font-semibold ${col.headerClassName} ${
+                          col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : ''
+                        }`}
                       >
                         {col.label}
                       </th>
@@ -389,96 +447,45 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                       deepCutsCount,
                     } = computeProjectCardMetrics(project);
                     const displayTitle = getProjectDisplayTitle(project);
-                    const formattedDate = formatSystemTimestamp(project.updatedAt);
-
-                    const purgeMs = project.purgeAt?.toMillis
-                      ? project.purgeAt.toMillis()
-                      : project.purgeAt?.toDate
-                      ? project.purgeAt.toDate().getTime()
-                      : project.purgeAt?.seconds
-                      ? project.purgeAt.seconds * 1000
-                      : typeof project.purgeAt === 'string' || typeof project.purgeAt === 'number'
-                      ? new Date(project.purgeAt).getTime()
-                      : project.trashedAt
-                      ? (project.trashedAt?.toMillis ? project.trashedAt.toMillis() : new Date(project.trashedAt).getTime()) + 30 * 24 * 3600 * 1000
-                      : Date.now();
-                    const daysLeft = Math.max(0, Math.ceil((purgeMs - Date.now()) / (1000 * 60 * 60 * 24)));
+                    const formattedDate = project.updatedAt ? formatSystemTimestamp(project.updatedAt) : 'New Project';
+                    const daysLeft = getDaysLeft(project);
 
                     const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
                     const tdClass = `transition-colors ${rowBg} group-hover:bg-white/5`;
 
                     return (
                       <tr key={project.id} className={`group border-b border-zinc-800/30 ${activeMenuId === project.id ? 'relative z-40' : ''}`}>
-                        <td className={`py-4 px-6 font-medium text-white ${tdClass}`}>
-                          <div className="flex items-center gap-3">
-                            <span className="material-symbols-outlined !text-lg text-amber-400">
+                        <td className={`py-3.5 pl-4 pr-3 font-medium text-white ${tdClass}`}>
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <span className="material-symbols-outlined !text-[18px] text-amber-400 shrink-0">
                               auto_delete
                             </span>
-                            <span className="truncate max-w-[240px]">{displayTitle}</span>
-                            <ProjectMetricPill variant="table-inline">SCENES: {sceneCount || 1}</ProjectMetricPill>
+                            <span className="truncate max-w-[180px] xl:max-w-[260px] text-sm">{displayTitle}</span>
                           </div>
                         </td>
-                        <td className={`py-4 px-6 text-zinc-400 text-sm font-mono font-normal ${tdClass}`}>
+                        <td className={`py-3.5 px-3 text-zinc-400 text-xs font-mono font-normal whitespace-nowrap ${tdClass}`}>
                           {formattedDate}
                         </td>
-                        <td className={`py-4 px-6 font-normal ${tdClass}`}>
-                          <ProjectMetricPill variant="table">ROOT ARTISTS: {rootArtistsCount}</ProjectMetricPill>
+                        <td className={`py-3.5 px-2.5 text-center ${tdClass}`}>
+                          <ProjectTableMetricValue value={sceneCount || 1} />
                         </td>
-                        <td className={`py-4 px-6 font-normal ${tdClass}`}>
-                          <ProjectMetricPill variant="table">ARTISTS: {recommendedCount}</ProjectMetricPill>
+                        <td className={`py-3.5 px-2.5 text-center ${tdClass}`}>
+                          <ProjectTableMetricValue value={rootArtistsCount} />
                         </td>
-                        <td className={`py-4 px-6 font-normal ${tdClass}`}>
-                          {labelCount > 0 ? (
-                            <ProjectMetricPill variant="table">LABELS: {labelCount}</ProjectMetricPill>
-                          ) : (
-                            <ProjectMetricPill variant="table" muted>-</ProjectMetricPill>
-                          )}
+                        <td className={`py-3.5 px-2.5 text-center ${tdClass}`}>
+                          <ProjectTableMetricValue value={recommendedCount} />
                         </td>
-                        <td className={`py-4 px-6 font-normal ${tdClass}`}>
-                          <ProjectMetricPill variant="table">DEEP CUTS: {deepCutsCount}</ProjectMetricPill>
+                        <td className={`py-3.5 px-2.5 text-center ${tdClass}`}>
+                          <ProjectTableMetricValue value={labelCount} mutedWhenZero />
                         </td>
-                        <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                        <td className={`py-3.5 px-2.5 text-center ${tdClass}`}>
+                          <ProjectTableMetricValue value={deepCutsCount} />
+                        </td>
+                        <td className={`py-3.5 px-3 text-center ${tdClass}`}>
                           <ProjectStatusBadge status="trashed" daysLeft={daysLeft} variant="table" />
                         </td>
-                        <td className={`py-4 px-6 text-right ${tdClass} ${activeMenuId === project.id ? 'relative z-50' : ''}`} onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end relative">
-                            <button
-                              onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
-                              className="w-9 h-9 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center shrink-0 relative before:absolute before:inset-[-4px] before:content-['']"
-                            >
-                              <span className="material-symbols-outlined !text-xl">more_vert</span>
-                            </button>
-                            {activeMenuId === project.id && (
-                              <>
-                                <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                <div className="absolute right-0 top-10 w-56 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left antialiased space-y-0.5">
-                                  {onRestoreProject && (
-                                    <button
-                                      onClick={() => {
-                                        setActiveMenuId(null);
-                                        onRestoreProject(project.id);
-                                      }}
-                                      className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-emerald-400 hover:bg-emerald-500/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
-                                    >
-                                      <span className="material-symbols-outlined !text-[18px] text-emerald-400">restore</span>
-                                      Restore (0T)
-                                    </button>
-                                  )}
-                                  <div className="border-t border-zinc-800/80 my-2" />
-                                  <button
-                                    onClick={() => {
-                                      setActiveMenuId(null);
-                                      setProjectToPurge(project.id);
-                                    }}
-                                    className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
-                                  >
-                                    <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete_forever</span>
-                                    Delete Forever
-                                  </button>
-                                </div>
-                              </>
-                            )}
-                          </div>
+                        <td className={`py-3.5 pl-2 pr-4 text-right ${tdClass} ${activeMenuId === project.id ? 'relative z-50' : ''}`} onClick={(e) => e.stopPropagation()}>
+                          {renderTrashRowActions(project)}
                         </td>
                       </tr>
                     );

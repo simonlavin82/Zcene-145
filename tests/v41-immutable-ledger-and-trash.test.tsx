@@ -282,13 +282,23 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       expect(screen.getByText(/ARTISTS: 1/i)).toBeInTheDocument();
       expect(screen.getByText(/DEEP CUTS: 1/i)).toBeInTheDocument();
 
-      // Desktop (>= 768px) retains Grid/List ViewToggle; mobile (< 768px) hides toggle and locks to Card View
-      expect(screen.getByRole('button', { name: 'List View' })).toBeInTheDocument();
+      // Desktop (>= 768px) renders 9-column table in List View; mobile (< 768px) keeps Grid/List parity with single-branch ProjectMobileListCard & ToolbarSearch
+      const desktopListBtn = screen.getByRole('button', { name: 'List View' });
+      expect(desktopListBtn).toBeInTheDocument();
+      fireEvent.click(desktopListBtn);
+      expect(screen.getByTestId('trash-desktop-table')).toBeInTheDocument();
+      expect(document.querySelectorAll('thead th')).toHaveLength(9);
+      expect(screen.getByText('Scenes')).toBeInTheDocument();
+
       rerender(<TrashPage {...trashBaseProps} isSmallScreen={true} />);
-      expect(screen.queryByRole('button', { name: 'Grid View' })).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: 'List View' })).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Grid View' })).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'List View' })).toBeInTheDocument();
+      expect(screen.getByTestId('trash-mobile-list')).toBeInTheDocument();
+      expect(screen.getByTestId('trash-search-trigger')).toBeInTheDocument();
+      expect(screen.queryByTestId('trash-desktop-table')).not.toBeInTheDocument();
       expect(document.querySelector('table')).toBeNull();
       expect(screen.getByText('Spaced')).toBeInTheDocument();
+      expect(screen.getByText(/days left/i)).toBeInTheDocument();
     });
   });
 

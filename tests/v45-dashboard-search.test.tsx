@@ -308,11 +308,15 @@ describe('Architecture V45: Dashboard Search Parity (Artist & Label Nodes, Multi
     expect((searchInput as HTMLInputElement).value).toBe('');
     expect(screen.getByText('Mouthpiece')).toBeInTheDocument();
 
-    // Desktop (>= 768px) retains Grid/List ViewToggle and switches cleanly to the 8-column table
+    // Desktop (>= 768px) retains Grid/List ViewToggle and switches cleanly to the 9-column compact table (zero mobile list cards)
     const listViewBtn = screen.getByRole('button', { name: 'List View' });
     expect(listViewBtn).toBeInTheDocument();
     fireEvent.click(listViewBtn);
-    expect(document.querySelector('table')).not.toBeNull();
+    expect(screen.getByTestId('dashboard-desktop-table')).toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-mobile-list')).not.toBeInTheDocument();
+    expect(document.querySelectorAll('thead th')).toHaveLength(9);
+    expect(screen.getByText('Modified')).toBeInTheDocument();
+    expect(screen.getByText('Scenes')).toBeInTheDocument();
     expect(screen.getByText('Labels')).toBeInTheDocument();
   });
 
@@ -320,10 +324,17 @@ describe('Architecture V45: Dashboard Search Parity (Artist & Label Nodes, Multi
     const project = createMockProject({ id: 'proj-mobile', name: 'Mouthpiece', seedArtists: 'Mouthpiece' });
     renderDashboard([project], true);
 
-    // Mobile (< 768px) hides Grid/List ViewToggle and locks to zero-overflow Card View
-    expect(screen.queryByRole('button', { name: 'Grid View', hidden: true })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'List View', hidden: true })).not.toBeInTheDocument();
+    // Mobile (< 768px) keeps Grid/List ViewToggle parity: List View renders single-branch ProjectMobileListCard with zero desktop <table> DOM
+    const mobileListBtn = screen.getByRole('button', { name: 'List View' });
+    const mobileGridBtn = screen.getByRole('button', { name: 'Grid View' });
+    expect(mobileListBtn).toBeInTheDocument();
+    fireEvent.click(mobileListBtn);
+    expect(screen.getByTestId('dashboard-mobile-list')).toBeInTheDocument();
+    expect(screen.getByTestId('dashboard-mobile-list-card-proj-mobile')).toBeInTheDocument();
+    expect(screen.queryByTestId('dashboard-desktop-table')).not.toBeInTheDocument();
     expect(document.querySelector('table')).toBeNull();
+    fireEvent.click(mobileGridBtn);
+    expect(screen.queryByTestId('dashboard-mobile-list')).not.toBeInTheDocument();
 
     // Collapsed by default: single trigger, zero search inputs mounted
     const trigger = screen.getByTestId('dashboard-search-trigger');

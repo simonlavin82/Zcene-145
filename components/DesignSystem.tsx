@@ -7,18 +7,18 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { View, Project } from '../types';
 import * as d3 from 'd3';
-import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS, BandcampIcon } from './Icons';
+import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, StackIcon, LibraryIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS, BandcampIcon } from './Icons';
 import ViewToggle from './ViewToggle';
 import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { ModalHeader, ModalBody, ModalFooter, ModalFooterLink } from './ui/Dialog';
-import { PROJECT_TABLE_COLUMNS, ProjectMetricPill, ProjectStatusBadge } from './ui/ProjectMetrics';
+import { PROJECT_TABLE_COLUMNS, ProjectTableMetricValue, ProjectStatusBadge, ProjectMobileListCard } from './ui/ProjectMetrics';
 import { ToolbarSearch } from './ui/ToolbarSearch';
 export { ToolbarSearch } from './ui/ToolbarSearch';
 export type { ToolbarSearchProps } from './ui/ToolbarSearch';
-import { Waypoints, Flame, Check, ArrowLeft, Pin } from 'lucide-react';
+import { Flame, Check, ArrowLeft, Pin } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
 import { CountryFilterDropdown, ArtistVerificationCard, DisambiguationRadio } from './SharedModals';
 import { DashboardProjectCard } from './DashboardProjectCard';
@@ -628,7 +628,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     onNavigateMenu,
     tokenBalance
 }) => {
-    const [demoFocusMode, setDemoFocusMode] = useState<'organic' | 'cluster'>('organic');
+    const [demoViewMode, setDemoViewMode] = useState<'grid' | 'list'>('grid');
     const [demoAdminToggle, setDemoAdminToggle] = useState(false);
     const [demoChatToggle, setDemoChatToggle] = useState<'instant' | 'live'>('instant');
     const [demoProfileActive, setDemoProfileActive] = useState(false);
@@ -1380,86 +1380,108 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                         <div className="space-y-16">
                             <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
                                 <h3 className="text-xl font-medium text-primary mb-4">Icon Size Scale</h3>
-                                 <p className="text-base text-zinc-300 leading-relaxed max-w-3xl">
-                                    Zcene uses two standardised icon sizes to ensure visual clarity and consistent touch targets across the interface. Standard UI icons are optimized at **18px** for a refined, modern aesthetic.
+                                <p className="text-base text-zinc-300 leading-relaxed max-w-3xl">
+                                    Zcene uses two standardised icon sizes to ensure visual clarity and consistent touch targets across the interface. Standard UI icons are optimized at <strong>18px</strong> for a refined, modern aesthetic.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-8">
-                                    <IconDisplay icon={<span className="material-symbols-outlined !text-[14px]">star</span>} name="Metadata Only" pxSize="14px" description="Used for inline tags and small metadata markers." implementation="!text-[14px]" overrideIconClass="!text-[14px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">left_panel_open</span>} name="Standard UI" pxSize="18px" description="Primary interactive controls, sidebar toggles, and connections legend symbols." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<InstagramIcon />} name="Interactive Social" pxSize="18px" description="Social platform linking. Uses a matching stroke weight." implementation="w-4.5 h-4.5" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined !text-[14px]">check_circle</span>} name="Metadata & Inline" pxSize="14px" description="Used for compact inline badges, root toggles, and quiet metadata cues." implementation="!text-[14px]" overrideIconClass="!text-[14px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">left_panel_open</span>} name="Standard UI" pxSize="18px" description="Primary interactive controls, sidebar toggles, and toolbar actions." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<InstagramIcon />} name="Interactive Social" pxSize="18px" description="Custom SVG platform links matched to our 18px stroke weight." implementation="w-4.5 h-4.5" overrideIconClass="!text-[18px]" />
                                 </div>
                             </div>
 
                             <div>
-                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Sharing & Engagement</h3>
+                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Navigation, Panels &amp; Canvas Controls</h3>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <IconDisplay icon={<span className="material-symbols-outlined">share</span>} name="Social Share" pxSize="18px" description="Triggers the native share sheet or copies a deep link." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">check</span>} name="Shared Confirmation" pxSize="18px" description="Visual feedback replacing the share icon after successful action." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<InstagramIcon />} name="Instagram" pxSize="18px" description="Social link used in page footers." implementation="w-4.5 h-4.5" overrideIconClass="!text-[18px]" />
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Navigation & View Control</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <IconDisplay icon={<span className="material-symbols-outlined">left_panel_open</span>} name="Left Panel Open" pxSize="18px" description="Structural Sidebar Layout Toggles: Expands Left Artist Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">left_panel_close</span>} name="Left Panel Close" pxSize="18px" description="Structural Sidebar Layout Toggles: Collapses Left Artist Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_open</span>} name="Right Panel Open" pxSize="18px" description="Structural Sidebar Layout Toggles: Expands Right Deep Cuts Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_close</span>} name="Right Panel Close" pxSize="18px" description="Structural Sidebar Layout Toggles: Collapses Right Deep Cuts Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">close</span>} name="Close Panel / Exit" pxSize="18px" description="Exits magazine full-screen view or closes side panels." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">remove</span>} name="Remove Card" pxSize="18px" description="Dismisses/removes a single artist details card from the workspace stack view." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">refresh</span>} name="Refresh" pxSize="18px" description="Reloads content for a specific node or panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<ArrowLeft size={18} strokeWidth={2} />} name="Back (Header)" pxSize="18px" description="Primary structural navigation to return to the dashboard." implementation="<ArrowLeft size={18} strokeWidth={2} />" overrideIconClass="" />
-                                    <IconDisplay icon={<HelpIcon />} name="Help Guide" pxSize="18px" description="Triggers help section navigation." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<MicIcon />} name="Speech-to-Text" pxSize="18px" description="Triggers the browser's speech recognition API." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">center_focus_strong</span>} name="Center Focus" pxSize="18px" description="Resets graph zoom and centers simulation." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">add</span>} name="Zoom In" pxSize="18px" description="Increases graph magnification." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">remove</span>} name="Zoom Out" pxSize="18px" description="Decreases graph magnification." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">hub</span>} name="Organic View" pxSize="18px" description="Switches the graph to the default organic layout." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">bubble_chart</span>} name="Cluster View" pxSize="18px" description="Switches the graph to the clustered attribute layout." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<Waypoints size={18} />} name="Roots Breakdown" pxSize="18px" description="Dimensional Topology / Roots Breakdown." implementation="size={18}" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">left_panel_open</span>} name="Left Panel Open" pxSize="18px" description="Structural sidebar toggle: expands Left Roots Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">left_panel_close</span>} name="Left Panel Close" pxSize="18px" description="Structural sidebar toggle: collapses Left Roots Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_open</span>} name="Right Panel Open" pxSize="18px" description="Structural sidebar toggle: expands Right Deep Cuts Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">right_panel_close</span>} name="Right Panel Close" pxSize="18px" description="Structural sidebar toggle: collapses Right Deep Cuts Panel." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">close</span>} name="Close / Dismiss" pxSize="18px" description="Closes modals, exits Zine overlay, clears search, or dismisses cards." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">center_focus_strong</span>} name="Center Focus" pxSize="18px" description="Resets graph zoom and centers the Connections canvas." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">add</span>} name="Zoom In / Create" pxSize="18px" description="Increases graph magnification or creates a new Zcene / scene." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">remove</span>} name="Zoom Out" pxSize="18px" description="Decreases graph magnification on the Connections canvas." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">visibility_off</span>} name="Dim Scene on Canvas" pxSize="18px" description="Ephemerally dims a scene cluster on the canvas without mutating saved data." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">visibility</span>} name="Restore / Inspect" pxSize="18px" description="Restores a dimmed scene or opens Admin read-only wallet inspection." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">arrow_back</span>} name="Scene Move Left" pxSize="18px" description="Reorders a multi-scene pill one slot left in the ROOTS header." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">arrow_forward</span>} name="Scene Move Right" pxSize="18px" description="Reorders a multi-scene pill one slot right in the ROOTS header." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">filter_list</span>} name="Legend / Filter Toggle" pxSize="18px" description="Opens mobile Connections legend and discovery filter controls." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">grid_view</span>} name="Grid View" pxSize="18px" description="Switches Dashboard & Trash project lists to artwork Card View." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">list</span>} name="List View" pxSize="18px" description="Switches Dashboard & Trash to 9-col Table (desktop) or Compact List Cards (mobile)." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">schedule</span>} name="Sort by Recent" pxSize="18px" description="Orders Zcenes and library items by most recently updated." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">sort_by_alpha</span>} name="Sort Alphabetically" pxSize="18px" description="Orders Zcenes and library items alphabetically (A–Z)." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">more_vert</span>} name="Overflow Actions" pxSize="18px" description="Opens contextual menus on project cards, table rows, and scene pills." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                 </div>
                             </div>
 
                             <div>
-                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Platform Integrations</h3>
+                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Zine, Editorial &amp; Audio Actions</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <IconDisplay icon={<span className="material-symbols-outlined">auto_stories</span>} name="Open Zine" pxSize="18px" description="Opens the full-screen Magazine View / Zine editorial layout from Deep Cuts." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">picture_as_pdf</span>} name="Save as PDF" pxSize="18px" description="Triggers print-clean Zine PDF export from the Zine sticky toolbar." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">edit</span>} name="Edit / Rename" pxSize="18px" description="Toggles Zine editorial mode or renames projects and scenes." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">edit_note</span>} name="Curator's Note" pxSize="18px" description="Opens the owner-editable Zine intro note in editorial mode." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">add_photo_alternate</span>} name="Add Editorial Image" pxSize="18px" description="Attaches a curated https:// editorial photo above a Zine text block." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<Pin size={18} />} name="Pin Deep Cut" pxSize="18px" description="Pins a Deep Cut card to the top of the workspace details stack." implementation="&lt;Pin size={18} /&gt;" overrideIconClass="" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">play_circle</span>} name="Audio Preview" pxSize="18px" description="Plays zero-token 30-second iTunes track previews inside Deep Cuts." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<MicIcon />} name="Speech-to-Text" pxSize="18px" description="Starts continuous voice dictation in Deep Connections & Curator's Note." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>stop</span>} name="Stop Dictation" pxSize="18px" description="Stops active continuous dictation recording (paired with Mic)." implementation="!text-[18px] FILL 1" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">arrow_upward</span>} name="Submit Query" pxSize="18px" description="Sends text prompts inside Deep Connections AI chat." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">refresh</span>} name="Re-run / Refresh" pxSize="18px" description="Re-runs curation with adjusted discovery filters." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">content_copy</span>} name="Copy / Duplicate" pxSize="18px" description="Duplicates a Zcene or copies artist/album names to clipboard." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Library, Stack &amp; Project Lifecycle</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <IconDisplay icon={<StackIcon className="!text-[18px]" />} name="My Stack (layers)" pxSize="18px" description="Opens the user's saved artists & labels discovery stack." implementation="&lt;StackIcon className=&quot;!text-[18px]&quot; /&gt;" overrideIconClass="" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">archive</span>} name="Archive from Stack" pxSize="18px" description="Moves an active My Stack item into permanent Stack Archive provenance." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<LibraryIcon className="!text-[18px]" />} name="Music Library (queue_music)" pxSize="18px" description="Opens the user's imported personal music library in ROOTS." implementation="&lt;LibraryIcon className=&quot;!text-[18px]&quot; /&gt;" overrideIconClass="" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">upload</span>} name="Import Library" pxSize="18px" description="Initiates a local music library JSON/CSV file import." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">search</span>} name="Search" pxSize="18px" description="Standard leading icon and mobile takeover trigger for ToolbarSearch." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">folder</span>} name="Project Row" pxSize="18px" description="Leading entity marker for active Zcenes in desktop table & mobile list cards." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">auto_delete</span>} name="30-Day Trash" pxSize="18px" description="Identifies trashed Zcenes eligible for 0T restoration within 30 days." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">restore</span>} name="Restore (0T)" pxSize="18px" description="Restores a trashed Zcene or archived Stack item at zero token cost." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">delete</span>} name="Move to Trash" pxSize="18px" description="Soft-deletes a Zcene into the 30-day Trash retention window." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">delete_forever</span>} name="Delete Forever" pxSize="18px" description="Irreversibly purges canvas data or removes an archived discovery." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Token Economy, Verification &amp; Auth</h3>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <IconDisplay icon={<span className="material-symbols-outlined">bolt</span>} name="Tokens / Direct Hit" pxSize="18px" description="Marks wallet balance, Top-Up actions, token gates, and instant cache hits." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">account_balance_wallet</span>} name="Low-Balance Gate" pxSize="18px" description="Displayed in TokenConfirmationDialog when wallet balance is insufficient." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">checklist</span>} name="Confirm Your Artists" pxSize="18px" description="Header icon for ConsolidatedValidationModal pre-flight verification." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">monitoring</span>} name="Discovery Ledger" pxSize="18px" description="Navigates to Token Activity, Stack Archive, and Admin Control Room." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">redeem</span>} name="Admin Token Grant" pxSize="18px" description="Marks atomic goodwill/support token credit grants in Admin Analytics." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<HelpIcon />} name="Help / Escape Hatch" pxSize="18px" description="Triggers contextual help and 'Not this artist?' origin verification." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<Flame size={18} />} name="Style Profile (Flame)" pxSize="18px" description="Represents musical style compatibility and saved taste profiles." implementation="&lt;Flame size={18} /&gt;" overrideIconClass="" />
+                                    <IconDisplay icon={<VisibilityIcon className="w-[18px] h-[18px]" />} name="Show Password" pxSize="18px" description="Toggles password fields to visible inside authentication gates." implementation="&lt;VisibilityIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" overrideIconClass="" />
+                                    <IconDisplay icon={<VisibilityOffIcon className="w-[18px] h-[18px]" />} name="Hide Password" pxSize="18px" description="Paired with Show Password when the field is currently revealed." implementation="&lt;VisibilityOffIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" overrideIconClass="" />
+                                </div>
+                            </div>
+
+                            <div>
+                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Sharing &amp; Platform Integrations</h3>
                                 <p className="text-base text-zinc-400 leading-relaxed max-w-3xl mb-8">
-                                    For third-party integrations where native Material symbols are insufficient, we utilize custom SVG components. These custom icons strictly adhere to our "Standard UI" scale rules (18px) to ensure perfect visual balance alongside native symbols.
+                                    For third-party integrations where native Material symbols are insufficient, we utilize custom SVG components matched strictly to our <strong>18px</strong> Standard UI scale.
                                 </p>
                                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                    <IconDisplay icon={<span className="material-symbols-outlined">share</span>} name="Social Share" pxSize="18px" description="Triggers the native share sheet or copies a 0T guest share link." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">check</span>} name="Confirmation Check" pxSize="18px" description="Replaces share/copy icons after success and marks selected options." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">public</span>} name="Official Website" pxSize="18px" description="Links external artist domains and regional origin metadata." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<InstagramIcon />} name="Instagram" pxSize="18px" description="Social link used in page footers and official merch inquiries." implementation="w-4.5 h-4.5" overrideIconClass="!text-[18px]" />
                                     <IconDisplay 
                                         icon={<BandcampIcon className="w-[18px] h-[18px]" />} 
                                         name="BandcampIcon" 
                                         pxSize="18px" 
-                                        description="Custom SVG Integration. Used in Artist Catalogs to link external artist stores." 
+                                        description="Custom SVG integration used in Artist Catalogs to link external artist stores." 
                                         implementation="<BandcampIcon className='w-[18px] h-[18px]' />" 
                                         overrideIconClass="" 
                                     />
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Search & Filters</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <IconDisplay icon={<span className="material-symbols-outlined">search</span>} name="Search" pxSize="18px" description="Standard indicator for searchable inputs." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">filter_list</span>} name="Filter Toggle" pxSize="18px" description="Opens mobile legend/filter controls." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">tune</span>} name="Preferences" pxSize="18px" description="Accesses graph preferences and layout settings." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">library_music</span>} name="Library" pxSize="18px" description="Accesses the imported user collection." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">upload</span>} name="Upload" pxSize="18px" description="Initiates a local file import." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">arrow_upward</span>} name="Submit Query" pxSize="18px" description="Used to send text queries in the AI chat." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                </div>
-                            </div>
-
-                            <div>
-                                <h3 className="text-xl font-medium text-zinc-200 mb-6">Editorial & Action Icons</h3>
-                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                                    <IconDisplay icon={<span className="material-symbols-outlined">shopping_bag</span>} name="Catalog / Shop" pxSize="18px" description="Represents physical media or store links (e.g. Bandcamp)." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">public</span>} name="Website / Public" pxSize="18px" description="Represents official artist domains." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<Flame size={18} />} name="Taste Profile (Flame)" pxSize="18px" description="Represents user's taste compatibility (high energy/independent culture)." implementation="&lt;Flame size={18} /&gt;" />
-                                    <IconDisplay icon={<VisibilityIcon className="w-[18px] h-[18px]" />} name="Show Password (Eye)" pxSize="18px" description="Toggles password field to visible. Used on all password inputs." implementation="&lt;VisibilityIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" />
-                                    <IconDisplay icon={<VisibilityOffIcon className="w-[18px] h-[18px]" />} name="Hide Password (Eye-Off)" pxSize="18px" description="Paired with Eye; shown when the password is currently revealed." implementation="&lt;VisibilityOffIcon className=&quot;w-[18px] h-[18px]&quot; /&gt;" />
-                                    <IconDisplay icon={<Pin size={18} />} name="Pin / Deep Cuts Curate" pxSize="18px" description="Action icon for explicitly curating/pinning a Deep Cut node to the top of the stack." implementation="&lt;Pin size={18} /&gt;" />
-
                                 </div>
                             </div>
                         </div>
@@ -2881,10 +2903,17 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </div>
                                     </div>
                                     <div className="flex-1 flex flex-col items-center justify-center gap-6">
-                                        <ViewToggle value={demoFocusMode} onChange={(v) => setDemoFocusMode(v as 'organic' | 'cluster')} />
+                                        <ViewToggle
+                                            value={demoViewMode}
+                                            onChange={(v) => setDemoViewMode(v as 'grid' | 'list')}
+                                            options={[
+                                                { id: 'grid', icon: 'grid_view', label: 'Grid View' },
+                                                { id: 'list', icon: 'list', label: 'List View' }
+                                            ]}
+                                        />
                                         <div className="text-center">
                                             <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest mb-1">Interactive Demo</p>
-                                            <p className="text-sm font-medium text-primary capitalize">{demoFocusMode} View</p>
+                                            <p className="text-sm font-medium text-primary capitalize">{demoViewMode} View</p>
                                         </div>
                                     </div>
                                 </div>
@@ -2894,12 +2923,12 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         Interactive selector controls use a custom <strong>12px border-radius</strong> (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code>) outer container — concentric with our softened <strong>16px</strong> structural layout containers. The active icon is highlighted by a flush, morphing solid sliding fill that aligns cleanly with the outer container's border stroke, avoiding internal double-bordering.
                                     </p>
                                     <ul className="text-xs text-zinc-500 space-y-2 list-disc list-outside pl-4">
-                                        <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through the Material Symbol icons (Hub = Organic, Bubble Chart = Cluster, Grid View = Grid, List = Table, Schedule = Recent, Sort By Alpha = Alphabetical).</li>
-                                        <li><strong>Flush Outer & Inner Radius:</strong> The outer toggle container uses a <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code> (12px) border radius with <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">overflow-hidden</code> and zero padding. To sit perfectly flush against a 1px border, the inner sliding badge dynamically morphs its border radius between left (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5">11px 0 0 11px</code>) and right (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5">0 11px 11px 0</code>) depending on its active state.</li>
+                                        <li><strong>Icon-only minimalism:</strong> No text labels — identity is communicated purely through Material Symbol icons (Grid View = Card View, List = Table / Mobile List Cards, Schedule = Recent, Sort By Alpha = Alphabetical).</li>
+                                        <li><strong>Flush Outer &amp; Inner Radius:</strong> The outer toggle container uses a <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">rounded-xl</code> (12px) border radius with <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">overflow-hidden</code> and zero padding. To sit perfectly flush against a 1px border, the inner sliding badge dynamically morphs its border radius between left (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5">11px 0 0 11px</code>) and right (<code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5">0 11px 11px 0</code>) depending on its active state.</li>
                                         <li><strong>Badge Styling:</strong> Internal rings and shadows have been intentionally stripped from the solid <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5">bg-zinc-800</code> badge to maintain a stark, clean structural appearance.</li>
-                                        <li><strong>Global Height Parity:</strong> Toggles are exactly 38px tall, precisely matching our standard CTAs and Select Dropdowns for perfect side-by-side flex-box alignment.</li>
+                                        <li><strong>Global Height Parity:</strong> Toggles are exactly 38px tall, precisely matching our standard CTAs, ToolbarSearch (<code className="text-[10px] text-zinc-300">size=&quot;control&quot;</code>), and Select Dropdowns for side-by-side flex alignment.</li>
                                         <li><strong>Spring animation:</strong> Badge translates via <code className="text-[10px] text-primary bg-zinc-900 px-1 py-0.5 rounded-xl">stiffness: 480 / damping: 38</code> — snappy and responsive, not floaty.</li>
-                                        <li><strong>Main Graph & Dashboard Alignment:</strong> This same component is used generic and dynamically inside the main graph canvas for layout mode switching, and inside the dashboard controls panel for View and Sort mode switching.</li>
+                                        <li><strong>Dashboard &amp; Trash Parity:</strong> Both Dashboard and Trash render Sort and Grid/List toggles across desktop and mobile (<code className="text-[10px] text-zinc-300">74px</code> each, fitting cleanly on a single 375px toolbar row).</li>
                                     </ul>
                                 </div>
                             </div>
@@ -3465,25 +3494,27 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
 
-                                {/* ── Table Row Preview (Live ProjectMetrics Primitives) ── */}
+                                {/* ── Table Row Preview (Live 9-Column ProjectMetrics Primitives) ── */}
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3">
                                         <span className="material-symbols-outlined text-zinc-400">list</span>
                                         <h4 className="text-base font-medium text-zinc-200">Project List — Table View Preview</h4>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                        On desktop and tablet viewports (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&ge; 768px</code>), table view renders all 8 governed columns from <code className="text-xs text-primary bg-zinc-800 px-1 rounded">PROJECT_TABLE_COLUMNS</code> — pairing an inline <code className="text-xs text-primary bg-zinc-800 px-1 rounded">SCENES</code> pill inside the <strong>Title</strong> cell with dedicated <strong>Roots</strong>, <strong>Artists</strong>, <strong>Labels</strong>, <strong>Deep Cuts</strong>, and <strong>Status</strong> columns inside a <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">rounded-2xl</code> frame. Cell hovers apply <code className="text-xs text-primary bg-zinc-800 px-1 rounded">group-hover:bg-white/5 transition-colors</code> directly on each <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">td</code>.
+                                        On desktop and tablet viewports (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&ge; 768px</code>), table view renders all 9 governed columns from <code className="text-xs text-primary bg-zinc-800 px-1 rounded">PROJECT_TABLE_COLUMNS</code> (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Title</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Modified</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Scenes</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Roots</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Artists</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Labels</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Deep Cuts</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Status</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Actions</code>). The five numeric columns use plain tabular monospace figures via <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ProjectTableMetricValue /&gt;</code> so <strong>Status</strong> stays the sole focal badge and all 9 columns fit inside laptop viewports with zero right-edge clipping.
                                     </p>
 
-                                    {/* Table Specimen wired to PROJECT_TABLE_COLUMNS, ProjectMetricPill, ProjectStatusBadge */}
+                                    {/* 9-Column Compact Desktop Table Specimen */}
                                     <div className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
-                                        <table className="w-full text-left border-collapse min-w-[640px]">
+                                        <table className="w-full text-left border-collapse min-w-[780px]">
                                             <thead>
                                                 <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
                                                     {PROJECT_TABLE_COLUMNS.map((col) => (
                                                         <th
                                                             key={col.key}
-                                                            className={`py-4 px-6 font-semibold ${col.align === 'right' ? 'text-right' : ''}`}
+                                                            className={`py-3.5 font-semibold ${col.headerClassName} ${
+                                                                col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : ''
+                                                            }`}
                                                         >
                                                             {col.label}
                                                         </th>
@@ -3491,63 +3522,67 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-zinc-800/50 bg-zinc-900">
-                                                {/* Mapped row (even row: bg-zinc-900) */}
+                                                {/* Mapped row */}
                                                 <tr className="group cursor-pointer border-b border-zinc-800/30">
-                                                    <td className="py-4 px-6 font-medium text-white bg-zinc-900 group-hover:bg-white/5 group-hover:text-primary transition-colors relative z-10">
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="material-symbols-outlined text-zinc-555 !text-lg group-hover:text-primary transition-colors">folder</span>
-                                                            <span className="truncate max-w-[180px]">Midwest Emo Roots</span>
-                                                            <ProjectMetricPill variant="table-inline">SCENES: 2</ProjectMetricPill>
+                                                    <td className="py-3.5 pl-4 pr-3 font-medium text-white bg-zinc-900 group-hover:bg-white/5 group-hover:text-primary transition-colors relative z-10">
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <span className="material-symbols-outlined text-zinc-555 !text-[18px] group-hover:text-primary transition-colors shrink-0">folder</span>
+                                                            <span className="truncate max-w-[180px] text-sm">Midwest Emo Roots</span>
                                                         </div>
                                                     </td>
-                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10 whitespace-nowrap">27/06/2026 • 8:09 am</td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
-                                                        <ProjectMetricPill variant="table">ROOT ARTISTS: 3</ProjectMetricPill>
+                                                    <td className="py-3.5 px-3 text-zinc-400 text-xs font-mono font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10 whitespace-nowrap">27/06/2026 • 8:09 am</td>
+                                                    <td className="py-3.5 px-2.5 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <ProjectTableMetricValue value={2} />
                                                     </td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
-                                                        <ProjectMetricPill variant="table">ARTISTS: 24</ProjectMetricPill>
+                                                    <td className="py-3.5 px-2.5 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <ProjectTableMetricValue value={3} />
                                                     </td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
-                                                        <ProjectMetricPill variant="table">LABELS: 8</ProjectMetricPill>
+                                                    <td className="py-3.5 px-2.5 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <ProjectTableMetricValue value={24} />
                                                     </td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
-                                                        <ProjectMetricPill variant="table">DEEP CUTS: 7</ProjectMetricPill>
+                                                    <td className="py-3.5 px-2.5 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <ProjectTableMetricValue value={8} mutedWhenZero />
                                                     </td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                    <td className="py-3.5 px-2.5 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <ProjectTableMetricValue value={7} />
+                                                    </td>
+                                                    <td className="py-3.5 px-3 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
                                                         <ProjectStatusBadge status="completed" variant="table" />
                                                     </td>
-                                                    <td className="py-4 px-6 text-right bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                    <td className="py-3.5 pl-2 pr-4 text-right bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
                                                         <div className="w-9 h-9 rounded-lg text-zinc-500 inline-flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
                                                             <span className="material-symbols-outlined !text-xl">more_vert</span>
                                                         </div>
                                                     </td>
                                                 </tr>
-                                                {/* Unmapped row (odd row: bg-zinc-950/40) */}
+                                                {/* Unmapped row */}
                                                 <tr className="group cursor-pointer border-b border-zinc-800/30">
-                                                    <td className="py-4 px-6 font-medium text-zinc-300 bg-zinc-950/40 group-hover:bg-white/5 group-hover:text-primary transition-colors">
-                                                        <div className="flex items-center gap-3">
-                                                            <span className="material-symbols-outlined text-zinc-600 !text-lg group-hover:text-primary transition-colors">folder</span>
-                                                            <span className="truncate max-w-[180px]">New Zcene Draft</span>
-                                                            <ProjectMetricPill variant="table-inline">SCENES: 1</ProjectMetricPill>
+                                                    <td className="py-3.5 pl-4 pr-3 font-medium text-zinc-300 bg-zinc-950/40 group-hover:bg-white/5 group-hover:text-primary transition-colors">
+                                                        <div className="flex items-center gap-2.5 min-w-0">
+                                                            <span className="material-symbols-outlined text-zinc-600 !text-[18px] group-hover:text-primary transition-colors shrink-0">folder</span>
+                                                            <span className="truncate max-w-[180px] text-sm">New Zcene Draft</span>
                                                         </div>
                                                     </td>
-                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors whitespace-nowrap">New Project</td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
-                                                        <ProjectMetricPill variant="table">ROOT ARTISTS: 1</ProjectMetricPill>
+                                                    <td className="py-3.5 px-3 text-zinc-400 text-xs font-mono font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors whitespace-nowrap">New Project</td>
+                                                    <td className="py-3.5 px-2.5 text-center bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <ProjectTableMetricValue value={1} />
                                                     </td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
-                                                        <ProjectMetricPill variant="table" muted>-</ProjectMetricPill>
+                                                    <td className="py-3.5 px-2.5 text-center bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <ProjectTableMetricValue value={1} />
                                                     </td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
-                                                        <ProjectMetricPill variant="table" muted>-</ProjectMetricPill>
+                                                    <td className="py-3.5 px-2.5 text-center bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <ProjectTableMetricValue value={null} />
                                                     </td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
-                                                        <ProjectMetricPill variant="table" muted>-</ProjectMetricPill>
+                                                    <td className="py-3.5 px-2.5 text-center bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <ProjectTableMetricValue value={null} />
                                                     </td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                    <td className="py-3.5 px-2.5 text-center bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <ProjectTableMetricValue value={null} />
+                                                    </td>
+                                                    <td className="py-3.5 px-3 text-center bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
                                                         <ProjectStatusBadge status="draft" variant="table" />
                                                     </td>
-                                                    <td className="py-4 px-6 text-right bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                    <td className="py-3.5 pl-2 pr-4 text-right bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
                                                         <div className="w-9 h-9 rounded-lg text-zinc-500 inline-flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
                                                             <span className="material-symbols-outlined !text-xl">more_vert</span>
                                                         </div>
@@ -3557,10 +3592,56 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </table>
                                     </div>
                                     <p className="text-[10px] text-zinc-500 font-mono">
-                                        Row 1: completed — SCENES + all 4 metric columns + Mapped badge. Row 2: unmapped draft — empty metric columns render muted (-).
+                                        Row 1: completed — dedicated SCENES through DEEP CUTS tabular counts + Mapped badge. Row 2: unmapped draft — empty metric cells render muted (-).
                                     </p>
-                                    <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-400 leading-relaxed max-w-2xl">
-                                        <strong className="text-zinc-200">Responsive Mobile Lock (&lt; 768px):</strong> On <code className="text-primary font-mono">isSmallScreen</code> viewports, both <strong>Dashboard</strong> and <strong>Trash</strong> hide the Grid/List <code className="text-zinc-300 font-mono">&lt;ViewToggle /&gt;</code> and force single-column Card View (<code className="text-zinc-300 font-mono">effectiveView = isSmallScreen ? &apos;grid&apos; : view</code>), eliminating horizontal table overflow on 375px screens while preserving desktop view preference on resize (see <strong>Responsive Ledger Mobile Card Anatomy</strong> below).
+
+                                    {/* Mobile Compact List Card Specimen (Live <ProjectMobileListCard />) */}
+                                    <div className="pt-6 space-y-4">
+                                        <div className="flex items-center gap-3">
+                                            <span className="material-symbols-outlined text-zinc-400">smartphone</span>
+                                            <h4 className="text-base font-medium text-zinc-200">Project List — Mobile Compact List Card (&lt; 768px)</h4>
+                                        </div>
+                                        <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
+                                            Full desktop/mobile feature parity: both <strong>Dashboard</strong> and <strong>Trash</strong> keep the Grid/List <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ViewToggle /&gt;</code> active on mobile (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">isSmallScreen</code>). Switching to List View below <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">768px</code> mounts single-branch <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ProjectMobileListCard /&gt;</code> rows (zero album artwork banner, zero desktop <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;table&gt;</code> DOM nodes, preserving crate tabs on Dashboard and 0T Restore on Trash).
+                                        </p>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                                            <ProjectMobileListCard
+                                                title="Midwest Emo Roots"
+                                                formattedDate="27/06/2026 • 8:09 am"
+                                                icon="folder"
+                                                iconClassName="text-zinc-555"
+                                                sceneCount={2}
+                                                rootArtistsCount={3}
+                                                recommendedCount={24}
+                                                labelCount={8}
+                                                deepCutsCount={7}
+                                                status="completed"
+                                                onClick={() => {}}
+                                                actionMenuSlot={
+                                                    <div className="w-8 h-8 rounded-lg text-zinc-500 inline-flex items-center justify-center">
+                                                        <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                                    </div>
+                                                }
+                                            />
+                                            <ProjectMobileListCard
+                                                title="New Zcene Draft"
+                                                formattedDate="New Project"
+                                                icon="folder"
+                                                iconClassName="text-zinc-600"
+                                                sceneCount={1}
+                                                rootArtistsCount={1}
+                                                recommendedCount={null}
+                                                labelCount={null}
+                                                deepCutsCount={null}
+                                                status="draft"
+                                                onClick={() => {}}
+                                                actionMenuSlot={
+                                                    <div className="w-8 h-8 rounded-lg text-zinc-500 inline-flex items-center justify-center">
+                                                        <span className="material-symbols-outlined !text-xl">more_vert</span>
+                                                    </div>
+                                                }
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
@@ -4986,13 +5067,13 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </p>
                                     </div>
                                     <div className="w-12 h-12 rounded-xl bg-zinc-800 flex items-center justify-center text-zinc-400 border border-zinc-700">
-                                        <span className="material-symbols-outlined !text-[24px]">open_in_full</span>
+                                        <span className="material-symbols-outlined !text-[24px]">auto_stories</span>
                                     </div>
                                 </div>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">Trigger</p>
-                                        <p className="text-sm text-zinc-300">open_in_full icon in Deep Cut header; owner-only `[ Edit ]` / `[ Done ]` toggle with Section 15 Action State indicator badge (`[ ✎ Edit (N) ]`) paired with `[ Close ]` using matched `h-9 !px-5` (`rounded-xl`, `text-sm`, `!text-[18px]` icon) Zine header action geometry.</p>
+                                        <p className="text-sm text-zinc-300">auto_stories icon in Deep Cuts header; owner-only `[ Edit ]` / `[ Done ]` toggle with Section 15 Action State indicator badge (`[ ✎ Edit (N) ]`) paired with `[ Close ]` using matched `h-9 !px-5` (`rounded-xl`, `text-sm`, `!text-[18px]` icon) Zine header action geometry.</p>
                                     </div>
                                     <div className="bg-zinc-950 p-4 rounded-xl border border-zinc-800">
                                         <p className="text-[10px] font-semibold text-zinc-600 uppercase tracking-widest mb-1">State & Layout</p>
@@ -5640,7 +5721,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
                                     <ul className="list-disc list-outside pl-4 space-y-1.5 mt-2">
                                         <li><strong>Shared Card Shell:</strong> <code className="text-zinc-300">border border-zinc-800 bg-zinc-950/40 p-4 rounded-2xl</code> stacked with <code className="text-zinc-300">space-y-3</code> and subtle <code className="text-zinc-300">border-t border-zinc-800/60</code> monospace metadata footers.</li>
-                                        <li><strong>Zero Duplicate Nodes:</strong> Conditional rendering via <code className="text-zinc-300">isSmallScreen ? &lt;MobileCards /&gt; : &lt;DesktopTable /&gt;</code> guarantees only one branch mounts per viewport across Standard User tables (<strong>Token Activity</strong>, <strong>Stack Archive</strong>), Admin Control Room tables (<strong>Author P&amp;L</strong>, nested <strong>Author Receipts</strong>, <strong>Deep Connections Query Log</strong>, <strong>JIT Auto-Healing</strong>, and <strong>Failed &amp; Auto-Refunded Curations</strong>), and Project Lists (<strong>Dashboard</strong> &amp; <strong>Trash</strong> lock to Card View below 768px and hide the Grid/List toggle).</li>
+                                        <li><strong>Zero Duplicate Nodes:</strong> Conditional rendering via <code className="text-zinc-300">isSmallScreen ? &lt;MobileCards /&gt; : &lt;DesktopTable /&gt;</code> guarantees only one branch mounts per viewport across Standard User tables (<strong>Token Activity</strong>, <strong>Stack Archive</strong>), Admin Control Room tables (<strong>Author P&amp;L</strong>, nested <strong>Author Receipts</strong>, <strong>Deep Connections Query Log</strong>, <strong>JIT Auto-Healing</strong>, and <strong>Failed &amp; Auto-Refunded Curations</strong>), and Project Lists (<strong>Dashboard</strong> &amp; <strong>Trash</strong> keep Grid/List toggle parity on mobile, rendering <code className="text-zinc-300">&lt;ProjectMobileListCard /&gt;</code> below 768px with zero desktop table DOM).</li>
                                         <li><strong>Progressive Pagination:</strong> Activity and Admin operational logs paginate at <code className="text-zinc-300">10</code> rows (<code className="text-zinc-300">20</code> rows for Stack Archive) with incremental <code className="text-zinc-300">Show more (N remaining)</code> expansion.</li>
                                         <li><strong>Support Strip Placement:</strong> Billing dispute support (<code className="text-zinc-300">support@zcene.online</code>) sits quietly below the Token Activity list and Show More control rather than inside the top Wallet Hero.</li>
                                     </ul>

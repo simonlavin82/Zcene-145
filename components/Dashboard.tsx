@@ -15,7 +15,7 @@ import { CreateProjectCard } from './CreateProjectCard';
 import { PROFILE_COLORS } from './SharedModals';
 import { computeProjectCardMetrics, parseProjectScenes, stripSceneNamespace } from '../shared/multiSceneUtils';
 import { ToolbarSearch } from './DesignSystem';
-import { PROJECT_TABLE_COLUMNS, ProjectMetricPill, ProjectStatusBadge } from './ui/ProjectMetrics';
+import { PROJECT_TABLE_COLUMNS, ProjectTableMetricValue, ProjectStatusBadge, ProjectMobileListCard } from './ui/ProjectMetrics';
 
 
 interface DashboardProps {
@@ -97,7 +97,6 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleTrash = onTrashProject || onDeleteProject;
   const [renameValue, setRenameValue] = React.useState('');
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
-  const effectiveView = isSmallScreen ? 'grid' : view;
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
   const [openColorPopover, setOpenColorPopover] = React.useState<string | null>(null);
 
@@ -428,6 +427,72 @@ const Dashboard: React.FC<DashboardProps> = ({
     });
   }, [groupedProjects, sortBy]);
 
+  const renderProjectRowActions = (project: Project) => (
+    <div className="flex items-center justify-end relative">
+      <button
+        type="button"
+        onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
+        className="w-9 h-9 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center shrink-0 relative before:absolute before:inset-[-4px] before:content-['']"
+        aria-label={`Actions for ${getProjectDisplayTitle(project)}`}
+      >
+        <span className="material-symbols-outlined !text-xl">more_vert</span>
+      </button>
+
+      {activeMenuId === project.id && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
+          <div className="absolute right-0 top-10 w-56 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased space-y-0.5">
+            <button
+              onClick={() => {
+                setActiveMenuId(null);
+                handleRenameClick(project);
+              }}
+              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+            >
+              <span className="material-symbols-outlined !text-[18px] text-zinc-500">edit</span>
+              Rename
+            </button>
+            {onShareProject && (
+              <button
+                onClick={() => {
+                  setActiveMenuId(null);
+                  onShareProject(project);
+                }}
+                className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+              >
+                <span className="material-symbols-outlined !text-[18px] text-zinc-500">share</span>
+                Share
+              </button>
+            )}
+            {onDuplicateProject && (
+              <button
+                onClick={() => {
+                  setActiveMenuId(null);
+                  onDuplicateProject(project);
+                }}
+                className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
+              >
+                <span className="material-symbols-outlined !text-[18px] text-zinc-500">content_copy</span>
+                Duplicate
+              </button>
+            )}
+            <div className="border-t border-zinc-800/80 my-2" />
+            <button
+              onClick={() => {
+                setActiveMenuId(null);
+                setProjectToDelete(project.id);
+              }}
+              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
+            >
+              <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete</span>
+              Move to Trash
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+
   return (
     <div 
       className="h-full w-full overflow-hidden bg-background-dark text-zinc-200 font-display flex flex-col relative"
@@ -485,17 +550,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                     ]}
                   />
 
-                  {/* Grid/List View Toggle (desktop/tablet >= 768px only; mobile locks to zero-overflow Card View) */}
-                  {!isSmallScreen && (
-                    <ViewToggle 
-                      value={view}
-                      onChange={(v) => setView(v as 'grid' | 'list')}
-                      options={[
-                        { id: 'grid', icon: 'grid_view', label: 'Grid View' },
-                        { id: 'list', icon: 'list', label: 'List View' }
-                      ]}
-                    />
-                  )}
+                  {/* Grid/List View Toggle (full desktop/mobile parity: desktop renders 9-col table, mobile renders compact list cards) */}
+                  <ViewToggle 
+                    value={view}
+                    onChange={(v) => setView(v as 'grid' | 'list')}
+                    options={[
+                      { id: 'grid', icon: 'grid_view', label: 'Grid View' },
+                      { id: 'list', icon: 'list', label: 'List View' }
+                    ]}
+                  />
                 </div>
 
                 {/* Unified Toolbar Search */}
@@ -538,7 +601,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                   {resolvedActiveCuratingProject ? (
                     <>
                       <span className="material-symbols-outlined animate-spin !text-lg">progress_activity</span>
-                      Curation in Progress — View Active Zcene
+                      <span className="sm:hidden">Curating...</span>
+                      <span className="hidden sm:inline">Curation in Progress — View Active Zcene</span>
                     </>
                   ) : isCreatingProject ? (
                     <>
@@ -591,7 +655,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 Clear Search
               </button>
             </div>
-          ) : effectiveView === 'grid' ? (
+          ) : view === 'grid' ? (
             <div className="w-full flex flex-wrap gap-x-8 gap-y-12 items-start pt-6">
               {sortedBucketKeys.map((bucketKey, bucketIndex) => {
                 const projectsInBucket = groupedProjects[bucketKey] || [];
@@ -715,16 +779,127 @@ const Dashboard: React.FC<DashboardProps> = ({
                 onViewActiveCuration={onSelectProject}
               />
             </div>
+          ) : isSmallScreen ? (
+            /* Single-Branch Responsive Mobile Compact List View (< 768px — preserves crate grouping & zero desktop table DOM) */
+            <div data-testid="dashboard-mobile-list" className="w-full space-y-10 pt-6">
+              {sortedBucketKeys.map((bucketKey, bucketIndex) => {
+                const projectsInBucket = groupedProjects[bucketKey] || [];
+                const isUnassigned = bucketKey === 'UNASSIGNED';
+                const defaultColor = zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
+                const crateColor = isUnassigned ? zceneFallbackColor : (crateColors?.[bucketKey] || defaultColor);
+                const crateTextColor = getContrastTextColor(crateColor);
+                const isBucketActive = openColorPopover === bucketKey || projectsInBucket.some(p => p.id === activeMenuId);
+
+                return (
+                  <div
+                    key={bucketKey}
+                    className={`w-full rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-3.5 relative ${isBucketActive ? 'z-50' : 'z-0'}`}
+                    style={{
+                      backgroundColor: crateColor.toLowerCase() === '#18181b' ? `${crateColor}26` : `${crateColor}33`
+                    }}
+                  >
+                    {/* Unified Folder Index Tab */}
+                    <div
+                      className={`group w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[24.5px] left-[-1px] pl-3 pr-1.5 py-1 flex items-center justify-between h-[25px] select-none ${openColorPopover === bucketKey ? 'z-[70]' : 'z-10'} ${!isUnassigned ? 'cursor-pointer active:brightness-95 before:absolute before:inset-[-6px] before:content-[\'\']' : ''}`}
+                      style={{ backgroundColor: crateColor }}
+                      onClick={(e) => {
+                        if (!isUnassigned) {
+                          e.stopPropagation();
+                          setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey);
+                        }
+                      }}
+                    >
+                      <div
+                        className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest font-bold"
+                        style={{ color: crateTextColor }}
+                      >
+                        {bucketKey}
+                      </div>
+
+                      {openColorPopover === bucketKey && (
+                        <>
+                          <div className="fixed inset-0 z-10" onClick={() => setOpenColorPopover(null)} />
+                          <div
+                            className="absolute top-full left-0 mt-1.5 p-2.5 bg-brand-black border border-white/10 rounded-xl shadow-2xl shadow-black z-[70] flex items-center gap-2.5 max-w-[calc(100vw-2rem)] animate-fade-in-down antialiased pointer-events-auto"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            {PROFILE_COLORS.map(color => {
+                              const isSelected = crateColor.toLowerCase() === colorHexMap[color.name]?.toLowerCase();
+                              const contrastColor = getContrastTextColor(colorHexMap[color.name]);
+                              return (
+                                <button
+                                  key={color.name}
+                                  aria-label={`Set crate color to ${color.name}`}
+                                  onClick={() => {
+                                    onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
+                                    setOpenColorPopover(null);
+                                  }}
+                                  className={`w-6 h-6 rounded-full transition-all shrink-0 flex items-center justify-center relative cursor-pointer ${color.class} hover:scale-110 active:scale-95 before:absolute before:inset-[-4px] before:content-[''] ${
+                                    isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-950 scale-105' : 'opacity-85 hover:opacity-100'
+                                  }`}
+                                >
+                                  {isSelected && (
+                                    <span className="material-symbols-outlined !text-[13px] font-bold" style={{ color: contrastColor }}>
+                                      check
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </>
+                      )}
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {projectsInBucket.map((project) => {
+                        const {
+                          sceneCount,
+                          rootArtistsCount,
+                          recommendedCount,
+                          labelCount,
+                          deepCutsCount,
+                        } = computeProjectCardMetrics(project);
+                        const isMapped = project.status === 'completed';
+
+                        return (
+                          <ProjectMobileListCard
+                            key={project.id}
+                            data-testid={`dashboard-mobile-list-card-${project.id}`}
+                            title={getProjectDisplayTitle(project)}
+                            formattedDate={project.updatedAt ? formatSystemTimestamp(project.updatedAt) : 'New Project'}
+                            icon="folder"
+                            iconClassName="text-zinc-555"
+                            sceneCount={sceneCount || 1}
+                            rootArtistsCount={rootArtistsCount}
+                            recommendedCount={isMapped ? recommendedCount : null}
+                            labelCount={isMapped && labelCount > 0 ? labelCount : null}
+                            deepCutsCount={isMapped ? deepCutsCount : null}
+                            status={project.status}
+                            isActiveCuration={Boolean(project.activeJobId)}
+                            isMenuOpen={activeMenuId === project.id}
+                            onClick={() => onSelectProject(project.id)}
+                            actionMenuSlot={renderProjectRowActions(project)}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           ) : (
-            /* High-Contrast Tabular List View */
-            <div className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
-              <table className="w-full text-left border-collapse min-w-[640px]">
+            /* High-Contrast 9-Column Desktop Tabular List View (>= 768px) */
+            <div data-testid="dashboard-desktop-table" className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
+              <table className="w-full text-left border-collapse min-w-[780px]">
                 <thead>
                   <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
                     {PROJECT_TABLE_COLUMNS.map((col) => (
                       <th
                         key={col.key}
-                        className={`py-4 px-6 font-semibold ${col.align === 'right' ? 'text-right' : ''}`}
+                        className={`py-3.5 font-semibold ${col.headerClassName} ${
+                          col.align === 'center' ? 'text-center' : col.align === 'right' ? 'text-right' : ''
+                        }`}
                       >
                         {col.label}
                       </th>
@@ -742,18 +917,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                       <React.Fragment key={bucketKey}>
                         {/* Unified Folder Tab Divider Row */}
                         <tr className="select-none pointer-events-none bg-zinc-900">
-                          <td colSpan={8} className="pt-6 pb-0 px-6 align-bottom bg-zinc-900 border-none">
+                          <td colSpan={9} className="pt-6 pb-0 px-4 align-bottom bg-zinc-900 border-none">
                             {/* The Folder Tab */}
                             <div 
-                              className={`group w-[140px] sm:w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg pl-3 pr-1.5 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] flex items-center justify-between pointer-events-auto ${openColorPopover === bucketKey ? 'z-[70]' : 'z-0'} ${!isUnassigned && isSmallScreen ? 'cursor-pointer active:brightness-95 before:absolute before:inset-[-6px] before:content-[\'\']' : ''}`}
+                              className={`group w-[140px] sm:w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg pl-3 pr-1.5 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] flex items-center justify-between pointer-events-auto ${openColorPopover === bucketKey ? 'z-[70]' : 'z-0'}`}
                               style={{
                                 backgroundColor: crateColor
-                              }}
-                              onClick={(e) => {
-                                if (!isUnassigned && isSmallScreen) {
-                                  e.stopPropagation();
-                                  setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey);
-                                }
                               }}
                             >
                               <div 
@@ -818,15 +987,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                       {groupedProjects[bucketKey].map((project, index) => {
                         const {
                           sceneCount,
-                          seedList,
                           rootArtistsCount,
                           recommendedCount,
                           labelCount,
                           deepCutsCount,
                         } = computeProjectCardMetrics(project);
                         const displayTitle = getProjectDisplayTitle(project);
-                        const formattedDate = formatSystemTimestamp(project.updatedAt);
-                        const hasGraphNodes = !!project.graphData && !project.graphData.includes('"nodes":[]');
+                        const formattedDate = project.updatedAt ? formatSystemTimestamp(project.updatedAt) : 'New Project';
                         const isMapped = project.status === 'completed';
                         
                         const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
@@ -838,41 +1005,40 @@ const Dashboard: React.FC<DashboardProps> = ({
                             onClick={() => onSelectProject(project.id)}
                             className={`group border-b border-zinc-800/30 cursor-pointer ${activeMenuId === project.id ? 'relative z-40' : ''}`}
                           >
-                            <td className={`py-4 px-6 font-medium text-white group-hover:text-primary transition-colors ${tdClass}`}>
+                            <td className={`py-3.5 pl-4 pr-3 font-medium text-white group-hover:text-primary transition-colors ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <div className="flex items-center gap-3">
-                                <span className="material-symbols-outlined !text-lg transition-colors text-zinc-555 group-hover:text-primary">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                <span className="material-symbols-outlined !text-[18px] transition-colors text-zinc-555 group-hover:text-primary shrink-0">
                                   folder
                                 </span>
-                                <span className="truncate max-w-[240px]">{displayTitle}</span>
-                                <ProjectMetricPill variant="table-inline">SCENES: {sceneCount || 1}</ProjectMetricPill>
+                                <span className="truncate max-w-[180px] xl:max-w-[260px] text-sm">{displayTitle}</span>
                               </div>
                             </td>
-                            <td className={`py-4 px-6 text-zinc-400 text-sm font-mono font-normal ${tdClass}`}>
+                            <td className={`py-3.5 px-3 text-zinc-400 text-xs font-mono font-normal whitespace-nowrap ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               {formattedDate}
                             </td>
-                            <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                            <td className={`py-3.5 px-2.5 text-center ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <ProjectMetricPill variant="table">ROOT ARTISTS: {rootArtistsCount}</ProjectMetricPill>
+                              <ProjectTableMetricValue value={sceneCount || 1} />
                             </td>
-                            <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                            <td className={`py-3.5 px-2.5 text-center ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <ProjectMetricPill variant="table">ARTISTS: {recommendedCount}</ProjectMetricPill>
+                              <ProjectTableMetricValue value={rootArtistsCount} />
                             </td>
-                            <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                            <td className={`py-3.5 px-2.5 text-center ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              {labelCount > 0 ? (
-                                <ProjectMetricPill variant="table">LABELS: {labelCount}</ProjectMetricPill>
-                              ) : (
-                                <ProjectMetricPill variant="table" muted>-</ProjectMetricPill>
-                              )}
+                              <ProjectTableMetricValue value={isMapped ? recommendedCount : null} />
                             </td>
-                            <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                            <td className={`py-3.5 px-2.5 text-center ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <ProjectMetricPill variant="table">DEEP CUTS: {deepCutsCount}</ProjectMetricPill>
+                              <ProjectTableMetricValue value={isMapped ? labelCount : null} mutedWhenZero />
                             </td>
-                            <td className={`py-4 px-6 font-normal ${tdClass}`}>
+                            <td className={`py-3.5 px-2.5 text-center ${tdClass}`}>
+                              {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
+                              <ProjectTableMetricValue value={isMapped ? deepCutsCount : null} />
+                            </td>
+                            <td className={`py-3.5 px-3 text-center ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               <ProjectStatusBadge
                                 status={project.status}
@@ -880,69 +1046,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 variant="table"
                               />
                             </td>
-                            <td className={`py-4 px-6 text-right ${tdClass} ${activeMenuId === project.id ? 'relative z-50' : ''}`} onClick={(e) => e.stopPropagation()}>
+                            <td className={`py-3.5 pl-2 pr-4 text-right ${tdClass} ${activeMenuId === project.id ? 'relative z-50' : ''}`} onClick={(e) => e.stopPropagation()}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <div className="flex items-center justify-end relative">
-                                <button
-                                  onClick={() => setActiveMenuId(activeMenuId === project.id ? null : project.id)}
-                                  className="w-9 h-9 rounded-lg text-zinc-500 hover:text-white hover:bg-zinc-800 transition-all cursor-pointer flex items-center justify-center shrink-0 relative before:absolute before:inset-[-4px] before:content-['']"
-                                >
-                                  <span className="material-symbols-outlined !text-xl">more_vert</span>
-                                </button>
-                                
-                                {activeMenuId === project.id && (
-                                  <>
-                                    <div className="fixed inset-0 z-10" onClick={() => setActiveMenuId(null)} />
-                                    <div className="absolute right-0 top-10 w-56 z-[70] overflow-hidden rounded-xl border border-white/10 bg-brand-black p-1.5 shadow-2xl shadow-black pointer-events-auto text-left animate-fade-in-down antialiased space-y-0.5">
-                                      <button
-                                        onClick={() => {
-                                          setActiveMenuId(null);
-                                          handleRenameClick(project);
-                                        }}
-                                        className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
-                                      >
-                                        <span className="material-symbols-outlined !text-[18px] text-zinc-500">edit</span>
-                                        Rename
-                                      </button>
-                                          {onShareProject && (
-                                            <button
-                                              onClick={() => {
-                                                setActiveMenuId(null);
-                                                onShareProject(project);
-                                              }}
-                                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
-                                            >
-                                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">share</span>
-                                              Share
-                                            </button>
-                                          )}
-                                          {onDuplicateProject && (
-                                            <button
-                                              onClick={() => {
-                                                setActiveMenuId(null);
-                                                onDuplicateProject(project);
-                                              }}
-                                              className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 transition-all rounded-lg flex items-center gap-2.5 group"
-                                            >
-                                              <span className="material-symbols-outlined !text-[18px] text-zinc-500">content_copy</span>
-                                              Duplicate
-                                            </button>
-                                          )}
-                                          <div className="border-t border-zinc-800/80 my-2" />
-                                          <button
-                                            onClick={() => {
-                                              setActiveMenuId(null);
-                                              setProjectToDelete(project.id);
-                                            }}
-                                            className="w-full text-left px-3.5 py-2.5 text-sm font-medium text-[#ef4444] hover:bg-[#ef4444]/10 transition-all rounded-lg flex items-center gap-2.5 group cursor-pointer"
-                                          >
-                                            <span className="material-symbols-outlined !text-[18px] text-[#ef4444]">delete</span>
-                                            Move to Trash
-                                          </button>
-                                    </div>
-                                  </>
-                                )}
-                              </div>
+                              {renderProjectRowActions(project)}
                             </td>
                           </tr>
                         );
