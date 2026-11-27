@@ -308,29 +308,52 @@ describe('Architecture V45: Dashboard Search Parity (Artist & Label Nodes, Multi
     expect((searchInput as HTMLInputElement).value).toBe('');
     expect(screen.getByText('Mouthpiece')).toBeInTheDocument();
 
-    // Desktop (>= 768px) retains Grid/List ViewToggle and switches cleanly to the 9-column compact table (zero mobile list cards)
+    // Desktop (>= 1024px) retains Grid/List ViewToggle and switches cleanly to the 9-column compact table (zero folder icons, zero mobile list cards)
     const listViewBtn = screen.getByRole('button', { name: 'List View' });
     expect(listViewBtn).toBeInTheDocument();
     fireEvent.click(listViewBtn);
-    expect(screen.getByTestId('dashboard-desktop-table')).toBeInTheDocument();
+    const desktopTable = screen.getByTestId('dashboard-desktop-table');
+    expect(desktopTable).toBeInTheDocument();
+    expect(desktopTable.textContent).not.toContain('folder');
     expect(screen.queryByTestId('dashboard-mobile-list')).not.toBeInTheDocument();
     expect(document.querySelectorAll('thead th')).toHaveLength(9);
     expect(screen.getByText('Modified')).toBeInTheDocument();
     expect(screen.getByText('Scenes')).toBeInTheDocument();
     expect(screen.getByText('Labels')).toBeInTheDocument();
+
+    // Narrow-tablet (< 1024px, while global isSmallScreen stays false) switches List View to Option A solid-dark framed rows with zero <table> clipping
+    const origInnerWidth = window.innerWidth;
+    try {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: 820 });
+      fireEvent(window, new Event('resize'));
+      expect(screen.getByTestId('dashboard-mobile-list')).toBeInTheDocument();
+      expect(screen.queryByTestId('dashboard-desktop-table')).not.toBeInTheDocument();
+      expect(document.querySelector('table')).toBeNull();
+    } finally {
+      Object.defineProperty(window, 'innerWidth', { configurable: true, writable: true, value: origInnerWidth });
+      fireEvent(window, new Event('resize'));
+    }
+    expect(screen.getByTestId('dashboard-desktop-table')).toBeInTheDocument();
   });
 
   it('9. Mobile collapses to icon trigger, synchronously focuses full-width takeover via flushSync, marks siblings inert, and preserves open state on blur when query is active', () => {
     const project = createMockProject({ id: 'proj-mobile', name: 'Mouthpiece', seedArtists: 'Mouthpiece' });
     renderDashboard([project], true);
 
-    // Mobile (< 768px) keeps Grid/List ViewToggle parity: List View renders single-branch ProjectMobileListCard with zero desktop <table> DOM
+    // Mobile (< 768px) keeps Grid/List ViewToggle parity: List View renders Option A single solid-dark framed list (zero pink crate wrap, zero folder icon, zero desktop <table> DOM)
     const mobileListBtn = screen.getByRole('button', { name: 'List View' });
     const mobileGridBtn = screen.getByRole('button', { name: 'Grid View' });
     expect(mobileListBtn).toBeInTheDocument();
     fireEvent.click(mobileListBtn);
-    expect(screen.getByTestId('dashboard-mobile-list')).toBeInTheDocument();
-    expect(screen.getByTestId('dashboard-mobile-list-card-proj-mobile')).toBeInTheDocument();
+    const mobileList = screen.getByTestId('dashboard-mobile-list');
+    expect(mobileList).toBeInTheDocument();
+    expect(mobileList.className).toContain('bg-zinc-900');
+    expect(mobileList.className).toContain('rounded-2xl');
+    expect(mobileList.className).not.toContain('overflow-hidden');
+    expect(mobileList.textContent).not.toContain('folder');
+    const mobileRow = screen.getByTestId('dashboard-mobile-list-card-proj-mobile');
+    expect(mobileRow).toBeInTheDocument();
+    expect(mobileRow.className).toContain('rounded-b-[15px]');
     expect(screen.queryByTestId('dashboard-desktop-table')).not.toBeInTheDocument();
     expect(document.querySelector('table')).toBeNull();
     fireEvent.click(mobileGridBtn);

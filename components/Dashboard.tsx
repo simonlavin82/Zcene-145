@@ -99,6 +99,18 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
   const [openColorPopover, setOpenColorPopover] = React.useState<string | null>(null);
+  const [isBelowDesktopTable, setIsBelowDesktopTable] = React.useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
+
+  React.useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setIsBelowDesktopTable(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const useCompactList = isSmallScreen || isBelowDesktopTable;
 
   React.useEffect(() => {
     const handleGlobalClick = () => setOpenColorPopover(null);
@@ -779,117 +791,136 @@ const Dashboard: React.FC<DashboardProps> = ({
                 onViewActiveCuration={onSelectProject}
               />
             </div>
-          ) : isSmallScreen ? (
-            /* Single-Branch Responsive Mobile Compact List View (< 768px — preserves crate grouping & zero desktop table DOM) */
-            <div data-testid="dashboard-mobile-list" className="w-full space-y-10 pt-6">
+          ) : useCompactList ? (
+            /* Single-Branch Distraction-Free Responsive Table List (< 1024px — mirrors Desktop Table 1:1 with zero desktop <table> DOM) */
+            <div data-testid="dashboard-mobile-list" className="w-full rounded-2xl border border-zinc-800 bg-zinc-900">
               {sortedBucketKeys.map((bucketKey, bucketIndex) => {
                 const projectsInBucket = groupedProjects[bucketKey] || [];
                 const isUnassigned = bucketKey === 'UNASSIGNED';
                 const defaultColor = zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
                 const crateColor = isUnassigned ? zceneFallbackColor : (crateColors?.[bucketKey] || defaultColor);
                 const crateTextColor = getContrastTextColor(crateColor);
-                const isBucketActive = openColorPopover === bucketKey || projectsInBucket.some(p => p.id === activeMenuId);
+                const isLastBucket = bucketIndex === sortedBucketKeys.length - 1;
 
                 return (
-                  <div
-                    key={bucketKey}
-                    className={`w-full rounded-tr-xl rounded-b-xl rounded-tl-none border border-zinc-800 p-3.5 relative ${isBucketActive ? 'z-50' : 'z-0'}`}
-                    style={{
-                      backgroundColor: crateColor.toLowerCase() === '#18181b' ? `${crateColor}26` : `${crateColor}33`
-                    }}
-                  >
-                    {/* Unified Folder Index Tab */}
+                  <React.Fragment key={bucketKey}>
+                    {/* Lightweight Inline Colored Crate Tab Divider */}
                     <div
-                      className={`group w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg text-[9px] font-mono absolute -top-[24.5px] left-[-1px] pl-3 pr-1.5 py-1 flex items-center justify-between h-[25px] select-none ${openColorPopover === bucketKey ? 'z-[70]' : 'z-10'} ${!isUnassigned ? 'cursor-pointer active:brightness-95 before:absolute before:inset-[-6px] before:content-[\'\']' : ''}`}
-                      style={{ backgroundColor: crateColor }}
-                      onClick={(e) => {
-                        if (!isUnassigned) {
-                          e.stopPropagation();
-                          setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey);
-                        }
-                      }}
+                      className={`bg-zinc-900 px-3.5 pb-0 border-b border-zinc-800/80 relative ${
+                        bucketIndex === 0 ? 'pt-4 rounded-t-[15px]' : 'pt-6 border-t border-t-zinc-800/60'
+                      } ${openColorPopover === bucketKey ? 'z-50' : 'z-0'}`}
                     >
                       <div
-                        className="truncate text-ellipsis whitespace-nowrap uppercase tracking-widest font-bold"
-                        style={{ color: crateTextColor }}
+                        className={`group w-[150px] sm:w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg pl-3 pr-1.5 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] flex items-center justify-between select-none ${
+                          openColorPopover === bucketKey ? 'z-[70]' : 'z-10'
+                        } ${!isUnassigned ? "cursor-pointer active:brightness-95 before:absolute before:inset-[-6px] before:content-['']" : ''}`}
+                        style={{ backgroundColor: crateColor }}
+                        onClick={(e) => {
+                          if (!isUnassigned) {
+                            e.stopPropagation();
+                            setOpenColorPopover(openColorPopover === bucketKey ? null : bucketKey);
+                          }
+                        }}
                       >
-                        {bucketKey}
-                      </div>
+                        <div
+                          className="truncate text-ellipsis whitespace-nowrap"
+                          style={{ color: crateTextColor }}
+                        >
+                          {bucketKey}
+                        </div>
 
-                      {openColorPopover === bucketKey && (
-                        <>
-                          <div className="fixed inset-0 z-10" onClick={() => setOpenColorPopover(null)} />
-                          <div
-                            className="absolute top-full left-0 mt-1.5 p-2.5 bg-brand-black border border-white/10 rounded-xl shadow-2xl shadow-black z-[70] flex items-center gap-2.5 max-w-[calc(100vw-2rem)] animate-fade-in-down antialiased pointer-events-auto"
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            {PROFILE_COLORS.map(color => {
-                              const isSelected = crateColor.toLowerCase() === colorHexMap[color.name]?.toLowerCase();
-                              const contrastColor = getContrastTextColor(colorHexMap[color.name]);
-                              return (
-                                <button
-                                  key={color.name}
-                                  aria-label={`Set crate color to ${color.name}`}
-                                  onClick={() => {
-                                    onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
-                                    setOpenColorPopover(null);
-                                  }}
-                                  className={`w-6 h-6 rounded-full transition-all shrink-0 flex items-center justify-center relative cursor-pointer ${color.class} hover:scale-110 active:scale-95 before:absolute before:inset-[-4px] before:content-[''] ${
-                                    isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-950 scale-105' : 'opacity-85 hover:opacity-100'
-                                  }`}
-                                >
-                                  {isSelected && (
-                                    <span className="material-symbols-outlined !text-[13px] font-bold" style={{ color: contrastColor }}>
-                                      check
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })}
+                        {!isUnassigned && (
+                          <div className="hidden md:group-hover:flex items-center pointer-events-none">
+                            <span
+                              className="material-symbols-outlined !text-[16px] opacity-75 group-hover:opacity-100 transition-opacity -my-1"
+                              style={{ color: crateTextColor }}
+                            >
+                              more_horiz
+                            </span>
                           </div>
-                        </>
-                      )}
+                        )}
+
+                        {openColorPopover === bucketKey && (
+                          <>
+                            <div className="fixed inset-0 z-10" onClick={() => setOpenColorPopover(null)} />
+                            <div
+                              className="absolute top-full left-0 mt-1.5 p-2.5 bg-brand-black border border-white/10 rounded-xl shadow-2xl shadow-black z-[70] flex items-center gap-2.5 max-w-[calc(100vw-2rem)] animate-fade-in-down antialiased pointer-events-auto"
+                              onClick={(e) => e.stopPropagation()}
+                            >
+                              {PROFILE_COLORS.map(color => {
+                                const isSelected = crateColor.toLowerCase() === colorHexMap[color.name]?.toLowerCase();
+                                const contrastColor = getContrastTextColor(colorHexMap[color.name]);
+                                return (
+                                  <button
+                                    key={color.name}
+                                    aria-label={`Set crate color to ${color.name}`}
+                                    onClick={() => {
+                                      onUpdateCrateColor?.(bucketKey, colorHexMap[color.name]);
+                                      setOpenColorPopover(null);
+                                    }}
+                                    className={`w-6 h-6 rounded-full transition-all shrink-0 flex items-center justify-center relative cursor-pointer ${color.class} hover:scale-110 active:scale-95 before:absolute before:inset-[-4px] before:content-[''] ${
+                                      isSelected ? 'ring-2 ring-white ring-offset-2 ring-offset-zinc-950 scale-105' : 'opacity-85 hover:opacity-100'
+                                    }`}
+                                  >
+                                    {isSelected && (
+                                      <span className="material-symbols-outlined !text-[13px] font-bold" style={{ color: contrastColor }}>
+                                        check
+                                      </span>
+                                    )}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
                     </div>
 
-                    <div className="space-y-2.5">
-                      {projectsInBucket.map((project) => {
-                        const {
-                          sceneCount,
-                          rootArtistsCount,
-                          recommendedCount,
-                          labelCount,
-                          deepCutsCount,
-                        } = computeProjectCardMetrics(project);
-                        const isMapped = project.status === 'completed';
+                    {projectsInBucket.map((project, projectIndex) => {
+                      const {
+                        sceneCount,
+                        rootArtistsCount,
+                        recommendedCount,
+                        labelCount,
+                        deepCutsCount,
+                      } = computeProjectCardMetrics(project);
+                      const isMapped = project.status === 'completed';
+                      const isLastRowOverall = isLastBucket && projectIndex === projectsInBucket.length - 1;
+                      const rowBg = projectIndex % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
+                      const rowClasses = [
+                        rowBg,
+                        projectIndex > 0 ? 'border-t border-zinc-800/50' : '',
+                        isLastRowOverall ? 'rounded-b-[15px]' : '',
+                      ]
+                        .filter(Boolean)
+                        .join(' ');
 
-                        return (
-                          <ProjectMobileListCard
-                            key={project.id}
-                            data-testid={`dashboard-mobile-list-card-${project.id}`}
-                            title={getProjectDisplayTitle(project)}
-                            formattedDate={project.updatedAt ? formatSystemTimestamp(project.updatedAt) : 'New Project'}
-                            icon="folder"
-                            iconClassName="text-zinc-555"
-                            sceneCount={sceneCount || 1}
-                            rootArtistsCount={rootArtistsCount}
-                            recommendedCount={isMapped ? recommendedCount : null}
-                            labelCount={isMapped && labelCount > 0 ? labelCount : null}
-                            deepCutsCount={isMapped ? deepCutsCount : null}
-                            status={project.status}
-                            isActiveCuration={Boolean(project.activeJobId)}
-                            isMenuOpen={activeMenuId === project.id}
-                            onClick={() => onSelectProject(project.id)}
-                            actionMenuSlot={renderProjectRowActions(project)}
-                          />
-                        );
-                      })}
-                    </div>
-                  </div>
+                      return (
+                        <ProjectMobileListCard
+                          key={project.id}
+                          data-testid={`dashboard-mobile-list-card-${project.id}`}
+                          title={getProjectDisplayTitle(project)}
+                          formattedDate={project.updatedAt ? formatSystemTimestamp(project.updatedAt) : 'New Project'}
+                          sceneCount={sceneCount || 1}
+                          rootArtistsCount={rootArtistsCount}
+                          recommendedCount={isMapped ? recommendedCount : null}
+                          labelCount={isMapped && labelCount > 0 ? labelCount : null}
+                          deepCutsCount={isMapped ? deepCutsCount : null}
+                          status={project.status}
+                          isActiveCuration={Boolean(project.activeJobId)}
+                          isMenuOpen={activeMenuId === project.id}
+                          onClick={() => onSelectProject(project.id)}
+                          actionMenuSlot={renderProjectRowActions(project)}
+                          className={rowClasses}
+                        />
+                      );
+                    })}
+                  </React.Fragment>
                 );
               })}
             </div>
           ) : (
-            /* High-Contrast 9-Column Desktop Tabular List View (>= 768px) */
+            /* High-Contrast 9-Column Desktop Tabular List View (>= 1024px) */
             <div data-testid="dashboard-desktop-table" className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
               <table className="w-full text-left border-collapse min-w-[780px]">
                 <thead>
@@ -1007,12 +1038,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                           >
                             <td className={`py-3.5 pl-4 pr-3 font-medium text-white group-hover:text-primary transition-colors ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <div className="flex items-center gap-2.5 min-w-0">
-                                <span className="material-symbols-outlined !text-[18px] transition-colors text-zinc-555 group-hover:text-primary shrink-0">
-                                  folder
-                                </span>
-                                <span className="truncate max-w-[180px] xl:max-w-[260px] text-sm">{displayTitle}</span>
-                              </div>
+                              <span className="block truncate max-w-[200px] xl:max-w-[280px] text-sm">{displayTitle}</span>
                             </td>
                             <td className={`py-3.5 px-3 text-zinc-400 text-xs font-mono font-normal whitespace-nowrap ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}

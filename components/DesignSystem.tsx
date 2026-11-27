@@ -1441,8 +1441,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <IconDisplay icon={<LibraryIcon className="!text-[18px]" />} name="Music Library (queue_music)" pxSize="18px" description="Opens the user's imported personal music library in ROOTS." implementation="&lt;LibraryIcon className=&quot;!text-[18px]&quot; /&gt;" overrideIconClass="" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">upload</span>} name="Import Library" pxSize="18px" description="Initiates a local music library JSON/CSV file import." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">search</span>} name="Search" pxSize="18px" description="Standard leading icon and mobile takeover trigger for ToolbarSearch." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">folder</span>} name="Project Row" pxSize="18px" description="Leading entity marker for active Zcenes in desktop table & mobile list cards." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
-                                    <IconDisplay icon={<span className="material-symbols-outlined">auto_delete</span>} name="30-Day Trash" pxSize="18px" description="Identifies trashed Zcenes eligible for 0T restoration within 30 days." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
+                                    <IconDisplay icon={<span className="material-symbols-outlined">auto_delete</span>} name="30-Day Trash" pxSize="18px" description="30-day Trash empty-state marker for trashed Zcenes eligible for 0T restoration." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">restore</span>} name="Restore (0T)" pxSize="18px" description="Restores a trashed Zcene or archived Stack item at zero token cost." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">delete</span>} name="Move to Trash" pxSize="18px" description="Soft-deletes a Zcene into the 30-day Trash retention window." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
                                     <IconDisplay icon={<span className="material-symbols-outlined">delete_forever</span>} name="Delete Forever" pxSize="18px" description="Irreversibly purges canvas data or removes an archived discovery." implementation="!text-[18px]" overrideIconClass="!text-[18px]" />
@@ -3426,7 +3425,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Project Card &amp; Table List — Discovery Metric Layout</h3>
                                     <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-3xl">
-                                        Both the project card footer and desktop table list consume shared <code className="text-xs text-primary bg-zinc-800 px-1 rounded">ProjectMetrics.tsx</code> primitives (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectMetricPill /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectStatusBadge /&gt;</code>, and <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">PROJECT_TABLE_COLUMNS</code>) so discovery metrics stay in 1:1 lockstep across Dashboard, Trash, and this living guide.
+                                        Both the project card footer and responsive list views consume shared <code className="text-xs text-primary bg-zinc-800 px-1 rounded">ProjectMetrics.tsx</code> primitives (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectMetricPill /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectTableMetricValue /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectStatusBadge /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectMobileListCard /&gt;</code>, and <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">PROJECT_TABLE_COLUMNS</code>) so discovery metrics stay in 1:1 lockstep across Dashboard, Trash, and this living guide.
                                     </p>
                                 </div>
 
@@ -3501,7 +3500,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         <h4 className="text-base font-medium text-zinc-200">Project List — Table View Preview</h4>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                        On desktop and tablet viewports (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&ge; 768px</code>), table view renders all 9 governed columns from <code className="text-xs text-primary bg-zinc-800 px-1 rounded">PROJECT_TABLE_COLUMNS</code> (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Title</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Modified</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Scenes</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Roots</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Artists</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Labels</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Deep Cuts</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Status</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Actions</code>). The five numeric columns use plain tabular monospace figures via <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ProjectTableMetricValue /&gt;</code> so <strong>Status</strong> stays the sole focal badge and all 9 columns fit inside laptop viewports with zero right-edge clipping.
+                                        On laptop and desktop viewports (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&ge; 1024px</code>), table view renders all 9 governed columns from <code className="text-xs text-primary bg-zinc-800 px-1 rounded">PROJECT_TABLE_COLUMNS</code> (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Title</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Modified</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Scenes</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Roots</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Artists</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Labels</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Deep Cuts</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Status</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Actions</code>) inside a single solid-dark <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">bg-zinc-900</code> frame with inline colored crate tabs. Plain editorial titles (no leading folder icon) and tabular monospace counts via <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ProjectTableMetricValue /&gt;</code> keep <strong>Status</strong> as the sole focal badge with zero right-edge clipping.
                                     </p>
 
                                     {/* 9-Column Compact Desktop Table Specimen */}
@@ -3521,47 +3520,63 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     ))}
                                                 </tr>
                                             </thead>
-                                            <tbody className="divide-y divide-zinc-800/50 bg-zinc-900">
+                                            <tbody className="bg-zinc-900">
+                                                {/* Inline Colored Crate Tab Divider Row */}
+                                                <tr className="select-none bg-zinc-900">
+                                                    <td colSpan={9} className="pt-5 pb-0 px-4 align-bottom bg-zinc-900 border-none">
+                                                        <div
+                                                            className="w-[150px] sm:w-[160px] border-t border-l border-r border-zinc-800 rounded-t-lg pl-3 pr-1.5 py-1.5 font-mono tracking-widest text-[9px] sm:text-[10px] uppercase font-bold relative -mb-[1px] text-white"
+                                                            style={{ backgroundColor: '#ec4899' }}
+                                                        >
+                                                            POST HARDCORE
+                                                        </div>
+                                                    </td>
+                                                </tr>
                                                 {/* Mapped row */}
                                                 <tr className="group cursor-pointer border-b border-zinc-800/30">
                                                     <td className="py-3.5 pl-4 pr-3 font-medium text-white bg-zinc-900 group-hover:bg-white/5 group-hover:text-primary transition-colors relative z-10">
-                                                        <div className="flex items-center gap-2.5 min-w-0">
-                                                            <span className="material-symbols-outlined text-zinc-555 !text-[18px] group-hover:text-primary transition-colors shrink-0">folder</span>
-                                                            <span className="truncate max-w-[180px] text-sm">Midwest Emo Roots</span>
-                                                        </div>
+                                                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />
+                                                        <span className="block truncate max-w-[200px] text-sm">Midwest Emo Roots</span>
                                                     </td>
-                                                    <td className="py-3.5 px-3 text-zinc-400 text-xs font-mono font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10 whitespace-nowrap">27/06/2026 • 8:09 am</td>
+                                                    <td className="py-3.5 px-3 text-zinc-400 text-xs font-mono font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10 whitespace-nowrap">
+                                                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />
+                                                        27/06/2026 • 8:09 am
+                                                    </td>
                                                     <td className="py-3.5 px-2.5 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />
                                                         <ProjectTableMetricValue value={2} />
                                                     </td>
                                                     <td className="py-3.5 px-2.5 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />
                                                         <ProjectTableMetricValue value={3} />
                                                     </td>
                                                     <td className="py-3.5 px-2.5 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />
                                                         <ProjectTableMetricValue value={24} />
                                                     </td>
                                                     <td className="py-3.5 px-2.5 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />
                                                         <ProjectTableMetricValue value={8} mutedWhenZero />
                                                     </td>
                                                     <td className="py-3.5 px-2.5 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />
                                                         <ProjectTableMetricValue value={7} />
                                                     </td>
                                                     <td className="py-3.5 px-3 text-center bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />
                                                         <ProjectStatusBadge status="completed" variant="table" />
                                                     </td>
                                                     <td className="py-3.5 pl-2 pr-4 text-right bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />
                                                         <div className="w-9 h-9 rounded-lg text-zinc-500 inline-flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
                                                             <span className="material-symbols-outlined !text-xl">more_vert</span>
                                                         </div>
                                                     </td>
                                                 </tr>
                                                 {/* Unmapped row */}
-                                                <tr className="group cursor-pointer border-b border-zinc-800/30">
+                                                <tr className="group cursor-pointer border-b border-zinc-800/30 last:border-b-0">
                                                     <td className="py-3.5 pl-4 pr-3 font-medium text-zinc-300 bg-zinc-950/40 group-hover:bg-white/5 group-hover:text-primary transition-colors">
-                                                        <div className="flex items-center gap-2.5 min-w-0">
-                                                            <span className="material-symbols-outlined text-zinc-600 !text-[18px] group-hover:text-primary transition-colors shrink-0">folder</span>
-                                                            <span className="truncate max-w-[180px] text-sm">New Zcene Draft</span>
-                                                        </div>
+                                                        <span className="block truncate max-w-[200px] text-sm">New Zcene Draft</span>
                                                     </td>
                                                     <td className="py-3.5 px-3 text-zinc-400 text-xs font-mono font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors whitespace-nowrap">New Project</td>
                                                     <td className="py-3.5 px-2.5 text-center bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
@@ -3592,24 +3607,30 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </table>
                                     </div>
                                     <p className="text-[10px] text-zinc-500 font-mono">
-                                        Row 1: completed — dedicated SCENES through DEEP CUTS tabular counts + Mapped badge. Row 2: unmapped draft — empty metric cells render muted (-).
+                                        Row 1: completed — inline crate tab seam + dedicated SCENES through DEEP CUTS tabular counts + Mapped badge. Row 2: unmapped draft — empty metric cells render muted (-).
                                     </p>
 
-                                    {/* Mobile Compact List Card Specimen (Live <ProjectMobileListCard />) */}
+                                    {/* Mobile & Narrow-Tablet Distraction-Free List Frame Specimen (Live <ProjectMobileListCard />) */}
                                     <div className="pt-6 space-y-4">
                                         <div className="flex items-center gap-3">
                                             <span className="material-symbols-outlined text-zinc-400">smartphone</span>
-                                            <h4 className="text-base font-medium text-zinc-200">Project List — Mobile Compact List Card (&lt; 768px)</h4>
+                                            <h4 className="text-base font-medium text-zinc-200">Project List — Mobile &amp; Narrow-Tablet View (&lt; 1024px)</h4>
                                         </div>
                                         <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                            Full desktop/mobile feature parity: both <strong>Dashboard</strong> and <strong>Trash</strong> keep the Grid/List <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ViewToggle /&gt;</code> active on mobile (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">isSmallScreen</code>). Switching to List View below <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">768px</code> mounts single-branch <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ProjectMobileListCard /&gt;</code> rows (zero album artwork banner, zero desktop <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;table&gt;</code> DOM nodes, preserving crate tabs on Dashboard and 0T Restore on Trash).
+                                            Full desktop/mobile feature parity: both <strong>Dashboard</strong> and <strong>Trash</strong> keep the Grid/List <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ViewToggle /&gt;</code> active across every viewport. Below <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">1024px</code> (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">isSmallScreen || isBelowDesktopTable</code>), List View folds cleanly into one distraction-free solid-dark <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">rounded-2xl border border-zinc-800 bg-zinc-900</code> table frame with lightweight inline crate tabs and flat <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ProjectMobileListCard /&gt;</code> rows — zero translucent crate tint bleed, zero desktop <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;table&gt;</code> DOM, and <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">overflow-visible</code> so bottom action menus never clip.
                                         </p>
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl">
+                                        <div className="max-w-md rounded-2xl border border-zinc-800 bg-zinc-900">
+                                            <div className="bg-zinc-900 px-3.5 pt-4 pb-0 border-b border-zinc-800/80 rounded-t-[15px]">
+                                                <div
+                                                    className="w-[150px] border-t border-l border-r border-zinc-800 rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] uppercase font-bold text-white relative -mb-[1px]"
+                                                    style={{ backgroundColor: '#ec4899' }}
+                                                >
+                                                    POST HARDCORE
+                                                </div>
+                                            </div>
                                             <ProjectMobileListCard
                                                 title="Midwest Emo Roots"
                                                 formattedDate="27/06/2026 • 8:09 am"
-                                                icon="folder"
-                                                iconClassName="text-zinc-555"
                                                 sceneCount={2}
                                                 rootArtistsCount={3}
                                                 recommendedCount={24}
@@ -3617,6 +3638,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 deepCutsCount={7}
                                                 status="completed"
                                                 onClick={() => {}}
+                                                className="bg-zinc-900"
                                                 actionMenuSlot={
                                                     <div className="w-8 h-8 rounded-lg text-zinc-500 inline-flex items-center justify-center">
                                                         <span className="material-symbols-outlined !text-xl">more_vert</span>
@@ -3626,8 +3648,6 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <ProjectMobileListCard
                                                 title="New Zcene Draft"
                                                 formattedDate="New Project"
-                                                icon="folder"
-                                                iconClassName="text-zinc-600"
                                                 sceneCount={1}
                                                 rootArtistsCount={1}
                                                 recommendedCount={null}
@@ -3635,6 +3655,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 deepCutsCount={null}
                                                 status="draft"
                                                 onClick={() => {}}
+                                                className="bg-zinc-950/40 border-t border-zinc-800/50 rounded-b-[15px]"
                                                 actionMenuSlot={
                                                     <div className="w-8 h-8 rounded-lg text-zinc-500 inline-flex items-center justify-center">
                                                         <span className="material-symbols-outlined !text-xl">more_vert</span>
@@ -5721,7 +5742,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
                                     <ul className="list-disc list-outside pl-4 space-y-1.5 mt-2">
                                         <li><strong>Shared Card Shell:</strong> <code className="text-zinc-300">border border-zinc-800 bg-zinc-950/40 p-4 rounded-2xl</code> stacked with <code className="text-zinc-300">space-y-3</code> and subtle <code className="text-zinc-300">border-t border-zinc-800/60</code> monospace metadata footers.</li>
-                                        <li><strong>Zero Duplicate Nodes:</strong> Conditional rendering via <code className="text-zinc-300">isSmallScreen ? &lt;MobileCards /&gt; : &lt;DesktopTable /&gt;</code> guarantees only one branch mounts per viewport across Standard User tables (<strong>Token Activity</strong>, <strong>Stack Archive</strong>), Admin Control Room tables (<strong>Author P&amp;L</strong>, nested <strong>Author Receipts</strong>, <strong>Deep Connections Query Log</strong>, <strong>JIT Auto-Healing</strong>, and <strong>Failed &amp; Auto-Refunded Curations</strong>), and Project Lists (<strong>Dashboard</strong> &amp; <strong>Trash</strong> keep Grid/List toggle parity on mobile, rendering <code className="text-zinc-300">&lt;ProjectMobileListCard /&gt;</code> below 768px with zero desktop table DOM).</li>
+                                        <li><strong>Zero Duplicate Nodes:</strong> Conditional rendering via <code className="text-zinc-300">isSmallScreen ? &lt;MobileCards /&gt; : &lt;DesktopTable /&gt;</code> guarantees only one branch mounts per viewport across Standard User tables (<strong>Token Activity</strong>, <strong>Stack Archive</strong>) and Admin Control Room tables (<strong>Author P&amp;L</strong>, nested <strong>Author Receipts</strong>, <strong>Deep Connections Query Log</strong>, <strong>JIT Auto-Healing</strong>, and <strong>Failed &amp; Auto-Refunded Curations</strong>). Project Lists (<strong>Dashboard</strong> &amp; <strong>Trash</strong>) keep Grid/List toggle parity everywhere and fold at <code className="text-zinc-300">&lt; 1024px</code> into a single distraction-free solid-dark <code className="text-zinc-300">bg-zinc-900</code> table frame of <code className="text-zinc-300">&lt;ProjectMobileListCard /&gt;</code> rows with inline crate tabs and zero desktop table DOM.</li>
                                         <li><strong>Progressive Pagination:</strong> Activity and Admin operational logs paginate at <code className="text-zinc-300">10</code> rows (<code className="text-zinc-300">20</code> rows for Stack Archive) with incremental <code className="text-zinc-300">Show more (N remaining)</code> expansion.</li>
                                         <li><strong>Support Strip Placement:</strong> Billing dispute support (<code className="text-zinc-300">support@zcene.online</code>) sits quietly below the Token Activity list and Show More control rather than inside the top Wallet Hero.</li>
                                     </ul>

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import Header from './Header';
 import ViewToggle from './ViewToggle';
 import { DashboardProjectCard } from './DashboardProjectCard';
@@ -72,6 +72,18 @@ export const TrashPage: React.FC<TrashPageProps> = ({
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [projectToPurge, setProjectToPurge] = useState<string | null>(null);
+  const [isBelowDesktopTable, setIsBelowDesktopTable] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const handleResize = () => setIsBelowDesktopTable(window.innerWidth < 1024);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  const useCompactList = isSmallScreen || isBelowDesktopTable;
 
   const trashedProjects = useMemo(() => {
     return projects.filter(p => p.status === 'trashed');
@@ -385,10 +397,10 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                 />
               ))}
             </div>
-          ) : isSmallScreen ? (
-            /* Single-Branch Responsive Mobile Compact List View (< 768px — zero desktop table DOM) */
-            <div data-testid="trash-mobile-list" className="space-y-3">
-              {filteredProjects.map((project) => {
+          ) : useCompactList ? (
+            /* Single-Branch Distraction-Free Responsive Table List (< 1024px — zero desktop <table> DOM) */
+            <div data-testid="trash-mobile-list" className="w-full rounded-2xl border border-zinc-800 bg-zinc-900">
+              {filteredProjects.map((project, index) => {
                 const {
                   sceneCount,
                   rootArtistsCount,
@@ -397,6 +409,15 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                   deepCutsCount,
                 } = computeProjectCardMetrics(project);
                 const daysLeft = getDaysLeft(project);
+                const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
+                const rowClasses = [
+                  rowBg,
+                  index > 0 ? 'border-t border-zinc-800/50' : '',
+                  index === 0 ? 'rounded-t-[15px]' : '',
+                  index === filteredProjects.length - 1 ? 'rounded-b-[15px]' : '',
+                ]
+                  .filter(Boolean)
+                  .join(' ');
 
                 return (
                   <ProjectMobileListCard
@@ -404,8 +425,6 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                     data-testid={`trash-mobile-list-card-${project.id}`}
                     title={getProjectDisplayTitle(project)}
                     formattedDate={project.updatedAt ? formatSystemTimestamp(project.updatedAt) : 'New Project'}
-                    icon="auto_delete"
-                    iconClassName="text-amber-400"
                     sceneCount={sceneCount || 1}
                     rootArtistsCount={rootArtistsCount}
                     recommendedCount={recommendedCount}
@@ -415,12 +434,13 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                     daysLeft={daysLeft}
                     isMenuOpen={activeMenuId === project.id}
                     actionMenuSlot={renderTrashRowActions(project)}
+                    className={rowClasses}
                   />
                 );
               })}
             </div>
           ) : (
-            /* 9-Column Desktop Tabular List View (>= 768px) */
+            /* 9-Column Desktop Tabular List View (>= 1024px) */
             <div data-testid="trash-desktop-table" className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
               <table className="w-full text-left border-collapse min-w-[780px]">
                 <thead>
@@ -456,12 +476,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                     return (
                       <tr key={project.id} className={`group border-b border-zinc-800/30 ${activeMenuId === project.id ? 'relative z-40' : ''}`}>
                         <td className={`py-3.5 pl-4 pr-3 font-medium text-white ${tdClass}`}>
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <span className="material-symbols-outlined !text-[18px] text-amber-400 shrink-0">
-                              auto_delete
-                            </span>
-                            <span className="truncate max-w-[180px] xl:max-w-[260px] text-sm">{displayTitle}</span>
-                          </div>
+                          <span className="block truncate max-w-[200px] xl:max-w-[280px] text-sm">{displayTitle}</span>
                         </td>
                         <td className={`py-3.5 px-3 text-zinc-400 text-xs font-mono font-normal whitespace-nowrap ${tdClass}`}>
                           {formattedDate}

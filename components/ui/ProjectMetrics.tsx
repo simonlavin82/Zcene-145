@@ -153,8 +153,6 @@ export const ProjectStatusBadge: React.FC<ProjectStatusBadgeProps> = ({
 export interface ProjectMobileListCardProps {
   title: string;
   formattedDate: string;
-  icon: 'folder' | 'auto_delete';
-  iconClassName?: string;
   sceneCount: number;
   rootArtistsCount: number;
   recommendedCount: number | null;
@@ -166,14 +164,13 @@ export interface ProjectMobileListCardProps {
   isMenuOpen?: boolean;
   onClick?: () => void;
   actionMenuSlot?: React.ReactNode;
+  className?: string;
   'data-testid'?: string;
 }
 
 export const ProjectMobileListCard: React.FC<ProjectMobileListCardProps> = ({
   title,
   formattedDate,
-  icon,
-  iconClassName = 'text-zinc-500',
   sceneCount,
   rootArtistsCount,
   recommendedCount,
@@ -185,6 +182,7 @@ export const ProjectMobileListCard: React.FC<ProjectMobileListCardProps> = ({
   isMenuOpen = false,
   onClick,
   actionMenuSlot,
+  className = '',
   'data-testid': testId,
 }) => {
   const stats: { label: string; value: number | null }[] = [
@@ -199,19 +197,14 @@ export const ProjectMobileListCard: React.FC<ProjectMobileListCardProps> = ({
     <div
       data-testid={testId}
       onClick={onClick}
-      className={`border border-zinc-800 bg-zinc-950/40 rounded-2xl p-3.5 space-y-2.5 transition-colors relative ${
-        onClick ? 'cursor-pointer hover:bg-zinc-900/50 active:bg-zinc-900/70' : ''
-      } ${isMenuOpen ? 'z-40' : 'z-0'}`}
+      className={`px-3.5 py-3.5 space-y-2.5 transition-colors relative ${
+        onClick ? 'cursor-pointer hover:bg-white/5 active:bg-white/10' : ''
+      } ${isMenuOpen ? 'z-50' : 'z-0'} ${className}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          <span className={`material-symbols-outlined !text-[18px] shrink-0 ${iconClassName}`}>
-            {icon}
-          </span>
-          <span className="font-medium text-white text-sm truncate leading-snug">
-            {title}
-          </span>
-        </div>
+        <span className="font-medium text-white text-sm truncate leading-snug min-w-0 flex-1">
+          {title}
+        </span>
 
         {actionMenuSlot && (
           <div

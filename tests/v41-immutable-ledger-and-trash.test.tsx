@@ -282,18 +282,28 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       expect(screen.getByText(/ARTISTS: 1/i)).toBeInTheDocument();
       expect(screen.getByText(/DEEP CUTS: 1/i)).toBeInTheDocument();
 
-      // Desktop (>= 768px) renders 9-column table in List View; mobile (< 768px) keeps Grid/List parity with single-branch ProjectMobileListCard & ToolbarSearch
+      // Desktop (>= 1024px) renders 9-column table in List View (zero auto_delete row icon); mobile/narrow-tablet (< 1024px) keeps Grid/List parity with Option A single solid-dark framed list & ToolbarSearch
       const desktopListBtn = screen.getByRole('button', { name: 'List View' });
       expect(desktopListBtn).toBeInTheDocument();
       fireEvent.click(desktopListBtn);
-      expect(screen.getByTestId('trash-desktop-table')).toBeInTheDocument();
+      const trashDesktopTable = screen.getByTestId('trash-desktop-table');
+      expect(trashDesktopTable).toBeInTheDocument();
+      expect(trashDesktopTable.textContent).not.toContain('auto_delete');
       expect(document.querySelectorAll('thead th')).toHaveLength(9);
       expect(screen.getByText('Scenes')).toBeInTheDocument();
 
       rerender(<TrashPage {...trashBaseProps} isSmallScreen={true} />);
       expect(screen.getByRole('button', { name: 'Grid View' })).toBeInTheDocument();
       expect(screen.getByRole('button', { name: 'List View' })).toBeInTheDocument();
-      expect(screen.getByTestId('trash-mobile-list')).toBeInTheDocument();
+      const trashMobileList = screen.getByTestId('trash-mobile-list');
+      expect(trashMobileList).toBeInTheDocument();
+      expect(trashMobileList.className).toContain('bg-zinc-900');
+      expect(trashMobileList.className).toContain('rounded-2xl');
+      expect(trashMobileList.className).not.toContain('overflow-hidden');
+      expect(trashMobileList.textContent).not.toContain('auto_delete');
+      const trashMobileRow = screen.getByTestId('trash-mobile-list-card-proj-spaced');
+      expect(trashMobileRow.className).toContain('rounded-t-[15px]');
+      expect(trashMobileRow.className).toContain('rounded-b-[15px]');
       expect(screen.getByTestId('trash-search-trigger')).toBeInTheDocument();
       expect(screen.queryByTestId('trash-desktop-table')).not.toBeInTheDocument();
       expect(document.querySelector('table')).toBeNull();
