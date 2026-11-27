@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useMemo, useRef } from 'react';
 import { Flame, Pin } from 'lucide-react';
 import { View } from '../types';
 import { InstagramIcon, MicIcon, StackIcon } from './Icons';
 import Header from './Header';
 import { BackButton } from './DesignSystem';
+import { DocsPageShell, useSectionScrollSpy } from './ui/DocsSidebarNav';
 import { GlobalFooter } from './GlobalFooter';
 import { nodeTypeColorMap } from '../utils/formatters';
 import {
@@ -460,7 +461,7 @@ const LegendItem: React.FC<LegendItemProps> = ({ icon, color, title, description
 );
 
 const HelpSection: React.FC<{ title: string; id?: string; children: React.ReactNode }> = ({ title, id, children }) => (
-    <section id={id}>
+    <section id={id} className="scroll-mt-6">
         <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">{title}</h2>
         {children}
     </section>
@@ -514,49 +515,6 @@ const HelpPage: React.FC<HelpPageProps> = ({
     tokenBalance = 0
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
-    const [activeSectionId, setActiveSectionId] = useState<string>('');
-
-    const scrollToSection = (sectionId: string, offset: number = 80) => {
-        const element = document.getElementById(sectionId);
-        const container = containerRef.current;
-        if (element && container) {
-            const containerRect = container.getBoundingClientRect();
-            const elementRect = element.getBoundingClientRect();
-            const relativeTop = elementRect.top - containerRect.top;
-            const targetScrollTop = container.scrollTop + relativeTop - offset;
-            container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
-        }
-    };
-
-    useEffect(() => {
-        if (!isActive || !containerRef.current) return;
-
-        let raf1 = 0;
-        let raf2 = 0;
-
-        const syncHashNavigation = () => {
-            const hashId = typeof window !== 'undefined' ? window.location.hash.replace(/^#/, '').trim() : '';
-            if (hashId && document.getElementById(hashId)) {
-                setActiveSectionId(hashId);
-                raf1 = requestAnimationFrame(() => {
-                    raf2 = requestAnimationFrame(() => {
-                        scrollToSection(hashId, isSmallScreen ? 160 : 80);
-                    });
-                });
-            } else {
-                setActiveSectionId('');
-                containerRef.current?.scrollTo(0, 0);
-            }
-        };
-
-        syncHashNavigation();
-        window.addEventListener('hashchange', syncHashNavigation);
-        return () => {
-            window.removeEventListener('hashchange', syncHashNavigation);
-            if (raf1) cancelAnimationFrame(raf1);
-            if (raf2) cancelAnimationFrame(raf2);
-        };
-    }, [isActive, isSmallScreen]);
 
     // Exact live parity with GraphPage.tsx legendConfig & legendOrder
     const legendItems: LegendItemProps[] = [
@@ -598,7 +556,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
         }
     ];
 
-    const sections = [
+    const sections = useMemo(() => [
         { id: 'choose-artists', title: 'Choosing your roots' },
         { id: 'getting-around', title: 'Getting around' },
         { id: 'digging-details', title: 'Digging for details' },
@@ -610,99 +568,61 @@ const HelpPage: React.FC<HelpPageProps> = ({
         { id: 'legend-glossary', title: 'Legend Glossary' },
         { id: 'troubleshooting', title: 'Troubleshooting' },
         { id: 'contact-support', title: 'Official Support & Contact' }
-    ];
+    ], []);
 
-    const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
-        e.preventDefault();
-        setActiveSectionId(sectionId);
-        scrollToSection(sectionId, 80);
-    };
+    const navGroups = useMemo(() => [{ items: sections }], [sections]);
+    const sectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
 
-    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const sectionId = e.target.value;
-        if (!sectionId) return;
-        setActiveSectionId(sectionId);
-        scrollToSection(sectionId, 160);
-        e.target.value = "";
-    };
+    const { activeSectionId, scrollToSection } = useSectionScrollSpy({
+        containerRef,
+        sectionIds,
+        isActive,
+        syncHash: true,
+    });
+
+    const backButton = (
+        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
+    );
 
     return (
-        <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative">
-            <Header
-                user={user}
-                onLogoClick={onLogoClick}
-                view="dashboard"
-                isSmallScreen={isSmallScreen}
-                isMagazineViewOpen={false}
-                stackCount={stackCount}
-                isStackNew={isStackNew}
-                onOpenStack={onOpenStack}
-                onNavigate={onNavigateMenu || onNavigate}
-                onLogout={onLogout}
-                onDeleteAccount={onDeleteAccount}
-                isAdmin={isAdmin}
-                isProfileOpen={isProfileOpen}
-                setIsProfileOpen={setIsProfileOpen}
-                isDeleteAccountModalOpen={isDeleteAccountModalOpen}
-                setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
-                isMenuOpen={isMenuOpen}
-                setIsMenuOpen={setIsMenuOpen}
-                onRestartWalkthrough={onRestartWalkthrough}
-                tokenBalance={tokenBalance}
-            />
-
-            <div className="lg:hidden p-4 sticky top-0 bg-background-dark/95 backdrop-blur-md z-[90] border-b border-zinc-800 flex items-center gap-3">
-                <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
-                <div className="relative flex-1 min-w-0">
-                    <select
-                        id="help-nav"
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-10 text-sm font-medium focus:ring-1 focus:ring-primary focus:outline-none"
-                        onChange={handleSelectChange}
-                        defaultValue=""
-                    >
-                        <option value="" disabled>Jump to section...</option>
-                        {sections.map(section => (
-                            <option key={section.id} value={section.id}>{section.title}</option>
-                        ))}
-                    </select>
-                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 !text-[18px]">arrow_drop_down</span>
-                </div>
-            </div>
-
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
-                <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 scrollbar-thin scrollbar-thumb-zinc-800">
-                    <div className="pt-6 pb-4">
-                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
-                    </div>
-                    <nav className="space-y-1">
-                        {sections.map(section => {
-                            const isCurrentSection = activeSectionId === section.id;
-                            return (
-                                <a
-                                    key={section.id}
-                                    href={`#${section.id}`}
-                                    onClick={(e) => handleNavClick(e, section.id)}
-                                    aria-current={isCurrentSection ? 'location' : undefined}
-                                    className={`block py-1.5 px-2 rounded-xl transition-colors text-sm ${
-                                        isCurrentSection
-                                            ? 'text-primary bg-zinc-800/60 font-medium'
-                                            : 'text-zinc-400 hover:text-primary hover:bg-zinc-800/50'
-                                    }`}
-                                >
-                                    {section.title}
-                                </a>
-                            );
-                        })}
-                    </nav>
-                </aside>
-
-                <main className="flex-1 py-10 space-y-24 min-w-0">
-                    <div className="lg:hidden pt-4 pb-2">
-                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
-                    </div>
-
+        <DocsPageShell
+            scrollContainerRef={containerRef}
+            groups={navGroups}
+            activeSectionId={activeSectionId}
+            onSelectSection={(id) => scrollToSection(id)}
+            backButton={backButton}
+            sidebarWidthClassName="w-56"
+            sidebarAriaLabel="Help Sections"
+            sheetTitle="Help Sections"
+            mainClassName="space-y-24"
+            header={
+                <Header
+                    user={user}
+                    onLogoClick={onLogoClick}
+                    view="dashboard"
+                    isSmallScreen={isSmallScreen}
+                    isMagazineViewOpen={false}
+                    stackCount={stackCount}
+                    isStackNew={isStackNew}
+                    onOpenStack={onOpenStack}
+                    onNavigate={onNavigateMenu || onNavigate}
+                    onLogout={onLogout}
+                    onDeleteAccount={onDeleteAccount}
+                    isAdmin={isAdmin}
+                    isProfileOpen={isProfileOpen}
+                    setIsProfileOpen={setIsProfileOpen}
+                    isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+                    setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+                    isMenuOpen={isMenuOpen}
+                    setIsMenuOpen={setIsMenuOpen}
+                    onRestartWalkthrough={onRestartWalkthrough}
+                    tokenBalance={tokenBalance}
+                />
+            }
+            footer={<GlobalFooter onNavigate={onNavigate} isAdmin={isAdmin} currentView={View.Help} />}
+        >
                     {/* CHOOSING YOUR ROOTS */}
-                    <section id="choose-artists">
+                    <section id="choose-artists" className="scroll-mt-6">
                         <div className="mb-10 border-b border-zinc-700 pb-8">
                             <h1 className="text-3xl font-medium text-white mb-4">Help</h1>
                             <p className="text-zinc-400 leading-relaxed max-w-3xl text-base">
@@ -1197,11 +1117,7 @@ const HelpPage: React.FC<HelpPageProps> = ({
                             <strong className="text-zinc-200">Billing & Refund Reviews:</strong> If you believe a system error was not automatically refunded to your token ledger, please send your authenticated account email and project name to <a href={ZCENE_SUPPORT_MAILTO} className="text-primary hover:underline">{ZCENE_SUPPORT_EMAIL}</a> for an immediate review.
                         </div>
                     </HelpSection>
-                </main>
-            </div>
-
-            <GlobalFooter onNavigate={onNavigate} isAdmin={isAdmin} currentView={View.Help} />
-        </div>
+        </DocsPageShell>
     );
 };
 

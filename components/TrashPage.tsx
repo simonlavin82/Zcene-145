@@ -248,31 +248,34 @@ export const TrashPage: React.FC<TrashPageProps> = ({
   );
 
   return (
-    <div className="h-full w-full overflow-y-auto bg-background-dark text-white selection:bg-primary selection:text-black flex flex-col relative">
-      <Header
-        user={user}
-        onLogoClick={onLogoClick}
-        view="dashboard"
-        isSmallScreen={isSmallScreen}
-        isMagazineViewOpen={false}
-        stackCount={stackCount}
-        isStackNew={isStackNew}
-        onOpenStack={onOpenStack}
-        onNavigate={onNavigateMenu || onNavigate}
-        onLogout={onLogout}
-        onDeleteAccount={onDeleteAccount}
-        isAdmin={isAdmin}
-        tokenBalance={tokenBalance}
-        isProfileOpen={isProfileOpen}
-        setIsProfileOpen={setIsProfileOpen}
-        isDeleteAccountModalOpen={isDeleteAccountModalOpen}
-        setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
-        isMenuOpen={isMenuOpen}
-        setIsMenuOpen={setIsMenuOpen}
-        onRestartWalkthrough={onRestartWalkthrough}
-      />
+    <div className="h-full w-full overflow-hidden bg-background-dark text-white selection:bg-primary selection:text-black flex flex-col relative">
+      <div className="shrink-0 relative z-[100] bg-background-dark border-b border-zinc-800/70">
+        <Header
+          user={user}
+          onLogoClick={onLogoClick}
+          view="dashboard"
+          isSmallScreen={isSmallScreen}
+          isMagazineViewOpen={false}
+          stackCount={stackCount}
+          isStackNew={isStackNew}
+          onOpenStack={onOpenStack}
+          onNavigate={onNavigateMenu || onNavigate}
+          onLogout={onLogout}
+          onDeleteAccount={onDeleteAccount}
+          isAdmin={isAdmin}
+          tokenBalance={tokenBalance}
+          isProfileOpen={isProfileOpen}
+          setIsProfileOpen={setIsProfileOpen}
+          isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+          setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+          isMenuOpen={isMenuOpen}
+          setIsMenuOpen={setIsMenuOpen}
+          onRestartWalkthrough={onRestartWalkthrough}
+        />
+      </div>
 
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow">
+      <div className="flex-1 min-h-0 w-full overflow-y-auto relative flex flex-col">
+        <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow">
         <div className="max-w-6xl mx-auto space-y-8">
           {/* Back Button */}
           <div className="pt-6 pb-2">
@@ -492,7 +495,8 @@ export const TrashPage: React.FC<TrashPageProps> = ({
             </ResponsiveTableFrame>
           )}
         </div>
-      </main>
+        </main>
+      </div>
 
       {/* Custom Permanent Purge Confirmation Modal */}
       {projectToPurge && (

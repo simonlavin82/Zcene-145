@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import { View, Node, NodeDetails } from '../types';
 import { ZceneLogo } from './Icons';
 import Header from './Header';
@@ -6,6 +6,7 @@ import Markdown from 'react-markdown';
 import { Terminal, ChevronDown, ChevronRight } from 'lucide-react';
 import { BACKEND_REGRESSION_RUNBOOK } from '../docs/backend-regression-runbook';
 import { BackButton } from './DesignSystem';
+import { DocsPageShell, useSectionScrollSpy } from './ui/DocsSidebarNav';
 import { extractBlockArtistChips, buildGoogleImagesSearchUrl, partitionBlockIndicesIntoThreeColumns, estimateEditorialBlockHeight } from './DetailsPanel';
 import { normalizeZineTitle } from '../shared/multiSceneUtils';
 
@@ -851,12 +852,6 @@ export const EnginePage: React.FC<SourcePageProps> = ({
 }) => {
     const containerRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (isActive && containerRef.current) {
-            containerRef.current.scrollTo(0, 0);
-        }
-    }, [isActive]);
-
     const CodeBlock: React.FC<{ title: string; content: string }> = ({ title: blockTitle, content }) => (
         <div className="rounded-xl border border-zinc-700/50 bg-zinc-900/50 overflow-hidden mb-6">
             <div className="bg-zinc-800/50 px-5 py-3 border-b border-zinc-700/50 flex justify-between items-center">
@@ -871,110 +866,77 @@ export const EnginePage: React.FC<SourcePageProps> = ({
         </div>
     );
 
-    const sections = [
+    const sections = useMemo(() => [
         { id: 'architecture', title: '1. Architecture & Pipeline' },
         { id: 'data-lifecycle', title: '2. Data Lifecycle & Storage' },
         { id: 'runbooks', title: '3. Runbooks & Automation' },
         { id: 'runtime-physics', title: '4. Runtime Systems & Physics' }
-    ];
+    ], []);
 
-    const scrollToSection = (sectionId: string, offset: number = 80) => {
-        const element = document.getElementById(sectionId);
-        const container = containerRef.current;
-        if (element && container) {
-            const containerRect = container.getBoundingClientRect();
-            const elementRect = element.getBoundingClientRect();
-            const relativeTop = elementRect.top - containerRect.top;
-            const targetScrollTop = container.scrollTop + relativeTop - offset;
-            container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
-        }
-    };
+    const navGroups = useMemo(() => [{ items: sections }], [sections]);
+    const sectionIds = useMemo(() => sections.map((s) => s.id), [sections]);
 
-    const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
-        e.preventDefault();
-        scrollToSection(sectionId, 80);
-    };
+    const { activeSectionId, scrollToSection } = useSectionScrollSpy({
+        containerRef,
+        sectionIds,
+        isActive,
+        syncHash: true,
+    });
 
-    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const sectionId = e.target.value;
-        if (!sectionId) return;
-        scrollToSection(sectionId, 80);
-        e.target.value = "";
-    };
+    const backButton = (
+        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
+    );
 
     return (
-        <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative">
-            <Header
-                user={user}
-                onLogoClick={onLogoClick}
-                view="dashboard"
-                isSmallScreen={isSmallScreen}
-                isMagazineViewOpen={false}
-                stackCount={stackCount}
-                isStackNew={isStackNew}
-                onOpenStack={onOpenStack}
-                onNavigate={onNavigateMenu || onNavigate}
-                onLogout={onLogout}
-                onDeleteAccount={onDeleteAccount}
-                isAdmin={isAdmin}
-                tokenBalance={tokenBalance ?? profile?.tokenBalance ?? 0}
-                isProfileOpen={isProfileOpen}
-                setIsProfileOpen={setIsProfileOpen}
-                isDeleteAccountModalOpen={isDeleteAccountModalOpen}
-                setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
-                isMenuOpen={isMenuOpen}
-                setIsMenuOpen={setIsMenuOpen}
-                onRestartWalkthrough={onRestartWalkthrough}
-            />
-
-            {/* Mobile Navigation Dropdown */}
-            <div className="lg:hidden p-4 sticky top-0 bg-background-dark/95 backdrop-blur-md z-[90] border-b border-zinc-800 flex items-center gap-3">
-                <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
-                <div className="relative flex-1 min-w-0">
-                    <select
-                        id="engine-nav"
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-10 text-sm font-medium focus:ring-1 focus:ring-primary focus:outline-none"
-                        onChange={handleSelectChange}
-                        defaultValue=""
-                    >
-                        <option value="" disabled>Jump to architectural pillar...</option>
-                        {sections.map(s => (
-                            <option key={s.id} value={s.id}>{s.title}</option>
-                        ))}
-                    </select>
-                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 !text-[18px]">arrow_drop_down</span>
+        <DocsPageShell
+            scrollContainerRef={containerRef}
+            groups={navGroups}
+            activeSectionId={activeSectionId}
+            onSelectSection={(id) => scrollToSection(id)}
+            backButton={backButton}
+            sidebarWidthClassName="w-56"
+            sidebarAriaLabel="Engine Architectural Pillars"
+            sheetTitle="Architectural Pillars"
+            mainClassName="space-y-16"
+            sidebarFooter={
+                <div className="text-[10px] text-zinc-500 font-mono pl-2">
+                    Zcene V47.20 Blueprint<br />
+                    100% Anti-Regression
                 </div>
-            </div>
-
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
-                {/* Desktop Sticky Sidebar */}
-                <aside className="w-56 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 scrollbar-thin scrollbar-thumb-zinc-800">
-                    <div className="pt-6 pb-4">
-                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
+            }
+            header={
+                <Header
+                    user={user}
+                    onLogoClick={onLogoClick}
+                    view="dashboard"
+                    isSmallScreen={isSmallScreen}
+                    isMagazineViewOpen={false}
+                    stackCount={stackCount}
+                    isStackNew={isStackNew}
+                    onOpenStack={onOpenStack}
+                    onNavigate={onNavigateMenu || onNavigate}
+                    onLogout={onLogout}
+                    onDeleteAccount={onDeleteAccount}
+                    isAdmin={isAdmin}
+                    tokenBalance={tokenBalance ?? profile?.tokenBalance ?? 0}
+                    isProfileOpen={isProfileOpen}
+                    setIsProfileOpen={setIsProfileOpen}
+                    isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+                    setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+                    isMenuOpen={isMenuOpen}
+                    setIsMenuOpen={setIsMenuOpen}
+                    onRestartWalkthrough={onRestartWalkthrough}
+                />
+            }
+            footer={
+                <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
+                    <div className="container mx-auto text-center">
+                        <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
+                        <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.20 Programmatic Architecture.</p>
                     </div>
-                    <nav className="space-y-1">
-                        {sections.map(s => (
-                            <a 
-                                key={s.id} 
-                                href={`#${s.id}`} 
-                                onClick={(e) => handleNavClick(e, s.id)}
-                                className="block text-zinc-400 hover:text-primary hover:bg-zinc-800/50 py-1.5 px-2 rounded-xl transition-colors text-sm"
-                            >
-                                {s.title}
-                            </a>
-                        ))}
-                    </nav>
-                    <div className="mt-8 pt-4 border-t border-zinc-800/60 text-[10px] text-zinc-500 font-mono pl-2">
-                        Zcene V47.20 Blueprint<br/>
-                        100% Anti-Regression
-                    </div>
-                </aside>
-
-                <main className="flex-1 py-10 space-y-16 min-w-0">
-                    <div className="lg:hidden pt-4 pb-2">
-                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
-                    </div>
-                    
+                </footer>
+            }
+        >
                     {/* Header Banner */}
                     <div className="mb-8 border-b border-zinc-700/60 pb-6">
                         <div className="flex items-center gap-3 mb-2">
@@ -987,7 +949,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     </div>
 
                     {/* ── PILLAR 1: ARCHITECTURE & PIPELINE ── */}
-                    <section id="architecture" className="scroll-mt-24 mb-12">
+                    <section id="architecture" className="scroll-mt-6 mb-12">
                         <h2 className="text-xl sm:text-2xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-6">
                             1. Architecture & Pipeline
                         </h2>
@@ -996,7 +958,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     </section>
 
                     {/* ── PILLAR 2: DATA LIFECYCLE & STORAGE ── */}
-                    <section id="data-lifecycle" className="scroll-mt-24 mb-12">
+                    <section id="data-lifecycle" className="scroll-mt-6 mb-12">
                         <h2 className="text-xl sm:text-2xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-6">
                             2. Data Lifecycle & Storage
                         </h2>
@@ -1005,7 +967,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     </section>
 
                     {/* ── PILLAR 3: RUNBOOKS & AUTOMATION ── */}
-                    <section id="runbooks" className="scroll-mt-24 mb-12">
+                    <section id="runbooks" className="scroll-mt-6 mb-12">
                         <h2 className="text-xl sm:text-2xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-6">
                             3. Runbooks & Automation
                         </h2>
@@ -1014,7 +976,7 @@ export const EnginePage: React.FC<SourcePageProps> = ({
                     </section>
 
                     {/* ── PILLAR 4: RUNTIME SYSTEMS & PHYSICS ── */}
-                    <section id="runtime-physics" className="scroll-mt-24 mb-12">
+                    <section id="runtime-physics" className="scroll-mt-6 mb-12">
                         <h2 className="text-xl sm:text-2xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-6">
                             4. Runtime Systems & Physics
                         </h2>
@@ -1062,17 +1024,7 @@ LOCKED SEMANTIC TOPOLOGY & ZERO READ-ONLY WRITES (Rule 21):
 - Telemetry Audit: Granular token usage and USD list-price receipts committed to adminLedger/system/jitHeals.`} 
                         />
                     </section>
-
-                </main>
-            </div>
-
-            <footer className="w-full p-6 text-zinc-400 text-xs z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
-                <div className="container mx-auto text-center">
-                    <ZceneLogo className="h-6 w-auto text-primary mx-auto mb-2" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. V47.20 Programmatic Architecture.</p>
-                </div>
-            </footer>
-        </div>
+        </DocsPageShell>
     );
 };
 

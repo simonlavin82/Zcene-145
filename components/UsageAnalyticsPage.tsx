@@ -3154,31 +3154,34 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     }, [user?.uid, stackCount, archivedStack.length, authorStackCache, loadingStackUids]);
 
     return (
-        <div ref={containerRef} className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative select-text">
-            <Header
-                user={user}
-                onLogoClick={onLogoClick}
-                view="dashboard"
-                isSmallScreen={isSmallScreen}
-                isMagazineViewOpen={false}
-                stackCount={stackCount}
-                isStackNew={isStackNew}
-                onOpenStack={onOpenStack}
-                onNavigate={onNavigateMenu || onNavigate}
-                onLogout={onLogout}
-                onDeleteAccount={onDeleteAccount}
-                isAdmin={isAdmin}
-                tokenBalance={liveTokenBalance}
-                isProfileOpen={isProfileOpen}
-                setIsProfileOpen={setIsProfileOpen}
-                isDeleteAccountModalOpen={isDeleteAccountModalOpen}
-                setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
-                isMenuOpen={isMenuOpen}
-                setIsMenuOpen={setIsMenuOpen}
-                onRestartWalkthrough={onRestartWalkthrough}
-            />
+        <div className="h-full w-full overflow-hidden bg-background-dark text-zinc-200 font-display flex flex-col relative select-text">
+            <div className="shrink-0 relative z-[100] bg-background-dark border-b border-zinc-800/70">
+                <Header
+                    user={user}
+                    onLogoClick={onLogoClick}
+                    view="dashboard"
+                    isSmallScreen={isSmallScreen}
+                    isMagazineViewOpen={false}
+                    stackCount={stackCount}
+                    isStackNew={isStackNew}
+                    onOpenStack={onOpenStack}
+                    onNavigate={onNavigateMenu || onNavigate}
+                    onLogout={onLogout}
+                    onDeleteAccount={onDeleteAccount}
+                    isAdmin={isAdmin}
+                    tokenBalance={liveTokenBalance}
+                    isProfileOpen={isProfileOpen}
+                    setIsProfileOpen={setIsProfileOpen}
+                    isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+                    setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+                    isMenuOpen={isMenuOpen}
+                    setIsMenuOpen={setIsMenuOpen}
+                    onRestartWalkthrough={onRestartWalkthrough}
+                />
+            </div>
 
-            <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-grow">
+            <div ref={containerRef} className="flex-1 min-h-0 w-full overflow-y-auto relative flex flex-col">
+                <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8 flex-grow">
                 <div className="max-w-6xl mx-auto space-y-6">
                     <div className="pt-1">
                         <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
@@ -4390,7 +4393,8 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                             : "© 2026 Zcene Admin Console. Restricted access authorisation archives."}
                     </p>
                 </div>
-            </footer>
+                </footer>
+            </div>
 
             {/* Permanent Delete Stack Archive Item Confirmation Modal */}
             {stackItemToDelete && !isInspectingOtherUser && (() => {

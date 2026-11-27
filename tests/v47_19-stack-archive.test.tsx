@@ -1567,9 +1567,17 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(dsSrc).toContain('POST HARDCORE');
     expect(dsSrc).toContain('Tables &amp; Lists');
     expect(dsSrc).toContain('Cards &amp; Crates');
+    expect(dsSrc).toContain('DocsPageShell');
+    expect(dsSrc).toContain('DocsDesktopSidebar');
+    expect(dsSrc).toContain('DocsMobileBreadcrumbBar');
+    expect(dsSrc).toContain('DocsSectionSheet');
+    expect(dsSrc).toContain('useSectionScrollSpy');
+    expect(dsSrc).toContain('id="docs-navigation"');
     expect(dsSrc).toContain('auto_stories');
     expect(dsSrc).toContain('picture_as_pdf');
     expect(dsSrc).toContain('visibility_off');
+    expect(dsSrc).not.toContain('id="styleguide-nav"');
+    expect(dsSrc).not.toContain('<div className="lg:hidden pt-4 pb-2">');
     expect(dsSrc).not.toContain('#aaff00');
     expect(dsSrc).not.toContain('Old — Removed');
     expect(dsSrc).not.toContain('\\u2014');
@@ -1585,5 +1593,31 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(dsSrc).not.toContain('Roots Breakdown');
     expect(dsSrc).not.toContain('shopping_bag');
     expect(dsSrc).not.toContain('**18px**');
+
+    // Shared DocsSidebarNav + single BackButton + split-flex pinned Header parity across Help, Engine, Terms, Trash & Analytics
+    const helpSrc = fs.readFileSync(path.resolve(__dirname, '../components/HelpPage.tsx'), 'utf-8');
+    const engineSrc = fs.readFileSync(path.resolve(__dirname, '../components/EnginePage.tsx'), 'utf-8');
+    const termsSrc = fs.readFileSync(path.resolve(__dirname, '../components/TermsPage.tsx'), 'utf-8');
+    const trashSrc = fs.readFileSync(path.resolve(__dirname, '../components/TrashPage.tsx'), 'utf-8');
+    const analyticsSrc = fs.readFileSync(path.resolve(__dirname, '../components/UsageAnalyticsPage.tsx'), 'utf-8');
+
+    expect(helpSrc).toContain('DocsPageShell');
+    expect(helpSrc).toContain('useSectionScrollSpy');
+    expect(helpSrc).toContain('syncHash: true');
+    expect(helpSrc).not.toContain('id="help-nav"');
+    expect(helpSrc).not.toContain('<div className="lg:hidden pt-4 pb-2">');
+    expect((helpSrc.match(/<BackButton\b/g) || []).length).toBe(1);
+
+    expect(engineSrc).toContain('DocsPageShell');
+    expect(engineSrc).toContain('useSectionScrollSpy');
+    expect(engineSrc).toContain('syncHash: true');
+    expect(engineSrc).not.toContain('id="engine-nav"');
+    expect(engineSrc).not.toContain('<div className="lg:hidden pt-4 pb-2">');
+    expect((engineSrc.match(/<BackButton\b/g) || []).length).toBe(1);
+
+    expect(termsSrc).not.toContain('h-screen w-screen');
+    expect(termsSrc).toContain('h-full w-full overflow-hidden');
+    expect(trashSrc).toContain('h-full w-full overflow-hidden');
+    expect(analyticsSrc).toContain('h-full w-full overflow-hidden');
   });
 });

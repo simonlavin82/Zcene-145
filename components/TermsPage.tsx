@@ -66,32 +66,37 @@ export const TermsPage: React.FC<TermsPageProps> = ({
 
   return (
     <div
-      ref={containerRef}
       data-testid="terms-page"
-      className="h-screen w-screen bg-background-dark text-zinc-200 font-sans overflow-y-auto overflow-x-hidden flex flex-col"
+      className="h-full w-full overflow-hidden bg-background-dark text-zinc-200 font-sans flex flex-col relative"
     >
-      <Header
-        user={user}
-        onLogoClick={onLogoClick || (() => onNavigate(View.Home))}
-        isSmallScreen={isSmallScreen}
-        stackCount={stackCount}
-        isStackNew={isStackNew}
-        onOpenStack={onOpenStack}
-        onNavigate={onNavigateMenu || ((p) => onNavigate(p as View))}
-        onLogout={onLogout}
-        onDeleteAccount={onDeleteAccount}
-        isAdmin={isAdmin}
-        isProfileOpen={isProfileOpen}
-        setIsProfileOpen={setIsProfileOpen}
-        isDeleteAccountModalOpen={isDeleteAccountModalOpen}
-        setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
-        isMenuOpen={isMenuOpen}
-        setIsMenuOpen={setIsMenuOpen}
-        onRestartWalkthrough={onRestartWalkthrough}
-        tokenBalance={tokenBalance}
-      />
+      <div className="shrink-0 relative z-[100] bg-background-dark border-b border-zinc-800/70">
+        <Header
+          user={user}
+          onLogoClick={onLogoClick || (() => onNavigate(View.Home))}
+          isSmallScreen={isSmallScreen}
+          stackCount={stackCount}
+          isStackNew={isStackNew}
+          onOpenStack={onOpenStack}
+          onNavigate={onNavigateMenu || ((p) => onNavigate(p as View))}
+          onLogout={onLogout}
+          onDeleteAccount={onDeleteAccount}
+          isAdmin={isAdmin}
+          isProfileOpen={isProfileOpen}
+          setIsProfileOpen={setIsProfileOpen}
+          isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+          setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+          isMenuOpen={isMenuOpen}
+          setIsMenuOpen={setIsMenuOpen}
+          onRestartWalkthrough={onRestartWalkthrough}
+          tokenBalance={tokenBalance}
+        />
+      </div>
 
-      <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow">
+      <div
+        ref={containerRef}
+        className="flex-1 min-h-0 w-full overflow-y-auto overflow-x-hidden relative flex flex-col"
+      >
+        <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-10 flex-grow">
         <div className="max-w-3xl mx-auto space-y-10">
           <div className="pt-4">
             <BackButton
@@ -172,9 +177,10 @@ export const TermsPage: React.FC<TermsPageProps> = ({
             </p>
           </section>
         </div>
-      </main>
+        </main>
 
-      <GlobalFooter onNavigate={onNavigate} isAdmin={isAdmin} currentView={View.Terms} />
+        <GlobalFooter onNavigate={onNavigate} isAdmin={isAdmin} currentView={View.Terms} />
+      </div>
     </div>
   );
 };

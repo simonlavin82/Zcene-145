@@ -4,7 +4,7 @@
  * Any proposed changes to layout, spacing, or component behavior must align with these specs
  * to ensure consistency across the Zcene application.
  */
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { View, Project } from '../types';
 import * as d3 from 'd3';
 import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, StackIcon, LibraryIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS, BandcampIcon } from './Icons';
@@ -16,6 +16,14 @@ import { InfoTooltip } from './ui/InfoTooltip';
 import { ModalHeader, ModalBody, ModalFooter, ModalFooterLink } from './ui/Dialog';
 import { PROJECT_TABLE_COLUMNS, ProjectMetricPill, ProjectTableMetricValue, ProjectStatusBadge, ProjectMobileListCard } from './ui/ProjectMetrics';
 import { DATA_TABLE_TOKENS, ResponsiveTableFrame } from './ui/DataTable';
+import {
+  DocsPageShell,
+  DocsDesktopSidebar,
+  DocsMobileBreadcrumbBar,
+  DocsSectionSheet,
+  DocsNavGroup,
+  useSectionScrollSpy,
+} from './ui/DocsSidebarNav';
 import { ToolbarSearch } from './ui/ToolbarSearch';
 export { ToolbarSearch } from './ui/ToolbarSearch';
 export type { ToolbarSearchProps } from './ui/ToolbarSearch';
@@ -650,218 +658,172 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     const [demoFilterCountry, setDemoFilterCountry] = useState<string>('United Kingdom');
     const [demoSelectedCandidateId, setDemoSelectedCandidateId] = useState<string>('spaced-us-buffalo');
     const [demoVerifyEscapeOpen, setDemoVerifyEscapeOpen] = useState<boolean>(false);
-    const [activeSectionId, setActiveSectionId] = useState<string>('introduction');
+    const [demoDocsActiveId, setDemoDocsActiveId] = useState<string>('docs-navigation');
+    const [demoDocsSheetOpen, setDemoDocsSheetOpen] = useState<boolean>(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    useEffect(() => {
-        if (isActive && containerRef.current) {
-            containerRef.current.scrollTo(0, 0);
-            setActiveSectionId('introduction');
-        }
-    }, [isActive]);
+    const demoDocsGroups: DocsNavGroup[] = useMemo(
+        () => [
+            {
+                label: 'Foundations',
+                items: [
+                    { id: 'introduction', title: 'Introduction' },
+                    { id: 'color-palette', title: 'Color Palette' },
+                    { id: 'typography', title: 'Typography' },
+                ],
+            },
+            {
+                label: 'Components',
+                items: [
+                    { id: 'dialogs', title: 'Dialogs' },
+                    { id: 'docs-navigation', title: 'Docs Navigation' },
+                    { id: 'tables-lists', title: 'Tables & Lists' },
+                ],
+            },
+            {
+                label: 'Archived',
+                items: [{ id: 'advertisement', title: 'Advertisement', badge: 'Inactive' }],
+            },
+        ],
+        []
+    );
 
-    const sectionGroups: {
-        label: string;
-        items: { id: string; title: string; badge?: string }[];
-    }[] = [
-        {
-            label: 'Foundations',
-            items: [
-                { id: 'introduction', title: 'Introduction' },
-                { id: 'border-radius', title: 'Border Radius' },
-                { id: 'color-palette', title: 'Color Palette' },
-                { id: 'iconography', title: 'Iconography' },
-                { id: 'layout-spacing', title: 'Layout & Spacing' },
-                { id: 'logo', title: 'Logo' },
-                { id: 'tone-of-voice', title: 'Tone of Voice' },
-                { id: 'typography', title: 'Typography' },
-                { id: 'visuals', title: 'Visuals' },
-            ],
-        },
-        {
-            label: 'Components',
-            items: [
-                { id: 'badges-tags', title: 'Badges & Tags' },
-                { id: 'buttons', title: 'Buttons' },
-                { id: 'cards-crates', title: 'Cards & Crates' },
-                { id: 'contextual-indicators', title: 'Contextual Indicators' },
-                { id: 'dialogs', title: 'Dialogs' },
-                { id: 'dropdown-menus', title: 'Dropdown Menus' },
-                { id: 'form-controls', title: 'Form Controls' },
-                { id: 'inputs', title: 'Inputs' },
-                { id: 'links', title: 'Links' },
-                { id: 'loaders-status', title: 'Loaders & Status' },
-                { id: 'pagination', title: 'Pagination' },
-                { id: 'sliders', title: 'Sliders' },
-                { id: 'lists', title: 'Tables & Lists' },
-                { id: 'toasts', title: 'Toasts' },
-                { id: 'toggles', title: 'Toggles' },
-            ],
-        },
-        {
-            label: 'Workspace & Patterns',
-            items: [
-                { id: 'artist-metadata', title: 'Artist Metadata' },
-                { id: 'bio-scannability', title: 'Bio Scannability' },
-                { id: 'spiderweb-controls', title: 'Connections Controls' },
-                { id: 'spiderweb-legends', title: 'Connections Legends' },
-                { id: 'deep-connections', title: 'Deep Connections' },
-                { id: 'discovery-filters', title: 'Discovery Filters' },
-                { id: 'error-messages', title: 'Error Messages' },
-                { id: 'graph-links-bridge-lines', title: 'Graph Links & Bridge Lines' },
-                { id: 'interactive-states', title: 'Interactive States' },
-                { id: 'mobile-navigation', title: 'Mobile Navigation Bar' },
-                { id: 'onboarding-flow', title: 'Onboarding Flow' },
-                { id: 'taste-compatibility', title: 'Style Compatibility' },
-                { id: 'telemetry-blocks', title: 'Telemetry Blocks' },
-                { id: 'viewports', title: 'Viewports' },
-            ],
-        },
-        {
-            label: 'Archived',
-            items: [
-                { id: 'advertisement', title: 'Advertisement', badge: 'Inactive' },
-            ],
-        },
-    ];
+    const demoDocsActiveTitle =
+        demoDocsGroups
+            .flatMap((g) => g.items)
+            .find((item) => item.id === demoDocsActiveId)?.title || 'Docs Navigation';
 
-    const allSections = sectionGroups.flatMap((group) => group.items);
+    const sectionGroups: DocsNavGroup[] = useMemo(
+        () => [
+            {
+                label: 'Foundations',
+                items: [
+                    { id: 'introduction', title: 'Introduction' },
+                    { id: 'border-radius', title: 'Border Radius' },
+                    { id: 'color-palette', title: 'Color Palette' },
+                    { id: 'iconography', title: 'Iconography' },
+                    { id: 'layout-spacing', title: 'Layout & Spacing' },
+                    { id: 'logo', title: 'Logo' },
+                    { id: 'tone-of-voice', title: 'Tone of Voice' },
+                    { id: 'typography', title: 'Typography' },
+                    { id: 'visuals', title: 'Visuals' },
+                ],
+            },
+            {
+                label: 'Components',
+                items: [
+                    { id: 'badges-tags', title: 'Badges & Tags' },
+                    { id: 'buttons', title: 'Buttons' },
+                    { id: 'cards-crates', title: 'Cards & Crates' },
+                    { id: 'contextual-indicators', title: 'Contextual Indicators' },
+                    { id: 'dialogs', title: 'Dialogs' },
+                    { id: 'docs-navigation', title: 'Docs Navigation' },
+                    { id: 'dropdown-menus', title: 'Dropdown Menus' },
+                    { id: 'form-controls', title: 'Form Controls' },
+                    { id: 'inputs', title: 'Inputs' },
+                    { id: 'links', title: 'Links' },
+                    { id: 'loaders-status', title: 'Loaders & Status' },
+                    { id: 'pagination', title: 'Pagination' },
+                    { id: 'sliders', title: 'Sliders' },
+                    { id: 'lists', title: 'Tables & Lists' },
+                    { id: 'toasts', title: 'Toasts' },
+                    { id: 'toggles', title: 'Toggles' },
+                ],
+            },
+            {
+                label: 'Workspace & Patterns',
+                items: [
+                    { id: 'artist-metadata', title: 'Artist Metadata' },
+                    { id: 'bio-scannability', title: 'Bio Scannability' },
+                    { id: 'spiderweb-controls', title: 'Connections Controls' },
+                    { id: 'spiderweb-legends', title: 'Connections Legends' },
+                    { id: 'deep-connections', title: 'Deep Connections' },
+                    { id: 'discovery-filters', title: 'Discovery Filters' },
+                    { id: 'error-messages', title: 'Error Messages' },
+                    { id: 'graph-links-bridge-lines', title: 'Graph Links & Bridge Lines' },
+                    { id: 'interactive-states', title: 'Interactive States' },
+                    { id: 'mobile-navigation', title: 'Mobile Navigation Bar' },
+                    { id: 'onboarding-flow', title: 'Onboarding Flow' },
+                    { id: 'taste-compatibility', title: 'Style Compatibility' },
+                    { id: 'telemetry-blocks', title: 'Telemetry Blocks' },
+                    { id: 'viewports', title: 'Viewports' },
+                ],
+            },
+            {
+                label: 'Archived',
+                items: [
+                    { id: 'advertisement', title: 'Advertisement', badge: 'Inactive' },
+                ],
+            },
+        ],
+        []
+    );
 
-    const handleContainerScroll = () => {
-        const container = containerRef.current;
-        if (!container) return;
-        const containerTop = container.getBoundingClientRect().top;
-        let currentId = allSections[0]?.id || 'introduction';
-        for (const item of allSections) {
-            const el = document.getElementById(item.id);
-            if (!el) continue;
-            if (el.getBoundingClientRect().top - containerTop <= 150) {
-                currentId = item.id;
-            }
-        }
-        setActiveSectionId((prev) => (prev === currentId ? prev : currentId));
-    };
+    const sectionIds = useMemo(
+        () => sectionGroups.flatMap((group) => group.items.map((item) => item.id)),
+        [sectionGroups]
+    );
 
-    const scrollToSection = (sectionId: string, offset: number = 80) => {
-        const element = document.getElementById(sectionId);
-        const container = containerRef.current;
-        if (element && container) {
-            setActiveSectionId(sectionId);
-            const containerRect = container.getBoundingClientRect();
-            const elementRect = element.getBoundingClientRect();
-            const relativeTop = elementRect.top - containerRect.top;
-            const targetScrollTop = container.scrollTop + relativeTop - offset;
-            container.scrollTo({ top: targetScrollTop, behavior: 'smooth' });
-        }
-    };
+    const { activeSectionId, scrollToSection } = useSectionScrollSpy({
+        containerRef,
+        sectionIds,
+        isActive,
+        syncHash: true,
+    });
 
     const handleNavClick = (e: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
         e.preventDefault();
-        scrollToSection(sectionId, 80);
+        scrollToSection(sectionId);
     };
 
-    const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        const sectionId = e.target.value;
-        if (!sectionId) return;
-        scrollToSection(sectionId, 160);
-        e.target.value = "";
-    };
+    const backButton = (
+        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
+    );
 
     return (
-        <div
-            ref={containerRef}
-            onScroll={handleContainerScroll}
-            className="h-full w-full overflow-y-auto bg-background-dark text-zinc-200 font-display flex flex-col relative"
+        <DocsPageShell
+            scrollContainerRef={containerRef}
+            groups={sectionGroups}
+            activeSectionId={activeSectionId}
+            onSelectSection={(id) => scrollToSection(id)}
+            backButton={backButton}
+            sidebarWidthClassName="w-60"
+            sidebarAriaLabel="Design System Sections"
+            sheetTitle="Design System Sections"
+            mainClassName="space-y-24"
+            header={
+                <Header
+                    user={user}
+                    onLogoClick={onLogoClick}
+                    view="dashboard"
+                    isSmallScreen={isSmallScreen}
+                    isMagazineViewOpen={false}
+                    stackCount={stackCount}
+                    isStackNew={isStackNew}
+                    onOpenStack={onOpenStack}
+                    onNavigate={onNavigateMenu || onNavigate}
+                    onLogout={onLogout}
+                    onDeleteAccount={onDeleteAccount}
+                    isAdmin={isAdmin}
+                    tokenBalance={tokenBalance ?? profile?.tokenBalance ?? 0}
+                    isProfileOpen={isProfileOpen}
+                    setIsProfileOpen={setIsProfileOpen}
+                    isDeleteAccountModalOpen={isDeleteAccountModalOpen}
+                    setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
+                    isMenuOpen={isMenuOpen}
+                    setIsMenuOpen={setIsMenuOpen}
+                    onRestartWalkthrough={onRestartWalkthrough}
+                />
+            }
+            footer={
+                <footer className="w-full p-8 text-zinc-400 text-sm z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
+                    <div className="container mx-auto text-center">
+                        <ZceneLogo className="h-8 w-auto text-primary mx-auto mb-4" />
+                        <p className="text-zinc-600">© 2026 Zcene Admin Console. Restricted access authorization design system.</p>
+                    </div>
+                </footer>
+            }
         >
-            <Header
-                user={user}
-                onLogoClick={onLogoClick}
-                view="dashboard"
-                isSmallScreen={isSmallScreen}
-                isMagazineViewOpen={false}
-                stackCount={stackCount}
-                isStackNew={isStackNew}
-                onOpenStack={onOpenStack}
-                onNavigate={onNavigateMenu || onNavigate}
-                onLogout={onLogout}
-                onDeleteAccount={onDeleteAccount}
-                isAdmin={isAdmin}
-                tokenBalance={tokenBalance ?? profile?.tokenBalance ?? 0}
-                isProfileOpen={isProfileOpen}
-                setIsProfileOpen={setIsProfileOpen}
-                isDeleteAccountModalOpen={isDeleteAccountModalOpen}
-                setIsDeleteAccountModalOpen={setIsDeleteAccountModalOpen}
-                isMenuOpen={isMenuOpen}
-                setIsMenuOpen={setIsMenuOpen}
-                onRestartWalkthrough={onRestartWalkthrough}
-            />
-            
-            <div className="lg:hidden p-4 sticky top-0 bg-background-dark/95 backdrop-blur-md z-[90] border-b border-zinc-800 flex items-center gap-3">
-                <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
-                <div className="relative flex-1 min-w-0">
-                    <select
-                        id="styleguide-nav"
-                        className="w-full appearance-none rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-300 py-2.5 pl-4 pr-10 text-sm font-medium focus:ring-1 focus:ring-primary focus:outline-none"
-                        onChange={handleSelectChange}
-                        defaultValue=""
-                    >
-                        <option value="" disabled>Jump to section...</option>
-                        {sectionGroups.map((group) => (
-                            <optgroup key={group.label} label={group.label}>
-                                {group.items.map((section) => (
-                                    <option key={section.id} value={section.id}>
-                                        {section.badge ? `${section.title} (${section.badge})` : section.title}
-                                    </option>
-                                ))}
-                            </optgroup>
-                        ))}
-                    </select>
-                    <span className="material-symbols-outlined pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 !text-[18px]">arrow_drop_down</span>
-                </div>
-            </div>
-
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 flex gap-12 flex-grow">
-                <aside className="w-60 flex-shrink-0 sticky top-28 self-start h-[calc(100vh-8rem)] hidden lg:block overflow-y-auto overflow-x-hidden pl-4 pr-2 scrollbar-thin scrollbar-thumb-zinc-800">
-                    <div className="pt-6 pb-4">
-                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
-                    </div>
-                    <nav className="space-y-5 pb-8" aria-label="Design System Sections">
-                        {sectionGroups.map((group) => (
-                            <div key={group.label} className="space-y-1">
-                                <p className="px-2 pb-1 text-[10px] font-bold uppercase tracking-widest text-zinc-500">
-                                    {group.label}
-                                </p>
-                                {group.items.map((section) => {
-                                    const isCurrent = activeSectionId === section.id;
-                                    return (
-                                        <a
-                                            key={section.id}
-                                            href={`#${section.id}`}
-                                            onClick={(e) => handleNavClick(e, section.id)}
-                                            className={`flex items-center justify-between gap-2 py-1.5 px-2 rounded-xl transition-colors text-sm ${
-                                                isCurrent
-                                                    ? 'text-primary bg-zinc-800/60 font-medium'
-                                                    : 'text-zinc-400 hover:text-primary hover:bg-zinc-800/40'
-                                            }`}
-                                        >
-                                            <span className="truncate">{section.title}</span>
-                                            {section.badge && (
-                                                <span className="text-[9px] font-mono uppercase tracking-wider px-1.5 py-0.5 rounded bg-zinc-800/80 text-zinc-500 border border-zinc-700/60 shrink-0">
-                                                    {section.badge}
-                                                </span>
-                                            )}
-                                        </a>
-                                    );
-                                })}
-                            </div>
-                        ))}
-                    </nav>
-                </aside>
-
-                <main className="flex-1 py-10 space-y-24 min-w-0">
-                    <div className="lg:hidden pt-4 pb-2">
-                        <BackButton onClose={onClose} onNavigate={onNavigateMenu || onNavigate} fallbackView={View.Dashboard} />
-                    </div>
 
                     {/* ==================== FOUNDATIONS ==================== */}
 
@@ -2953,6 +2915,106 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             </div>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section id="docs-navigation" className="scroll-mt-6">
+                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Docs Navigation</h2>
+                        <div className="space-y-12">
+                            <p className="text-base text-zinc-400 leading-relaxed max-w-3xl">
+                                Shared documentation shell and scroll-spy primitive (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded font-mono">components/ui/DocsSidebarNav.tsx</code>) powering <strong>Help</strong> (<code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 rounded font-mono">/help</code>), <strong>Design System</strong> (<code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 rounded font-mono">/design</code>), and <strong>Engine</strong> (<code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 rounded font-mono">/engine</code>). Enforces a split-flex pinned <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 rounded font-mono">&lt;Header /&gt;</code>, a permanently pinned desktop <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 rounded font-mono">&lt;BackButton /&gt;</code>, and a Zcene-native mobile breadcrumb bar + dark bottom sheet with zero native <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 rounded font-mono">&lt;select&gt;</code> dropdowns and zero duplicate mobile back buttons.
+                            </p>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+                                {/* Live Mobile Breadcrumb Bar + Interactive Bottom Sheet Specimen */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <h3 className="text-xl font-medium text-zinc-200">Mobile Breadcrumb &amp; Section Sheet</h3>
+                                        <span className="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 border border-primary/20 rounded-full">&lt; 1024px</span>
+                                    </div>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        Pinned directly beneath <code className="text-xs bg-zinc-950 text-zinc-300 px-1 py-0.5 rounded font-mono">&lt;Header /&gt;</code> outside the scroll pane (<code className="text-xs bg-zinc-950 text-zinc-300 px-1 py-0.5 rounded font-mono">z-[90]</code>). Tap the live breadcrumb trigger below to open <code className="text-xs bg-zinc-950 text-primary px-1 py-0.5 rounded font-mono">&lt;DocsSectionSheet /&gt;</code> (<code className="text-xs bg-zinc-950 text-zinc-300 px-1 py-0.5 rounded font-mono">z-[200]</code>).
+                                    </p>
+                                    <div className="p-6 bg-zinc-950 rounded-2xl border border-zinc-800 flex justify-center">
+                                        <div className="w-full max-w-[375px] rounded-2xl border border-zinc-800 bg-background-dark overflow-hidden shadow-xl">
+                                            <div className="h-10 px-4 border-b border-zinc-800/70 flex items-center justify-between bg-background-dark">
+                                                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Pinned Header (64px)</span>
+                                                <span className="w-2 h-2 rounded-full bg-primary/70" />
+                                            </div>
+                                            <DocsMobileBreadcrumbBar
+                                                backButton={<BackButton onClick={() => {}} />}
+                                                activeTitle={demoDocsActiveTitle}
+                                                isOpen={demoDocsSheetOpen}
+                                                onOpen={() => setDemoDocsSheetOpen(true)}
+                                                className="px-4 py-2.5 bg-background-dark/95 border-b border-zinc-800 flex items-center gap-2.5"
+                                                triggerAriaLabel="Preview Docs Section Sheet"
+                                            />
+                                            <div className="p-4 space-y-2">
+                                                <p className="text-[10px] font-mono uppercase tracking-widest text-zinc-500">Active Section Preview</p>
+                                                <p className="text-base font-medium text-white">{demoDocsActiveTitle}</p>
+                                                <p className="text-xs text-zinc-500">Tap the breadcrumb pill above to switch sections via the Zcene dark bottom sheet.</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <DocsSectionSheet
+                                        isOpen={demoDocsSheetOpen}
+                                        onClose={() => setDemoDocsSheetOpen(false)}
+                                        groups={demoDocsGroups}
+                                        activeSectionId={demoDocsActiveId}
+                                        onSelectSection={(id) => setDemoDocsActiveId(id)}
+                                        title="Preview Sections"
+                                    />
+                                </div>
+
+                                {/* Live Pinned-Back Desktop Sidebar Specimen */}
+                                <div className="space-y-4">
+                                    <div className="flex items-center justify-between gap-2">
+                                        <h3 className="text-xl font-medium text-zinc-200">Pinned-Back Desktop Sidebar</h3>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">&ge; 1024px</span>
+                                    </div>
+                                    <p className="text-sm text-zinc-400 leading-relaxed">
+                                        Flex-column <code className="text-xs bg-zinc-950 text-zinc-300 px-1 py-0.5 rounded font-mono">&lt;aside&gt;</code> (<code className="text-xs bg-zinc-950 text-primary px-1 py-0.5 rounded font-mono">sticky top-6 self-start</code>) keeps <code className="text-xs bg-zinc-950 text-zinc-300 px-1 py-0.5 rounded font-mono">&lt;BackButton /&gt;</code> permanently pinned while only the inner <code className="text-xs bg-zinc-950 text-zinc-300 px-1 py-0.5 rounded font-mono">&lt;nav&gt;</code> scrolls with container-scoped auto-follow.
+                                    </p>
+                                    <div className="p-6 bg-zinc-950 rounded-2xl border border-zinc-800 flex justify-center">
+                                        <DocsDesktopSidebar
+                                            groups={demoDocsGroups}
+                                            activeSectionId={demoDocsActiveId}
+                                            onSelectSection={(id) => setDemoDocsActiveId(id)}
+                                            backButton={<BackButton onClick={() => {}} />}
+                                            autoFollow={false}
+                                            ariaLabel="Docs Sidebar Preview"
+                                            className="w-full max-w-[260px] flex flex-col max-h-[290px] rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 overflow-hidden"
+                                            footer={
+                                                <div className="text-[10px] text-zinc-500 font-mono pl-2">
+                                                    Optional Pinned Footer Slot
+                                                </div>
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Architecture & Scroll-Spy Contract */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <div className="p-5 bg-zinc-900/40 border border-zinc-800 rounded-2xl space-y-2">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Split-Flex Pinned Header</p>
+                                    <p className="text-xs text-zinc-400 leading-relaxed">
+                                        Outer shell locks to <code className="text-zinc-300">h-full overflow-hidden flex flex-col</code> with pinned <code className="text-zinc-300">&lt;Header /&gt;</code> (<code className="text-zinc-300">z-[100]</code>) and dedicated <code className="text-zinc-300">flex-1 min-h-0 overflow-y-auto</code> scroll pane — giving a single unified <code className="text-primary">24px</code> (<code className="text-zinc-300">scroll-mt-6</code>) section offset across desktop and mobile.
+                                    </p>
+                                </div>
+                                <div className="p-5 bg-zinc-900/40 border border-zinc-800 rounded-2xl space-y-2">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-primary">useSectionScrollSpy</p>
+                                    <p className="text-xs text-zinc-400 leading-relaxed">
+                                        Container-scoped section queries, <code className="text-zinc-300">rAF</code>-throttled passive scroll + resize listeners, <code className="text-zinc-300">700ms</code> programmatic-scroll lock (released immediately on <code className="text-zinc-300">wheel</code>/<code className="text-zinc-300">touchstart</code>), bottom-of-container clamp, and 2× <code className="text-zinc-300">rAF</code> hash sync (<code className="text-zinc-300">/help#token-economy</code>).
+                                    </p>
+                                </div>
+                                <div className="p-5 bg-zinc-900/40 border border-zinc-800 rounded-2xl space-y-2">
+                                    <p className="text-[10px] font-bold uppercase tracking-widest text-primary">Zero Duplicate Controls</p>
+                                    <p className="text-xs text-zinc-400 leading-relaxed">
+                                        <code className="text-zinc-300">&lt;DocsPageShell /&gt;</code> owns the sole <code className="text-zinc-300">backButton</code> slot across breakpoints, preventing stacked mobile back buttons and keeping <code className="text-zinc-300">navRef.scrollTop</code> auto-follow isolated from <code className="text-zinc-300">&lt;main&gt;</code> scroll.
+                                    </p>
                                 </div>
                             </div>
                         </div>
@@ -6019,15 +6081,6 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
                         </div>
                     </section>
-                </main>
-            </div>
-
-            <footer className="w-full p-8 text-zinc-400 text-sm z-10 relative bg-neutral-900 flex-shrink-0 border-t border-neutral-800">
-                <div className="container mx-auto text-center">
-                    <ZceneLogo className="h-8 w-auto text-primary mx-auto mb-4" />
-                    <p className="text-zinc-600">© 2026 Zcene Admin Console. Restricted access authorization design system.</p>
-                </div>
-            </footer>
-        </div>
+        </DocsPageShell>
     );
 };
