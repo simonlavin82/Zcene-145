@@ -4016,6 +4016,10 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
     const isProgrammaticScrollRef = useRef(false);
     const magazineScrollContainerRef = useRef<HTMLDivElement>(null);
 
+    const selectedNodeRawId = selectedNode?.id ?? null;
+    const selectedNodeCanonRaw = selectedNode ? stripSceneNamespace(selectedNode.canonicalId || selectedNode.id) : null;
+    const selectedNodeCanonId = selectedNodeCanonRaw ? selectedNodeCanonRaw.toLowerCase() : null;
+
     useEffect(() => {
         if (!isMagazineViewOpen) {
             hasOpenedMagazineRef.current = false;
@@ -4030,14 +4034,14 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             if (container) {
                 container.scrollTop = 0;
             }
-            if (selectedNode) {
-                lastScrolledNodeIdRef.current = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id).toLowerCase();
+            if (selectedNodeCanonId) {
+                lastScrolledNodeIdRef.current = selectedNodeCanonId;
             }
             return;
         }
 
-        const selectedCanon = selectedNode ? stripSceneNamespace(selectedNode.canonicalId || selectedNode.id).toLowerCase() : null;
-        if (selectedNode) {
+        const selectedCanon = selectedNodeCanonId;
+        if (selectedNodeRawId && selectedNodeCanonRaw) {
             // If the target artist is currently filtered out by a Zine search query or Scene Filter, clear the blocking filter so the card renders
             if (magazineSearchQuery.trim() || selectedZineSceneId !== 'all') {
                 const isPresent = filteredAndSortedNodes.some(n => {
@@ -4074,8 +4078,8 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
                 const scrollEl = magazineScrollContainerRef.current || (typeof document !== 'undefined' ? document.getElementById('magazine-scroll-container') : null);
                 if (!scrollEl) return;
 
-                const rawId = selectedNode.id;
-                const canonId = stripSceneNamespace(selectedNode.canonicalId || selectedNode.id);
+                const rawId = selectedNodeRawId;
+                const canonId = selectedNodeCanonRaw;
                 const normId = normalizeArtistId(canonId);
 
                 const rawEsc = safeEscape(rawId);
@@ -4112,7 +4116,7 @@ export const DetailsPanel: React.FC<DetailsPanelProps> = ({
             }, SCROLL_DELAY);
             return () => clearTimeout(timeoutId);
         }
-    }, [selectedNode, isMagazineViewOpen]);
+    }, [selectedNodeRawId, selectedNodeCanonId, isMagazineViewOpen]);
 
     const chatHistoriesRef = useRef(chatHistories);
     useEffect(() => { chatHistoriesRef.current = chatHistories; }, [chatHistories]);

@@ -4080,7 +4080,7 @@ describe('DetailsPanel', () => {
                         const namespacedNode1 = { id: 'scene-1::korn-us', canonicalId: 'korn-us', label: 'Korn', type: 'artist' as const };
                         const namespacedNode2 = { id: 'scene-1::deftones-us', canonicalId: 'deftones-us', label: 'Deftones', type: 'artist' as const };
 
-                        const { rerender } = render(
+                        const { rerender, unmount } = render(
                             <DetailsPanel
                                 {...baseProps({
                                     isMagazineViewOpen: true,
@@ -4150,6 +4150,107 @@ describe('DetailsPanel', () => {
                                 behavior: 'smooth',
                             })
                         );
+
+                        // Flush programmatic-scroll reset timer before simulating deep user scroll
+                        act(() => {
+                            vi.advanceTimersByTime(650);
+                        });
+
+                        // Desktop: cloned selectedNode object (same id/canonicalId, new reference — e.g. MyStackDialog close / Firestore snapshot) must NOT reset scroll
+                        const desktopScrollEl = document.getElementById('magazine-scroll-container') as HTMLElement;
+                        expect(desktopScrollEl).not.toBeNull();
+                        desktopScrollEl.scrollTop = 1800;
+                        act(() => {
+                            fireEvent.scroll(desktopScrollEl);
+                        });
+
+                        rerender(
+                            <DetailsPanel
+                                {...baseProps({
+                                    isMagazineViewOpen: true,
+                                    isSmallScreen: false,
+                                    activeNodes: [bareNode1, bareNode2],
+                                    selectedNode: { ...namespacedNode2 },
+                                })}
+                            />
+                        );
+
+                        act(() => {
+                            vi.advanceTimersByTime(400);
+                        });
+
+                        expect(scrollToSpy).toHaveBeenCalledTimes(3);
+                        expect(desktopScrollEl.scrollTop).toBe(1800);
+
+                        // Mobile: cloned selectedNode reference must NOT reset scroll, while genuine node switches still scroll smoothly
+                        unmount();
+                        const mobileRender = render(
+                            <DetailsPanel
+                                {...baseProps({
+                                    isMagazineViewOpen: true,
+                                    isSmallScreen: true,
+                                    activeNodes: [bareNode1, bareNode2],
+                                    selectedNode: namespacedNode1,
+                                })}
+                            />
+                        );
+
+                        act(() => {
+                            vi.advanceTimersByTime(100);
+                        });
+
+                        const mobileScrollEl = document.getElementById('magazine-scroll-container') as HTMLElement;
+                        expect(mobileScrollEl).not.toBeNull();
+                        mobileScrollEl.scrollTop = 1400;
+                        act(() => {
+                            fireEvent.scroll(mobileScrollEl);
+                        });
+
+                        mobileRender.rerender(
+                            <DetailsPanel
+                                {...baseProps({
+                                    isMagazineViewOpen: true,
+                                    isSmallScreen: true,
+                                    activeNodes: [bareNode1, bareNode2],
+                                    selectedNode: { ...namespacedNode1 },
+                                })}
+                            />
+                        );
+
+                        act(() => {
+                            vi.advanceTimersByTime(450);
+                        });
+
+                        expect(scrollToSpy).toHaveBeenCalledTimes(3);
+                        expect(mobileScrollEl.scrollTop).toBe(1400);
+
+                        // Genuine mobile switch A -> B still smoothly scrolls after mobile SCROLL_DELAY (350ms)
+                        mobileRender.rerender(
+                            <DetailsPanel
+                                {...baseProps({
+                                    isMagazineViewOpen: true,
+                                    isSmallScreen: true,
+                                    activeNodes: [bareNode1, bareNode2],
+                                    selectedNode: namespacedNode2,
+                                })}
+                            />
+                        );
+
+                        act(() => {
+                            vi.advanceTimersByTime(450);
+                        });
+
+                        expect(scrollToSpy).toHaveBeenCalledTimes(4);
+                        expect(scrollToSpy).toHaveBeenLastCalledWith(
+                            expect.objectContaining({
+                                behavior: 'smooth',
+                            })
+                        );
+
+                        act(() => {
+                            vi.advanceTimersByTime(650);
+                        });
+                        mobileRender.unmount();
                     } finally {
                         Element.prototype.scrollTo = originalScrollTo;
                         vi.useRealTimers();

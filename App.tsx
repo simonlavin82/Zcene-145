@@ -8915,7 +8915,9 @@ const App: React.FC = () => {
               }
             }
             scenesRef.current = parsedScenes;
-            setScenes(parsedScenes);
+            setScenes((prev) =>
+              JSON.stringify(prev) === JSON.stringify(parsedScenes) ? prev : parsedScenes
+            );
             if (targetScene?.discoveryFilters) {
               setDiscoveryFilters((prev: any) => JSON.stringify(prev) === JSON.stringify(targetScene.discoveryFilters) ? prev : targetScene.discoveryFilters);
               const isTargetCurated = (targetScene.graphData?.nodes?.length ?? 0) > 0;
