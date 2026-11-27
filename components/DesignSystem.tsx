@@ -15,6 +15,7 @@ import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { ModalHeader, ModalBody, ModalFooter, ModalFooterLink } from './ui/Dialog';
 import { PROJECT_TABLE_COLUMNS, ProjectTableMetricValue, ProjectStatusBadge, ProjectMobileListCard } from './ui/ProjectMetrics';
+import { DATA_TABLE_TOKENS, ResponsiveTableFrame } from './ui/DataTable';
 import { ToolbarSearch } from './ui/ToolbarSearch';
 export { ToolbarSearch } from './ui/ToolbarSearch';
 export type { ToolbarSearchProps } from './ui/ToolbarSearch';
@@ -1779,43 +1780,43 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     {/* Token Specification Table */}
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Token Specification</p>
-                                        <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl overflow-hidden">
-                                            <table className="w-full text-left text-xs font-mono">
-                                                <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
-                                                    <tr>
-                                                        <th className="p-3">Attribute</th>
-                                                        <th className="p-3">Resting State</th>
-                                                        <th className="p-3">Active / Hover Focus</th>
+                                        <ResponsiveTableFrame mode="desktop" variant="nested">
+                                            <table className="w-full text-left text-xs font-mono border-collapse">
+                                                <thead>
+                                                    <tr className={DATA_TABLE_TOKENS.theadRow}>
+                                                        <th className={DATA_TABLE_TOKENS.nestedTh}>Attribute</th>
+                                                        <th className={DATA_TABLE_TOKENS.nestedTh}>Resting State</th>
+                                                        <th className={DATA_TABLE_TOKENS.nestedTh}>Active / Hover Focus</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
-                                                    <tr>
+                                                <tbody className={`${DATA_TABLE_TOKENS.tbody} text-zinc-300`}>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(0)}>
                                                         <td className="p-3 text-zinc-400">stroke</td>
                                                         <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">#e4e4e7</code> <span className="text-zinc-500">(zinc-200)</span></td>
                                                         <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">#F6E468</code> <span className="text-zinc-500">(gold)</span></td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(1)}>
                                                         <td className="p-3 text-zinc-400">stroke-opacity</td>
                                                         <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">0.30 – 0.40</code></td>
                                                         <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">0.90</code></td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(2)}>
                                                         <td className="p-3 text-zinc-400">stroke-width</td>
                                                         <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">1.0px</code></td>
                                                         <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">1.0px</code></td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(3)}>
                                                         <td className="p-3 text-zinc-400">stroke-dasharray</td>
                                                         <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">3,3</code></td>
                                                         <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">3,3</code></td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(4)}>
                                                         <td className="p-3 text-zinc-400">hitbox layer</td>
                                                         <td className="p-3 text-zinc-400" colSpan={2}>
                                                             <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">line.interactive-link</code> (16px transparent, pointer-events: stroke)
                                                         </td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(5, { isLast: true })}>
                                                         <td className="p-3 text-zinc-400">transition</td>
                                                         <td className="p-3 text-zinc-400" colSpan={2}>
                                                             <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">d3.transition().duration(300)</code>
@@ -1823,7 +1824,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     </tr>
                                                 </tbody>
                                             </table>
-                                        </div>
+                                        </ResponsiveTableFrame>
                                     </div>
                                 </div>
                             </div>
@@ -1916,49 +1917,49 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     {/* Token Specification Table */}
                                     <div className="space-y-4">
                                         <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Token Specification</p>
-                                        <div className="bg-zinc-900/30 border border-zinc-800 rounded-xl overflow-hidden">
-                                            <table className="w-full text-left text-xs font-mono">
-                                                <thead className="bg-zinc-900/80 text-zinc-400 border-b border-zinc-800 text-[10px] uppercase tracking-wider">
-                                                    <tr>
-                                                        <th className="p-3">Attribute</th>
-                                                        <th className="p-3">Resting State</th>
-                                                        <th className="p-3">Active / Hover Focus</th>
+                                        <ResponsiveTableFrame mode="desktop" variant="nested">
+                                            <table className="w-full text-left text-xs font-mono border-collapse">
+                                                <thead>
+                                                    <tr className={DATA_TABLE_TOKENS.theadRow}>
+                                                        <th className={DATA_TABLE_TOKENS.nestedTh}>Attribute</th>
+                                                        <th className={DATA_TABLE_TOKENS.nestedTh}>Resting State</th>
+                                                        <th className={DATA_TABLE_TOKENS.nestedTh}>Active / Hover Focus</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody className="divide-y divide-zinc-800/60 text-zinc-300">
-                                                    <tr>
+                                                <tbody className={`${DATA_TABLE_TOKENS.tbody} text-zinc-300`}>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(0)}>
                                                         <td className="p-3 text-zinc-400">stroke</td>
                                                         <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">#e4e4e7</code> <span className="text-zinc-500">(zinc-200)</span></td>
                                                         <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">#F6E468</code> <span className="text-zinc-500">(gold)</span></td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(1)}>
                                                         <td className="p-3 text-zinc-400">stroke-opacity</td>
                                                         <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">0.35 – 0.40</code></td>
                                                         <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">0.95</code></td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(2)}>
                                                         <td className="p-3 text-zinc-400">stroke-width</td>
                                                         <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">1.2px</code></td>
                                                         <td className="p-3"><code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">2.0px</code></td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(3)}>
                                                         <td className="p-3 text-zinc-400">stroke-dasharray</td>
                                                         <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">6,4</code> <span className="text-zinc-500">(elongated)</span></td>
                                                         <td className="p-3"><code className="text-zinc-200 bg-zinc-800 px-1 py-0.5 rounded">6,4</code></td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(4)}>
                                                         <td className="p-3 text-zinc-400">geometry</td>
                                                         <td className="p-3 text-zinc-400" colSpan={2}>
                                                             Non-physics quadratic Bézier: <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">d="M x1 y1 Q cx cy x2 y2"</code>
                                                         </td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(5)}>
                                                         <td className="p-3 text-zinc-400">arc lift math</td>
                                                         <td className="p-3 text-zinc-400" colSpan={2}>
                                                             <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">midY - arcLift</code> (70px – 200px upward curve; guarded by <code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">hypot &ge; 12px</code>)
                                                         </td>
                                                     </tr>
-                                                    <tr>
+                                                    <tr className={DATA_TABLE_TOKENS.getDesktopRowClass(6, { isLast: true })}>
                                                         <td className="p-3 text-zinc-400">hitbox &amp; tooltips</td>
                                                         <td className="p-3 text-zinc-400" colSpan={2}>
                                                             Transparent <code className="text-zinc-300 bg-zinc-800 px-1 py-0.5 rounded">path.bridge-hit-line</code> (14px). Tooltip hoists <code className="text-primary bg-zinc-800 px-1 py-0.5 rounded">[Rule 26]</code> narrative bridge snippets to top of node hover card.
@@ -1966,7 +1967,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     </tr>
                                                 </tbody>
                                             </table>
-                                        </div>
+                                        </ResponsiveTableFrame>
                                     </div>
                                 </div>
                             </div>
@@ -3420,12 +3421,45 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
                             </div>
 
-                            {/* ── Card Footer Badge Layout Rules ── */}
+                            {/* ── Unified Responsive Table System (DataTable.tsx) ── */}
                             <div className="space-y-8">
+                                <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl space-y-4">
+                                    <div className="flex flex-wrap items-center justify-between gap-3">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className="material-symbols-outlined text-primary">table_rows</span>
+                                            <h3 className="text-lg font-medium text-white">Responsive Table System (<code className="text-sm text-primary font-mono">DataTable.tsx</code>)</h3>
+                                        </div>
+                                        <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-zinc-950 text-zinc-300 border border-zinc-800">
+                                            9 Production Tables · Single Source of Truth
+                                        </span>
+                                    </div>
+                                    <p className="text-sm text-zinc-400 leading-relaxed max-w-3xl">
+                                        Every tabular view across Zcene — <strong>Dashboard</strong>, <strong>Trash</strong>, Standard User <strong>Token Activity</strong> &amp; <strong>Stack Archive</strong>, and Admin <strong>Author P&amp;L</strong> (plus nested <strong>Author Receipts</strong> &amp; <strong>Deep Connections Log</strong>), <strong>JIT Auto-Healing</strong>, and <strong>Failed Curations</strong> — shares one governed visual system via <code className="text-xs text-primary bg-zinc-950 px-1.5 py-0.5 rounded font-mono">&lt;ResponsiveTableFrame /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-950 px-1.5 py-0.5 rounded font-mono">DATA_TABLE_TOKENS</code>, and <code className="text-xs text-zinc-300 bg-zinc-950 px-1.5 py-0.5 rounded font-mono">useCompactTable(isSmallScreen)</code>.
+                                    </p>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-zinc-400 leading-relaxed">
+                                        <div className="p-3.5 bg-zinc-950/70 border border-zinc-800/80 rounded-xl space-y-1">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">Outer Frame &amp; Header</p>
+                                            <p>Primary: <code className="text-primary">rounded-2xl border border-zinc-800 bg-zinc-900</code>. Nested drawer tables: <code className="text-zinc-300">rounded-xl</code>. Header row: <code className="text-zinc-300">bg-zinc-950 text-[10px] uppercase tracking-widest text-zinc-400</code>.</p>
+                                        </div>
+                                        <div className="p-3.5 bg-zinc-950/70 border border-zinc-800/80 rounded-xl space-y-1">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">Zebra Rows &amp; Typography</p>
+                                            <p>Alternating <code className="text-zinc-300">bg-zinc-900</code> / <code className="text-zinc-300">bg-zinc-950/40</code> with <code className="text-zinc-300">hover:bg-white/5</code>. Unified primary titles (<code className="text-zinc-300">text-sm font-medium text-white</code>) and tabular mono metrics (<code className="text-zinc-300">text-xs font-mono tabular-nums</code>).</p>
+                                        </div>
+                                        <div className="p-3.5 bg-zinc-950/70 border border-zinc-800/80 rounded-xl space-y-1">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">&lt; 1024px Connected Stacking</p>
+                                            <p>Single-branch fold below <code className="text-primary">1024px</code> eliminates narrow-tablet (<code className="text-zinc-300">768–1023px</code>) horizontal clipping while keeping global <code className="text-zinc-300">isSmallScreen</code> (<code className="text-zinc-300">&lt; 768px</code>) unchanged.</p>
+                                        </div>
+                                        <div className="p-3.5 bg-zinc-950/70 border border-zinc-800/80 rounded-xl space-y-1">
+                                            <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-300">Overflow-Visible Corner Guardrail</p>
+                                            <p>Stacked frames stay <code className="text-zinc-300">overflow-visible</code> so row menus and crate color pickers never clip; first/last rows apply exact <code className="text-primary">15px</code> (<code className="text-zinc-300">11px</code> nested) inner corner rounding.</p>
+                                        </div>
+                                    </div>
+                                </div>
+
                                 <div className="border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Project Card &amp; Table List — Discovery Metric Layout</h3>
                                     <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-3xl">
-                                        Both the project card footer and responsive list views consume shared <code className="text-xs text-primary bg-zinc-800 px-1 rounded">ProjectMetrics.tsx</code> primitives (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectMetricPill /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectTableMetricValue /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectStatusBadge /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectMobileListCard /&gt;</code>, and <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">PROJECT_TABLE_COLUMNS</code>) so discovery metrics stay in 1:1 lockstep across Dashboard, Trash, and this living guide.
+                                        Both the project card footer and responsive list views consume shared <code className="text-xs text-primary bg-zinc-800 px-1 rounded">ProjectMetrics.tsx</code> primitives (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectMetricPill /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectTableMetricValue /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectStatusBadge /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectMobileListCard /&gt;</code>, and <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">PROJECT_TABLE_COLUMNS</code>) inside <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ResponsiveTableFrame /&gt;</code> so discovery metrics stay in 1:1 lockstep across Dashboard, Trash, and this living guide.
                                     </p>
                                 </div>
 
@@ -3504,10 +3538,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </p>
 
                                     {/* 9-Column Compact Desktop Table Specimen */}
-                                    <div className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
+                                    <ResponsiveTableFrame mode="desktop">
                                         <table className="w-full text-left border-collapse min-w-[780px]">
                                             <thead>
-                                                <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
+                                                <tr className={DATA_TABLE_TOKENS.theadRow}>
                                                     {PROJECT_TABLE_COLUMNS.map((col) => (
                                                         <th
                                                             key={col.key}
@@ -3520,7 +3554,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                     ))}
                                                 </tr>
                                             </thead>
-                                            <tbody className="bg-zinc-900">
+                                            <tbody className={DATA_TABLE_TOKENS.tbody}>
                                                 {/* Inline Colored Crate Tab Divider Row */}
                                                 <tr className="select-none bg-zinc-900">
                                                     <td colSpan={9} className="pt-5 pb-0 px-4 align-bottom bg-zinc-900 border-none">
@@ -3605,7 +3639,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 </tr>
                                             </tbody>
                                         </table>
-                                    </div>
+                                    </ResponsiveTableFrame>
                                     <p className="text-[10px] text-zinc-500 font-mono">
                                         Row 1: completed — inline crate tab seam + dedicated SCENES through DEEP CUTS tabular counts + Mapped badge. Row 2: unmapped draft — empty metric cells render muted (-).
                                     </p>
@@ -3617,9 +3651,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <h4 className="text-base font-medium text-zinc-200">Project List — Mobile &amp; Narrow-Tablet View (&lt; 1024px)</h4>
                                         </div>
                                         <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                            Full desktop/mobile feature parity: both <strong>Dashboard</strong> and <strong>Trash</strong> keep the Grid/List <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ViewToggle /&gt;</code> active across every viewport. Below <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">1024px</code> (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">isSmallScreen || isBelowDesktopTable</code>), List View folds cleanly into one distraction-free solid-dark <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">rounded-2xl border border-zinc-800 bg-zinc-900</code> table frame with lightweight inline crate tabs and flat <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ProjectMobileListCard /&gt;</code> rows — zero translucent crate tint bleed, zero desktop <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;table&gt;</code> DOM, and <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">overflow-visible</code> so bottom action menus never clip.
+                                            Full desktop/mobile feature parity: both <strong>Dashboard</strong> and <strong>Trash</strong> keep the Grid/List <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ViewToggle /&gt;</code> active across every viewport. Below <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">1024px</code> (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">useCompactTable(isSmallScreen)</code>), List View folds cleanly into one distraction-free solid-dark <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ResponsiveTableFrame mode=&quot;mobile&quot; /&gt;</code> with lightweight inline crate tabs and flat <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ProjectMobileListCard /&gt;</code> rows — zero translucent crate tint bleed, zero desktop <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;table&gt;</code> DOM, and <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">overflow-visible</code> so bottom action menus never clip.
                                         </p>
-                                        <div className="max-w-md rounded-2xl border border-zinc-800 bg-zinc-900">
+                                        <ResponsiveTableFrame mode="mobile" className="max-w-md">
                                             <div className="bg-zinc-900 px-3.5 pt-4 pb-0 border-b border-zinc-800/80 rounded-t-[15px]">
                                                 <div
                                                     className="w-[150px] border-t border-l border-r border-zinc-800 rounded-t-lg px-3 py-1.5 font-mono tracking-widest text-[9px] uppercase font-bold text-white relative -mb-[1px]"
@@ -3638,7 +3672,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 deepCutsCount={7}
                                                 status="completed"
                                                 onClick={() => {}}
-                                                className="bg-zinc-900"
+                                                className={DATA_TABLE_TOKENS.getStackedRowClass(0, 2, { hasTopHeader: true })}
                                                 actionMenuSlot={
                                                     <div className="w-8 h-8 rounded-lg text-zinc-500 inline-flex items-center justify-center">
                                                         <span className="material-symbols-outlined !text-xl">more_vert</span>
@@ -3655,14 +3689,14 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                                 deepCutsCount={null}
                                                 status="draft"
                                                 onClick={() => {}}
-                                                className="bg-zinc-950/40 border-t border-zinc-800/50 rounded-b-[15px]"
+                                                className={DATA_TABLE_TOKENS.getStackedRowClass(1, 2, { hasTopHeader: true })}
                                                 actionMenuSlot={
                                                     <div className="w-8 h-8 rounded-lg text-zinc-500 inline-flex items-center justify-center">
                                                         <span className="material-symbols-outlined !text-xl">more_vert</span>
                                                     </div>
                                                 }
                                             />
-                                        </div>
+                                        </ResponsiveTableFrame>
                                     </div>
                                 </div>
 
@@ -5592,61 +5626,59 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     High-density tabular layout presenting author-centric P&amp;L metrics. Click rows to test the expanding drawer sub-grids containing curation actions, top artist discoveries, unified token &amp; curation receipts, and Deep Connections logs.
                                 </p>
                                 <div className="space-y-6">
-                                    <div className="p-4 bg-zinc-900/40 border border-zinc-800 rounded-xl">
-                                        <DiscoveryLedgerTable
-                                            isLoading={false}
-                                            filteredLedger={[
-                                                {
-                                                    email: 'curator.alpha@zcene.online',
-                                                    projectsCount: 8,
-                                                    actionTriggers: { createCount: 8, updateCount: 24 },
-                                                    artistSearches: {
-                                                        globalCount: 32,
-                                                        topSearches: [
-                                                            { artistName: 'Sunny Day Real Estate', count: 12 },
-                                                            { artistName: 'Mineral', count: 8 },
-                                                            { artistName: 'The Promise Ring', count: 7 },
-                                                            { artistName: 'Texas Is the Reason', count: 5 }
-                                                        ]
-                                                    },
-                                                    cacheEfficiency: { liveQueries: 10, cacheHits: 22 },
-                                                    deepCutsOpened: 15,
-                                                    onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true },
-                                                    exactCost: 0.87,
-                                                    hasExactCost: true,
-                                                    tokenBalance: 60,
-                                                    lifetimeTokensPurchased: 100,
-                                                    lifetimeTokensSpent: 40,
-                                                    projects: []
+                                    <DiscoveryLedgerTable
+                                        isLoading={false}
+                                        filteredLedger={[
+                                            {
+                                                email: 'curator.alpha@zcene.online',
+                                                projectsCount: 8,
+                                                actionTriggers: { createCount: 8, updateCount: 24 },
+                                                artistSearches: {
+                                                    globalCount: 32,
+                                                    topSearches: [
+                                                        { artistName: 'Sunny Day Real Estate', count: 12 },
+                                                        { artistName: 'Mineral', count: 8 },
+                                                        { artistName: 'The Promise Ring', count: 7 },
+                                                        { artistName: 'Texas Is the Reason', count: 5 }
+                                                    ]
                                                 },
-                                                {
-                                                    email: 'explorer.beta@zcene.online',
-                                                    projectsCount: 4,
-                                                    actionTriggers: { createCount: 4, updateCount: 12 },
-                                                    artistSearches: {
-                                                        globalCount: 16,
-                                                        topSearches: [
-                                                            { artistName: 'American Football', count: 6 },
-                                                            { artistName: 'Cap\'n Jazz', count: 4 },
-                                                            { artistName: 'Braid', count: 4 },
-                                                            { artistName: 'Joan of Arc', count: 2 }
-                                                        ]
-                                                    },
-                                                    cacheEfficiency: { liveQueries: 8, cacheHits: 8 },
-                                                    deepCutsOpened: 5,
-                                                    onboardingProgress: { step1: true, step2: true, step3: true, step4: false, step5: false },
-                                                    exactCost: 0.29,
-                                                    hasExactCost: true,
-                                                    tokenBalance: 30,
-                                                    lifetimeTokensPurchased: 50,
-                                                    lifetimeTokensSpent: 20,
-                                                    projects: []
-                                                }
-                                            ]}
-                                            expandedRow={demoExpandedRow}
-                                            toggleRow={(email) => setDemoExpandedRow(prev => prev === email ? null : email)}
-                                        />
-                                    </div>
+                                                cacheEfficiency: { liveQueries: 10, cacheHits: 22 },
+                                                deepCutsOpened: 15,
+                                                onboardingProgress: { step1: true, step2: true, step3: true, step4: true, step5: true },
+                                                exactCost: 0.87,
+                                                hasExactCost: true,
+                                                tokenBalance: 60,
+                                                lifetimeTokensPurchased: 100,
+                                                lifetimeTokensSpent: 40,
+                                                projects: []
+                                            },
+                                            {
+                                                email: 'explorer.beta@zcene.online',
+                                                projectsCount: 4,
+                                                actionTriggers: { createCount: 4, updateCount: 12 },
+                                                artistSearches: {
+                                                    globalCount: 16,
+                                                    topSearches: [
+                                                        { artistName: 'American Football', count: 6 },
+                                                        { artistName: 'Cap\'n Jazz', count: 4 },
+                                                        { artistName: 'Braid', count: 4 },
+                                                        { artistName: 'Joan of Arc', count: 2 }
+                                                    ]
+                                                },
+                                                cacheEfficiency: { liveQueries: 8, cacheHits: 8 },
+                                                deepCutsOpened: 5,
+                                                onboardingProgress: { step1: true, step2: true, step3: true, step4: false, step5: false },
+                                                exactCost: 0.29,
+                                                hasExactCost: true,
+                                                tokenBalance: 30,
+                                                lifetimeTokensPurchased: 50,
+                                                lifetimeTokensSpent: 20,
+                                                projects: []
+                                            }
+                                        ]}
+                                        expandedRow={demoExpandedRow}
+                                        toggleRow={(email) => setDemoExpandedRow(prev => prev === email ? null : email)}
+                                    />
                                 </div>
                             </div>
 
@@ -5692,58 +5724,96 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="space-y-6">
                                 <h3 className="text-xl font-medium text-zinc-200">Responsive Ledger Mobile Card Anatomy</h3>
                                 <p className="text-sm text-zinc-400 max-w-2xl leading-relaxed">
-                                    Both <strong>Token Activity</strong> (paginated at 10 rows) and <strong>Stack Archive</strong> (paginated at 20 rows) use a single-branch <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">isSmallScreen</code> (&lt; 768px) switch so mobile viewports render zero-overflow cards with zero duplicate desktop table DOM nodes.
+                                    Both <strong>Token Activity</strong> (paginated at 10 rows) and <strong>Stack Archive</strong> (paginated at 20 rows) — along with all Admin Control Room ledgers — share the unified <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">useCompactTable(isSmallScreen)</code> (&lt; 1024px) switch and <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">&lt;ResponsiveTableFrame mode=&quot;mobile&quot; /&gt;</code> connected dark frame with zebra-alternating rows and zero duplicate desktop table DOM nodes.
                                 </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl">
-                                    {/* Token Activity Mobile Card Specimen */}
-                                    <div className="border border-zinc-800 bg-zinc-950/40 p-4 space-y-2.5 rounded-2xl">
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="min-w-0 flex-1">
-                                                <div className="flex items-center gap-2 flex-wrap">
-                                                    <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0">ACTIVE</span>
-                                                    <span className="font-medium text-white text-sm leading-snug">Madball &amp; Radiohead</span>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 max-w-3xl items-start">
+                                    {/* Token Activity Connected Solid-Dark Frame Specimen */}
+                                    <ResponsiveTableFrame mode="mobile">
+                                        <div className={`p-4 space-y-2.5 ${DATA_TABLE_TOKENS.getStackedRowClass(0, 2)}`}>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30 whitespace-nowrap shrink-0">ACTIVE</span>
+                                                        <span className={`${DATA_TABLE_TOKENS.primaryTitle} leading-snug`}>Madball &amp; Radiohead</span>
+                                                    </div>
+                                                    <span className={`block ${DATA_TABLE_TOKENS.subtitle} mt-0.5`}>9T settlement after 1T pre-flight</span>
                                                 </div>
-                                                <span className="block text-[11px] text-zinc-500 mt-0.5">9T settlement after 1T pre-flight</span>
+                                                <span className="text-sm font-mono tabular-nums font-bold text-zinc-200 whitespace-nowrap shrink-0">-9 T</span>
                                             </div>
-                                            <span className="text-sm font-mono font-bold text-zinc-200 whitespace-nowrap shrink-0">-9 T</span>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border bg-primary/15 text-primary border-primary/30 whitespace-nowrap shrink-0">Zcene Curation</span>
+                                                <span className="px-2 py-0.5 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 text-[11px] font-medium whitespace-nowrap shrink-0">Multi-Root Zcene</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono tabular-nums text-zinc-400">
+                                                <span>25 Nov 2026, 22:21</span>
+                                                <span className="whitespace-nowrap shrink-0">Bal: 59 T</span>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center gap-1.5 flex-wrap">
-                                            <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border bg-primary/15 text-primary border-primary/30 whitespace-nowrap shrink-0">Zcene Curation</span>
-                                            <span className="px-2 py-0.5 rounded-lg border border-zinc-700/80 bg-zinc-900 text-zinc-300 text-[11px] font-medium whitespace-nowrap shrink-0">Multi-Root Zcene</span>
+                                        <div className={`p-4 space-y-2.5 ${DATA_TABLE_TOKENS.getStackedRowClass(1, 2)}`}>
+                                            <div className="flex items-start justify-between gap-3">
+                                                <div className="min-w-0 flex-1">
+                                                    <span className={`${DATA_TABLE_TOKENS.primaryTitle} leading-snug block`}>Top-Up Pack (100 Tokens)</span>
+                                                </div>
+                                                <span className="text-sm font-mono tabular-nums font-bold text-emerald-400 whitespace-nowrap shrink-0">+100 T</span>
+                                            </div>
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <span className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border bg-emerald-500/15 text-emerald-300 border-emerald-500/30 whitespace-nowrap shrink-0">Top-Up</span>
+                                            </div>
+                                            <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono tabular-nums text-zinc-400">
+                                                <span>25 Nov 2026, 11:26</span>
+                                                <span className="whitespace-nowrap shrink-0">Bal: 149 T</span>
+                                            </div>
                                         </div>
-                                        <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
-                                            <span>25 Nov 2026, 22:21</span>
-                                            <span className="whitespace-nowrap shrink-0">Bal: 59 T</span>
-                                        </div>
-                                    </div>
+                                    </ResponsiveTableFrame>
 
-                                    {/* Stack Archive Mobile Card Specimen */}
-                                    <div className="border border-zinc-800 bg-zinc-950/40 p-4 space-y-3 rounded-2xl">
-                                        <div className="min-w-0">
-                                            <div className="flex items-center gap-2 flex-wrap">
-                                                <span className="font-medium text-white text-sm">Restraining Order</span>
-                                                <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/70 px-1.5 py-0.5 rounded-sm leading-none">ARTIST</span>
+                                    {/* Stack Archive Connected Solid-Dark Frame Specimen */}
+                                    <ResponsiveTableFrame mode="mobile">
+                                        <div className={`p-4 space-y-3 ${DATA_TABLE_TOKENS.getStackedRowClass(0, 2)}`}>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={DATA_TABLE_TOKENS.primaryTitle}>Restraining Order</span>
+                                                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/70 px-1.5 py-0.5 rounded-sm leading-none">ARTIST</span>
+                                                </div>
+                                                <p className="text-xs text-zinc-400 mt-1">via Spaced</p>
                                             </div>
-                                            <p className="text-xs text-zinc-400 mt-1">via Spaced</p>
+                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono tabular-nums text-zinc-400">
+                                                <div>
+                                                    <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">Saved</span>
+                                                    <span>29 Oct 2026, 10:43</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">Archived</span>
+                                                    <span>25 Nov 2026, 22:15</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
-                                            <div>
-                                                <span className="block text-[9px] uppercase tracking-wider text-zinc-500">Saved</span>
-                                                <span>29 Oct 2026, 10:43</span>
+                                        <div className={`p-4 space-y-3 ${DATA_TABLE_TOKENS.getStackedRowClass(1, 2)}`}>
+                                            <div className="min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap">
+                                                    <span className={DATA_TABLE_TOKENS.primaryTitle}>Dischord Records</span>
+                                                    <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/70 px-1.5 py-0.5 rounded-sm leading-none">LABEL</span>
+                                                </div>
+                                                <p className="text-xs text-zinc-400 mt-1">via Fugazi</p>
                                             </div>
-                                            <div>
-                                                <span className="block text-[9px] uppercase tracking-wider text-zinc-500">Archived</span>
-                                                <span>25 Nov 2026, 22:15</span>
+                                            <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono tabular-nums text-zinc-400">
+                                                <div>
+                                                    <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">Saved</span>
+                                                    <span>18 Oct 2026, 14:12</span>
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">Archived</span>
+                                                    <span>24 Nov 2026, 09:05</span>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
+                                    </ResponsiveTableFrame>
                                 </div>
                                 <div className="p-6 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-500 leading-relaxed max-w-3xl">
                                     <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
                                     <ul className="list-disc list-outside pl-4 space-y-1.5 mt-2">
-                                        <li><strong>Shared Card Shell:</strong> <code className="text-zinc-300">border border-zinc-800 bg-zinc-950/40 p-4 rounded-2xl</code> stacked with <code className="text-zinc-300">space-y-3</code> and subtle <code className="text-zinc-300">border-t border-zinc-800/60</code> monospace metadata footers.</li>
-                                        <li><strong>Zero Duplicate Nodes:</strong> Conditional rendering via <code className="text-zinc-300">isSmallScreen ? &lt;MobileCards /&gt; : &lt;DesktopTable /&gt;</code> guarantees only one branch mounts per viewport across Standard User tables (<strong>Token Activity</strong>, <strong>Stack Archive</strong>) and Admin Control Room tables (<strong>Author P&amp;L</strong>, nested <strong>Author Receipts</strong>, <strong>Deep Connections Query Log</strong>, <strong>JIT Auto-Healing</strong>, and <strong>Failed &amp; Auto-Refunded Curations</strong>). Project Lists (<strong>Dashboard</strong> &amp; <strong>Trash</strong>) keep Grid/List toggle parity everywhere and fold at <code className="text-zinc-300">&lt; 1024px</code> into a single distraction-free solid-dark <code className="text-zinc-300">bg-zinc-900</code> table frame of <code className="text-zinc-300">&lt;ProjectMobileListCard /&gt;</code> rows with inline crate tabs and zero desktop table DOM.</li>
-                                        <li><strong>Progressive Pagination:</strong> Activity and Admin operational logs paginate at <code className="text-zinc-300">10</code> rows (<code className="text-zinc-300">20</code> rows for Stack Archive) with incremental <code className="text-zinc-300">Show more (N remaining)</code> expansion.</li>
+                                        <li><strong>Unified Connected Frame (<code className="text-zinc-300">DataTable.tsx</code>):</strong> <code className="text-zinc-300">w-full rounded-2xl border border-zinc-800 bg-zinc-900</code> (<code className="text-zinc-300">rounded-xl</code> for nested drawer tables) with connected alternating <code className="text-zinc-300">bg-zinc-900</code> / <code className="text-zinc-300">bg-zinc-950/40</code> rows, <code className="text-zinc-300">border-t border-zinc-800/50</code> hairlines, and exact <code className="text-zinc-300">15px</code> (<code className="text-zinc-300">11px</code> nested) first/last corner radii.</li>
+                                        <li><strong>Zero Duplicate Nodes (&lt; 1024px):</strong> Conditional rendering via <code className="text-zinc-300">useCompactTable(isSmallScreen) ? &lt;StackedRows /&gt; : &lt;DesktopTable /&gt;</code> guarantees only one branch mounts per viewport across all 9 tables — Project Lists (<strong>Dashboard</strong>, <strong>Trash</strong>), Standard User ledgers (<strong>Token Activity</strong>, <strong>Stack Archive</strong>), and Admin Control Room ledgers (<strong>Author P&amp;L</strong> with recessed <code className="text-zinc-300">bg-zinc-950/90</code> accordion drawers, nested <strong>Author Receipts</strong> &amp; <strong>Deep Connections Query Log</strong>, <strong>JIT Auto-Healing</strong>, and <strong>Failed &amp; Auto-Refunded Curations</strong>).</li>
+                                        <li><strong>Progressive Pagination:</strong> Activity and Admin operational logs paginate at <code className="text-zinc-300">10</code> rows (<code className="text-zinc-300">20</code> rows for Stack Archive) with incremental <code className="text-zinc-300">Show more (N remaining)</code> expansion outside the table frame.</li>
                                         <li><strong>Support Strip Placement:</strong> Billing dispute support (<code className="text-zinc-300">support@zcene.online</code>) sits quietly below the Token Activity list and Show More control rather than inside the top Wallet Hero.</li>
                                     </ul>
                                 </div>

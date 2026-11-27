@@ -253,8 +253,12 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     await screen.findByTestId('token-transactions-ledger');
     fireEvent.click(screen.getByTestId('ledger-tab-stack-archive'));
 
-    // Single-branch render: mobile card list present, desktop table NOT mounted
-    expect(screen.getByTestId('stack-archive-mobile-list')).toBeInTheDocument();
+    // Single-branch render: connected solid-dark mobile list present (not space-y-3 disconnected cards), desktop table NOT mounted
+    const archiveMobileList = screen.getByTestId('stack-archive-mobile-list');
+    expect(archiveMobileList).toBeInTheDocument();
+    expect(archiveMobileList.className).toContain('bg-zinc-900');
+    expect(archiveMobileList.className).toContain('rounded-2xl');
+    expect(archiveMobileList.className).not.toContain('space-y-3');
     expect(screen.queryByTestId('stack-archive-desktop-table')).not.toBeInTheDocument();
     expect(screen.getAllByText('Buggin')).toHaveLength(1);
 
@@ -1128,7 +1132,11 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
       />
     );
 
-    expect(await screen.findByTestId('token-activity-mobile-list')).toBeInTheDocument();
+    const activityMobileList = await screen.findByTestId('token-activity-mobile-list');
+    expect(activityMobileList).toBeInTheDocument();
+    expect(activityMobileList.className).toContain('bg-zinc-900');
+    expect(activityMobileList.className).toContain('rounded-2xl');
+    expect(activityMobileList.className).not.toContain('space-y-3');
     expect(screen.queryByTestId('token-activity-desktop-table')).not.toBeInTheDocument();
     expect(screen.getAllByText('Madball & Radiohead')).toHaveLength(1);
     expect(screen.getByText('-9 T')).toBeInTheDocument();
@@ -1360,8 +1368,12 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
       />
     );
 
-    // Single-branch render: mobile card list present, desktop table absent
-    expect(screen.getByTestId('admin-authors-mobile-list')).toBeInTheDocument();
+    // Single-branch render: connected solid-dark mobile accordion present, desktop table absent
+    const authorsMobileList = screen.getByTestId('admin-authors-mobile-list');
+    expect(authorsMobileList).toBeInTheDocument();
+    expect(authorsMobileList.className).toContain('bg-zinc-900');
+    expect(authorsMobileList.className).toContain('rounded-2xl');
+    expect(authorsMobileList.className).not.toContain('space-y-3');
     expect(screen.queryByTestId('admin-authors-desktop-table')).not.toBeInTheDocument();
     expect(screen.getAllByText('simon.lavin1@gmail.com')).toHaveLength(1);
 
@@ -1373,8 +1385,12 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(screen.getByText('Curation Actions')).toBeInTheDocument();
     expect(screen.getByText('The Murder City Devils')).toBeInTheDocument();
 
-    // Nested author activity uses shared mobile receipt cards & paginates at 10 rows
-    expect(screen.getByTestId('admin-author-activity-mobile-list')).toBeInTheDocument();
+    // Nested author activity uses connected nested frame (rounded-xl bg-zinc-900) & paginates at 10 rows
+    const nestedActivityList = screen.getByTestId('admin-author-activity-mobile-list');
+    expect(nestedActivityList).toBeInTheDocument();
+    expect(nestedActivityList.className).toContain('bg-zinc-900');
+    expect(nestedActivityList.className).toContain('rounded-xl');
+    expect(nestedActivityList.className).not.toContain('space-y-2.5');
     expect(screen.queryByTestId('admin-author-activity-desktop-table')).not.toBeInTheDocument();
     expect(screen.getByText('Admin Mobile Receipt 1')).toBeInTheDocument();
     expect(screen.queryByText(`Admin Mobile Receipt ${ADMIN_LOG_PAGE_SIZE + 1}`)).not.toBeInTheDocument();
@@ -1447,8 +1463,12 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
       />
     );
 
-    // JIT mobile single-branch cards + 10-row pagination
-    expect(await screen.findByTestId('jit-heals-mobile-list')).toBeInTheDocument();
+    // JIT mobile single-branch connected dark frame + 10-row pagination
+    const jitMobileList = await screen.findByTestId('jit-heals-mobile-list');
+    expect(jitMobileList).toBeInTheDocument();
+    expect(jitMobileList.className).toContain('bg-zinc-900');
+    expect(jitMobileList.className).toContain('rounded-2xl');
+    expect(jitMobileList.className).not.toContain('space-y-3');
     expect(screen.queryByTestId('jit-heals-desktop-table')).not.toBeInTheDocument();
     expect(screen.getByText('Healed Band 1')).toBeInTheDocument();
     expect(screen.queryByText(`Healed Band ${ADMIN_LOG_PAGE_SIZE + 1}`)).not.toBeInTheDocument();
@@ -1457,8 +1477,12 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(screen.getByText(`Healed Band ${ADMIN_LOG_PAGE_SIZE + 4}`)).toBeInTheDocument();
     expect(screen.queryByTestId('jit-show-more-btn')).not.toBeInTheDocument();
 
-    // Failed & Auto-Refunded Curations mobile single-branch cards + 10-row pagination
-    expect(screen.getByTestId('curation-failures-mobile-list')).toBeInTheDocument();
+    // Failed & Auto-Refunded Curations mobile single-branch connected dark frame + 10-row pagination
+    const failuresMobileList = screen.getByTestId('curation-failures-mobile-list');
+    expect(failuresMobileList).toBeInTheDocument();
+    expect(failuresMobileList.className).toContain('bg-zinc-900');
+    expect(failuresMobileList.className).toContain('rounded-2xl');
+    expect(failuresMobileList.className).not.toContain('space-y-3');
     expect(screen.queryByTestId('curation-failures-desktop-table')).not.toBeInTheDocument();
     expect(screen.getByText('Failed Zcene 1')).toBeInTheDocument();
     expect(screen.queryByText(`Failed Zcene ${ADMIN_LOG_PAGE_SIZE + 1}`)).not.toBeInTheDocument();
@@ -1538,6 +1562,8 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
     expect(dsSrc).toContain('<DisambiguationRadio');
     expect(dsSrc).toContain('<ModalFooterLink');
     expect(dsSrc).toContain('<ProjectMobileListCard');
+    expect(dsSrc).toContain('<ResponsiveTableFrame');
+    expect(dsSrc).toContain('DataTable.tsx');
     expect(dsSrc).toContain('POST HARDCORE');
     expect(dsSrc).toContain('auto_stories');
     expect(dsSrc).toContain('picture_as_pdf');

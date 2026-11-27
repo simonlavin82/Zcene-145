@@ -1,4 +1,5 @@
 import React from 'react';
+import { DATA_TABLE_TOKENS } from './DataTable';
 
 export const PROJECT_TABLE_COLUMNS = [
   { key: 'title', label: 'Title', align: 'left' as const, headerClassName: 'pl-4 pr-3' },
@@ -23,9 +24,9 @@ export const ProjectTableMetricValue: React.FC<ProjectTableMetricValueProps> = (
 }) => {
   const isMuted = value === null || value === undefined || (mutedWhenZero && value <= 0);
   if (isMuted) {
-    return <span className="font-mono tabular-nums text-xs text-zinc-600">-</span>;
+    return <span className={`${DATA_TABLE_TOKENS.monoCell} text-zinc-600`}>-</span>;
   }
-  return <span className="font-mono tabular-nums text-xs font-medium text-zinc-300">{value}</span>;
+  return <span className={`${DATA_TABLE_TOKENS.monoCell} font-medium text-zinc-300`}>{value}</span>;
 };
 
 export interface ProjectMetricPillProps {
@@ -202,7 +203,7 @@ export const ProjectMobileListCard: React.FC<ProjectMobileListCardProps> = ({
       } ${isMenuOpen ? 'z-50' : 'z-0'} ${className}`}
     >
       <div className="flex items-center justify-between gap-2">
-        <span className="font-medium text-white text-sm truncate leading-snug min-w-0 flex-1">
+        <span className={`${DATA_TABLE_TOKENS.primaryTitle} truncate leading-snug min-w-0 flex-1`}>
           {title}
         </span>
 

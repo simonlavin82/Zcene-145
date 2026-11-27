@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import Header from './Header';
 import ViewToggle from './ViewToggle';
 import { DashboardProjectCard } from './DashboardProjectCard';
@@ -10,6 +10,7 @@ import { formatSystemTimestamp } from '../utils/formatters';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 import { BackButton, ToolbarSearch } from './DesignSystem';
 import { PROJECT_TABLE_COLUMNS, ProjectTableMetricValue, ProjectStatusBadge, ProjectMobileListCard } from './ui/ProjectMetrics';
+import { DATA_TABLE_TOKENS, ResponsiveTableFrame, useCompactTable } from './ui/DataTable';
 
 export interface TrashPageProps {
   user: User | null;
@@ -72,18 +73,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [activeMenuId, setActiveMenuId] = useState<string | null>(null);
   const [projectToPurge, setProjectToPurge] = useState<string | null>(null);
-  const [isBelowDesktopTable, setIsBelowDesktopTable] = useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
-  );
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleResize = () => setIsBelowDesktopTable(window.innerWidth < 1024);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const useCompactList = isSmallScreen || isBelowDesktopTable;
+  const useCompactList = useCompactTable(isSmallScreen);
 
   const trashedProjects = useMemo(() => {
     return projects.filter(p => p.status === 'trashed');
@@ -399,7 +389,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
             </div>
           ) : useCompactList ? (
             /* Single-Branch Distraction-Free Responsive Table List (< 1024px — zero desktop <table> DOM) */
-            <div data-testid="trash-mobile-list" className="w-full rounded-2xl border border-zinc-800 bg-zinc-900">
+            <ResponsiveTableFrame mode="mobile" data-testid="trash-mobile-list">
               {filteredProjects.map((project, index) => {
                 const {
                   sceneCount,
@@ -409,15 +399,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                   deepCutsCount,
                 } = computeProjectCardMetrics(project);
                 const daysLeft = getDaysLeft(project);
-                const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
-                const rowClasses = [
-                  rowBg,
-                  index > 0 ? 'border-t border-zinc-800/50' : '',
-                  index === 0 ? 'rounded-t-[15px]' : '',
-                  index === filteredProjects.length - 1 ? 'rounded-b-[15px]' : '',
-                ]
-                  .filter(Boolean)
-                  .join(' ');
+                const rowClasses = DATA_TABLE_TOKENS.getStackedRowClass(index, filteredProjects.length);
 
                 return (
                   <ProjectMobileListCard
@@ -438,13 +420,13 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                   />
                 );
               })}
-            </div>
+            </ResponsiveTableFrame>
           ) : (
             /* 9-Column Desktop Tabular List View (>= 1024px) */
-            <div data-testid="trash-desktop-table" className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
+            <ResponsiveTableFrame mode="desktop" data-testid="trash-desktop-table">
               <table className="w-full text-left border-collapse min-w-[780px]">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
+                  <tr className={DATA_TABLE_TOKENS.theadRow}>
                     {PROJECT_TABLE_COLUMNS.map((col) => (
                       <th
                         key={col.key}
@@ -457,7 +439,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                     ))}
                   </tr>
                 </thead>
-                <tbody className="bg-zinc-900">
+                <tbody className={DATA_TABLE_TOKENS.tbody}>
                   {filteredProjects.map((project, index) => {
                     const {
                       sceneCount,
@@ -470,11 +452,11 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                     const formattedDate = project.updatedAt ? formatSystemTimestamp(project.updatedAt) : 'New Project';
                     const daysLeft = getDaysLeft(project);
 
-                    const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
+                    const rowBg = DATA_TABLE_TOKENS.zebraBg(index);
                     const tdClass = `transition-colors ${rowBg} group-hover:bg-white/5`;
 
                     return (
-                      <tr key={project.id} className={`group border-b border-zinc-800/30 ${activeMenuId === project.id ? 'relative z-40' : ''}`}>
+                      <tr key={project.id} className={`group border-b border-zinc-800/30 last:border-b-0 ${activeMenuId === project.id ? 'relative z-40' : ''}`}>
                         <td className={`py-3.5 pl-4 pr-3 font-medium text-white ${tdClass}`}>
                           <span className="block truncate max-w-[200px] xl:max-w-[280px] text-sm">{displayTitle}</span>
                         </td>
@@ -507,7 +489,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                   })}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTableFrame>
           )}
         </div>
       </main>

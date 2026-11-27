@@ -16,6 +16,7 @@ import { PROFILE_COLORS } from './SharedModals';
 import { computeProjectCardMetrics, parseProjectScenes, stripSceneNamespace } from '../shared/multiSceneUtils';
 import { ToolbarSearch } from './DesignSystem';
 import { PROJECT_TABLE_COLUMNS, ProjectTableMetricValue, ProjectStatusBadge, ProjectMobileListCard } from './ui/ProjectMetrics';
+import { DATA_TABLE_TOKENS, ResponsiveTableFrame, useCompactTable } from './ui/DataTable';
 
 
 interface DashboardProps {
@@ -99,18 +100,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
   const [openColorPopover, setOpenColorPopover] = React.useState<string | null>(null);
-  const [isBelowDesktopTable, setIsBelowDesktopTable] = React.useState(() =>
-    typeof window !== 'undefined' ? window.innerWidth < 1024 : false
-  );
-
-  React.useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const handleResize = () => setIsBelowDesktopTable(window.innerWidth < 1024);
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  const useCompactList = isSmallScreen || isBelowDesktopTable;
+  const useCompactList = useCompactTable(isSmallScreen);
 
   React.useEffect(() => {
     const handleGlobalClick = () => setOpenColorPopover(null);
@@ -793,7 +783,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
           ) : useCompactList ? (
             /* Single-Branch Distraction-Free Responsive Table List (< 1024px — mirrors Desktop Table 1:1 with zero desktop <table> DOM) */
-            <div data-testid="dashboard-mobile-list" className="w-full rounded-2xl border border-zinc-800 bg-zinc-900">
+            <ResponsiveTableFrame mode="mobile" data-testid="dashboard-mobile-list">
               {sortedBucketKeys.map((bucketKey, bucketIndex) => {
                 const projectsInBucket = groupedProjects[bucketKey] || [];
                 const isUnassigned = bucketKey === 'UNASSIGNED';
@@ -886,14 +876,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                       } = computeProjectCardMetrics(project);
                       const isMapped = project.status === 'completed';
                       const isLastRowOverall = isLastBucket && projectIndex === projectsInBucket.length - 1;
-                      const rowBg = projectIndex % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
-                      const rowClasses = [
-                        rowBg,
-                        projectIndex > 0 ? 'border-t border-zinc-800/50' : '',
-                        isLastRowOverall ? 'rounded-b-[15px]' : '',
-                      ]
-                        .filter(Boolean)
-                        .join(' ');
+                      const rowClasses = DATA_TABLE_TOKENS.getStackedRowClass(projectIndex, projectsInBucket.length, {
+                        hasTopHeader: true,
+                        isLastOverall: isLastRowOverall,
+                      });
 
                       return (
                         <ProjectMobileListCard
@@ -918,13 +904,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                   </React.Fragment>
                 );
               })}
-            </div>
+            </ResponsiveTableFrame>
           ) : (
             /* High-Contrast 9-Column Desktop Tabular List View (>= 1024px) */
-            <div data-testid="dashboard-desktop-table" className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
+            <ResponsiveTableFrame mode="desktop" data-testid="dashboard-desktop-table">
               <table className="w-full text-left border-collapse min-w-[780px]">
                 <thead>
-                  <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
+                  <tr className={DATA_TABLE_TOKENS.theadRow}>
                     {PROJECT_TABLE_COLUMNS.map((col) => (
                       <th
                         key={col.key}
@@ -937,7 +923,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     ))}
                   </tr>
                 </thead>
-                <tbody className="bg-zinc-900">
+                <tbody className={DATA_TABLE_TOKENS.tbody}>
                   {sortedBucketKeys.map((bucketKey, bucketIndex) => {
                     const isUnassigned = bucketKey === 'UNASSIGNED';
                     const defaultColor = zceneCategoricalPalette[bucketIndex % zceneCategoricalPalette.length];
@@ -1027,7 +1013,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         const formattedDate = project.updatedAt ? formatSystemTimestamp(project.updatedAt) : 'New Project';
                         const isMapped = project.status === 'completed';
                         
-                        const rowBg = index % 2 === 0 ? 'bg-zinc-900' : 'bg-zinc-950/40';
+                        const rowBg = DATA_TABLE_TOKENS.zebraBg(index);
                         const tdClass = `transition-colors ${rowBg} group-hover:bg-white/5 ${index === 0 ? 'relative z-10' : ''}`;
                         
                         return (
@@ -1084,7 +1070,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                   })}
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTableFrame>
           )}
         </div>
         </main>

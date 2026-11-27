@@ -9,6 +9,7 @@ import { motion } from 'motion/react';
 import { InfoTooltip } from './ui/InfoTooltip';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
+import { DATA_TABLE_TOKENS, ResponsiveTableFrame, useCompactTable } from './ui/DataTable';
 import { cleanArtistDisplayName } from '../services/artistCacheService';
 import {
     TokenTopUpTierId,
@@ -899,12 +900,14 @@ interface ActivityReceiptMobileCardProps {
     row: UnifiedActivityRow;
     showAdminMetrics?: boolean;
     maskPurgedAsArchived?: boolean;
+    className?: string;
 }
 
 const ActivityReceiptMobileCard: React.FC<ActivityReceiptMobileCardProps> = ({
     row,
     showAdminMetrics = false,
     maskPurgedAsArchived = true,
+    className = '',
 }) => {
     const isPositive = row.delta > 0;
     const changeLabel = row.delta === 0
@@ -923,13 +926,13 @@ const ActivityReceiptMobileCard: React.FC<ActivityReceiptMobileCardProps> = ({
     return (
         <div
             data-testid={`activity-row-${row.id}`}
-            className={`border border-zinc-800 bg-zinc-950/40 p-4 space-y-2.5 ${RADIUS_TOKENS.frame}`}
+            className={`p-4 space-y-2.5 ${className}`}
         >
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
                         {row.isCurationRow && renderProjectStatusBadge(row.projectStatus, maskPurgedAsArchived)}
-                        <span className="font-medium text-white text-sm leading-snug break-words">{row.title}</span>
+                        <span className={`${DATA_TABLE_TOKENS.primaryTitle} leading-snug break-words`}>{row.title}</span>
                     </div>
                     {row.subtitle && (
                         <span className="block text-[11px] text-zinc-500 mt-0.5">
@@ -1249,6 +1252,7 @@ interface DeepWebQueryItem {
 }
 
 const DeepConnectionsQueryLog: React.FC<DeepConnectionsQueryLogProps> = ({ uid, isSmallScreen = false }) => {
+    const useCompact = useCompactTable(isSmallScreen);
     const [queries, setQueries] = useState<DeepWebQueryItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -1324,61 +1328,64 @@ const DeepConnectionsQueryLog: React.FC<DeepConnectionsQueryLogProps> = ({ uid, 
                 <div className="bg-black/50 border border-zinc-800 rounded-xl p-4 text-center text-xs text-zinc-500 italic">
                     No Deep Connections consults recorded yet for this author.
                 </div>
-            ) : isSmallScreen ? (
-                <div data-testid="deep-connections-mobile-list" className="space-y-2.5">
-                    {queries.map((q) => {
+            ) : useCompact ? (
+                <ResponsiveTableFrame mode="mobile" variant="nested" data-testid="deep-connections-mobile-list">
+                    {queries.map((q, idx) => {
                         const dateMs = extractTimestampMs(q.timestamp);
                         const dateStr = dateMs
                             ? new Date(dateMs).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ',')
                             : '—';
                         return (
-                            <div key={q.id} className="bg-black/50 border border-zinc-800 rounded-xl p-3.5 space-y-2">
+                            <div
+                                key={q.id}
+                                className={`p-3.5 space-y-2 ${DATA_TABLE_TOKENS.getStackedRowClass(idx, queries.length, { nested: true })}`}
+                            >
                                 <div className="flex items-start justify-between gap-2">
-                                    <span className="text-xs text-white font-medium break-words min-w-0">
+                                    <span className={`${DATA_TABLE_TOKENS.primaryTitle} break-words min-w-0`}>
                                         {q.nodeName || q.nodeId || '—'}
                                     </span>
-                                    <span className="text-xs font-mono text-red-400/80 whitespace-nowrap shrink-0">
+                                    <span className={`${DATA_TABLE_TOKENS.monoCell} text-red-400/80 whitespace-nowrap shrink-0`}>
                                         ${q.costUsd.toFixed(4)}
                                     </span>
                                 </div>
                                 <p className="text-xs text-zinc-300 leading-relaxed break-words">
                                     &ldquo;{q.question}&rdquo;
                                 </p>
-                                <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono tabular-nums text-zinc-400">
                                     <span className="truncate">{q.projectName || q.projectId || '—'}</span>
                                     <span className="whitespace-nowrap shrink-0">{dateStr}</span>
                                 </div>
                             </div>
                         );
                     })}
-                </div>
+                </ResponsiveTableFrame>
             ) : (
-                <div data-testid="deep-connections-desktop-table" className="bg-black/50 border border-zinc-800 rounded-md overflow-x-auto">
+                <ResponsiveTableFrame mode="desktop" variant="nested" data-testid="deep-connections-desktop-table">
                     <table className="w-full text-left border-collapse min-w-[600px]">
                         <thead>
-                            <tr className="border-b border-zinc-800 bg-zinc-900/30">
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Artist / Node</th>
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Project</th>
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Question</th>
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
+                            <tr className={DATA_TABLE_TOKENS.theadRow}>
+                                <th className={DATA_TABLE_TOKENS.nestedTh}>Date</th>
+                                <th className={DATA_TABLE_TOKENS.nestedTh}>Artist / Node</th>
+                                <th className={DATA_TABLE_TOKENS.nestedTh}>Project</th>
+                                <th className={DATA_TABLE_TOKENS.nestedTh}>Question</th>
+                                <th className={`${DATA_TABLE_TOKENS.nestedTh} text-right`}>Cost</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {queries.map((q) => {
+                        <tbody className={DATA_TABLE_TOKENS.tbody}>
+                            {queries.map((q, idx) => {
                                 const dateMs = extractTimestampMs(q.timestamp);
                                 const dateStr = dateMs
                                     ? new Date(dateMs).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }).replace(',', ',')
                                     : '—';
                                 return (
-                                    <tr key={q.id} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/20">
-                                        <td className="p-3 text-xs text-zinc-400 whitespace-nowrap font-mono">{dateStr}</td>
-                                        <td className="p-3 text-xs text-zinc-300 font-medium whitespace-nowrap">{q.nodeName || q.nodeId || '—'}</td>
+                                    <tr key={q.id} className={DATA_TABLE_TOKENS.getDesktopRowClass(idx)}>
+                                        <td className={`p-3 ${DATA_TABLE_TOKENS.monoCell} text-zinc-400 whitespace-nowrap`}>{dateStr}</td>
+                                        <td className={`p-3 ${DATA_TABLE_TOKENS.primaryTitle} whitespace-nowrap`}>{q.nodeName || q.nodeId || '—'}</td>
                                         <td className="p-3 text-xs text-zinc-400 whitespace-nowrap">{q.projectName || q.projectId || '—'}</td>
                                         <td className="p-3 text-xs text-zinc-300 max-w-md truncate" title={q.question}>
                                             "{q.question}"
                                         </td>
-                                        <td className="p-3 text-xs text-right font-mono text-red-400/80 whitespace-nowrap">
+                                        <td className={`p-3 ${DATA_TABLE_TOKENS.monoCell} text-right text-red-400/80 whitespace-nowrap`}>
                                             ${q.costUsd.toFixed(4)}
                                         </td>
                                     </tr>
@@ -1386,7 +1393,7 @@ const DeepConnectionsQueryLog: React.FC<DeepConnectionsQueryLogProps> = ({ uid, 
                             })}
                         </tbody>
                     </table>
-                </div>
+                </ResponsiveTableFrame>
             )}
         </div>
     );
@@ -1398,6 +1405,7 @@ interface AuthorUnifiedActivityTableProps {
 }
 
 const AuthorUnifiedActivityTable: React.FC<AuthorUnifiedActivityTableProps> = ({ user, isSmallScreen = false }) => {
+    const useCompact = useCompactTable(isSmallScreen);
     const unifiedRows = useMemo(() => buildUnifiedActivityRows(user), [user]);
     const [visibleCount, setVisibleCount] = useState<number>(ADMIN_LOG_PAGE_SIZE);
 
@@ -1419,36 +1427,37 @@ const AuthorUnifiedActivityTable: React.FC<AuthorUnifiedActivityTableProps> = ({
             </div>
 
             {unifiedRows.length === 0 ? (
-                <div className="bg-black/50 border border-zinc-800 rounded-xl p-4 text-center text-xs text-zinc-500 italic">
+                <div className="bg-zinc-900/60 border border-zinc-800 rounded-xl p-4 text-center text-xs text-zinc-500 italic">
                     No curation or token activity recorded yet for this author.
                 </div>
-            ) : isSmallScreen ? (
-                <div data-testid="admin-author-activity-mobile-list" className="space-y-2.5">
-                    {visibleRows.map((row) => (
+            ) : useCompact ? (
+                <ResponsiveTableFrame mode="mobile" variant="nested" data-testid="admin-author-activity-mobile-list">
+                    {visibleRows.map((row, idx) => (
                         <ActivityReceiptMobileCard
                             key={row.id}
                             row={row}
                             showAdminMetrics={true}
                             maskPurgedAsArchived={false}
+                            className={DATA_TABLE_TOKENS.getStackedRowClass(idx, visibleRows.length, { nested: true })}
                         />
                     ))}
-                </div>
+                </ResponsiveTableFrame>
             ) : (
-                <div data-testid="admin-author-activity-desktop-table" className="bg-black/50 border border-zinc-800 rounded-md overflow-x-auto">
+                <ResponsiveTableFrame mode="desktop" variant="nested" data-testid="admin-author-activity-desktop-table">
                     <table className="w-full text-left border-collapse min-w-[680px]">
                         <thead>
-                            <tr className="border-b border-zinc-800 bg-zinc-900/30">
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity / Zcene</th>
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Type / Generation</th>
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens</th>
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance</th>
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">AI Cost</th>
-                                <th className="p-3 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Net Margin</th>
+                            <tr className={DATA_TABLE_TOKENS.theadRow}>
+                                <th className={DATA_TABLE_TOKENS.nestedTh}>Date</th>
+                                <th className={DATA_TABLE_TOKENS.nestedTh}>Activity / Zcene</th>
+                                <th className={DATA_TABLE_TOKENS.nestedTh}>Type / Generation</th>
+                                <th className={`${DATA_TABLE_TOKENS.nestedTh} text-right`}>Tokens</th>
+                                <th className={`${DATA_TABLE_TOKENS.nestedTh} text-right`}>Balance</th>
+                                <th className={`${DATA_TABLE_TOKENS.nestedTh} text-right`}>AI Cost</th>
+                                <th className={`${DATA_TABLE_TOKENS.nestedTh} text-right`}>Net Margin</th>
                             </tr>
                         </thead>
-                        <tbody>
-                            {visibleRows.map((row) => {
+                        <tbody className={DATA_TABLE_TOKENS.tbody}>
+                            {visibleRows.map((row, idx) => {
                                 const isPositive = row.delta > 0;
                                 const isZeroCostDirectHit = row.isCurationRow && (row.generationType === 'Direct Hit' || row.generationType === 'Clone') && (row.aiCostUsd ?? 0) === 0;
                                 const dateStr = row.createdAt ? formatTxTimestamp(row.createdAt) : '—';
@@ -1462,15 +1471,15 @@ const AuthorUnifiedActivityTable: React.FC<AuthorUnifiedActivityTableProps> = ({
                                     : '—';
 
                                 return (
-                                    <tr key={row.id} className="border-b border-zinc-800/50 last:border-0 hover:bg-zinc-900/20">
-                                        <td className="p-3 text-xs text-zinc-400 whitespace-nowrap font-mono">{dateStr}</td>
-                                        <td className="p-3 text-xs text-zinc-200 font-medium">
+                                    <tr key={row.id} className={DATA_TABLE_TOKENS.getDesktopRowClass(idx)}>
+                                        <td className={`p-3 ${DATA_TABLE_TOKENS.monoCell} text-zinc-400 whitespace-nowrap`}>{dateStr}</td>
+                                        <td className="p-3">
                                             <div className="flex items-center gap-2 flex-wrap">
                                                 {row.isCurationRow && renderProjectStatusBadge(row.projectStatus, false)}
-                                                <span className="text-white">{row.title}</span>
+                                                <span className={DATA_TABLE_TOKENS.primaryTitle}>{row.title}</span>
                                             </div>
                                             {row.subtitle && (
-                                                <span className="block text-[11px] text-zinc-500 font-normal mt-0.5">
+                                                <span className={`block ${DATA_TABLE_TOKENS.subtitle} font-normal mt-0.5`}>
                                                     {row.subtitle}
                                                 </span>
                                             )}
@@ -1491,15 +1500,15 @@ const AuthorUnifiedActivityTable: React.FC<AuthorUnifiedActivityTableProps> = ({
                                                 )}
                                             </div>
                                         </td>
-                                        <td className={`p-3 text-xs text-right font-mono font-bold whitespace-nowrap ${
+                                        <td className={`p-3 ${DATA_TABLE_TOKENS.monoCell} text-right font-bold whitespace-nowrap ${
                                             isPositive ? 'text-emerald-400' : row.delta === 0 ? 'text-zinc-400' : 'text-zinc-200'
                                         }`}>
                                             {tokenLabel}
                                         </td>
-                                        <td className="p-3 text-xs text-right font-mono text-zinc-400 whitespace-nowrap">
+                                        <td className={`p-3 ${DATA_TABLE_TOKENS.monoCell} text-right text-zinc-400 whitespace-nowrap`}>
                                             {row.balanceAfter !== null ? `${row.balanceAfter}T` : '—'}
                                         </td>
-                                        <td className={`p-3 text-xs text-right font-mono whitespace-nowrap ${
+                                        <td className={`p-3 ${DATA_TABLE_TOKENS.monoCell} text-right whitespace-nowrap ${
                                             row.aiCostUsd === null
                                                 ? 'text-zinc-600'
                                                 : isZeroCostDirectHit
@@ -1508,7 +1517,7 @@ const AuthorUnifiedActivityTable: React.FC<AuthorUnifiedActivityTableProps> = ({
                                         }`}>
                                             {costStr}
                                         </td>
-                                        <td className="p-3 text-xs text-right font-mono whitespace-nowrap">
+                                        <td className={`p-3 ${DATA_TABLE_TOKENS.monoCell} text-right whitespace-nowrap`}>
                                             {row.netMarginUsd === null ? (
                                                 <span className="text-zinc-600">—</span>
                                             ) : row.isAdminBypass ? (
@@ -1532,7 +1541,7 @@ const AuthorUnifiedActivityTable: React.FC<AuthorUnifiedActivityTableProps> = ({
                             })}
                         </tbody>
                     </table>
-                </div>
+                </ResponsiveTableFrame>
             )}
 
             {unifiedRows.length > visibleCount && (
@@ -1570,6 +1579,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
     getAuthorStackCounts,
     isSmallScreen = false,
 }) => {
+    const useCompact = useCompactTable(isSmallScreen);
     const renderExpandedDetails = (user: UserTelemetry, totalActions: number) => (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 text-sm">
             {/* Left Column: Curation Actions Summary */}
@@ -1657,19 +1667,19 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
 
             {/* Full Width: Consolidated Unified Token Activity, Curations & Top-Up Receipts */}
             <div className="col-span-1 md:col-span-2 pt-4 border-t border-zinc-800/80 mt-1 min-w-0">
-                <AuthorUnifiedActivityTable user={user} isSmallScreen={isSmallScreen} />
+                <AuthorUnifiedActivityTable user={user} isSmallScreen={useCompact} />
             </div>
 
             {/* Full Width: Deep Connections Query Log (Admin Exclusive) */}
             <div className="col-span-1 md:col-span-2 pt-4 border-t border-zinc-800/80 mt-1 min-w-0">
-                <DeepConnectionsQueryLog uid={user.uid} email={user.email} isSmallScreen={isSmallScreen} />
+                <DeepConnectionsQueryLog uid={user.uid} email={user.email} isSmallScreen={useCompact} />
             </div>
         </div>
     );
 
     if (isLoading && filteredLedger.length === 0) {
         return (
-            <div className={`border border-zinc-800 bg-zinc-950/20 p-8 text-center text-zinc-500 text-sm italic ${RADIUS_TOKENS.frame}`}>
+            <div className={`border border-zinc-800 bg-zinc-900/60 p-8 text-center text-zinc-500 text-sm italic ${RADIUS_TOKENS.frame}`}>
                 <div className="flex items-center justify-center gap-3">
                     <span className="material-symbols-outlined animate-spin text-primary text-sm">progress_activity</span>
                     Querying discovery archive...
@@ -1680,16 +1690,16 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
 
     if (filteredLedger.length === 0) {
         return (
-            <div className={`border border-zinc-800 bg-zinc-950/20 p-8 text-center text-zinc-500 text-sm italic ${RADIUS_TOKENS.frame}`}>
+            <div className={`border border-zinc-800 bg-zinc-900/60 p-8 text-center text-zinc-500 text-sm italic ${RADIUS_TOKENS.frame}`}>
                 No Author records found in the discovery archive.
             </div>
         );
     }
 
-    if (isSmallScreen) {
+    if (useCompact) {
         return (
-            <div data-testid="admin-authors-mobile-list" className="space-y-3">
-                {filteredLedger.map((user) => {
+            <ResponsiveTableFrame mode="mobile" data-testid="admin-authors-mobile-list">
+                {filteredLedger.map((user, index) => {
                     const totalActions = user.actionTriggers.createCount + user.actionTriggers.updateCount + (user.preflightLookups?.calls || 0) + (user.deepWebConsults?.calls || 0);
                     const cost = user.hasExactCost ? user.exactCost : (user.cacheEfficiency.liveQueries * COST_PER_AI_CALL);
                     const costPrefix = user.hasExactCost ? '' : '~';
@@ -1700,32 +1710,46 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                     const netMarginUsd = earnedUsd - cost;
                     const netMarginPct = !authorIsAdmin && earnedUsd > 0 ? (netMarginUsd / earnedUsd) * 100 : null;
                     const isExpanded = expandedRow === user.email;
+                    const isFirst = index === 0;
+                    const isLast = index === filteredLedger.length - 1;
+                    const prevWasExpanded = index > 0 && expandedRow === filteredLedger[index - 1].email;
+                    const headerSurface = isExpanded
+                        ? 'bg-zinc-800/45'
+                        : `${DATA_TABLE_TOKENS.zebraBg(index)} hover:bg-white/5`;
+                    const headerClasses = [
+                        'p-4 space-y-3 cursor-pointer transition-colors',
+                        headerSurface,
+                        index > 0 && !prevWasExpanded ? 'border-t border-zinc-800/50' : '',
+                        isFirst ? 'rounded-t-[15px]' : '',
+                        isLast && !isExpanded ? 'rounded-b-[15px]' : '',
+                    ]
+                        .filter(Boolean)
+                        .join(' ');
 
                     return (
                         <div
                             key={user.email}
                             data-testid={`admin-author-card-${user.uid || user.email}`}
-                            className={`border border-zinc-800 bg-zinc-950/40 overflow-hidden ${RADIUS_TOKENS.frame}`}
                         >
                             <div
                                 onClick={() => toggleRow(user.email)}
-                                className="p-4 space-y-3 cursor-pointer hover:bg-zinc-900/20 transition-colors"
+                                className={headerClasses}
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="flex items-center gap-2 min-w-0 flex-1">
-                                        <span className="font-medium text-white text-sm truncate">{user.email}</span>
+                                        <span className={`${DATA_TABLE_TOKENS.primaryTitle} truncate`}>{user.email}</span>
                                         {authorIsAdmin && (
                                             <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-zinc-800 text-zinc-300 border border-zinc-700 shrink-0">
                                                 ADMIN
                                             </span>
                                         )}
                                     </div>
-                                    <span className="material-symbols-outlined text-zinc-500 !text-[20px] shrink-0">
+                                    <span className={`material-symbols-outlined !text-[20px] shrink-0 transition-colors ${isExpanded ? 'text-primary' : 'text-zinc-500'}`}>
                                         {isExpanded ? 'expand_less' : 'expand_more'}
                                     </span>
                                 </div>
 
-                                <div className="grid grid-cols-2 gap-2.5 pt-2.5 border-t border-zinc-800/60 text-xs font-mono">
+                                <div className="grid grid-cols-2 gap-2.5 pt-2.5 border-t border-zinc-800/60 text-xs font-mono tabular-nums">
                                     <div>
                                         <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">Wallet</span>
                                         <span className="text-primary font-semibold">{user.tokenBalance ?? 0}T</span>
@@ -1778,33 +1802,37 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                             </div>
 
                             {isExpanded && (
-                                <div className="border-t border-zinc-800 bg-zinc-900/20 p-4">
+                                <div
+                                    className={`bg-zinc-950/90 border-t border-zinc-800 p-4 ${
+                                        isLast ? 'rounded-b-[15px]' : 'border-b border-b-zinc-700/80'
+                                    }`}
+                                >
                                     {renderExpandedDetails(user, totalActions)}
                                 </div>
                             )}
                         </div>
                     );
                 })}
-            </div>
+            </ResponsiveTableFrame>
         );
     }
 
     return (
-        <div data-testid="admin-authors-desktop-table" className={`border border-zinc-800 bg-zinc-950/20 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
+        <ResponsiveTableFrame mode="desktop" data-testid="admin-authors-desktop-table">
             <table className="w-full text-left border-collapse min-w-[720px]">
                 <thead>
-                    <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Author</th>
-                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Wallet</th>
-                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-center">Zcenes</th>
-                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Revenue (Spent)</th>
-                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">AI Cost</th>
-                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Net Margin</th>
-                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 w-14"></th>
+                    <tr className={DATA_TABLE_TOKENS.theadRow}>
+                        <th className={DATA_TABLE_TOKENS.th}>Author</th>
+                        <th className={`${DATA_TABLE_TOKENS.th} text-center`}>Wallet</th>
+                        <th className={`${DATA_TABLE_TOKENS.th} text-center`}>Zcenes</th>
+                        <th className={`${DATA_TABLE_TOKENS.th} text-right`}>Revenue (Spent)</th>
+                        <th className={`${DATA_TABLE_TOKENS.th} text-right`}>AI Cost</th>
+                        <th className={`${DATA_TABLE_TOKENS.th} text-right`}>Net Margin</th>
+                        <th className={`${DATA_TABLE_TOKENS.th} w-14`}></th>
                     </tr>
                 </thead>
-                <tbody>
-                    {filteredLedger.map((user) => {
+                <tbody className={DATA_TABLE_TOKENS.tbody}>
+                    {filteredLedger.map((user, index) => {
                         const totalActions = user.actionTriggers.createCount + user.actionTriggers.updateCount + (user.preflightLookups?.calls || 0) + (user.deepWebConsults?.calls || 0);
                         const cost = user.hasExactCost ? user.exactCost : (user.cacheEfficiency.liveQueries * COST_PER_AI_CALL);
                         const costPrefix = user.hasExactCost ? '' : '~';
@@ -1815,17 +1843,22 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                         const netMarginUsd = earnedUsd - cost;
                         const netMarginPct = !authorIsAdmin && earnedUsd > 0 ? (netMarginUsd / earnedUsd) * 100 : null;
                         const isExpanded = expandedRow === user.email;
+                        const isLast = index === filteredLedger.length - 1;
 
                         return (
                             <React.Fragment key={user.email}>
-                                <tr 
-                                    onClick={() => toggleRow(user.email)} 
-                                    className="border-b border-zinc-900 hover:bg-zinc-900/20 cursor-pointer transition-colors"
+                                <tr
+                                    onClick={() => toggleRow(user.email)}
+                                    className={
+                                        isExpanded
+                                            ? 'bg-zinc-800/45 border-b border-zinc-800 cursor-pointer transition-colors'
+                                            : DATA_TABLE_TOKENS.getDesktopRowClass(index, { interactive: true, isLast })
+                                    }
                                 >
-                                    <td className="p-4">
+                                    <td className="py-3.5 px-3.5">
                                         <div className="flex items-center justify-between gap-3">
                                             <div className="flex items-center gap-2 min-w-0">
-                                                <span className="font-medium text-white truncate">{user.email}</span>
+                                                <span className={`${DATA_TABLE_TOKENS.primaryTitle} truncate`}>{user.email}</span>
                                                 {authorIsAdmin && (
                                                     <span className="px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider rounded bg-zinc-800 text-zinc-300 border border-zinc-700 shrink-0">
                                                         ADMIN
@@ -1848,13 +1881,13 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                             )}
                                         </div>
                                     </td>
-                                    <td className="p-4 text-center font-mono text-primary font-semibold whitespace-nowrap">
+                                    <td className={`py-3.5 px-3.5 text-center ${DATA_TABLE_TOKENS.monoCell} text-primary font-semibold whitespace-nowrap`}>
                                         {user.tokenBalance ?? 0}T
                                     </td>
-                                    <td className="p-4 text-center font-mono text-white">
+                                    <td className={`py-3.5 px-3.5 text-center ${DATA_TABLE_TOKENS.monoCell} text-white`}>
                                         {user.projectsCount}
                                     </td>
-                                    <td className="p-4 text-right font-mono whitespace-nowrap">
+                                    <td className={`py-3.5 px-3.5 text-right ${DATA_TABLE_TOKENS.monoCell} whitespace-nowrap`}>
                                         {authorIsAdmin ? (
                                             <div className="flex flex-col items-end">
                                                 <span className="text-zinc-500">$0.00</span>
@@ -1871,10 +1904,10 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                             </div>
                                         )}
                                     </td>
-                                    <td className="p-4 text-right font-mono text-red-400/80 whitespace-nowrap">
+                                    <td className={`py-3.5 px-3.5 text-right ${DATA_TABLE_TOKENS.monoCell} text-red-400/80 whitespace-nowrap`}>
                                         {costPrefix}${cost.toFixed(4)}
                                     </td>
-                                    <td className="p-4 text-right font-mono whitespace-nowrap">
+                                    <td className={`py-3.5 px-3.5 text-right ${DATA_TABLE_TOKENS.monoCell} whitespace-nowrap`}>
                                         {authorIsAdmin ? (
                                             <div className="flex flex-col items-end">
                                                 <span className="text-zinc-400">{formatSignedUsd(-cost, 4)}</span>
@@ -1895,14 +1928,14 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                                             </div>
                                         )}
                                     </td>
-                                    <td className="p-4 text-center">
-                                        <span className="material-symbols-outlined text-zinc-500">
+                                    <td className="py-3.5 px-3.5 text-center">
+                                        <span className={`material-symbols-outlined transition-colors ${isExpanded ? 'text-primary' : 'text-zinc-500'}`}>
                                             {isExpanded ? 'expand_less' : 'expand_more'}
                                         </span>
                                     </td>
                                 </tr>
                                 {isExpanded && (
-                                     <tr className="bg-zinc-900/10 border-b border-zinc-900">
+                                     <tr className={`bg-zinc-950/90 ${!isLast ? 'border-b border-zinc-700/80' : ''}`}>
                                          <td colSpan={7} className="p-6">
                                              {renderExpandedDetails(user, totalActions)}
                                          </td>
@@ -1913,7 +1946,7 @@ export const DiscoveryLedgerTable: React.FC<DiscoveryLedgerTableProps> = ({
                     })}
                 </tbody>
             </table>
-        </div>
+        </ResponsiveTableFrame>
     );
 };
 
@@ -2437,6 +2470,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
     onPermanentDeleteStackItem,
     requestedLedgerTab = null,
 }) => {
+    const useCompact = useCompactTable(isSmallScreen);
     const [searchTerm, setSearchTerm] = useState('');
     const [expandedRow, setExpandedRow] = useState<string | null>(null);
     const [simulateNormalUser, setSimulateNormalUser] = useState(false);
@@ -3550,51 +3584,52 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                 ? 'No token activity recorded yet. Top up your wallet above to begin curating.'
                                                 : 'No activity entries match the selected filter.'}
                                         </div>
-                                    ) : isSmallScreen ? (
-                                        <div data-testid="token-activity-mobile-list" className="space-y-3">
-                                            {visibleActivityRows.map((row) => (
-                                                <ActivityReceiptMobileCard key={row.id} row={row} />
+                                    ) : useCompact ? (
+                                        <ResponsiveTableFrame mode="mobile" data-testid="token-activity-mobile-list">
+                                            {visibleActivityRows.map((row, idx) => (
+                                                <ActivityReceiptMobileCard
+                                                    key={row.id}
+                                                    row={row}
+                                                    className={DATA_TABLE_TOKENS.getStackedRowClass(idx, visibleActivityRows.length)}
+                                                />
                                             ))}
-                                        </div>
+                                        </ResponsiveTableFrame>
                                     ) : (
-                                        <div
-                                            data-testid="token-activity-desktop-table"
-                                            className={`border border-zinc-800 bg-zinc-950/30 overflow-x-auto ${RADIUS_TOKENS.frame}`}
-                                        >
+                                        <ResponsiveTableFrame mode="desktop" data-testid="token-activity-desktop-table">
                                             <table className="w-full text-left border-collapse min-w-[640px]">
                                                 <thead>
-                                                    <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Activity / Zcene</th>
-                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 min-w-[140px] w-max whitespace-nowrap">Category & Scope</th>
-                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Change</th>
-                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Balance After</th>
+                                                    <tr className={DATA_TABLE_TOKENS.theadRow}>
+                                                        <th className={DATA_TABLE_TOKENS.th}>Date</th>
+                                                        <th className={DATA_TABLE_TOKENS.th}>Activity / Zcene</th>
+                                                        <th className={`${DATA_TABLE_TOKENS.th} min-w-[140px] w-max`}>Category & Scope</th>
+                                                        <th className={`${DATA_TABLE_TOKENS.th} text-right`}>Change</th>
+                                                        <th className={`${DATA_TABLE_TOKENS.th} text-right`}>Balance After</th>
                                                     </tr>
                                                 </thead>
-                                                <tbody>
-                                                    {visibleActivityRows.map((row) => {
+                                                <tbody className={DATA_TABLE_TOKENS.tbody}>
+                                                    {visibleActivityRows.map((row, idx) => {
                                                         const isPositive = row.delta > 0;
                                                         const changeLabel = row.delta === 0
                                                             ? '0 T'
                                                             : (isPositive ? `+${row.delta} T` : `${row.delta} T`);
 
                                                         return (
-                                                            <tr key={row.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
-                                                                <td className="p-4 text-xs font-mono text-zinc-400 whitespace-nowrap">
+                                                            <tr key={row.id} className={DATA_TABLE_TOKENS.getDesktopRowClass(idx)}>
+                                                                <td className={`py-3.5 px-3.5 ${DATA_TABLE_TOKENS.monoCell} text-zinc-400 whitespace-nowrap`}>
                                                                     {row.createdAt ? formatTxTimestamp(row.createdAt) : '—'}
                                                                 </td>
-                                                                <td className="p-4 text-sm text-zinc-200">
+                                                                <td className="py-3.5 px-3.5 text-sm text-zinc-200">
                                                                     <div className="flex items-center gap-2 flex-wrap">
                                                                         {row.isCurationRow && renderProjectStatusBadge(row.projectStatus, true)}
-                                                                        <span className="font-medium text-white">{row.title}</span>
+                                                                        <span className={DATA_TABLE_TOKENS.primaryTitle}>{row.title}</span>
                                                                     </div>
                                                                     {row.subtitle && (
-                                                                        <span className="block text-[11px] text-zinc-500 mt-0.5">
+                                                                        <span className={`block ${DATA_TABLE_TOKENS.subtitle} mt-0.5`}>
                                                                             {row.subtitle}
                                                                         </span>
                                                                     )}
                                                                 </td>
-                                                                <td className="p-4 text-xs min-w-[140px] w-max whitespace-nowrap">
+                                                                <td className="py-3.5 px-3.5 text-xs min-w-[140px] w-max whitespace-nowrap">
                                                                     <div className="flex items-center gap-1.5 flex-wrap">
                                                                         <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-lg border whitespace-nowrap inline-flex items-center shrink-0 ${row.categoryBadge.style}`}>
                                                                             {row.categoryBadge.label}
@@ -3606,12 +3641,12 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                                         )}
                                                                     </div>
                                                                 </td>
-                                                                <td className={`p-4 text-xs text-right font-mono font-bold whitespace-nowrap ${
+                                                                <td className={`py-3.5 px-3.5 ${DATA_TABLE_TOKENS.monoCell} text-right font-bold whitespace-nowrap ${
                                                                     isPositive ? 'text-emerald-400' : row.delta === 0 ? 'text-emerald-300' : 'text-zinc-200'
                                                                 }`}>
                                                                     {changeLabel}
                                                                 </td>
-                                                                <td className="p-4 text-xs text-right font-mono text-zinc-400 whitespace-nowrap">
+                                                                <td className={`py-3.5 px-3.5 ${DATA_TABLE_TOKENS.monoCell} text-right text-zinc-400 whitespace-nowrap`}>
                                                                     {row.balanceAfter !== null ? `${row.balanceAfter} T` : '—'}
                                                                 </td>
                                                             </tr>
@@ -3619,7 +3654,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                     })}
                                                 </tbody>
                                             </table>
-                                        </div>
+                                        </ResponsiveTableFrame>
                                     )}
 
                                     {filteredUserRows.length > activityVisibleCount && (
@@ -3734,9 +3769,9 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                 Clear Search
                                             </button>
                                         </div>
-                                    ) : isSmallScreen ? (
-                                        <div data-testid="stack-archive-mobile-list" className="space-y-3">
-                                            {visibleArchivedStack.map((item) => {
+                                    ) : useCompact ? (
+                                        <ResponsiveTableFrame mode="mobile" data-testid="stack-archive-mobile-list">
+                                            {visibleArchivedStack.map((item, idx) => {
                                                 const docKey = item.docId || item.id;
                                                 const displayTitle = item.displayName || cleanArtistDisplayName(item.id);
                                                 const isBusy = Boolean(busyStackDocIds[docKey]);
@@ -3744,12 +3779,12 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                     <div
                                                         key={docKey}
                                                         data-testid={`archive-row-${docKey}`}
-                                                        className={`border border-zinc-800 bg-zinc-950/40 p-4 space-y-3 ${RADIUS_TOKENS.frame}`}
+                                                        className={`p-4 space-y-3 ${DATA_TABLE_TOKENS.getStackedRowClass(idx, visibleArchivedStack.length)}`}
                                                     >
                                                         <div className="flex items-start justify-between gap-2">
                                                             <div className="min-w-0">
                                                                 <div className="flex items-center gap-2 flex-wrap">
-                                                                    <span className="font-medium text-white text-sm">{displayTitle}</span>
+                                                                    <span className={DATA_TABLE_TOKENS.primaryTitle}>{displayTitle}</span>
                                                                     <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/70 px-1.5 py-0.5 rounded-sm leading-none">
                                                                         {item.type}
                                                                     </span>
@@ -3760,13 +3795,13 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                             </div>
                                                         </div>
 
-                                                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                                        <div className="grid grid-cols-2 gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono tabular-nums text-zinc-400">
                                                             <div>
-                                                                <span className="block text-[9px] uppercase tracking-wider text-zinc-500">Saved</span>
+                                                                <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">Saved</span>
                                                                 <span>{item.dateSaved ? formatTxTimestamp(item.dateSaved) : '—'}</span>
                                                             </div>
                                                             <div>
-                                                                <span className="block text-[9px] uppercase tracking-wider text-zinc-500">Archived</span>
+                                                                <span className="block text-[9px] uppercase tracking-wider text-zinc-500 font-sans">Archived</span>
                                                                 <span>{item.archivedAt ? formatTxTimestamp(item.archivedAt) : '—'}</span>
                                                             </div>
                                                         </div>
@@ -3799,26 +3834,23 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                     </div>
                                                 );
                                             })}
-                                        </div>
+                                        </ResponsiveTableFrame>
                                     ) : (
-                                        <div
-                                            data-testid="stack-archive-desktop-table"
-                                            className={`border border-zinc-800 bg-zinc-950/30 overflow-x-auto ${RADIUS_TOKENS.frame}`}
-                                        >
+                                        <ResponsiveTableFrame mode="desktop" data-testid="stack-archive-desktop-table">
                                             <table className="w-full text-left border-collapse min-w-[640px]">
                                                 <thead>
-                                                    <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Artist / Label</th>
-                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Discovered Via</th>
-                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Saved</th>
-                                                        <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Archived</th>
+                                                    <tr className={DATA_TABLE_TOKENS.theadRow}>
+                                                        <th className={DATA_TABLE_TOKENS.th}>Artist / Label</th>
+                                                        <th className={DATA_TABLE_TOKENS.th}>Discovered Via</th>
+                                                        <th className={DATA_TABLE_TOKENS.th}>Saved</th>
+                                                        <th className={DATA_TABLE_TOKENS.th}>Archived</th>
                                                         {!isInspectingOtherUser && (
-                                                            <th className="p-4 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Actions</th>
+                                                            <th className={`${DATA_TABLE_TOKENS.th} text-right`}>Actions</th>
                                                         )}
                                                     </tr>
                                                 </thead>
-                                                <tbody>
-                                                    {visibleArchivedStack.map((item) => {
+                                                <tbody className={DATA_TABLE_TOKENS.tbody}>
+                                                    {visibleArchivedStack.map((item, idx) => {
                                                         const docKey = item.docId || item.id;
                                                         const displayTitle = item.displayName || cleanArtistDisplayName(item.id);
                                                         const isBusy = Boolean(busyStackDocIds[docKey]);
@@ -3826,27 +3858,27 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                             <tr
                                                                 key={docKey}
                                                                 data-testid={`archive-row-${docKey}`}
-                                                                className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors"
+                                                                className={DATA_TABLE_TOKENS.getDesktopRowClass(idx)}
                                                             >
-                                                                <td className="p-4 text-sm text-zinc-200">
+                                                                <td className="py-3.5 px-3.5 text-sm text-zinc-200">
                                                                     <div className="flex items-center gap-2 flex-wrap">
-                                                                        <span className="font-medium text-white">{displayTitle}</span>
+                                                                        <span className={DATA_TABLE_TOKENS.primaryTitle}>{displayTitle}</span>
                                                                         <span className="text-[9px] font-bold uppercase tracking-widest text-zinc-400 bg-zinc-800/70 px-1.5 py-0.5 rounded-sm leading-none">
                                                                             {item.type}
                                                                         </span>
                                                                     </div>
                                                                 </td>
-                                                                <td className="p-4 text-xs text-zinc-300">
+                                                                <td className="py-3.5 px-3.5 text-xs text-zinc-300">
                                                                     {item.discoveredVia || '—'}
                                                                 </td>
-                                                                <td className="p-4 text-xs font-mono text-zinc-400 whitespace-nowrap">
+                                                                <td className={`py-3.5 px-3.5 ${DATA_TABLE_TOKENS.monoCell} text-zinc-400 whitespace-nowrap`}>
                                                                     {item.dateSaved ? formatTxTimestamp(item.dateSaved) : '—'}
                                                                 </td>
-                                                                <td className="p-4 text-xs font-mono text-zinc-400 whitespace-nowrap">
+                                                                <td className={`py-3.5 px-3.5 ${DATA_TABLE_TOKENS.monoCell} text-zinc-400 whitespace-nowrap`}>
                                                                     {item.archivedAt ? formatTxTimestamp(item.archivedAt) : '—'}
                                                                 </td>
                                                                 {!isInspectingOtherUser && (
-                                                                    <td className="p-4 text-right whitespace-nowrap">
+                                                                    <td className="py-3.5 px-3.5 text-right whitespace-nowrap">
                                                                         <div className="inline-flex items-center justify-end gap-2">
                                                                             <button
                                                                                 type="button"
@@ -3878,7 +3910,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                     })}
                                                 </tbody>
                                             </table>
-                                        </div>
+                                        </ResponsiveTableFrame>
                                     )}
 
                                     {filteredArchivedStack.length > archiveVisibleCount && (
@@ -4021,9 +4053,9 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                     <div className={`border border-zinc-800 bg-zinc-950/20 p-6 text-center text-zinc-500 text-xs italic ${RADIUS_TOKENS.frame}`}>
                                         No JIT healing events recorded yet.
                                     </div>
-                                ) : isSmallScreen ? (
-                                    <div data-testid="jit-heals-mobile-list" className="space-y-3">
-                                        {jitHeals.slice(0, jitVisibleCount).map((heal) => {
+                                ) : useCompact ? (
+                                    <ResponsiveTableFrame mode="mobile" data-testid="jit-heals-mobile-list">
+                                        {jitHeals.slice(0, jitVisibleCount).map((heal, idx, arr) => {
                                             const d = new Date(heal.timestamp);
                                             const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
                                                 d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -4031,14 +4063,14 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                 <div
                                                     key={heal.id}
                                                     data-testid={`jit-heal-row-${heal.id}`}
-                                                    className={`border border-zinc-800 bg-zinc-950/40 p-4 space-y-2.5 ${RADIUS_TOKENS.frame}`}
+                                                    className={`p-4 space-y-2.5 ${DATA_TABLE_TOKENS.getStackedRowClass(idx, arr.length)}`}
                                                 >
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div className="min-w-0 flex-1">
-                                                            <span className="text-sm text-white font-medium block break-words">{heal.displayName}</span>
+                                                            <span className={`${DATA_TABLE_TOKENS.primaryTitle} block break-words`}>{heal.displayName}</span>
                                                             <span className="block text-[11px] font-mono text-zinc-500 truncate">{heal.entityId}</span>
                                                         </div>
-                                                        <span className="text-xs font-mono text-red-400 font-bold whitespace-nowrap shrink-0">
+                                                        <span className={`${DATA_TABLE_TOKENS.monoCell} text-red-400 font-bold whitespace-nowrap shrink-0`}>
                                                             ${heal.costUsd.toFixed(5)}
                                                         </span>
                                                     </div>
@@ -4057,40 +4089,40 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                         </span>
                                                     </div>
 
-                                                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono tabular-nums text-zinc-400">
                                                         <span className="whitespace-nowrap">{dateStr}</span>
                                                         <span className="whitespace-nowrap shrink-0">{heal.totalTokens.toLocaleString()} tok</span>
                                                     </div>
                                                 </div>
                                             );
                                         })}
-                                    </div>
+                                    </ResponsiveTableFrame>
                                 ) : (
-                                    <div data-testid="jit-heals-desktop-table" className={`border border-zinc-800 bg-zinc-950/20 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
+                                    <ResponsiveTableFrame mode="desktop" data-testid="jit-heals-desktop-table">
                                         <table className="w-full text-left border-collapse min-w-[700px]">
                                             <thead>
-                                                <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Entity</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Type</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Triggered By</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Tokens</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Cost</th>
+                                                <tr className={DATA_TABLE_TOKENS.theadRow}>
+                                                    <th className={DATA_TABLE_TOKENS.th}>Date</th>
+                                                    <th className={DATA_TABLE_TOKENS.th}>Entity</th>
+                                                    <th className={DATA_TABLE_TOKENS.th}>Type</th>
+                                                    <th className={DATA_TABLE_TOKENS.th}>Triggered By</th>
+                                                    <th className={`${DATA_TABLE_TOKENS.th} text-right`}>Tokens</th>
+                                                    <th className={`${DATA_TABLE_TOKENS.th} text-right`}>Cost</th>
                                                 </tr>
                                             </thead>
-                                            <tbody>
-                                                {jitHeals.slice(0, jitVisibleCount).map((heal) => {
+                                            <tbody className={DATA_TABLE_TOKENS.tbody}>
+                                                {jitHeals.slice(0, jitVisibleCount).map((heal, idx) => {
                                                     const d = new Date(heal.timestamp);
                                                     const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
                                                         d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
                                                     return (
-                                                        <tr key={heal.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
-                                                            <td className="p-3.5 text-xs text-zinc-400 font-mono whitespace-nowrap">
+                                                        <tr key={heal.id} className={DATA_TABLE_TOKENS.getDesktopRowClass(idx)}>
+                                                            <td className={`p-3.5 ${DATA_TABLE_TOKENS.monoCell} text-zinc-400 whitespace-nowrap`}>
                                                                 {dateStr}
                                                             </td>
-                                                            <td className="p-3.5 text-sm text-white font-medium">
+                                                            <td className={`p-3.5 ${DATA_TABLE_TOKENS.primaryTitle}`}>
                                                                 {heal.displayName}
-                                                                <span className="block text-[11px] font-mono text-zinc-600">{heal.entityId}</span>
+                                                                <span className="block text-[11px] font-mono text-zinc-500 font-normal">{heal.entityId}</span>
                                                             </td>
                                                             <td className="p-3.5 text-xs">
                                                                 <span className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${
@@ -4125,10 +4157,10 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                                     </span>
                                                                 )}
                                                             </td>
-                                                            <td className="p-3.5 text-xs text-right font-mono text-zinc-400">
+                                                            <td className={`p-3.5 ${DATA_TABLE_TOKENS.monoCell} text-right text-zinc-400`}>
                                                                 {heal.totalTokens.toLocaleString()}
                                                             </td>
-                                                            <td className="p-3.5 text-xs text-right font-mono text-red-400 font-bold">
+                                                            <td className={`p-3.5 ${DATA_TABLE_TOKENS.monoCell} text-right text-red-400 font-bold`}>
                                                                 ${heal.costUsd.toFixed(5)}
                                                             </td>
                                                         </tr>
@@ -4136,7 +4168,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                 })}
                                             </tbody>
                                         </table>
-                                    </div>
+                                    </ResponsiveTableFrame>
                                 )}
 
                                 {jitHeals.length > jitVisibleCount && (
@@ -4201,9 +4233,9 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                     <div className={`border border-zinc-800 bg-zinc-950/20 p-6 text-center text-zinc-500 text-xs italic ${RADIUS_TOKENS.frame}`}>
                                         No failed or reaped curation events recorded.
                                     </div>
-                                ) : isSmallScreen ? (
-                                    <div data-testid="curation-failures-mobile-list" className="space-y-3">
-                                        {curationFailures.slice(0, failuresVisibleCount).map((fail) => {
+                                ) : useCompact ? (
+                                    <ResponsiveTableFrame mode="mobile" data-testid="curation-failures-mobile-list">
+                                        {curationFailures.slice(0, failuresVisibleCount).map((fail, idx, arr) => {
                                             const d = new Date(fail.timestamp);
                                             const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
                                                 d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -4221,14 +4253,14 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                 <div
                                                     key={fail.id}
                                                     data-testid={`curation-failure-row-${fail.id}`}
-                                                    className={`border border-zinc-800 bg-zinc-950/40 p-4 space-y-2.5 ${RADIUS_TOKENS.frame}`}
+                                                    className={`p-4 space-y-2.5 ${DATA_TABLE_TOKENS.getStackedRowClass(idx, arr.length)}`}
                                                 >
                                                     <div className="flex items-start justify-between gap-3">
                                                         <div className="min-w-0 flex-1">
-                                                            <span className="text-sm font-medium text-white block truncate">{fail.userEmail || fail.uid}</span>
-                                                            <span className="block text-[11px] text-zinc-500 truncate">{fail.projectName || fail.projectId || '—'}</span>
+                                                            <span className={`${DATA_TABLE_TOKENS.primaryTitle} block truncate`}>{fail.userEmail || fail.uid}</span>
+                                                            <span className={`block ${DATA_TABLE_TOKENS.subtitle} truncate`}>{fail.projectName || fail.projectId || '—'}</span>
                                                         </div>
-                                                        <div className="text-right font-mono shrink-0">
+                                                        <div className="text-right font-mono tabular-nums shrink-0">
                                                             <span className="block text-xs text-emerald-300 font-semibold whitespace-nowrap">
                                                                 {fail.tokensRefunded > 0 ? `+${fail.tokensRefunded}T` : '0T'}
                                                             </span>
@@ -4248,30 +4280,30 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                         )}
                                                     </div>
 
-                                                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono text-zinc-400">
+                                                    <div className="flex items-center justify-between gap-2 pt-2 border-t border-zinc-800/60 text-[11px] font-mono tabular-nums text-zinc-400">
                                                         <span className="whitespace-nowrap">{dateStr}</span>
                                                         <span className="whitespace-nowrap shrink-0">{fail.sunkTotalTokens.toLocaleString()} tok</span>
                                                     </div>
                                                 </div>
                                             );
                                         })}
-                                    </div>
+                                    </ResponsiveTableFrame>
                                 ) : (
-                                    <div data-testid="curation-failures-desktop-table" className={`border border-zinc-800 bg-zinc-950/20 overflow-x-auto ${RADIUS_TOKENS.frame}`}>
+                                    <ResponsiveTableFrame mode="desktop" data-testid="curation-failures-desktop-table">
                                         <table className="w-full text-left border-collapse min-w-[780px]">
                                             <thead>
-                                                <tr className="border-b border-zinc-800 bg-zinc-900/50">
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Date</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">User / Project</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Source</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500">Reason</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Refunded</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Sunk Tokens</th>
-                                                    <th className="p-3.5 text-[10px] font-bold uppercase tracking-[0.2em] text-zinc-500 text-right">Sunk Cost</th>
+                                                <tr className={DATA_TABLE_TOKENS.theadRow}>
+                                                    <th className={DATA_TABLE_TOKENS.th}>Date</th>
+                                                    <th className={DATA_TABLE_TOKENS.th}>User / Project</th>
+                                                    <th className={DATA_TABLE_TOKENS.th}>Source</th>
+                                                    <th className={DATA_TABLE_TOKENS.th}>Reason</th>
+                                                    <th className={`${DATA_TABLE_TOKENS.th} text-right`}>Refunded</th>
+                                                    <th className={`${DATA_TABLE_TOKENS.th} text-right`}>Sunk Tokens</th>
+                                                    <th className={`${DATA_TABLE_TOKENS.th} text-right`}>Sunk Cost</th>
                                                 </tr>
                                             </thead>
-                                            <tbody>
-                                                {curationFailures.slice(0, failuresVisibleCount).map((fail) => {
+                                            <tbody className={DATA_TABLE_TOKENS.tbody}>
+                                                {curationFailures.slice(0, failuresVisibleCount).map((fail, idx) => {
                                                     const d = new Date(fail.timestamp);
                                                     const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ', ' +
                                                         d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
@@ -4286,15 +4318,15 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                             ? 'border-amber-500/30 text-amber-300 bg-amber-950/20'
                                                             : 'border-rose-500/30 text-rose-300 bg-rose-950/20';
                                                     return (
-                                                        <tr key={fail.id} className="border-b border-zinc-900/60 hover:bg-zinc-900/20 transition-colors">
-                                                            <td className="p-3.5 text-xs text-zinc-400 font-mono whitespace-nowrap">
+                                                        <tr key={fail.id} className={DATA_TABLE_TOKENS.getDesktopRowClass(idx)}>
+                                                            <td className={`p-3.5 ${DATA_TABLE_TOKENS.monoCell} text-zinc-400 whitespace-nowrap`}>
                                                                 {dateStr}
                                                             </td>
-                                                            <td className="p-3.5 text-xs text-zinc-300">
-                                                                <span className="font-medium text-white block truncate max-w-[220px]" title={fail.userEmail || fail.uid}>
+                                                            <td className="p-3.5">
+                                                                <span className={`${DATA_TABLE_TOKENS.primaryTitle} block truncate max-w-[220px]`} title={fail.userEmail || fail.uid}>
                                                                     {fail.userEmail || fail.uid}
                                                                 </span>
-                                                                <span className="block text-[11px] text-zinc-500 truncate max-w-[220px]" title={fail.projectId || undefined}>
+                                                                <span className={`block ${DATA_TABLE_TOKENS.subtitle} truncate max-w-[220px]`} title={fail.projectId || undefined}>
                                                                     {fail.projectName || fail.projectId || '—'}
                                                                 </span>
                                                             </td>
@@ -4313,13 +4345,13 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                                     </span>
                                                                 )}
                                                             </td>
-                                                            <td className="p-3.5 text-xs text-right font-mono text-emerald-300 font-semibold whitespace-nowrap">
+                                                            <td className={`p-3.5 ${DATA_TABLE_TOKENS.monoCell} text-right text-emerald-300 font-semibold whitespace-nowrap`}>
                                                                 {fail.tokensRefunded > 0 ? `+${fail.tokensRefunded}T` : '0T'}
                                                             </td>
-                                                            <td className="p-3.5 text-xs text-right font-mono text-zinc-400 whitespace-nowrap">
+                                                            <td className={`p-3.5 ${DATA_TABLE_TOKENS.monoCell} text-right text-zinc-400 whitespace-nowrap`}>
                                                                 {fail.sunkTotalTokens.toLocaleString()}
                                                             </td>
-                                                            <td className="p-3.5 text-xs text-right font-mono text-rose-400 font-bold whitespace-nowrap">
+                                                            <td className={`p-3.5 ${DATA_TABLE_TOKENS.monoCell} text-right text-rose-400 font-bold whitespace-nowrap`}>
                                                                 ${fail.sunkCostUsd.toFixed(4)}
                                                             </td>
                                                         </tr>
@@ -4327,7 +4359,7 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                                                 })}
                                             </tbody>
                                         </table>
-                                    </div>
+                                    </ResponsiveTableFrame>
                                 )}
 
                                 {curationFailures.length > failuresVisibleCount && (
