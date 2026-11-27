@@ -5,7 +5,7 @@
  * to ensure consistency across the Zcene application.
  */
 import React, { useEffect, useState, useRef } from 'react';
-import { View } from '../types';
+import { View, Project } from '../types';
 import * as d3 from 'd3';
 import { ZceneLogo, InstagramIcon, ZceneAbbreviatedLogo, FaviconLogo, LegendSymbol, SortControls, Spinner, HelpIcon, MicIcon, VisibilityIcon, VisibilityOffIcon, LoadingSpinner, DETAIL_THINKING_STEPS, GRAPH_THINKING_STEPS, BandcampIcon } from './Icons';
 import ViewToggle from './ViewToggle';
@@ -13,12 +13,15 @@ import Header from './Header';
 import { AdminViewToggle } from './ui/AdminViewToggle';
 import { SegmentedTextToggle } from './ui/SegmentedTextToggle';
 import { InfoTooltip } from './ui/InfoTooltip';
+import { ModalHeader, ModalBody, ModalFooter, ModalFooterLink } from './ui/Dialog';
+import { PROJECT_TABLE_COLUMNS, ProjectMetricPill, ProjectStatusBadge } from './ui/ProjectMetrics';
 import { ToolbarSearch } from './ui/ToolbarSearch';
 export { ToolbarSearch } from './ui/ToolbarSearch';
 export type { ToolbarSearchProps } from './ui/ToolbarSearch';
 import { Waypoints, Flame, Check, ArrowLeft, Pin } from 'lucide-react';
 import { TelemetryOverviewCards, DiscoveryLedgerTable, UserTelemetry } from './UsageAnalyticsPage';
-import { CountryFilterDropdown } from './SharedModals';
+import { CountryFilterDropdown, ArtistVerificationCard, DisambiguationRadio } from './SharedModals';
+import { DashboardProjectCard } from './DashboardProjectCard';
 import { extractInitials, generateDeterministicGradient, nodeTypeColorMap } from '../utils/formatters';
 
 // --- Layout Primitives & Sizings ---
@@ -502,35 +505,102 @@ interface StyleGuidePageProps {
     tokenBalance?: number;
 }
 
-export interface RootsBreakdownButtonProps {
-  state: 'disabled' | 'attention' | 'neutral';
-  onClick?: () => void;
-  isLoading?: boolean;
-}
-
-export const RootsBreakdownButton: React.FC<RootsBreakdownButtonProps> = ({ state, onClick, isLoading }) => {
-  const btnTitle = {
-    disabled: isLoading ? "Zine View in progress..." : "No Zine View available",
-    attention: "New Zine View available! Click to view",
-    neutral: "View Zine"
-  }[state];
-
-  const variant = state === 'attention' ? 'outline' : 'secondary';
-
-  return (
-    <Button 
-      variant={variant}
-      size="sm"
-      onClick={state !== 'disabled' ? onClick : undefined}
-      disabled={state === 'disabled'}
-      title={btnTitle}
-      className="backdrop-blur-sm"
-    >
-      <Waypoints size={16} className="text-current" />
-      <span>Zine</span>
-    </Button>
-  );
+// Static living-specimen fixture for <DashboardProjectCard /> (zero network/Firestore reads; computes 2 scenes, 3 roots, 24 artists, 8 labels, 7 deep cuts)
+const DEMO_DESIGN_SYSTEM_PROJECT: Project = {
+    id: 'ds-demo-midwest-emo',
+    name: 'Midwest Emo Roots',
+    seedArtists: 'Sunny Day Real Estate::Mineral::American Football',
+    status: 'completed',
+    updatedAt: new Date('2026-06-27T08:09:00Z').getTime(),
+    createdAt: new Date('2026-06-27T08:00:00Z').getTime(),
+    activeNodes: [
+        'scene-1::sunny-day-real-estate-us',
+        'scene-1::mineral-us',
+        'scene-1::artist-1',
+        'scene-1::artist-2',
+        'scene-1::artist-3',
+        'scene-2::american-football-us',
+        'scene-2::artist-13',
+    ],
+    scenes: [
+        {
+            sceneId: 'scene-1',
+            sceneIndex: 0,
+            title: '90s Pacific Northwest & Texas Emo',
+            seedArtists: 'Sunny Day Real Estate::Mineral',
+            seedIds: ['sunny-day-real-estate-us', 'mineral-us'],
+            synthesisRationale: '',
+            centerOffset: { x: 0, y: 0 },
+            status: 'ready',
+            updatedAt: new Date('2026-06-27T08:09:00Z').getTime(),
+            graphData: {
+                nodes: [
+                    { id: 'scene-1::sunny-day-real-estate-us', canonicalId: 'sunny-day-real-estate-us', label: 'Sunny Day Real Estate', type: 'artist', isSeed: true },
+                    { id: 'scene-1::mineral-us', canonicalId: 'mineral-us', label: 'Mineral', type: 'artist', isSeed: true },
+                    ...Array.from({ length: 12 }, (_, idx) => ({
+                        id: `scene-1::artist-${idx + 1}`,
+                        canonicalId: `artist-${idx + 1}`,
+                        label: `Artist ${idx + 1}`,
+                        type: 'artist',
+                    })),
+                    ...Array.from({ length: 4 }, (_, idx) => ({
+                        id: `scene-1::label-${idx + 1}`,
+                        canonicalId: `label-${idx + 1}`,
+                        label: `Label ${idx + 1}`,
+                        type: 'label',
+                    })),
+                ],
+                links: [],
+            },
+        } as any,
+        {
+            sceneId: 'scene-2',
+            sceneIndex: 1,
+            title: 'Champaign-Urbana Math Emo',
+            seedArtists: 'American Football',
+            seedIds: ['american-football-us'],
+            synthesisRationale: '',
+            centerOffset: { x: 1000, y: 0 },
+            status: 'ready',
+            updatedAt: new Date('2026-06-27T08:09:00Z').getTime(),
+            graphData: {
+                nodes: [
+                    { id: 'scene-2::american-football-us', canonicalId: 'american-football-us', label: 'American Football', type: 'artist', isSeed: true },
+                    ...Array.from({ length: 12 }, (_, idx) => ({
+                        id: `scene-2::artist-${idx + 13}`,
+                        canonicalId: `artist-${idx + 13}`,
+                        label: `Artist ${idx + 13}`,
+                        type: 'artist',
+                    })),
+                    ...Array.from({ length: 4 }, (_, idx) => ({
+                        id: `scene-2::label-${idx + 5}`,
+                        canonicalId: `label-${idx + 5}`,
+                        label: `Label ${idx + 5}`,
+                        type: 'label',
+                    })),
+                ],
+                links: [],
+            },
+        } as any,
+    ],
 };
+
+const DEMO_DISAMBIGUATION_CANDIDATES = [
+    {
+        id: 'spaced-us-buffalo',
+        name: 'Spaced',
+        origin: 'Buffalo, USA',
+        genre: 'Hardcore Punk',
+        disambiguationSnippet: 'High-energy hardcore punk band formed in Buffalo, New York (Revelation Records).',
+    },
+    {
+        id: 'spaced-uk-london',
+        name: 'Spaced',
+        origin: 'London, UK',
+        genre: 'Shoegaze / Indie',
+        disambiguationSnippet: 'Atmospheric guitar trio active in East London DIY venues.',
+    },
+];
 
 export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({ 
     onNavigate, 
@@ -574,6 +644,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
     const [demoMobileSearchOpen, setDemoMobileSearchOpen] = useState(false);
     const [demoMobileActiveQuery, setDemoMobileActiveQuery] = useState('Fugazi');
     const [demoMobileActiveOpen, setDemoMobileActiveOpen] = useState(false);
+    const [demoCardMenuId, setDemoCardMenuId] = useState<string | null>(null);
+    const [demoSelectedCandidateId, setDemoSelectedCandidateId] = useState<string>('spaced-us-buffalo');
+    const [demoVerifyEscapeOpen, setDemoVerifyEscapeOpen] = useState<boolean>(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -2772,54 +2845,16 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mt-6">
                                     <div className="space-y-2">
                                         <p className="text-sm text-primary font-semibold">Behavior</p>
-                                        <p className="text-xs text-zinc-400 leading-relaxed">The button naturally follows the artist seed list. As the list grows, the button pushes downward, ensuring it is always anchored to the content rather than hidden behind floating advertisements or viewport boundaries.</p>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">The button naturally follows the artist seed list. As the list grows, the button pushes downward, ensuring it is always anchored to the content rather than occluded by the floating bottom navigation bar or viewport boundaries.</p>
                                     </div>
                                     <div className="space-y-2">
                                         <p className="text-sm text-zinc-500 font-semibold">Padding</p>
-                                        <p className="text-xs text-zinc-400 leading-relaxed">A bottom padding of <strong>48px (pb-12)</strong> is applied to the scrollable container to ensure the button can be scrolled completely clear of the advertisement area on mobile devices.</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            {/* Magazine View Button */}
-                            <div>
-                                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-4 border-b border-zinc-800 pb-4">
-                                    <h3 className="text-xl font-medium text-zinc-200">Magazine View Button</h3>
-                                    <div className="flex flex-wrap gap-2">
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Component: RootsBreakdownButton</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Icon: Waypoints (lucide)</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Size: Compact (sm)</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">States: attention, neutral</span>
-                                    </div>
-                                </div>
-                                <p className="text-sm text-zinc-400 mb-8 max-w-2xl leading-relaxed">
-                                    An always-visible, state-driven information button. Guides users to the graph's metadata breakdown using a two-state visual logic.
-                                </p>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
-                                     <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Attention State (Unread insights)</p>
-                                        <RootsBreakdownButton state="attention" />
-                                        <div className="flex flex-wrap gap-1.5 pt-2">
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-transparent border border-primary"></span>
-                                                Button variant="outline"
-                                            </span>
-                                        </div>
-                                    </div>
-                                     <div className="space-y-4">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Neutral State (Read insights)</p>
-                                        <RootsBreakdownButton state="neutral" />
-                                        <div className="flex flex-wrap gap-1.5 pt-2">
-                                            <span className="px-1.5 py-0.5 rounded-md bg-zinc-950 border border-zinc-800 text-[9px] font-mono text-zinc-500 flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-sm bg-zinc-800 border border-zinc-700"></span>
-                                                Button variant="secondary"
-                                            </span>
-                                        </div>
-                                    </div>
+                                        <p className="text-xs text-zinc-400 leading-relaxed">Generous bottom padding is applied to the scrollable container so the primary CTA always scrolls cleanly above the floating Mobile Navigation Bar and safe-area insets on mobile devices.</p>
                                     </div>
                                 </div>
                             </div>
                         </div>
+                    </div>
                     </section>
 
                     {/* 7.5. TOGGLES */}
@@ -3362,7 +3397,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="border-b border-zinc-800 pb-4">
                                     <h3 className="text-xl font-medium text-zinc-200">Project Card &amp; Table List — Discovery Metric Layout</h3>
                                     <p className="text-sm text-zinc-400 mt-2 leading-relaxed max-w-3xl">
-                                        The project card footer and table list both surface the four discovery metric badges in a fixed production sequence. The layout system changed from a rigid no-wrap row to a responsive wrapping grid to accommodate variable badge widths on mobile.
+                                        Both the project card footer and desktop table list consume shared <code className="text-xs text-primary bg-zinc-800 px-1 rounded">ProjectMetrics.tsx</code> primitives (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectMetricPill /&gt;</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&lt;ProjectStatusBadge /&gt;</code>, and <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">PROJECT_TABLE_COLUMNS</code>) so discovery metrics stay in 1:1 lockstep across Dashboard, Trash, and this living guide.
                                     </p>
                                 </div>
 
@@ -3402,156 +3437,118 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                 </div>
 
-                                {/* ── Project Card Preview ── */}
+                                {/* ── Project Card Preview (Live <DashboardProjectCard />) ── */}
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3">
                                         <span className="material-symbols-outlined text-zinc-400">grid_view</span>
                                         <h4 className="text-base font-medium text-zinc-200">Project Card — Grid View Preview</h4>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                        Badges sit flush in the card footer, without top borders, creating a cleaner negative space. Card backgrounds support a 50/50 split grid when multiple seeds are present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">ARTISTS</code>, <code className="text-xs text-primary bg-zinc-800 px-1 rounded">LABELS</code>, and <code className="text-xs text-primary bg-zinc-800 px-1 rounded">DEEP CUTS</code> badges are conditionally rendered only when <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is present. The <code className="text-xs text-primary bg-zinc-800 px-1 rounded">MAPPED</code> status pill now lives in the card header directly beneath the modified date.
+                                        Live <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;DashboardProjectCard /&gt;</code> specimen (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">rounded-2xl</code>). Badges sit flush in the card footer via <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ProjectMetricPill variant=&quot;card&quot; /&gt;</code> with <code className="text-xs text-primary bg-zinc-800 px-1 rounded">SCENES</code> leading the sequence. Completed cards intentionally suppress a redundant <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Mapped</code> chip via <code className="text-xs text-primary bg-zinc-800 px-1 rounded">&lt;ProjectStatusBadge variant=&quot;card&quot; /&gt;</code>, reserving card header status badges for <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Unmapped</code>, active <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">curating</code>, <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">Failed</code>, and Trash <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">N DAYS LEFT</code>.
                                     </p>
 
-                                    {/* Mock Card */}
-                                    <div className="max-w-xs">
-                                        <div className="bg-zinc-900 border border-zinc-700/50 rounded-none p-5 flex flex-col justify-between min-h-[160px]">
-                                            {/* Card Header */}
-                                            <div className="space-y-4">
-                                                <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                                                    <div className="flex items-center justify-between gap-3">
-                                                        <h3 className="text-base font-medium text-white truncate">Midwest Emo Roots</h3>
-                                                        <div className="w-9 h-9 -mr-2 -mt-1 shrink-0 rounded-lg text-zinc-600 flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
-                                                            <span className="material-symbols-outlined !text-xl">more_vert</span>
-                                                        </div>
-                                                    </div>
-                                                    <p className="font-mono text-[10px] text-zinc-300 font-normal uppercase tracking-widest">Edited 27/06/2026</p>
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-950 font-bold px-2 py-0.5 rounded-full whitespace-nowrap transition-colors w-fit mt-0.5" style={{ backgroundColor: '#aaff00' }}>
-                                                        Mapped
-                                                    </span>
-                                                </div>
-                                            </div>
-                                            {/* Card Footer — production badge sequence */}
-                                            <div className="mt-3 flex items-center">
-                                                <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
-                                                    {/* 1. ROOT ARTISTS */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                                        ROOT ARTISTS: 3
-                                                    </span>
-                                                    {/* 2. ARTISTS */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                                        ARTISTS: 24
-                                                    </span>
-                                                    {/* 3. LABELS */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                                        LABELS: 8
-                                                    </span>
-                                                    {/* 4. DEEP CUTS */}
-                                                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                                                        DEEP CUTS: 7
-                                                    </span>
-                                                </div>
-                                            </div>
-                                        </div>
+                                    {/* Live Production Card Specimen */}
+                                    <div className="w-full md:w-fit">
+                                        <DashboardProjectCard
+                                            project={DEMO_DESIGN_SYSTEM_PROJECT}
+                                            onSelectProject={() => {}}
+                                            activeMenuId={demoCardMenuId}
+                                            setActiveMenuId={setDemoCardMenuId}
+                                            handleRenameClick={() => {}}
+                                            setProjectToDelete={() => {}}
+                                            onShareProject={() => {}}
+                                            onDuplicateProject={() => {}}
+                                        />
                                         <p className="text-[10px] text-zinc-500 font-mono mt-2">
-                                            Sequence: ROOT ARTISTS → ARTISTS → LABELS → DEEP CUTS
+                                            Sequence: SCENES → ROOT ARTISTS → ARTISTS → LABELS → DEEP CUTS
                                         </p>
                                     </div>
                                 </div>
 
-                                {/* ── Table Row Preview ── */}
+                                {/* ── Table Row Preview (Live ProjectMetrics Primitives) ── */}
                                 <div className="space-y-4">
                                     <div className="flex items-center gap-3">
                                         <span className="material-symbols-outlined text-zinc-400">list</span>
                                         <h4 className="text-base font-medium text-zinc-200">Project List — Table View Preview</h4>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed max-w-2xl">
-                                        In table view the same four tokens each occupy a dedicated column cell. The <strong>Status</strong> column renders <strong>Mapped</strong> (accent) or <strong>Unmapped</strong> (muted) depending on whether <code className="text-xs text-primary bg-zinc-800 px-1 rounded">project.graphData</code> is truthy. To ensure unified hover behavior across alternating striped rows and custom layouts, background hovers are applied directly to individual cell elements (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">td</code>) using <code className="text-xs text-primary bg-zinc-800 px-1 rounded">group-hover:bg-primary/5 transition-colors</code> instead of on the parent row (<code className="text-xs text-primary bg-zinc-800 px-1 rounded">tr</code>) element.
+                                        On desktop and tablet viewports (<code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">&ge; 768px</code>), table view renders all 8 governed columns from <code className="text-xs text-primary bg-zinc-800 px-1 rounded">PROJECT_TABLE_COLUMNS</code> — pairing an inline <code className="text-xs text-primary bg-zinc-800 px-1 rounded">SCENES</code> pill inside the <strong>Title</strong> cell with dedicated <strong>Roots</strong>, <strong>Artists</strong>, <strong>Labels</strong>, <strong>Deep Cuts</strong>, and <strong>Status</strong> columns inside a <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">rounded-2xl</code> frame. Cell hovers apply <code className="text-xs text-primary bg-zinc-800 px-1 rounded">group-hover:bg-white/5 transition-colors</code> directly on each <code className="text-xs text-zinc-300 bg-zinc-800 px-1 rounded">td</code>.
                                     </p>
 
-                                    {/* Mock Table */}
-                                    <div className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-none">
+                                    {/* Table Specimen wired to PROJECT_TABLE_COLUMNS, ProjectMetricPill, ProjectStatusBadge */}
+                                    <div className="w-full overflow-x-auto border border-zinc-800 bg-zinc-900 rounded-2xl">
                                         <table className="w-full text-left border-collapse min-w-[640px]">
                                             <thead>
                                                 <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
-                                                    <th className="py-4 px-6 font-semibold">Title</th>
-                                                    <th className="py-4 px-6 font-semibold">Modified Date</th>
-                                                    <th className="py-4 px-6 font-semibold">Roots</th>
-                                                    <th className="py-4 px-6 font-semibold">Artists</th>
-                                                    <th className="py-4 px-6 font-semibold">Deep Cuts</th>
-                                                    <th className="py-4 px-6 font-semibold">Status</th>
-                                                    <th className="py-4 px-6 font-semibold text-right">Actions</th>
+                                                    {PROJECT_TABLE_COLUMNS.map((col) => (
+                                                        <th
+                                                            key={col.key}
+                                                            className={`py-4 px-6 font-semibold ${col.align === 'right' ? 'text-right' : ''}`}
+                                                        >
+                                                            {col.label}
+                                                        </th>
+                                                    ))}
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-zinc-800/50 bg-zinc-900">
-                                                {/* Mapped row (even / first row style: bg-zinc-900 with relative z-10) */}
+                                                {/* Mapped row (even row: bg-zinc-900) */}
                                                 <tr className="group cursor-pointer border-b border-zinc-800/30">
-                                                    <td className="py-4 px-6 font-medium text-white bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
+                                                    <td className="py-4 px-6 font-medium text-white bg-zinc-900 group-hover:bg-white/5 group-hover:text-primary transition-colors relative z-10">
                                                         <div className="flex items-center gap-3">
                                                             <span className="material-symbols-outlined text-zinc-555 !text-lg group-hover:text-primary transition-colors">folder</span>
                                                             <span className="truncate max-w-[180px]">Midwest Emo Roots</span>
+                                                            <ProjectMetricPill variant="table-inline">SCENES: 2</ProjectMetricPill>
                                                         </div>
                                                     </td>
-                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">27/06/2026 • 8:09 am</td>
-                                                    {/* 1. ROOT ARTISTS */}
-                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
-                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                                            ROOT ARTISTS: 3
-                                                        </span>
+                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10 whitespace-nowrap">27/06/2026 • 8:09 am</td>
+                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <ProjectMetricPill variant="table">ROOT ARTISTS: 3</ProjectMetricPill>
                                                     </td>
-                                                    {/* 2. ARTISTS */}
-                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
-                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                                            ARTISTS: 24
-                                                        </span>
+                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <ProjectMetricPill variant="table">ARTISTS: 24</ProjectMetricPill>
                                                     </td>
-                                                    {/* 3. DEEP CUTS */}
-                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
-                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                                            DEEP CUTS: 7
-                                                        </span>
+                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <ProjectMetricPill variant="table">LABELS: 8</ProjectMetricPill>
                                                     </td>
-                                                    {/* 4. MAPPED */}
-                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
-                                                        <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
-                                                            Mapped
-                                                        </span>
+                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <ProjectMetricPill variant="table">DEEP CUTS: 7</ProjectMetricPill>
                                                     </td>
-                                                    <td className="py-4 px-6 text-right bg-zinc-900 group-hover:bg-primary/5 transition-colors relative z-10">
-                                                        <div className="w-9 h-9 rounded-lg text-zinc-600 inline-flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
+                                                    <td className="py-4 px-6 font-normal bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <ProjectStatusBadge status="completed" variant="table" />
+                                                    </td>
+                                                    <td className="py-4 px-6 text-right bg-zinc-900 group-hover:bg-white/5 transition-colors relative z-10">
+                                                        <div className="w-9 h-9 rounded-lg text-zinc-500 inline-flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
                                                             <span className="material-symbols-outlined !text-xl">more_vert</span>
                                                         </div>
                                                     </td>
                                                 </tr>
-                                                {/* Unmapped row (odd row style: bg-zinc-950/40) */}
+                                                {/* Unmapped row (odd row: bg-zinc-950/40) */}
                                                 <tr className="group cursor-pointer border-b border-zinc-800/30">
-                                                    <td className="py-4 px-6 font-medium text-zinc-300 bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
+                                                    <td className="py-4 px-6 font-medium text-zinc-300 bg-zinc-950/40 group-hover:bg-white/5 group-hover:text-primary transition-colors">
                                                         <div className="flex items-center gap-3">
                                                             <span className="material-symbols-outlined text-zinc-600 !text-lg group-hover:text-primary transition-colors">folder</span>
                                                             <span className="truncate max-w-[180px]">New Zcene Draft</span>
+                                                            <ProjectMetricPill variant="table-inline">SCENES: 1</ProjectMetricPill>
                                                         </div>
                                                     </td>
-                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">New Project</td>
-                                                    {/* 1. ROOT ARTISTS */}
-                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
-                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                                            ROOT ARTISTS: 1
-                                                        </span>
+                                                    <td className="py-4 px-6 text-zinc-400 text-sm font-mono font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors whitespace-nowrap">New Project</td>
+                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <ProjectMetricPill variant="table">ROOT ARTISTS: 1</ProjectMetricPill>
                                                     </td>
-                                                    {/* 2–3: hidden when unmapped */}
-                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
-                                                        <span className="text-[10px] text-zinc-600 font-mono">—</span>
+                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <ProjectMetricPill variant="table" muted>-</ProjectMetricPill>
                                                     </td>
-                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
-                                                        <span className="text-[10px] text-zinc-600 font-mono">—</span>
+                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <ProjectMetricPill variant="table" muted>-</ProjectMetricPill>
                                                     </td>
-                                                    {/* 4. UNMAPPED */}
-                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
-                                                        <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-2 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 whitespace-nowrap">
-                                                            Unmapped
-                                                        </span>
+                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <ProjectMetricPill variant="table" muted>-</ProjectMetricPill>
                                                     </td>
-                                                    <td className="py-4 px-6 text-right bg-zinc-950/40 group-hover:bg-primary/5 transition-colors">
-                                                        <div className="w-9 h-9 rounded-lg text-zinc-600 inline-flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
+                                                    <td className="py-4 px-6 font-normal bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <ProjectStatusBadge status="draft" variant="table" />
+                                                    </td>
+                                                    <td className="py-4 px-6 text-right bg-zinc-950/40 group-hover:bg-white/5 transition-colors">
+                                                        <div className="w-9 h-9 rounded-lg text-zinc-500 inline-flex items-center justify-center relative before:absolute before:inset-[-4px] before:content-['']">
                                                             <span className="material-symbols-outlined !text-xl">more_vert</span>
                                                         </div>
                                                     </td>
@@ -3560,8 +3557,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                         </table>
                                     </div>
                                     <p className="text-[10px] text-zinc-500 font-mono">
-                                        Row 1: fully mapped — all 4 badges present. Row 2: unmapped — ARTISTS &amp; DEEP CUTS columns suppressed (—).
+                                        Row 1: completed — SCENES + all 4 metric columns + Mapped badge. Row 2: unmapped draft — empty metric columns render muted (-).
                                     </p>
+                                    <div className="p-4 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-zinc-400 leading-relaxed max-w-2xl">
+                                        <strong className="text-zinc-200">Responsive Mobile Lock (&lt; 768px):</strong> On <code className="text-primary font-mono">isSmallScreen</code> viewports, both <strong>Dashboard</strong> and <strong>Trash</strong> hide the Grid/List <code className="text-zinc-300 font-mono">&lt;ViewToggle /&gt;</code> and force single-column Card View (<code className="text-zinc-300 font-mono">effectiveView = isSmallScreen ? &apos;grid&apos; : view</code>), eliminating horizontal table overflow on 375px screens while preserving desktop view preference on resize (see <strong>Responsive Ledger Mobile Card Anatomy</strong> below).
+                                    </div>
                                 </div>
 
                             </div>{/* end discovery metric layout block */}
@@ -3628,7 +3628,8 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h3 className="text-xl font-medium text-zinc-200">Fully-Featured Search Input</h3>
                                     <div className="flex flex-wrap gap-2">
                                         <span className="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 border border-primary/20 rounded-full">Component: ToolbarSearch</span>
-                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Optimum Width: 256px (max-w-64)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Optimum: 256px (max-w-64)</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Wide: 320px (sm:w-80)</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Breakpoint: md (768px / isSmallScreen)</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Sizes: toolbar (h-10) · control (h-[38px])</span>
                                         <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Copy: &ldquo;Find in &lt;view&gt;...&rdquo;</span>
@@ -3637,10 +3638,10 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 <div className="space-y-8 bg-zinc-900/30 p-8 rounded-none border border-zinc-800">
                                     <div className="space-y-2.5 max-w-3xl">
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            Unified toolbar search primitive used across <strong>Dashboard</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">size=&quot;control&quot;</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">h-[38px]</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">&quot;Find in zcenes...&quot;</code>), <strong>Stack Archive</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">size=&quot;control&quot;</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">h-[38px]</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">&quot;Find in archive...&quot;</code>), and <strong>Zine</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">size=&quot;toolbar&quot;</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">h-10</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">&quot;Find in zine...&quot;</code>). Built on <strong>The Void</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-zinc-950</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">border-zinc-700</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">focus:ring-1 focus:ring-primary</code>). Always open inline at <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">md:</code> (&ge;768px); collapses below <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">md:</code> into a secondary icon button that opens a full-width <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">absolute inset-0</code> toolbar takeover (<code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">z-20</code> / <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">z-30</code>) with zero vertical layout shift.
+                                            Unified toolbar search primitive used across <strong>Dashboard</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">size=&quot;control&quot;</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">h-[38px]</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">&quot;Find in zcenes...&quot;</code>), <strong>Stack Archive</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">size=&quot;control&quot;</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">h-[38px]</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">&quot;Find in archive...&quot;</code>), <strong>Admin Author P&amp;L</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">width=&quot;wide&quot;</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">sm:w-80</code>), and <strong>Zine</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">size=&quot;toolbar&quot;</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">h-10</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">&quot;Find in zine...&quot;</code>). Built on <strong>The Void</strong> (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">bg-zinc-950</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">border-zinc-700</code>, <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">focus:ring-1 focus:ring-primary</code>). Always open inline at <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">md:</code> (&ge;768px); collapses below <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">md:</code> into a secondary icon button that opens a full-width <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">absolute inset-0</code> toolbar takeover (<code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">z-20</code> / <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">z-30</code>) with zero vertical layout shift.
                                         </p>
                                         <p className="text-xs text-zinc-400 leading-relaxed">
-                                            <strong className="text-zinc-200">Optimum Width Rule:</strong> Desktop inline search defaults to <code className="text-[11px] bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">width=&quot;optimum&quot;</code> (<code className="text-[11px] bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">w-full flex-1 min-w-0 max-w-64</code> &rarr; <strong>256px</strong>, matching Connections&apos; <code className="text-[11px] bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">w-64</code> proportion) so lookups stay proportional without dominating primary toolbar controls and shrink gracefully at tight <code className="text-[11px] bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">768px</code> widths. <strong className="text-zinc-200">Permitted Overrides:</strong> Pass <code className="text-[11px] bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">width=&quot;full&quot;</code> for standalone full-width filters above wide tables or inside dedicated modal rows (e.g. Admin Control Room author search, Music Library), or <code className="text-[11px] bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">width=&quot;custom&quot;</code> with bespoke <code className="text-[11px] bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">className</code> sizing when a layout intentionally requires a narrower/wider cap without Tailwind v4 cascade conflicts. Mobile <code className="text-[11px] bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">absolute inset-0</code> takeovers always span 100% width.
+                                            <strong className="text-zinc-200">Governed Width Tokens:</strong> Desktop inline search defaults to <code className="text-[11px] bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">width=&quot;optimum&quot;</code> (<code className="text-[11px] bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">w-full flex-1 min-w-0 max-w-64</code> &rarr; <strong>256px</strong>) so compact toolbars stay balanced at tight <code className="text-[11px] bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">768px</code> widths. Use <code className="text-[11px] bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">width=&quot;wide&quot;</code> (<code className="text-[11px] bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">w-full sm:w-80 sm:shrink-0</code> &rarr; <strong>320px</strong>) for table/ledger identity filters alongside a section header (e.g. Admin Control Room <strong>Author P&amp;L</strong>), <code className="text-[11px] bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">width=&quot;full&quot;</code> for standalone full-width modal rows, or <code className="text-[11px] bg-zinc-950 text-primary px-1.5 py-0.5 font-mono">width=&quot;custom&quot;</code> with explicit <code className="text-[11px] bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">className</code> sizing when a layout requires a bespoke cap. Mobile <code className="text-[11px] bg-zinc-950 text-zinc-300 px-1.5 py-0.5 font-mono">absolute inset-0</code> takeovers always span 100% width.
                                         </p>
                                     </div>
 
@@ -4197,23 +4198,23 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <h4 className="text-sm font-medium text-zinc-400 mb-3">Desktop (Centered)</h4>
                                             <div className="bg-zinc-900/50 p-4 rounded-lg border border-zinc-800 flex items-center justify-center min-h-[200px]">
                                                 <div className="bg-background-dark border border-zinc-600 rounded-2xl overflow-hidden relative w-full max-w-[300px]">
-                                                    <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
+                                                    <ModalHeader>
                                                         <div className="flex items-center gap-2">
                                                             <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
                                                             <h3 className="font-medium text-white text-base">Modal Title</h3>
                                                         </div>
                                                         <span className="material-symbols-outlined text-zinc-500 !text-[18px]">close</span>
-                                                    </div>
-                                                    <div className="p-4 text-sm text-zinc-400">
+                                                    </ModalHeader>
+                                                    <ModalBody>
                                                         Desktop content description area. Components inside match the zinc-900/60 utility style.
-                                                    </div>
-                                                    <div className="p-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
-                                                        <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
-                                                        <button className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
+                                                    </ModalBody>
+                                                    <ModalFooter>
+                                                        <button type="button" className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
+                                                        <button type="button" className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
                                                             <span className="material-symbols-outlined !text-[16px]">check</span>
                                                             Action
                                                         </button>
-                                                    </div>
+                                                    </ModalFooter>
                                                 </div>
                                             </div>
                                         </div>
@@ -4223,22 +4224,49 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                             <div className="bg-zinc-900/50 rounded-lg border border-zinc-800 flex flex-col justify-end min-h-[250px] relative overflow-hidden max-w-[350px] mx-auto">
                                                 <div className="absolute inset-0 bg-black/60" />
                                                 <div className="bg-background-dark border border-zinc-600 border-b-0 rounded-t-2xl overflow-hidden relative w-full">
-                                                    <div className="p-3 bg-zinc-900 border-b border-zinc-700 flex justify-between items-center">
+                                                    <ModalHeader>
                                                         <div className="flex items-center gap-2">
                                                             <span className="material-symbols-outlined text-primary !text-[18px]">info</span>
                                                             <h3 className="font-medium text-white text-base">Modal Title</h3>
                                                         </div>
                                                         <span className="material-symbols-outlined text-zinc-500 !text-[18px]">close</span>
-                                                    </div>
-                                                    <div className="p-4 text-sm text-zinc-400">
+                                                    </ModalHeader>
+                                                    <ModalBody>
                                                         Mobile bottom-anchored content. Uses <code>rounded-t-2xl</code> and safe-area footer padding.
-                                                    </div>
-                                                    <div className="p-3 pb-6 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2">
-                                                        <button className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
-                                                        <button className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
+                                                    </ModalBody>
+                                                    <ModalFooter className="pb-6 sm:pb-6 sm:rounded-b-none">
+                                                        <button type="button" className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors">Cancel</button>
+                                                        <button type="button" className="px-4 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm flex items-center gap-2 hover:opacity-90 transition-opacity">
                                                             <span className="material-symbols-outlined !text-[16px]">check</span>
                                                             Action
                                                         </button>
+                                                    </ModalFooter>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="pt-4 border-t border-zinc-800/80 space-y-3">
+                                            <h4 className="text-sm font-medium text-zinc-400">Footer Variants (Desktop &amp; 375px Mobile)</h4>
+                                            <div className="space-y-3 max-w-[360px] mx-auto">
+                                                <div className="space-y-1.5">
+                                                    <span className="block text-[10px] font-mono uppercase tracking-wider text-zinc-500">Standard — &lt;ModalFooter&gt;</span>
+                                                    <div className="rounded-xl overflow-hidden border border-zinc-700/80">
+                                                        <ModalFooter className="border-t-0 sm:rounded-b-none">
+                                                            <button type="button" className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors whitespace-nowrap">Cancel</button>
+                                                            <button type="button" className="px-5 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm hover:opacity-90 transition-opacity whitespace-nowrap">Confirm</button>
+                                                        </ModalFooter>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-1.5">
+                                                    <span className="block text-[10px] font-mono uppercase tracking-wider text-zinc-500">Split Utility — &lt;ModalFooter leftAction=&#123;&lt;ModalFooterLink&gt;&#125;&gt;</span>
+                                                    <div className="rounded-xl overflow-hidden border border-zinc-700/80">
+                                                        <ModalFooter
+                                                            className="border-t-0 sm:rounded-b-none"
+                                                            leftAction={<ModalFooterLink>Token Pricing</ModalFooterLink>}
+                                                        >
+                                                            <button type="button" className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors whitespace-nowrap">Cancel</button>
+                                                            <button type="button" className="px-5 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm hover:opacity-90 transition-opacity whitespace-nowrap">Confirm</button>
+                                                        </ModalFooter>
                                                     </div>
                                                 </div>
                                             </div>
@@ -4311,30 +4339,77 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
 
                             <div className="pt-8 border-t border-zinc-800 mt-12">
-                                <h3 className="text-xl font-medium text-zinc-200 mb-4">Interactive Candidate Card (Disambiguation Pattern)</h3>
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 mb-4">
+                                    <h3 className="text-xl font-medium text-zinc-200">Artist Verification &amp; Disambiguation Cards</h3>
+                                    <div className="flex flex-wrap gap-2">
+                                        <span className="text-[10px] font-mono text-primary bg-primary/10 px-2 py-0.5 border border-primary/20 rounded-full">Modal: ConsolidatedValidationModal</span>
+                                        <span className="text-[10px] font-mono text-zinc-400 bg-zinc-950 px-2 py-0.5 border border-zinc-800 rounded-full">Components: ArtistVerificationCard · DisambiguationRadio</span>
+                                    </div>
+                                </div>
                                 <p className="text-sm text-zinc-400 mb-6 leading-relaxed max-w-3xl">
-                                    Used inside search disambiguation dialogs when presenting an instant cache hit or live AI verified entity. Features a refined thin secondary border (<code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">border border-zinc-700 hover:border-primary/50</code>) that illuminates cleanly on hover, ensuring frictionless hero selection without visual heaviness when multiple candidates are stacked.
+                                    Live production components from <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">SharedModals.tsx</code> rendered inside <strong>Confirm Your Artists</strong>. Standard verified entities present a calm confirmation card with an inline <strong>Not this artist?</strong> escape hatch (Admin-only <code className="text-xs bg-zinc-950 text-zinc-300 px-1.5 py-0.5 rounded border border-zinc-800">CACHE HIT</code> pill), while homonym collisions elevate into an amber disambiguation frame with interactive <code className="text-xs bg-zinc-950 text-primary px-1.5 py-0.5 rounded border border-zinc-800">&lt;DisambiguationRadio /&gt;</code> selection rows.
                                 </p>
-                                <div className="max-w-md bg-zinc-950 p-6 rounded-xl border border-zinc-800">
-                                    <button
-                                        type="button"
-                                        className="w-full text-left p-4 bg-zinc-900/50 hover:bg-zinc-800 border border-zinc-700 hover:border-primary/50 transition-all duration-200 flex items-center gap-4 group rounded-xl cursor-pointer"
-                                    >
-                                        <span className="material-symbols-outlined text-zinc-600 group-hover:text-primary group-hover:scale-110 transition-all text-2xl flex-shrink-0">check_circle</span>
-                                        <div className="flex flex-col gap-0.5 min-w-0">
-                                            <span className="text-white group-hover:text-primary font-medium transition-colors text-base truncate">
-                                                Spaced
-                                            </span>
-                                            <div className="flex flex-wrap gap-x-2 text-[10px] text-zinc-400 group-hover:text-zinc-300 transition-colors uppercase tracking-wider font-semibold">
-                                                <span>BUFFALO, USA</span>
-                                                <span>•</span>
-                                                <span>HARDCORE PUNK</span>
+                                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    {/* Standard Verified Artist Card */}
+                                    <div className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 space-y-3">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Standard Verified Card</p>
+                                        <ArtistVerificationCard
+                                            name="Spaced"
+                                            origin="Buffalo, USA"
+                                            genre="Hardcore Punk"
+                                            showCacheHit={true}
+                                            isEditing={demoVerifyEscapeOpen}
+                                            onNotThisArtist={() => setDemoVerifyEscapeOpen(true)}
+                                            editorSlot={
+                                                <div className="mt-2.5 p-2.5 bg-zinc-950/80 border border-zinc-800 rounded-lg flex flex-col gap-2">
+                                                    <p className="text-[11px] text-zinc-400 font-light">
+                                                        Inline escape-hatch editor opens here for custom Origin / Genre re-query.
+                                                    </p>
+                                                    <div className="flex justify-end">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => setDemoVerifyEscapeOpen(false)}
+                                                            className="px-2.5 py-1 text-[11px] text-zinc-300 hover:text-white bg-zinc-800 rounded cursor-pointer"
+                                                        >
+                                                            Close Preview
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            }
+                                        />
+                                    </div>
+
+                                    {/* Collision / Disambiguation State */}
+                                    <div className="bg-zinc-950 p-6 rounded-xl border border-zinc-800 space-y-3">
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Collision Disambiguation State (Interactive)</p>
+                                        <div className="flex flex-col gap-3 p-3.5 bg-amber-950/20 border border-amber-500/40 rounded-xl">
+                                            <div className="flex items-center justify-between gap-2">
+                                                <span className="text-white font-medium text-base truncate">Spaced</span>
+                                                <span className="text-[10px] uppercase tracking-wider text-amber-400 bg-amber-500/20 border border-amber-500/30 px-2 py-0.5 rounded-full font-semibold whitespace-nowrap">
+                                                    COLLISION DETECTED
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-zinc-300 font-light">
+                                                Multiple prominent acts share this name. Select your intended artist:
+                                            </p>
+                                            <div className="flex flex-col gap-2">
+                                                {DEMO_DISAMBIGUATION_CANDIDATES.map((candidate) => (
+                                                    <DisambiguationRadio
+                                                        key={candidate.id}
+                                                        candidate={candidate}
+                                                        isSelected={demoSelectedCandidateId === candidate.id}
+                                                        onSelect={() => setDemoSelectedCandidateId(candidate.id)}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <div className="mt-1 pt-2 border-t border-amber-500/20 flex items-center justify-between">
+                                                <span className="text-[11px] text-zinc-400 flex items-center gap-1 font-light underline decoration-zinc-700 underline-offset-2">
+                                                    <span className="material-symbols-outlined !text-[13px]">help_outline</span>
+                                                    Not listed? Specify another origin
+                                                </span>
                                             </div>
                                         </div>
-                                        <span className="material-symbols-outlined text-primary transition-transform group-hover:translate-x-1 text-[16px] ml-auto flex-shrink-0">
-                                            arrow_forward_ios
-                                        </span>
-                                    </button>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -4871,33 +4946,33 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                 <div className="space-y-6">
-                                     <h3 className="text-xl font-medium text-zinc-200">Desktop (lg+)</h3>
+                                    <h3 className="text-xl font-medium text-zinc-200">Desktop (lg+)</h3>
                                     <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 aspect-video relative flex gap-2">
-                                         <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Roots</div>
-                                        <div className="flex-grow h-full bg-zinc-900 border border-zinc-800 rounded-xl flex flex-col">
-                                            <div className="flex-grow flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Connections</div>
-                                            <div className="h-8 bg-zinc-800 border-t border-zinc-700 mx-2 mb-2 rounded-xl flex items-center justify-center text-[8px] text-zinc-500">Ad Space</div>
+                                        <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-500 font-medium uppercase tracking-widest">Roots</div>
+                                        <div className="flex-grow h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-400 font-medium uppercase tracking-widest">
+                                            Connections
                                         </div>
-                                        <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Deep Cut</div>
+                                        <div className="w-1/4 h-full bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-500 font-medium uppercase tracking-widest">Deep Cuts</div>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Three-column flexible layout. Panels support custom width dragging via manual handlers. Central column adapts its width for responsive ad placement using ResizeObserver. Left panel automatically collapses when a node is selected on the D3 graph to yield space to the canvas.
+                                        Ad-free three-column flexible workspace (<strong>Roots</strong>, <strong>Connections</strong>, and <strong>Deep Cuts</strong>). Sidebars support custom width dragging via manual resize handles and collapse cleanly, allowing the central D3 graph canvas to claim 100% of remaining height and width.
                                     </p>
                                 </div>
 
                                 <div className="space-y-6">
                                     <h3 className="text-xl font-medium text-zinc-200">Mobile (&lt;lg)</h3>
-                                    <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 aspect-video flex flex-col">
-                                        <div className="h-8 flex gap-1 mb-2">
-                                            <div className="flex-1 bg-primary/20 border border-primary/50 rounded-xl flex items-center justify-center text-[8px] font-semibold text-primary">TAB 1</div>
-                                            <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[8px] text-zinc-600">TAB 2</div>
-                                            <div className="flex-1 bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[8px] text-zinc-600">TAB 3</div>
+                                    <div className="p-6 bg-zinc-950 rounded-xl border border-zinc-800 aspect-video relative flex flex-col justify-between overflow-hidden">
+                                        <div className="flex-grow bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-500 font-medium uppercase tracking-widest pb-8">
+                                            Full-Bleed Panel View
                                         </div>
-                                        <div className="flex-grow bg-zinc-900 border border-zinc-800 rounded-xl flex items-center justify-center text-[10px] text-zinc-600 font-medium uppercase tracking-widest">Panel View</div>
-                                        <div className="h-6 bg-zinc-800 border-t border-zinc-700 mt-2 rounded-xl flex items-center justify-center text-[8px] text-zinc-500">Fixed Footer Ad</div>
+                                        <div className="absolute inset-x-10 bottom-8 p-1 bg-zinc-900/95 backdrop-blur-xl border border-zinc-700/80 rounded-xl shadow-lg flex items-center gap-1">
+                                            <div className="flex-1 py-1.5 rounded-lg flex items-center justify-center text-[8px] font-semibold uppercase tracking-wider text-zinc-400">Roots</div>
+                                            <div className="flex-1 py-1.5 bg-zinc-800 border border-zinc-700/60 rounded-lg flex items-center justify-center text-[8px] font-semibold uppercase tracking-wider text-primary">Connections</div>
+                                            <div className="flex-1 py-1.5 rounded-lg flex items-center justify-center text-[8px] font-semibold uppercase tracking-wider text-zinc-400">Deep Cuts</div>
+                                        </div>
                                     </div>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Stacked navigation using a high-fidelity tab system. Panels occupy 100% of the viewport width with a persistent flex-shrink ad footer pinned to the bottom. Dynamic landing routing defaults to the 'CONNECTIONS' tab if project seeds exist.
+                                        Full-bleed 100%-width sliding panels paired with a bottom-anchored floating glassmorphism navigation bar (<strong>ROOTS</strong>, <strong>CONNECTIONS</strong>, <strong>DEEP CUTS</strong>) with safe-area inset support. Dynamic landing routing defaults to the &lsquo;CONNECTIONS&rsquo; tab when project seeds exist.
                                     </p>
                                 </div>
                             </div>
@@ -5565,7 +5640,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     <h4 className="font-semibold text-zinc-400 uppercase tracking-widest">Specifications</h4>
                                     <ul className="list-disc list-outside pl-4 space-y-1.5 mt-2">
                                         <li><strong>Shared Card Shell:</strong> <code className="text-zinc-300">border border-zinc-800 bg-zinc-950/40 p-4 rounded-2xl</code> stacked with <code className="text-zinc-300">space-y-3</code> and subtle <code className="text-zinc-300">border-t border-zinc-800/60</code> monospace metadata footers.</li>
-                                        <li><strong>Zero Duplicate Nodes:</strong> Conditional rendering via <code className="text-zinc-300">isSmallScreen ? &lt;MobileCards /&gt; : &lt;DesktopTable /&gt;</code> guarantees only one branch mounts per viewport across Standard User tables (<strong>Token Activity</strong>, <strong>Stack Archive</strong>) and Admin Control Room tables (<strong>Author P&amp;L</strong>, nested <strong>Author Receipts</strong>, <strong>Deep Connections Query Log</strong>, <strong>JIT Auto-Healing</strong>, and <strong>Failed &amp; Auto-Refunded Curations</strong>).</li>
+                                        <li><strong>Zero Duplicate Nodes:</strong> Conditional rendering via <code className="text-zinc-300">isSmallScreen ? &lt;MobileCards /&gt; : &lt;DesktopTable /&gt;</code> guarantees only one branch mounts per viewport across Standard User tables (<strong>Token Activity</strong>, <strong>Stack Archive</strong>), Admin Control Room tables (<strong>Author P&amp;L</strong>, nested <strong>Author Receipts</strong>, <strong>Deep Connections Query Log</strong>, <strong>JIT Auto-Healing</strong>, and <strong>Failed &amp; Auto-Refunded Curations</strong>), and Project Lists (<strong>Dashboard</strong> &amp; <strong>Trash</strong> lock to Card View below 768px and hide the Grid/List toggle).</li>
                                         <li><strong>Progressive Pagination:</strong> Activity and Admin operational logs paginate at <code className="text-zinc-300">10</code> rows (<code className="text-zinc-300">20</code> rows for Stack Archive) with incremental <code className="text-zinc-300">Show more (N remaining)</code> expansion.</li>
                                         <li><strong>Support Strip Placement:</strong> Billing dispute support (<code className="text-zinc-300">support@zcene.online</code>) sits quietly below the Token Activity list and Show More control rather than inside the top Wallet Hero.</li>
                                     </ul>
@@ -5576,20 +5651,31 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
 
                     {/* 28. ADVERTISEMENT */}
                     <section id="advertisement">
-                        <h2 className="text-3xl font-medium text-white tracking-tight border-b-2 border-primary/50 pb-2 mb-8">Advertisement</h2>
+                        <div className="flex flex-wrap items-center justify-between gap-3 border-b-2 border-primary/50 pb-2 mb-6">
+                            <h2 className="text-3xl font-medium text-white tracking-tight">Advertisement</h2>
+                            <span className="text-[10px] font-mono font-bold uppercase tracking-widest px-2.5 py-1 rounded-full bg-amber-500/15 text-amber-300 border border-amber-500/30 whitespace-nowrap">
+                                INACTIVE · FUTURE USE
+                            </span>
+                        </div>
+                        <div className="mb-10 px-4 py-3 rounded-xl bg-amber-950/20 border border-amber-500/30 text-xs text-amber-200/90 flex items-center gap-2.5">
+                            <span className="material-symbols-outlined text-amber-400 !text-[16px] shrink-0">info</span>
+                            <span>
+                                In-app advertising is currently disabled across the V47.20 product. These specifications are retained strictly as an archived layout reference for potential future use.
+                            </span>
+                        </div>
                         <div className="space-y-12">
                             <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
-                                <h3 className="text-2xl font-medium text-primary mb-4">Responsive Ad Strategy</h3>
+                                <h3 className="text-2xl font-medium text-primary mb-4">Responsive Ad Strategy (Reference Spec)</h3>
                                 <p className="text-base text-zinc-300 leading-relaxed max-w-3xl">
-                                    Zcene implements a <strong>Dual-Instance Responsive Ad Strategy</strong>. While the standalone landing pages scale between mobile slim and desktop leaderboard banners using standard CSS queries, the interactive dashboard view exclusively uses the compact 320x50 size standard to maximize vertical canvas space.
+                                    Archived reference specification for a <strong>Dual-Instance Responsive Ad Strategy</strong>. If re-enabled in the future, standalone landing pages would scale between mobile slim and desktop leaderboard banners using standard CSS queries, while interactive workspace surfaces would remain restricted to the compact 320x50 standard to preserve vertical canvas space.
                                 </p>
                             </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4">
-                                    <h4 className="text-lg font-medium text-white">Logic: ResizeObserver & Key Reset</h4>
+                                    <h4 className="text-lg font-medium text-white">Logic: Compact Size Standard &amp; Key Reset</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        The interactive dashboard view enforces the compact ad size variant across all viewports to maximize visual real estate for the node canvas. The dynamic container-aware ResizeObserver size-switching logic has been retired in the application dashboard to optimize workspace layout stability and rendering efficiency.
+                                        If workspace ads were ever re-enabled, interactive views would enforce the compact ad size variant across all viewports to preserve node canvas real estate. Dynamic container-aware ResizeObserver size-switching was retired to maintain layout stability and rendering efficiency.
                                     </p>
                                     <div className="grid grid-cols-2 gap-4 pt-2">
                                         <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
@@ -5604,9 +5690,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                 </div>
 
                                 <div className="p-6 bg-zinc-900/50 border border-zinc-800 rounded-xl space-y-4">
-                                    <h4 className="text-lg font-medium text-white">Mobile Footer Standard</h4>
+                                    <h4 className="text-lg font-medium text-white">Mobile Footer Standard (Reference)</h4>
                                     <p className="text-sm text-zinc-400 leading-relaxed">
-                                        Mobile viewports employ a persistent footer to house advertisements. This ensures the unit remains visible regardless of the active dashboard tab (Roots, Connections, or Deep Cut). To maintain the immersive feel, vertical spacing is kept to a strict minimum.
+                                        Under the archived mobile layout spec, a dedicated footer slot would house compact 320x50 banners across workspace tabs (Roots, Connections, or Deep Cuts) while keeping vertical spacing to a strict minimum.
                                     </p>
                                     <div className="grid grid-cols-2 gap-4 pt-2">
                                         <div className="bg-zinc-950 p-3 rounded-xl border border-zinc-800">
@@ -5622,25 +5708,25 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
 
                             <div className="space-y-6">
-                                <h3 className="text-xl font-medium text-white">Positioning & Hierarchy</h3>
+                                <h3 className="text-xl font-medium text-white">Positioning &amp; Hierarchy (Reference)</h3>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
                                     <div className="space-y-4">
                                         <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Desktop Placement</h4>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            On Desktop, the advertisement container is anchored to the bottom of the central column (Connections view). It is separated from the interactive map by a 2-pixel gap and is contained within its own <strong>bg-zinc-900 rounded-none</strong> box.
+                                            On Desktop, an optional future ad slot would anchor to the bottom of the central column (Connections view), separated from the interactive map by a 2-pixel gap inside a contained <strong>bg-zinc-900 rounded-none</strong> box.
                                         </p>
                                         <ul className="list-disc list-outside pl-4 text-xs text-zinc-500 space-y-1">
-                                            <li>Resizing sidebars triggers an immediate ad swap if width cross-threshold occurs.</li>
-                                            <li>Forced unmount/remount via React keys prevents "glitchy" overflows.</li>
+                                            <li>Sidebar resizes across thresholds would trigger a clean key-based remount.</li>
+                                            <li>Forced unmount/remount via React keys prevents layout overflow artifacts.</li>
                                         </ul>
                                     </div>
                                     <div className="space-y-4">
                                         <h4 className="text-base font-semibold text-zinc-500 uppercase tracking-widest">Mobile Placement</h4>
                                         <p className="text-sm text-zinc-400 leading-relaxed">
-                                            On Mobile, the ad is placed in a dedicated flex-shrink-0 container at the very bottom of the viewport. It sits above the system home bar and is persistent across all three dashboard views.
+                                            On Mobile, an optional future ad slot would sit in a dedicated flex-shrink-0 container at the base of the viewport above the system home bar.
                                         </p>
                                         <ul className="list-disc list-outside pl-4 text-xs text-zinc-500 space-y-1">
-                                            <li>Fixed position relative to the dashboard content.</li>
+                                            <li>Fixed slot relative to the workspace scroll area.</li>
                                             <li>Standardized labels using bold Zinc-500 text at 10px.</li>
                                         </ul>
                                     </div>
@@ -5678,7 +5764,7 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             <div className="p-8 bg-primary/5 rounded-xl border border-primary/20">
                                 <h3 className="text-xl font-medium text-primary mb-4">Figma Design Specifications</h3>
                                 <p className="text-sm text-zinc-300 leading-relaxed mb-6">
-                                    When creating custom graphics for Zcene advertisements in Figma, use the following specifications to ensure high-fidelity rendering on all displays.
+                                    If custom promotional graphics are created for future Zcene banner placements in Figma, use the following specifications to ensure crisp retina rendering across displays.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                                     <div className="space-y-4">
@@ -5713,9 +5799,9 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                             </div>
 
                             <div className="p-8 bg-zinc-900/50 rounded-xl border border-zinc-800">
-                                <h3 className="text-lg font-medium text-white mb-4">Technical Implementation Details</h3>
+                                <h3 className="text-lg font-medium text-white mb-4">Technical Implementation Details (Archived)</h3>
                                 <p className="text-sm text-zinc-400 leading-relaxed mb-6">
-                                    To prevent <strong>Cumulative Layout Shift (CLS)</strong>, all mobile ad containers are assigned a <strong>min-height: 50px</strong> (matching the custom slim mobile banner height) and wrapped in a high-contrast <strong>bg-[#18181b]</strong> footer container with a z-index safety layer and zero vertical padding to sit flush and squared against the graphic asset. In the interactive dashboard view, all ad units (regardless of desktop width) are locked to this compact <strong>50px</strong> height standard to maximize vertical real estate, while public landing page units scale up to a <strong>min-height: 90px</strong> on wide viewports. This ensures layout stability and visibility across all platform contexts.
+                                    To prevent <strong>Cumulative Layout Shift (CLS)</strong> if banner units are ever re-introduced, mobile containers should reserve <strong>min-height: 50px</strong> inside a high-contrast <strong>bg-[#18181b]</strong> footer wrapper with zero vertical padding, while public landing banners scale up to <strong>min-height: 90px</strong> on wide viewports.
                                 </p>
                                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                                     <div className="space-y-1">
@@ -5724,11 +5810,11 @@ export const StyleGuidePage: React.FC<StyleGuidePageProps> = ({
                                     </div>
                                     <div className="space-y-1">
                                         <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Integration</p>
-                                        <p className="text-xs text-zinc-300">Dual instance rendering with unique keys for zero-artifact swapping.</p>
+                                        <p className="text-xs text-zinc-300">Dual-instance rendering with unique keys for zero-artifact swapping.</p>
                                     </div>
                                     <div className="space-y-1">
-                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Labeling</p>
-                                        <p className="text-xs text-zinc-300">The "ADVERTISEMENT" header has been removed for custom banners to maximize vertical space, as the visual content is self-evident.</p>
+                                        <p className="text-[10px] font-semibold text-zinc-500 uppercase tracking-widest">Status</p>
+                                        <p className="text-xs text-amber-300 font-mono">Inactive in V47.20 workspace</p>
                                     </div>
                                 </div>
                             </div>

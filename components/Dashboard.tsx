@@ -15,6 +15,7 @@ import { CreateProjectCard } from './CreateProjectCard';
 import { PROFILE_COLORS } from './SharedModals';
 import { computeProjectCardMetrics, parseProjectScenes, stripSceneNamespace } from '../shared/multiSceneUtils';
 import { ToolbarSearch } from './DesignSystem';
+import { PROJECT_TABLE_COLUMNS, ProjectMetricPill, ProjectStatusBadge } from './ui/ProjectMetrics';
 
 
 interface DashboardProps {
@@ -96,6 +97,7 @@ const Dashboard: React.FC<DashboardProps> = ({
   const handleTrash = onTrashProject || onDeleteProject;
   const [renameValue, setRenameValue] = React.useState('');
   const [view, setView] = React.useState<'grid' | 'list'>('grid');
+  const effectiveView = isSmallScreen ? 'grid' : view;
   const [activeMenuId, setActiveMenuId] = React.useState<string | null>(null);
   const [openColorPopover, setOpenColorPopover] = React.useState<string | null>(null);
 
@@ -483,15 +485,17 @@ const Dashboard: React.FC<DashboardProps> = ({
                     ]}
                   />
 
-                  {/* Grid/List View Toggle */}
-                  <ViewToggle 
-                    value={view}
-                    onChange={(v) => setView(v as 'grid' | 'list')}
-                    options={[
-                      { id: 'grid', icon: 'grid_view', label: 'Grid View' },
-                      { id: 'list', icon: 'list', label: 'List View' }
-                    ]}
-                  />
+                  {/* Grid/List View Toggle (desktop/tablet >= 768px only; mobile locks to zero-overflow Card View) */}
+                  {!isSmallScreen && (
+                    <ViewToggle 
+                      value={view}
+                      onChange={(v) => setView(v as 'grid' | 'list')}
+                      options={[
+                        { id: 'grid', icon: 'grid_view', label: 'Grid View' },
+                        { id: 'list', icon: 'list', label: 'List View' }
+                      ]}
+                    />
+                  )}
                 </div>
 
                 {/* Unified Toolbar Search */}
@@ -587,7 +591,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 Clear Search
               </button>
             </div>
-          ) : view === 'grid' ? (
+          ) : effectiveView === 'grid' ? (
             <div className="w-full flex flex-wrap gap-x-8 gap-y-12 items-start pt-6">
               {sortedBucketKeys.map((bucketKey, bucketIndex) => {
                 const projectsInBucket = groupedProjects[bucketKey] || [];
@@ -717,14 +721,14 @@ const Dashboard: React.FC<DashboardProps> = ({
               <table className="w-full text-left border-collapse min-w-[640px]">
                 <thead>
                   <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
-                    <th className="py-4 px-6 font-semibold">Title</th>
-                    <th className="py-4 px-6 font-semibold">Modified Date</th>
-                    <th className="py-4 px-6 font-semibold">Roots</th>
-                    <th className="py-4 px-6 font-semibold">Artists</th>
-                    <th className="py-4 px-6 font-semibold">Labels</th>
-                    <th className="py-4 px-6 font-semibold">Deep Cuts</th>
-                    <th className="py-4 px-6 font-semibold">Status</th>
-                    <th className="py-4 px-6 font-semibold text-right">Actions</th>
+                    {PROJECT_TABLE_COLUMNS.map((col) => (
+                      <th
+                        key={col.key}
+                        className={`py-4 px-6 font-semibold ${col.align === 'right' ? 'text-right' : ''}`}
+                      >
+                        {col.label}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="bg-zinc-900">
@@ -841,9 +845,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                   folder
                                 </span>
                                 <span className="truncate max-w-[240px]">{displayTitle}</span>
-                                <span className="text-[10px] uppercase tracking-widest text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap">
-                                  SCENES: {sceneCount || 1}
-                                </span>
+                                <ProjectMetricPill variant="table-inline">SCENES: {sceneCount || 1}</ProjectMetricPill>
                               </div>
                             </td>
                             <td className={`py-4 px-6 text-zinc-400 text-sm font-mono font-normal ${tdClass}`}>
@@ -852,53 +854,31 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                ROOT ARTISTS: {rootArtistsCount}
-                              </span>
+                              <ProjectMetricPill variant="table">ROOT ARTISTS: {rootArtistsCount}</ProjectMetricPill>
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                ARTISTS: {recommendedCount}
-                              </span>
+                              <ProjectMetricPill variant="table">ARTISTS: {recommendedCount}</ProjectMetricPill>
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
                               {labelCount > 0 ? (
-                                <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                  LABELS: {labelCount}
-                                </span>
+                                <ProjectMetricPill variant="table">LABELS: {labelCount}</ProjectMetricPill>
                               ) : (
-                                <span className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                  -
-                                </span>
+                                <ProjectMetricPill variant="table" muted>-</ProjectMetricPill>
                               )}
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                                DEEP CUTS: {deepCutsCount}
-                              </span>
+                              <ProjectMetricPill variant="table">DEEP CUTS: {deepCutsCount}</ProjectMetricPill>
                             </td>
                             <td className={`py-4 px-6 font-normal ${tdClass}`}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}
-                              {(project.status === 'curating' || project.status === 'pending' || Boolean(project.activeJobId)) ? (
-                                <span className="text-[10px] uppercase tracking-wider text-amber-500/80 font-bold px-2 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse">
-                                  Mapping...
-                                </span>
-                              ) : project.status === 'failed' ? (
-                                <span className="text-[10px] uppercase tracking-wider text-red-500/80 font-bold px-2 py-0.5 bg-red-500/10 rounded-md border border-red-500/10 whitespace-nowrap">
-                                  Failed
-                                </span>
-                              ) : project.status === 'completed' ? (
-                                <span className="text-[10px] uppercase tracking-widest text-primary/70 font-bold px-2 py-0.5 bg-primary/10 rounded-md border border-primary/20 whitespace-nowrap">
-                                  Mapped
-                                </span>
-                              ) : (
-                                <span className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold px-2 py-0.5 bg-zinc-800 rounded-md border border-zinc-800 whitespace-nowrap">
-                                  Unmapped
-                                </span>
-                              )}
+                              <ProjectStatusBadge
+                                status={project.status}
+                                isActiveCuration={Boolean(project.activeJobId)}
+                                variant="table"
+                              />
                             </td>
                             <td className={`py-4 px-6 text-right ${tdClass} ${activeMenuId === project.id ? 'relative z-50' : ''}`} onClick={(e) => e.stopPropagation()}>
                               {index === 0 && <div className="absolute top-0 left-0 right-0 h-[1px] bg-zinc-800/80 z-20 pointer-events-none" />}

@@ -40,8 +40,83 @@ export const ModalBody: React.FC<{ children: React.ReactNode; className?: string
   </div>
 );
 
-export const ModalFooter: React.FC<{ children: React.ReactNode; className?: string; [key: string]: any }> = ({ children, className = '', ...rest }) => (
-  <footer className={`p-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2 sm:rounded-b-2xl ${className}`} {...rest}>
-    {children}
-  </footer>
-);
+export interface ModalFooterLinkProps {
+  children: React.ReactNode;
+  href?: string;
+  target?: string;
+  rel?: string;
+  onClick?: React.MouseEventHandler<HTMLElement>;
+  disabled?: boolean;
+  className?: string;
+  'data-testid'?: string;
+  [key: string]: any;
+}
+
+const MODAL_FOOTER_LINK_BASE_CLASS =
+  'text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 hover:decoration-primary/60 cursor-pointer whitespace-nowrap shrink-0';
+
+export const ModalFooterLink: React.FC<ModalFooterLinkProps> = ({
+  children,
+  href,
+  target,
+  rel,
+  onClick,
+  disabled,
+  className = '',
+  ...rest
+}) => {
+  if (href) {
+    return (
+      <a
+        href={href}
+        target={target}
+        rel={rel}
+        onClick={onClick as React.MouseEventHandler<HTMLAnchorElement> | undefined}
+        className={`${MODAL_FOOTER_LINK_BASE_CLASS} ${className}`.trim()}
+        {...rest}
+      >
+        {children}
+      </a>
+    );
+  }
+  return (
+    <button
+      type="button"
+      disabled={disabled}
+      onClick={onClick as React.MouseEventHandler<HTMLButtonElement> | undefined}
+      className={`${MODAL_FOOTER_LINK_BASE_CLASS} disabled:opacity-40 disabled:cursor-not-allowed ${className}`.trim()}
+      {...rest}
+    >
+      {children}
+    </button>
+  );
+};
+
+export const ModalFooter: React.FC<{
+  children: React.ReactNode;
+  leftAction?: React.ReactNode;
+  className?: string;
+  [key: string]: any;
+}> = ({ children, leftAction, className = '', ...rest }) => {
+  if (leftAction) {
+    return (
+      <footer
+        className={`p-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-3 bg-zinc-900 border-t border-zinc-700 flex items-center justify-between gap-2 w-full sm:rounded-b-2xl ${className}`}
+        {...rest}
+      >
+        {leftAction}
+        <div className="flex items-center justify-end gap-2 shrink-0">
+          {children}
+        </div>
+      </footer>
+    );
+  }
+  return (
+    <footer
+      className={`p-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:pb-3 bg-zinc-900 border-t border-zinc-700 flex justify-end gap-2 sm:rounded-b-2xl ${className}`}
+      {...rest}
+    >
+      {children}
+    </footer>
+  );
+};

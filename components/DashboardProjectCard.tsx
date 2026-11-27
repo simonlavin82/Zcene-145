@@ -6,6 +6,7 @@ import { formatSystemTimestamp, generateDeterministicGradient, extractInitials }
 import { useSeedImages } from '../hooks/useSeedImages';
 import { useDominantColor } from '../hooks/useDominantColor';
 import { computeProjectCardMetrics } from '../shared/multiSceneUtils';
+import { ProjectMetricPill, ProjectStatusBadge } from './ui/ProjectMetrics';
 
 interface DashboardProjectCardProps {
   project: Project;
@@ -151,25 +152,12 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
                 <p className="font-mono text-[10px] font-normal truncate uppercase tracking-widest text-zinc-400">
                   {project.updatedAt ? `Edited ${formatSystemTimestamp(project.updatedAt)}` : 'New Project'}
                 </p>
-                {isTrashed ? (
-                  <span className="text-[9px] uppercase tracking-wide text-amber-300 font-bold px-1.5 py-0.5 bg-amber-950/60 rounded-md border border-amber-500/40 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
-                    {daysLeft} {daysLeft === 1 ? 'DAY' : 'DAYS'} LEFT
-                  </span>
-                ) : project.status === 'curating' || project.status === 'pending' || Boolean(project.activeJobId) ? (
-                  <span className="text-[9px] uppercase tracking-wider text-amber-500/80 font-bold px-1.5 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/10 whitespace-nowrap animate-pulse backdrop-blur-sm w-fit mt-0.5">
-                    Mapping...
-                  </span>
-                ) : project.status === 'failed' ? (
-                  <span className="text-[9px] uppercase tracking-wider text-red-500/80 font-bold px-1.5 py-0.5 bg-red-500/10 rounded-md border border-red-500/10 whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
-                    Failed
-                  </span>
-                ) : project.status === 'completed' ? (
-                  null
-                ) : (
-                  <span className="text-[9px] uppercase tracking-wide text-zinc-400 font-bold px-1.5 py-0.5 bg-zinc-800/80 rounded-md border border-zinc-700/60 font-mono whitespace-nowrap backdrop-blur-sm w-fit mt-0.5">
-                    Unmapped
-                  </span>
-                )}
+                <ProjectStatusBadge
+                  status={project.status}
+                  isActiveCuration={Boolean(project.activeJobId)}
+                  daysLeft={daysLeft}
+                  variant="card"
+                />
               </div>
             </div>
             
@@ -276,25 +264,15 @@ export const DashboardProjectCard: React.FC<DashboardProjectCardProps> = ({
         {!isUnmapped && (
           <div className="mt-3 flex items-center">
             <div className="flex items-center flex-wrap gap-x-1 gap-y-1.5">
-              <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                SCENES: {sceneCount || 1}
-              </span>
-              <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                ROOT ARTISTS: {rootArtistsCount}
-              </span>
+              <ProjectMetricPill variant="card">SCENES: {sceneCount || 1}</ProjectMetricPill>
+              <ProjectMetricPill variant="card">ROOT ARTISTS: {rootArtistsCount}</ProjectMetricPill>
               {(project.status === 'completed' || isTrashed) && (
                 <>
-                  <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                    ARTISTS: {recommendedCount}
-                  </span>
+                  <ProjectMetricPill variant="card">ARTISTS: {recommendedCount}</ProjectMetricPill>
                   {labelCount > 0 && (
-                    <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                      LABELS: {labelCount}
-                    </span>
+                    <ProjectMetricPill variant="card">LABELS: {labelCount}</ProjectMetricPill>
                   )}
-                  <span className="text-[9px] uppercase tracking-wide text-zinc-300 font-bold px-2 py-0.5 bg-zinc-900/50 rounded-full border border-white/10 font-mono whitespace-nowrap backdrop-blur-sm">
-                    DEEP CUTS: {deepCutsCount}
-                  </span>
+                  <ProjectMetricPill variant="card">DEEP CUTS: {deepCutsCount}</ProjectMetricPill>
                 </>
               )}
             </div>

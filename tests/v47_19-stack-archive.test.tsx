@@ -1516,19 +1516,29 @@ describe('V47.19 Stack Archive, Two-Tab Discovery Ledger & Legacy Link Housekeep
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: origInnerWidth });
     }
 
-    // ToolbarSearch author filter filters mobile author cards and clears via built-in Clear button
+    // ToolbarSearch author filter sits inside Author P&L header (width="wide" -> sm:w-80), filters mobile author cards, and clears via built-in Clear button
+    expect(screen.getByText('Author P&L')).toBeInTheDocument();
     const authorSearch = screen.getByTestId('admin-author-search-input');
     expect(authorSearch).toHaveAttribute('placeholder', 'Search by Author identity...');
+    expect(authorSearch.parentElement?.className).toContain('sm:w-80');
     fireEvent.change(authorSearch, { target: { value: 'simon.lavin1' } });
     expect(screen.getByTestId('admin-author-card-u-cust')).toBeInTheDocument();
     expect(screen.queryByTestId(`admin-author-card-${ADMIN_UID}`)).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Clear search' }));
     expect(screen.getByTestId(`admin-author-card-${ADMIN_UID}`)).toBeInTheDocument();
 
-    // DesignSystem.tsx documents single-row Confirm split footer, InfoTooltip align="right"/"left", and Admin mobile cards
+    // DesignSystem.tsx documents living components, single-row Confirm split footer, InfoTooltip align="right"/"left", Admin mobile cards, and ad-free V47.20 parity
     const dsSrc = fs.readFileSync(path.resolve(__dirname, '../components/DesignSystem.tsx'), 'utf-8');
     expect(dsSrc).toContain('InfoTooltip align=&quot;right&quot;');
     expect(dsSrc).toContain('Failed &amp; Auto-Refunded Curations');
     expect(dsSrc).toContain('Progressive Pagination:');
+    expect(dsSrc).toContain('INACTIVE · FUTURE USE');
+    expect(dsSrc).toContain('<DashboardProjectCard');
+    expect(dsSrc).toContain('<ArtistVerificationCard');
+    expect(dsSrc).toContain('<DisambiguationRadio');
+    expect(dsSrc).toContain('<ModalFooterLink');
+    expect(dsSrc).not.toContain('RootsBreakdownButton');
+    expect(dsSrc).not.toContain('Ad Space');
+    expect(dsSrc).not.toContain('Fixed Footer Ad');
   });
 });

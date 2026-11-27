@@ -4,11 +4,12 @@ import ViewToggle from './ViewToggle';
 import { DashboardProjectCard } from './DashboardProjectCard';
 import { Project, View } from '../types';
 import { User } from 'firebase/auth';
-import { getProjectDisplayTitle, isNodeInSeedList } from '../services/artistCacheService';
-import { parseProjectScenes, stripSceneNamespace } from '../shared/multiSceneUtils';
+import { getProjectDisplayTitle } from '../services/artistCacheService';
+import { computeProjectCardMetrics, parseProjectScenes, stripSceneNamespace } from '../shared/multiSceneUtils';
 import { formatSystemTimestamp } from '../utils/formatters';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 import { BackButton } from './DesignSystem';
+import { PROJECT_TABLE_COLUMNS, ProjectMetricPill, ProjectStatusBadge } from './ui/ProjectMetrics';
 
 export interface TrashPageProps {
   user: User | null;
@@ -66,6 +67,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
   tokenBalance = 0,
 }) => {
   const [view, setView] = useState<'grid' | 'list'>('grid');
+  const effectiveView = isSmallScreen ? 'grid' : view;
   const [sortBy, setSortBy] = useState<'recent' | 'alphabetical'>('recent');
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -240,15 +242,17 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                 ]}
               />
 
-              {/* Grid/List View Toggle */}
-              <ViewToggle
-                value={view}
-                onChange={(v) => setView(v as 'grid' | 'list')}
-                options={[
-                  { id: 'grid', icon: 'grid_view', label: 'Grid View' },
-                  { id: 'list', icon: 'list', label: 'List View' }
-                ]}
-              />
+              {/* Grid/List View Toggle (desktop/tablet >= 768px only; mobile locks to zero-overflow Card View) */}
+              {!isSmallScreen && (
+                <ViewToggle
+                  value={view}
+                  onChange={(v) => setView(v as 'grid' | 'list')}
+                  options={[
+                    { id: 'grid', icon: 'grid_view', label: 'Grid View' },
+                    { id: 'list', icon: 'list', label: 'List View' }
+                  ]}
+                />
+              )}
 
               {/* Deep Search Input */}
               <div
@@ -342,7 +346,7 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                 Clear Search
               </button>
             </div>
-          ) : view === 'grid' ? (
+          ) : effectiveView === 'grid' ? (
             /* Grid View */
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {filteredProjects.map((project) => (
@@ -365,39 +369,27 @@ export const TrashPage: React.FC<TrashPageProps> = ({
               <table className="w-full text-left border-collapse min-w-[640px]">
                 <thead>
                   <tr className="border-b border-zinc-800 text-[10px] text-zinc-400 uppercase tracking-widest font-bold bg-zinc-950">
-                    <th className="py-4 px-6 font-semibold">Title</th>
-                    <th className="py-4 px-6 font-semibold">Modified Date</th>
-                    <th className="py-4 px-6 font-semibold">Roots</th>
-                    <th className="py-4 px-6 font-semibold">Artists</th>
-                    <th className="py-4 px-6 font-semibold">Labels</th>
-                    <th className="py-4 px-6 font-semibold">Deep Cuts</th>
-                    <th className="py-4 px-6 font-semibold">Status</th>
-                    <th className="py-4 px-6 font-semibold text-right">Actions</th>
+                    {PROJECT_TABLE_COLUMNS.map((col) => (
+                      <th
+                        key={col.key}
+                        className={`py-4 px-6 font-semibold ${col.align === 'right' ? 'text-right' : ''}`}
+                      >
+                        {col.label}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody className="bg-zinc-900">
                   {filteredProjects.map((project, index) => {
-                    const seedList = project.seedArtists ? project.seedArtists.split('::').filter(Boolean) : [];
+                    const {
+                      sceneCount,
+                      rootArtistsCount,
+                      recommendedCount,
+                      labelCount,
+                      deepCutsCount,
+                    } = computeProjectCardMetrics(project);
                     const displayTitle = getProjectDisplayTitle(project);
                     const formattedDate = formatSystemTimestamp(project.updatedAt);
-                    let deepCutsCount = project.activeNodesCount ?? 0;
-                    let recommendedCount = 0;
-                    let labelCount = 0;
-
-                    if (project.graphData) {
-                      try {
-                        const pg = typeof project.graphData === 'string' ? JSON.parse(project.graphData) : project.graphData;
-                        if (pg && Array.isArray(pg.nodes)) {
-                          const rawActive = project.activeNodes || [];
-                          deepCutsCount = pg.nodes.filter((n: any) =>
-                            rawActive.includes(n.id) && (n.type === 'artist' || n.type === 'label' || !n.type)
-                          ).length;
-                          const artistNodes = pg.nodes.filter((n: any) => n.type === 'artist' || !n.type);
-                          recommendedCount = artistNodes.filter((n: any) => !isNodeInSeedList(n.id || n.label || '', seedList)).length;
-                          labelCount = pg.nodes.filter((n: any) => n.type === 'label').length;
-                        }
-                      } catch (e) { /* ignore */ }
-                    }
 
                     const purgeMs = project.purgeAt?.toMillis
                       ? project.purgeAt.toMillis()
@@ -423,41 +415,30 @@ export const TrashPage: React.FC<TrashPageProps> = ({
                               auto_delete
                             </span>
                             <span className="truncate max-w-[240px]">{displayTitle}</span>
+                            <ProjectMetricPill variant="table-inline">SCENES: {sceneCount || 1}</ProjectMetricPill>
                           </div>
                         </td>
                         <td className={`py-4 px-6 text-zinc-400 text-sm font-mono font-normal ${tdClass}`}>
                           {formattedDate}
                         </td>
                         <td className={`py-4 px-6 font-normal ${tdClass}`}>
-                          <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                            ROOT ARTISTS: {seedList.length}
-                          </span>
+                          <ProjectMetricPill variant="table">ROOT ARTISTS: {rootArtistsCount}</ProjectMetricPill>
                         </td>
                         <td className={`py-4 px-6 font-normal ${tdClass}`}>
-                          <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                            ARTISTS: {recommendedCount}
-                          </span>
+                          <ProjectMetricPill variant="table">ARTISTS: {recommendedCount}</ProjectMetricPill>
                         </td>
                         <td className={`py-4 px-6 font-normal ${tdClass}`}>
                           {labelCount > 0 ? (
-                            <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                              LABELS: {labelCount}
-                            </span>
+                            <ProjectMetricPill variant="table">LABELS: {labelCount}</ProjectMetricPill>
                           ) : (
-                            <span className="text-[10px] uppercase tracking-widest text-zinc-600 font-bold px-2.5 py-0.5 bg-zinc-900 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                              -
-                            </span>
+                            <ProjectMetricPill variant="table" muted>-</ProjectMetricPill>
                           )}
                         </td>
                         <td className={`py-4 px-6 font-normal ${tdClass}`}>
-                          <span className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold px-2.5 py-0.5 bg-zinc-800 rounded-full border border-white/5 font-mono whitespace-nowrap">
-                            DEEP CUTS: {deepCutsCount}
-                          </span>
+                          <ProjectMetricPill variant="table">DEEP CUTS: {deepCutsCount}</ProjectMetricPill>
                         </td>
                         <td className={`py-4 px-6 font-normal ${tdClass}`}>
-                          <span className="text-[10px] uppercase tracking-wider text-amber-400 font-bold px-2 py-0.5 bg-amber-500/10 rounded-md border border-amber-500/20 whitespace-nowrap font-mono">
-                            {daysLeft} {daysLeft === 1 ? 'day' : 'days'} left
-                          </span>
+                          <ProjectStatusBadge status="trashed" daysLeft={daysLeft} variant="table" />
                         </td>
                         <td className={`py-4 px-6 text-right ${tdClass} ${activeMenuId === project.id ? 'relative z-50' : ''}`} onClick={(e) => e.stopPropagation()}>
                           <div className="flex items-center justify-end relative">

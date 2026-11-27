@@ -15,10 +15,11 @@ export interface ToolbarSearchProps {
   /**
    * Desktop inline width strategy (ignored on mobile, where takeover is always full-width):
    * - 'optimum' (default): 256px cap (`w-full flex-1 min-w-0 max-w-64`) matching Connections' crisp proportion
-   * - 'full': unconstrained width (`w-full flex-1 min-w-0`) for standalone table/modal filters
+   * - 'wide': 320px right-aligned table/ledger filter (`w-full sm:w-80 sm:shrink-0`) for email/identity lookups (e.g. Admin Control Room Author P&L)
+   * - 'full': unconstrained width (`w-full flex-1 min-w-0`) for standalone modal/table rows
    * - 'custom': omits default width/flex classes so caller controls sizing via `className` without Tailwind v4 cascade conflicts
    */
-  width?: 'optimum' | 'full' | 'custom';
+  width?: 'optimum' | 'wide' | 'full' | 'custom';
   /** Optional extra classes applied to the desktop inline container. */
   className?: string;
   /** Classes applied to the mobile absolute inset-0 takeover overlay (e.g. z-20 px-4 bg-zinc-950/95 backdrop-blur-md). */
@@ -65,6 +66,8 @@ export const ToolbarSearch: React.FC<ToolbarSearchProps> = ({
   const widthClass =
     width === 'optimum'
       ? 'w-full flex-1 min-w-0 max-w-64'
+      : width === 'wide'
+      ? 'w-full sm:w-80 sm:shrink-0'
       : width === 'full'
       ? 'w-full flex-1 min-w-0'
       : '';

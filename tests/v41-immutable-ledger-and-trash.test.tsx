@@ -244,26 +244,25 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       const onPermanentDeleteProject = vi.fn();
       const onClose = vi.fn();
 
-      render(
-        <TrashPage
-          user={{ uid: 'user-1', email: 'member@zcene.online' } as any}
-          projects={[mockActiveProject, mockTrashedProject]}
-          onRestoreProject={onRestoreProject}
-          onPermanentDeleteProject={onPermanentDeleteProject}
-          onNavigate={vi.fn()}
-          isActive={true}
-          onClose={onClose}
-          isSmallScreen={false}
-          onLogout={vi.fn()}
-          onDeleteAccount={vi.fn()}
-          isProfileOpen={false}
-          setIsProfileOpen={vi.fn()}
-          isDeleteAccountModalOpen={false}
-          setIsDeleteAccountModalOpen={vi.fn()}
-          isMenuOpen={false}
-          setIsMenuOpen={vi.fn()}
-        />
-      );
+      const trashBaseProps = {
+        user: { uid: 'user-1', email: 'member@zcene.online' } as any,
+        projects: [mockActiveProject, mockTrashedProject],
+        onRestoreProject,
+        onPermanentDeleteProject,
+        onNavigate: vi.fn(),
+        isActive: true,
+        onClose,
+        onLogout: vi.fn(),
+        onDeleteAccount: vi.fn(),
+        isProfileOpen: false,
+        setIsProfileOpen: vi.fn(),
+        isDeleteAccountModalOpen: false,
+        setIsDeleteAccountModalOpen: vi.fn(),
+        isMenuOpen: false,
+        setIsMenuOpen: vi.fn(),
+      };
+
+      const { rerender } = render(<TrashPage {...trashBaseProps} isSmallScreen={false} />);
 
       // Top-left Back button
       expect(screen.getByRole('button', { name: /back/i })).toBeInTheDocument();
@@ -282,6 +281,14 @@ describe('Architecture V41: 2-Stage 30-Day Trash & Immutable Discovery Ledger', 
       expect(screen.getByText(/ROOT ARTISTS: 1/i)).toBeInTheDocument();
       expect(screen.getByText(/ARTISTS: 1/i)).toBeInTheDocument();
       expect(screen.getByText(/DEEP CUTS: 1/i)).toBeInTheDocument();
+
+      // Desktop (>= 768px) retains Grid/List ViewToggle; mobile (< 768px) hides toggle and locks to Card View
+      expect(screen.getByRole('button', { name: 'List View' })).toBeInTheDocument();
+      rerender(<TrashPage {...trashBaseProps} isSmallScreen={true} />);
+      expect(screen.queryByRole('button', { name: 'Grid View' })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'List View' })).not.toBeInTheDocument();
+      expect(document.querySelector('table')).toBeNull();
+      expect(screen.getByText('Spaced')).toBeInTheDocument();
     });
   });
 

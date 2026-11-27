@@ -3444,19 +3444,6 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         </form>
                     )}
 
-                    {/* Author Search Bar (Admin Exclusive — standardized ToolbarSearch) */}
-                    {!isNormalUserView && (
-                        <ToolbarSearch
-                            value={searchTerm}
-                            onChange={setSearchTerm}
-                            placeholder="Search by Author identity..."
-                            isMobile={false}
-                            size="control"
-                            width="full"
-                            inputTestId="admin-author-search-input"
-                        />
-                    )}
-
                     {error && (
                         <div className="bg-red-950/20 border border-red-500/30 text-red-200 p-4 font-mono text-xs flex items-center gap-3">
                             <span className="material-symbols-outlined text-red-400 text-sm">warning</span>
@@ -3911,23 +3898,53 @@ export const UsageAnalyticsPage: React.FC<UsageAnalyticsPageProps> = ({
                         </div>
                     ) : (
                         <>
-                            {/* Master Ledger List (Admin Mode) */}
-                            <DiscoveryLedgerTable
-                                isLoading={isLoading}
-                                filteredLedger={filteredLedger}
-                                expandedRow={expandedRow}
-                                toggleRow={toggleRow}
-                                getAuthorStackCounts={getAuthorStackCounts}
-                                isSmallScreen={isSmallScreen}
-                                onInspectUser={(inspected) => {
-                                    setInspectedAuthor({ uid: inspected.uid || '', email: inspected.email });
-                                    setActivityFilter('all');
-                                    setActiveLedgerTab('activity');
-                                    setArchiveSearchQuery('');
-                                    setIsArchiveSearchOpen(false);
-                                    setSimulateNormalUser(true);
-                                }}
-                            />
+                            {/* Master Ledger List (Admin Mode — Author P&L) */}
+                            <div className="space-y-4 pt-2" data-testid="admin-author-pnl-section">
+                                <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 sm:gap-4 border-b border-zinc-800 pb-4">
+                                    <div className="min-w-0">
+                                        <div className="flex flex-wrap items-center gap-2.5">
+                                            <h3 className="text-lg sm:text-xl font-medium text-white leading-snug">
+                                                Author P&amp;L
+                                            </h3>
+                                            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-zinc-900 text-zinc-400 border border-zinc-800 whitespace-nowrap">
+                                                {searchTerm.trim()
+                                                    ? `${filteredLedger.length} of ${ledgerData.length} ${ledgerData.length === 1 ? 'Author' : 'Authors'}`
+                                                    : `${ledgerData.length} ${ledgerData.length === 1 ? 'Author' : 'Authors'}`}
+                                            </span>
+                                        </div>
+                                        <p className="text-xs text-zinc-400 mt-1 leading-relaxed">
+                                            Per-author wallet balances, token spend revenue, AI costs, and net margin.
+                                        </p>
+                                    </div>
+
+                                    <ToolbarSearch
+                                        value={searchTerm}
+                                        onChange={setSearchTerm}
+                                        placeholder="Search by Author identity..."
+                                        isMobile={false}
+                                        size="control"
+                                        width="wide"
+                                        inputTestId="admin-author-search-input"
+                                    />
+                                </div>
+
+                                <DiscoveryLedgerTable
+                                    isLoading={isLoading}
+                                    filteredLedger={filteredLedger}
+                                    expandedRow={expandedRow}
+                                    toggleRow={toggleRow}
+                                    getAuthorStackCounts={getAuthorStackCounts}
+                                    isSmallScreen={isSmallScreen}
+                                    onInspectUser={(inspected) => {
+                                        setInspectedAuthor({ uid: inspected.uid || '', email: inspected.email });
+                                        setActivityFilter('all');
+                                        setActiveLedgerTab('activity');
+                                        setArchiveSearchQuery('');
+                                        setIsArchiveSearchOpen(false);
+                                        setSimulateNormalUser(true);
+                                    }}
+                                />
+                            </div>
 
                             {/* JIT Auto-Healing Telemetry (Phase 3 Admin Exclusive) */}
                             <div className="space-y-4 pt-6" data-testid="admin-jit-heals-section">

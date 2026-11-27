@@ -1,4 +1,4 @@
-import { ModalFooter, ModalContainer, ModalBackdrop, ModalHeader, ModalBody } from './ui/Dialog';
+import { ModalFooter, ModalFooterLink, ModalContainer, ModalBackdrop, ModalHeader, ModalBody } from './ui/Dialog';
 import { Input } from './DesignSystem';
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { 
@@ -117,27 +117,24 @@ export const MyStackDialog: React.FC<{
                     })
                 )}
             </ModalBody>
-            <ModalFooter>
-                <div className={`flex items-center gap-2 w-full ${onOpenStackArchive ? 'justify-between' : 'justify-end'}`}>
-                    {onOpenStackArchive && (
-                        <button
-                            type="button"
+            <ModalFooter
+                leftAction={
+                    onOpenStackArchive ? (
+                        <ModalFooterLink
                             data-testid="my-stack-archive-link"
                             onClick={onOpenStackArchive}
-                            className="text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 hover:decoration-primary/60 cursor-pointer whitespace-nowrap shrink-0"
                         >
                             Stack Archive
-                        </button>
-                    )}
-                    <div className="flex items-center gap-2 shrink-0">
-                        <button onClick={onClose} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors whitespace-nowrap">
-                            Cancel
-                        </button>
-                        <button onClick={onClose} className="px-6 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 whitespace-nowrap">
-                            Done
-                        </button>
-                    </div>
-                </div>
+                        </ModalFooterLink>
+                    ) : undefined
+                }
+            >
+                <button onClick={onClose} className="px-3 py-1.5 text-zinc-400 text-sm rounded-xl hover:bg-zinc-800 transition-colors whitespace-nowrap">
+                    Cancel
+                </button>
+                <button onClick={onClose} className="px-6 py-1.5 bg-white text-brand-black rounded-xl font-medium text-sm transition-opacity hover:opacity-90 whitespace-nowrap">
+                    Done
+                </button>
             </ModalFooter>
         </ModalContainer>
     </ModalBackdrop>
@@ -1029,46 +1026,44 @@ export const SimulatedStripeModal: React.FC<SimulatedStripeModalProps> = ({
           </div>
         )}
 
-        <ModalFooter className="shrink-0">
-          <div className={`flex items-center gap-2 w-full ${onOpenTokenActivity ? 'justify-between' : 'justify-end'}`}>
-            {onOpenTokenActivity && (
-              <button
-                type="button"
+        <ModalFooter
+          className="shrink-0"
+          leftAction={
+            onOpenTokenActivity ? (
+              <ModalFooterLink
                 data-testid="stripe-token-activity-link"
                 disabled={isProcessing}
                 onClick={onOpenTokenActivity}
-                className="text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 hover:decoration-primary/60 cursor-pointer whitespace-nowrap shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 Token Activity
-              </button>
+              </ModalFooterLink>
+            ) : undefined
+          }
+        >
+          <button
+            type="button"
+            disabled={isProcessing}
+            onClick={onClose}
+            className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors whitespace-nowrap"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            data-testid="stripe-confirm-button"
+            disabled={isProcessing || !isValidQuantity || !waiverAccepted}
+            onClick={handleConfirmPurchase}
+            className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+          >
+            {isProcessing ? (
+              <>
+                <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
+                <span>Crediting...</span>
+              </>
+            ) : (
+              <span>Confirm</span>
             )}
-            <div className="flex items-center justify-end gap-2 shrink-0">
-              <button
-                type="button"
-                disabled={isProcessing}
-                onClick={onClose}
-                className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors whitespace-nowrap"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                data-testid="stripe-confirm-button"
-                disabled={isProcessing || !isValidQuantity || !waiverAccepted}
-                onClick={handleConfirmPurchase}
-                className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
-              >
-                {isProcessing ? (
-                  <>
-                    <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
-                    <span>Crediting...</span>
-                  </>
-                ) : (
-                  <span>Confirm</span>
-                )}
-              </button>
-            </div>
-          </div>
+          </button>
         </ModalFooter>
       </ModalContainer>
     </ModalBackdrop>
@@ -1317,69 +1312,68 @@ export const TokenConfirmationDialog: React.FC<{
           </div>
         )}
 
-        <ModalFooter className="shrink-0">
-          <div className="flex items-center justify-between gap-2 w-full">
-            <a
+        <ModalFooter
+          className="shrink-0"
+          leftAction={
+            <ModalFooterLink
               href="/help#token-economy"
               target="_blank"
               rel="noopener noreferrer"
               data-testid="token-pricing-help-link"
-              className="text-zinc-400 hover:text-primary transition-colors text-sm underline underline-offset-4 decoration-zinc-700 hover:decoration-primary/60 cursor-pointer whitespace-nowrap shrink-0"
             >
               Token Pricing
-            </a>
-            <div className="flex items-center justify-end gap-2 shrink-0">
-              {onBack ? (
-                <button
-                  type="button"
-                  disabled={isBusy}
-                  onClick={onBack}
-                  className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Back
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  data-testid="token-cancel-button"
-                  disabled={isBusy}
-                  onClick={onClose}
-                  className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  Cancel
-                </button>
-              )}
+            </ModalFooterLink>
+          }
+        >
+          {onBack ? (
+            <button
+              type="button"
+              disabled={isBusy}
+              onClick={onBack}
+              className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Back
+            </button>
+          ) : (
+            <button
+              type="button"
+              data-testid="token-cancel-button"
+              disabled={isBusy}
+              onClick={onClose}
+              className="px-3 py-2 text-zinc-400 text-sm font-medium rounded-xl hover:text-white hover:bg-zinc-800 transition-colors border border-transparent whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Cancel
+            </button>
+          )}
 
-              {!isAdmin && !hasSufficientBalance ? (
-                <button
-                  type="button"
-                  data-testid="token-authorize-button"
-                  disabled={isBusy}
-                  onClick={() => triggerTopUp('gbp_10')}
-                  className="px-4 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer whitespace-nowrap"
-                >
-                  Top Up Tokens
-                </button>
+          {!isAdmin && !hasSufficientBalance ? (
+            <button
+              type="button"
+              data-testid="token-authorize-button"
+              disabled={isBusy}
+              onClick={() => triggerTopUp('gbp_10')}
+              className="px-4 py-2 bg-primary text-brand-black rounded-xl font-semibold text-sm transition-opacity hover:opacity-90 disabled:opacity-50 cursor-pointer whitespace-nowrap"
+            >
+              Top Up Tokens
+            </button>
+          ) : (
+            <button
+              type="button"
+              data-testid="token-authorize-button"
+              disabled={isBusy}
+              onClick={handleConfirmClick}
+              className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+            >
+              {isBusy ? (
+                <>
+                  <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
+                  <span>{type === 'live_chat_search' ? 'Unlocking...' : 'Confirming...'}</span>
+                </>
               ) : (
-                <button
-                  type="button"
-                  data-testid="token-authorize-button"
-                  disabled={isBusy}
-                  onClick={handleConfirmClick}
-                  className="px-6 py-2 bg-white text-brand-black rounded-xl font-medium text-sm active:scale-95 transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
-                >
-                  {isBusy ? (
-                    <>
-                      <span className="material-symbols-outlined !text-[15px] animate-spin">progress_activity</span>
-                      <span>{type === 'live_chat_search' ? 'Unlocking...' : 'Confirming...'}</span>
-                    </>
-                  ) : (
-                    <span>Confirm</span>
-                  )}
-                </button>
+                <span>Confirm</span>
               )}
-            </div>
-          </div>
+            </button>
+          )}
         </ModalFooter>
       </ModalContainer>
     </ModalBackdrop>
@@ -2163,6 +2157,90 @@ export const DisambiguationRadio: React.FC<DisambiguationRadioProps> = ({ candid
   );
 }
 
+export interface ArtistVerificationCardProps {
+  name: string;
+  origin?: string;
+  genre?: string;
+  showCacheHit?: boolean;
+  isVerifyingOrigin?: boolean;
+  originalQuery?: string;
+  isEditing?: boolean;
+  onNotThisArtist?: () => void;
+  editorSlot?: React.ReactNode;
+}
+
+export const ArtistVerificationCard: React.FC<ArtistVerificationCardProps> = ({
+  name,
+  origin,
+  genre,
+  showCacheHit = false,
+  isVerifyingOrigin = false,
+  originalQuery,
+  isEditing = false,
+  onNotThisArtist,
+  editorSlot,
+}) => {
+  const hasOrigin = Boolean(origin && origin.trim() !== '');
+  return (
+    <div className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
+      <div className="flex flex-col">
+        <div className="flex items-center gap-2">
+          <span className="text-white font-medium text-base truncate">
+            {name}
+          </span>
+          {showCacheHit && (
+            <span className="text-[9px] uppercase tracking-wider text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full font-semibold">CACHE HIT</span>
+          )}
+        </div>
+
+        {isVerifyingOrigin ? (
+          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-zinc-400 font-light">
+            <span className="material-symbols-outlined !text-[13px] animate-spin text-amber-500">progress_activity</span>
+            <span>Searching artist origin & genre...</span>
+          </div>
+        ) : !isEditing ? (
+          <>
+            <span data-testid="validation-origin-text" className="text-xs text-zinc-400 font-light truncate mt-0.5">
+              {origin || 'Unknown Origin'}{genre ? ` • ${genre}` : ''}
+            </span>
+
+            {originalQuery && (
+              <span className="text-[10px] text-amber-500/80 font-medium truncate mt-0.5">
+                Auto-corrected from "{originalQuery}"
+              </span>
+            )}
+
+            {/* "Not this artist?" Escape Hatch */}
+            {onNotThisArtist && (
+              <div className="mt-2 pt-1 border-t border-zinc-800/60 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={onNotThisArtist}
+                  className="text-[11px] text-zinc-400 hover:text-amber-400 transition-colors flex items-center gap-1 font-light underline decoration-zinc-700 underline-offset-2 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined !text-[13px]">help_outline</span>
+                  Not this artist?
+                </button>
+              </div>
+            )}
+          </>
+        ) : (
+          editorSlot
+        )}
+      </div>
+
+      {!hasOrigin && !isEditing && !isVerifyingOrigin && (
+        <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-2.5 mt-1 flex items-start gap-2">
+          <span className="material-symbols-outlined text-amber-500 !text-[16px] mt-0.5">warning</span>
+          <p className="text-xs text-amber-200/90 leading-relaxed">
+            We couldn't confidently locate this artist. Use "Not this artist?" to specify their region.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+};
+
 export interface ConsolidatedValidationModalProps {
   isOpen: boolean;
   seeds: PreFlightSeed[];
@@ -2563,60 +2641,17 @@ export function ConsolidatedValidationModal({
                         <span>{seed.sceneLabel}</span>
                       </div>
                     )}
-                    <div className="flex flex-col gap-2 p-3 bg-zinc-900/50 border border-zinc-700/50 rounded-xl">
-                      <div className="flex flex-col">
-                        <div className="flex items-center gap-2">
-                          <span className="text-white font-medium text-base truncate">
-                            {seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
-                          </span>
-                          {isAdmin && !isAdminPreview && seed.isKnownCacheHit && (
-                            <span className="text-[9px] uppercase tracking-wider text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-full font-semibold">CACHE HIT</span>
-                          )}
-                        </div>
-                        
-                        {seed.isVerifyingOrigin ? (
-                          <div className="flex items-center gap-1.5 mt-1.5 text-xs text-zinc-400 font-light">
-                            <span className="material-symbols-outlined !text-[13px] animate-spin text-amber-500">progress_activity</span>
-                            <span>Searching artist origin & genre...</span>
-                          </div>
-                        ) : !isEditing ? (
-                          <>
-                            <span data-testid="validation-origin-text" className="text-xs text-zinc-400 font-light truncate mt-0.5">
-                              {seed.predictedOrigin || 'Unknown Origin'}{seed.genre ? ` • ${seed.genre}` : ''}
-                            </span>
-                            
-                            {seed.isCorrected && seed.originalQuery && (
-                              <span className="text-[10px] text-amber-500/80 font-medium truncate mt-0.5">
-                                Auto-corrected from "{seed.originalQuery}"
-                              </span>
-                            )}
-
-                            {/* "Not this artist?" Escape Hatch */}
-                            <div className="mt-2 pt-1 border-t border-zinc-800/60 flex items-center justify-between">
-                              <button
-                                type="button"
-                                onClick={() => handleStartEdit(seed)}
-                                className="text-[11px] text-zinc-400 hover:text-amber-400 transition-colors flex items-center gap-1 font-light underline decoration-zinc-700 underline-offset-2"
-                              >
-                                <span className="material-symbols-outlined !text-[13px]">help_outline</span>
-                                Not this artist?
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          renderEscapeHatchEditor(seed)
-                        )}
-                      </div>
-
-                      {(!seed.predictedOrigin || seed.predictedOrigin.trim() === '') && !isEditing && !seed.isVerifyingOrigin && (
-                        <div className="bg-amber-950/30 border border-amber-900/50 rounded-lg p-2.5 mt-1 flex items-start gap-2">
-                          <span className="material-symbols-outlined text-amber-500 !text-[16px] mt-0.5">warning</span>
-                          <p className="text-xs text-amber-200/90 leading-relaxed">
-                            We couldn't confidently locate this artist. Use "Not this artist?" to specify their region.
-                          </p>
-                        </div>
-                      )}
-                    </div>
+                    <ArtistVerificationCard
+                      name={seed.isCorrected && seed.correctedQuery ? seed.correctedQuery : seed.query}
+                      origin={seed.predictedOrigin}
+                      genre={seed.genre}
+                      showCacheHit={Boolean(isAdmin && !isAdminPreview && seed.isKnownCacheHit)}
+                      isVerifyingOrigin={Boolean(seed.isVerifyingOrigin)}
+                      originalQuery={seed.isCorrected && seed.originalQuery ? seed.originalQuery : undefined}
+                      isEditing={isEditing}
+                      onNotThisArtist={() => handleStartEdit(seed)}
+                      editorSlot={renderEscapeHatchEditor(seed)}
+                    />
                   </React.Fragment>
                 );
               })}

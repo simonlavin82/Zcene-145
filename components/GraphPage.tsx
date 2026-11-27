@@ -23,10 +23,9 @@ import MusicGraph from './MusicGraph';
 import { DetailsPanel } from './DetailsPanel';
 import { LoadingSpinner, ZceneAbbreviatedLogo, FaviconLogo, SortControls, LegendSymbol, HelpIcon, Spinner, StackIcon, LibraryIcon } from './Icons';
 import { analyticsService } from '../services/analyticsService';
-import AdSenseUnit from './AdSenseUnit';
 import OnboardingTooltip from './OnboardingTooltip';
 import * as d3 from 'd3';
-import { RootsBreakdownButton, Select, InputSizes, LayoutSizes, Checkbox, CanvasControlStyles } from './DesignSystem';
+import { Select, InputSizes, LayoutSizes, Checkbox, CanvasControlStyles } from './DesignSystem';
 import { ModalBackdrop, ModalContainer, ModalHeader, ModalBody, ModalFooter } from './ui/Dialog';
 import { nodeTypeColorMap } from '../utils/formatters';
 
@@ -167,7 +166,7 @@ const COLLAPSED_WIDTH = 64;
 const MIN_GRAPH_WIDTH = 400;
 
 // --- Components ---
-import { GenerativeRationaleModal, DisambiguationModal, DisambiguationCandidate } from './SharedModals';
+import { GenerativeRationaleModal } from './SharedModals';
 
 const DiscoveryFiltersPanel: React.FC<{
   filters: DiscoveryFilters;

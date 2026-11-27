@@ -307,11 +307,23 @@ describe('Architecture V45: Dashboard Search Parity (Artist & Label Nodes, Multi
     fireEvent.keyDown(searchInput, { key: 'Escape' });
     expect((searchInput as HTMLInputElement).value).toBe('');
     expect(screen.getByText('Mouthpiece')).toBeInTheDocument();
+
+    // Desktop (>= 768px) retains Grid/List ViewToggle and switches cleanly to the 8-column table
+    const listViewBtn = screen.getByRole('button', { name: 'List View' });
+    expect(listViewBtn).toBeInTheDocument();
+    fireEvent.click(listViewBtn);
+    expect(document.querySelector('table')).not.toBeNull();
+    expect(screen.getByText('Labels')).toBeInTheDocument();
   });
 
   it('9. Mobile collapses to icon trigger, synchronously focuses full-width takeover via flushSync, marks siblings inert, and preserves open state on blur when query is active', () => {
     const project = createMockProject({ id: 'proj-mobile', name: 'Mouthpiece', seedArtists: 'Mouthpiece' });
     renderDashboard([project], true);
+
+    // Mobile (< 768px) hides Grid/List ViewToggle and locks to zero-overflow Card View
+    expect(screen.queryByRole('button', { name: 'Grid View', hidden: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'List View', hidden: true })).not.toBeInTheDocument();
+    expect(document.querySelector('table')).toBeNull();
 
     // Collapsed by default: single trigger, zero search inputs mounted
     const trigger = screen.getByTestId('dashboard-search-trigger');
@@ -391,15 +403,18 @@ describe('Architecture V45: Dashboard Search Parity (Artist & Label Nodes, Multi
     expect(activeTrigger.className).toContain('text-primary');
     expect(screen.getByTestId('toolbar-search-active-dot')).toBeInTheDocument();
 
-    // Verify ToolbarSearch desktop width strategies: optimum (default 256px), full, and custom (cascade-safe)
+    // Verify ToolbarSearch desktop width strategies: optimum (default 256px), wide (320px), full, and custom (cascade-safe)
     const { unmount: unmountWidths } = render(
       <>
         <ToolbarSearch value="" onChange={vi.fn()} placeholder="Optimum" isMobile={false} inputTestId="ts-width-optimum" />
+        <ToolbarSearch value="" onChange={vi.fn()} placeholder="Wide" isMobile={false} width="wide" inputTestId="ts-width-wide" />
         <ToolbarSearch value="" onChange={vi.fn()} placeholder="Full" isMobile={false} width="full" inputTestId="ts-width-full" />
         <ToolbarSearch value="" onChange={vi.fn()} placeholder="Custom" isMobile={false} width="custom" className="w-full max-w-48" inputTestId="ts-width-custom" />
       </>
     );
     expect(screen.getByTestId('ts-width-optimum').parentElement?.className).toContain('max-w-64');
+    expect(screen.getByTestId('ts-width-wide').parentElement?.className).toContain('sm:w-80');
+    expect(screen.getByTestId('ts-width-wide').parentElement?.className).not.toContain('max-w-64');
     expect(screen.getByTestId('ts-width-full').parentElement?.className).toContain('w-full');
     expect(screen.getByTestId('ts-width-full').parentElement?.className).not.toContain('max-w-64');
     expect(screen.getByTestId('ts-width-custom').parentElement?.className).toContain('max-w-48');
